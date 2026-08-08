@@ -1,10 +1,13 @@
 use cli::{CliCommand, Command, Context as CliContext};
+
 use revelation::analyzer::Workspace;
 
+use crate::_core::EstateDiscovery;
 use crate::daemon::daemon::*;
-use crate::daemon::projection::command::{Deps, Explain, ExplainDoc, View, ViewFork, ViewList};
+use crate::daemon::projection::command::*;
 use crate::daemon::start::BackgroundDaemon;
 use crate::daemon::*;
+
 use crate::estate::*;
 // use crate::start::AnalyzeRequest;
 // Update your request type to carry the path
@@ -80,7 +83,7 @@ pub async fn execute(parsed_cli: cli::Cli, ctx: CliContext, _est_cxt: app::Conte
 			}
 		}
 		Command::Foo(_args) => {
-			EstateDiscovery::init();
+			let _ = EstateDiscovery::init();
 		}
 		Command::Bar(args) => {
 			LintDaemon.run(&ctx, &args).await;

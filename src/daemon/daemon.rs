@@ -1,7 +1,7 @@
 use crate::daemon::*;
 use cli::{CliCommand, Context as CliContext, FormatArgs};
 use comfy_table::{Cell, Table, presets::UTF8_FULL};
-use revelation::{analyzer::*, render::*};
+use revelation::analyzer::*;
 use serde::{Deserialize, Serialize};
 use std::{
 	fs,
