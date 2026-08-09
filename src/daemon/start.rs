@@ -1,7 +1,7 @@
 use crate::daemon::*;
-use anyhow::Error;
+use anyhow::{Error, Result};
 use async_trait::async_trait;
-use cli::{AnalyzeRequest, CliCommand, Context};
+use cli::{CliCommand, Context};
 use revelation::analyzer::{AnalyzerOptions, Workspace};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -13,121 +13,49 @@ use tokio::{
 	net::{TcpListener, UnixListener, UnixStream},
 	sync::{mpsc, oneshot},
 };
-use tower_lsp::jsonrpc::Response;
-
-///--------------------------------------------------------------------------------
-///      Long lived runner ready todo something
-///--------------------------------------------------------------------------------
-async fn serve(listener: TcpListener, runtime: EstateRuntime) {
-	loop {
-		let (mut socket, _) = listener.accept().await.unwrap();
-		let mut buf = [0; 1024];
-		let n = socket.read(&mut buf).await.unwrap();
-		let cmd = String::from_utf8_lossy(&buf[..n]);
-		match cmd.trim() {
-			"status" => {
-				runtime.emit(Event::daemon(EventKind::StatusRequested));
-				let out = serde_json::to_string(&runtime.state).unwrap();
-				socket.write_all(out.as_bytes()).await.unwrap();
-			}
-			other => {
-				runtime.emit(Event::cli(EventKind::CommandExecuted {
-					command: other.to_string(),
-				}));
-			}
-		}
-	}
-}
-
-fn init_runtime_state() {
-	let mut s = DaemonState::load();
-	s.starts += 1;
-	s.started_at = DaemonState::now();
-	DaemonState::save(&s);
-}
-// - See current
-// ps -p 6550 -o pid, ppid,user,%cpu,%mem,etime,command
-// - Watch live
-// top -pid 6550
-// - Check status
-// lsof -p 6550
-// - Check if alive
-// kill -0 6550
-// - KIll
-// kill 6550
-// kill -9 6550
-// 6550
-const SOCKET_PATH: &str = "/tmp/estate-daemon.sock";
-
-// async fn handle_client(stream: UnixStream) {
-// 	let (reader, mut writer) = stream.into_split();
-// 	let mut reader = BufReader::new(reader);
-// 	let mut line = String::new();
-// 	while reader.read_line(&mut line).await.unwrap() > 0 {
-// 		let command = line.trim();
-// 		println!("received command: {}", command);
-// 		let response = match command {
-// 			"status" => "daemon alive\n",
-// 			"shutdown" => "shutdown requested\n",
-// 			"hello" => "hello from daemon\n",
-// 			_ => "unknown command\n",
-// 		};
-// 		writer.write_all(response.as_bytes()).await.unwrap();
-// 		line.clear();
-// 	}
-// }
-// async fn daemon_running() -> bool {
-// 	UnixStream::connect(SOCKET_PATH).await.is_ok()
-// }
-
-pub struct DaemonServer;
-impl DaemonServer {
-	pub async fn run() {
-		println!("🟢 daemon server running");
-		if Path::new(SOCKET_PATH).exists() {
-			std::fs::remove_file(SOCKET_PATH).unwrap();
-		}
-		let listener = UnixListener::bind(SOCKET_PATH).expect("failed binding socket");
-		println!("listening on {}", SOCKET_PATH);
-		loop {
-			let (stream, _) = listener.accept().await.expect("accept failed");
-			tokio::spawn(async move {
-				Self::handle_client(stream).await;
-			});
-		}
-	}
-	async fn handle_client(stream: UnixStream) {
-		let (reader, mut writer) = stream.into_split();
-		let mut reader = BufReader::new(reader);
-		let mut line = String::new();
-		while reader.read_line(&mut line).await.unwrap() > 0 {
-			let command = line.trim();
-			println!("received command: {}", command);
-			let response = match command {
-				"status" => "daemon alive\n",
-				"shutdown" => "shutdown requested\n",
-				"hello" => "hello from daemon\n",
-				_ => "unknown command\n",
-			};
-			writer.write_all(response.as_bytes()).await.unwrap();
-			line.clear();
-		}
-	}
-}
-///
-///
-///
-///
-///
-///
-///
+// cargo run daemon
+// Troubleshooting:
+//
+// Check whether the process is still running:
+//   ps -p <PID> -o pid,ppid,stat,command
+//   ps -p 35762 -o pid,ppid,stat,command
+//
+// Example:
+//   ps -p {} -o pid,ppid,stat,command
+//
+// Check the daemon process directly:
+//   ps aux | grep 'estate*.*daemon'
+// Check whether the Unix socket exists:
+//   ls -l /tmp/loi_daemon.sock
+//
+// Check which process owns the socket:
+//   lsof /tmp/loi_daemon.sock
+//
+// Inspect the process's open files:
+//   lsof -p <PID>
+//
+// If the process appears stuck, inspect it with:
+//   kill -0 <PID>
+//
+// `kill -0` doesn't terminate the process; it only checks
+// whether the process exists and is accessible.
+//
+// Stop the daemon:
+//   kill <PID>
+//
+// Force-stop only if necessary:
+//   kill -9 <PID>
+//
+// Inspect
+// ps -p <PID> -o pid,ppid,stat,lstart,etime,command
+pub const SOCKET_PATH: &str = "/tmp/estate-daemon.sock";
 /// Daemon domain API — execute(Action) -> Response, start(), stop().
 /// Daemon transport/lifecycle — Unix socket, Tokio tasks, channels, request parsing.
 #[async_trait]
 pub trait Daemon {
-	async fn execute(&mut self, action: ActionRequest) -> anyhow::Result<DaemonResponse>;
-	async fn start(&mut self, options: DaemonOptions) -> anyhow::Result<DaemonResponse>;
-	async fn stop(&mut self) -> anyhow::Result<DaemonResponse>;
+	async fn execute(&mut self, action: ActionRequest) -> Result<DaemonResponse>;
+	async fn start(&mut self, options: DaemonOptions) -> Result<DaemonResponse>;
+	async fn stop(&mut self) -> Result<DaemonResponse>;
 }
 pub struct BackgroundDaemon {
 	workspace: Workspace,
@@ -136,7 +64,9 @@ pub struct BackgroundDaemon {
 }
 #[async_trait]
 impl Daemon for BackgroundDaemon {
-	async fn execute(&mut self, action: ActionRequest) -> anyhow::Result<DaemonResponse> {
+	async fn execute(&mut self, action: ActionRequest) -> Result<DaemonResponse> {
+		eprintln!("[daemon] execute: {:?}", action);
+
 		match action {
 			ActionRequest::Analyze {
 				path,
@@ -148,14 +78,14 @@ impl Daemon for BackgroundDaemon {
 			ActionRequest::InitializeEstate { path } => self.initialize_estate(path),
 		}
 	}
-	async fn start(&mut self, options: DaemonOptions) -> anyhow::Result<DaemonResponse> {
+	async fn start(&mut self, options: DaemonOptions) -> Result<DaemonResponse> {
 		if options.foreground {
 			self.run_foreground().await
 		} else {
 			self.run_background().await
 		}
 	}
-	async fn stop(&mut self) -> anyhow::Result<DaemonResponse> {
+	async fn stop(&mut self) -> Result<DaemonResponse> {
 		todo!("stop")
 	}
 }
@@ -164,45 +94,57 @@ impl BackgroundDaemon {
 		let (tx, rx) = mpsc::channel(32);
 		Self { workspace, rx, tx }
 	}
-	async fn run_foreground(&mut self) -> anyhow::Result<DaemonResponse> {
-		let socket_path = "/tmp/loi_daemon.sock";
+	// cargo run daemon --live
+	async fn run_foreground(&mut self) -> Result<DaemonResponse> {
 		let tx = self.tx.clone();
-		let _result = tokio::join!(
-			Self::run_socket_server(socket_path, tx),
+		let (socket_result, _processing_result) = tokio::join!(
+			Self::run_socket_server(SOCKET_PATH, tx),
 			self.run_processing_loop(),
 		);
+		socket_result?;
 		Ok(DaemonResponse::default())
 	}
-	async fn run_background(&mut self) -> anyhow::Result<DaemonResponse> {
+	///--------------------------------------------------------------------------------
+	/// Long lived runner ready todo something
+	/// cargo run daemon
+	///--------------------------------------------------------------------------------
+	async fn run_background(&mut self) -> Result<DaemonResponse> {
 		let exe = std::env::current_exe()?;
-		std::process::Command::new(exe)
+		let child = Command::new(&exe)
 			.args(["daemon", "--live"])
+			.stdin(Stdio::null())
+			.stdout(Stdio::null())
+			.stderr(Stdio::null())
 			.spawn()?;
-		Ok(DaemonResponse::default())
+
+		let pid = child.id();
+
+		eprintln!("Daemon started");
+		eprintln!("PID: {}", pid);
+		eprintln!("Socket: {}", SOCKET_PATH);
+
+		Ok(DaemonResponse {
+			status: "ok".into(),
+			message: Some(format!("Daemon started with PID {}", pid)),
+			..Default::default()
+		})
 	}
 	/// Spawns the Unix socket listener and routes incoming connections into the daemon's channel
-	pub async fn run_socket_server(
-		socket_path: &str,
-		tx: mpsc::Sender<DaemonMessage>,
-	) -> anyhow::Result<()> {
+	pub async fn run_socket_server(socket_path: &str, tx: mpsc::Sender<DaemonMessage>) -> Result<()> {
 		let _ = std::fs::remove_file(socket_path);
 		let listener = UnixListener::bind(socket_path)?;
+		eprintln!("[daemon] listening on {}", socket_path);
+
 		loop {
 			let (mut socket, _) = listener.accept().await?;
 			let tx = tx.clone();
 			tokio::spawn(async move {
 				let mut buf = vec![0; 8192];
-
 				let n = socket.read(&mut buf).await?;
 				if n == 0 {
 					return Ok(());
 				}
-				let raw_data = String::from_utf8_lossy(&buf[..n]);
-				let raw_trimmed = raw_data.trim();
-				let parsed: IncomingRequest = serde_json::from_str(raw_trimmed).or_else(|_| {
-					let unquoted = raw_trimmed.trim_matches('"').replace("\\\"", "\"");
-					serde_json::from_str(&unquoted)
-				})?;
+				let parsed = parse_action(buf, n)?;
 				let (resp_tx, resp_rx) = oneshot::channel();
 				tx.send(DaemonMessage::Execute {
 					action: ActionRequest::Analyze {
@@ -214,34 +156,38 @@ impl BackgroundDaemon {
 					respond_to: resp_tx,
 				})
 				.await?;
-
 				let result = resp_rx.await?;
-
 				let payload = match result {
 					Ok(response) => serde_json::to_string(&response)?,
-
 					Err(error) => serde_json::to_string(&serde_json::json!({
 							"status": "error",
 							"message": error.to_string(),
 					}))?,
 				};
-
 				socket.write_all(payload.as_bytes()).await?;
 				socket.write_all(b"\n").await?;
-
 				Ok::<(), anyhow::Error>(())
 			});
 		}
 	}
 	pub async fn run_processing_loop(&mut self) {
+		eprintln!("[daemon] processing loop started");
+
 		while let Some(message) = self.rx.recv().await {
 			match message {
 				DaemonMessage::Execute { action, respond_to } => {
+					eprintln!("[daemon] executing action");
+
 					let result = self.execute(action).await;
+
+					eprintln!("[daemon] execute completed");
+
 					let _ = respond_to.send(result);
 				}
 			}
 		}
+
+		eprintln!("[daemon] processing loop stopped");
 	}
 	fn analyze(
 		&mut self,
@@ -249,7 +195,7 @@ impl BackgroundDaemon {
 		line: Option<u32>,
 		column: Option<u32>,
 		mode: Option<String>,
-	) -> anyhow::Result<DaemonResponse> {
+	) -> Result<DaemonResponse> {
 		let options = AnalyzerOptions {
 			line,
 			column,
@@ -257,6 +203,7 @@ impl BackgroundDaemon {
 			include_private: true,
 			include_tests: true,
 		};
+
 		let system_path = if let Some(s) = path.to_str() {
 			if s.starts_with("file://") {
 				url::Url::parse(s)?
@@ -268,122 +215,37 @@ impl BackgroundDaemon {
 		} else {
 			path
 		};
+
 		let report =
-			revelation::analyzer::Workspace::analyze_ownership_on_click(&system_path, &options)?;
+			revelation::analyzer::Workspace::analyze(&system_path, &options)?;
+
 		Ok(DaemonResponse {
 			data: Some(serde_json::to_value(report)?),
 			..Default::default()
 		})
 	}
-	fn scan_workspace(&mut self, _path: PathBuf) -> anyhow::Result<DaemonResponse> {
+	fn scan_workspace(&mut self, _path: PathBuf) -> Result<DaemonResponse> {
 		todo!("scan_workspace")
 	}
-	fn initialize_estate(&mut self, _path: PathBuf) -> anyhow::Result<DaemonResponse> {
+	fn initialize_estate(&mut self, _path: PathBuf) -> Result<DaemonResponse> {
 		todo!("initialize_estate")
 	}
+}
 
-	// Your core processing loop handling mpsc messages
-	// pub async fn run_processing_loop2(&mut self, live: bool) {
-	// 	if live {
-	// 		eprintln!("Background daemon queue processor started...");
-	// 	}
-	// 	while let Some(request) = self.rx.recv().await {
-	// 		match request {
-	// 			AnalyzeRequest::RunAnalysis {
-	// 				path,
-	// 				line,
-	// 				column,
-	// 				mode,
-	// 				respond_to,
-	// 			} => {
-	// 				if live {
-	// 					eprintln!("-> Processing ownership analysis for path: {:?}", path);
-	// 				}
-	// 				let options = AnalyzerOptions {
-	// 					line,
-	// 					column,
-	// 					mode,
-	// 					include_private: true,
-	// 					include_tests: true,
-	// 				};
-	// 				let system_path = match path.to_str() {
-	// 					Some(s) if s.starts_with("file://") => match url::Url::parse(s) {
-	// 						Ok(url) => match url.to_file_path() {
-	// 							Ok(path) => path,
-	// 							Err(_) => {
-	// 								let _ = respond_to.send(
-	// 									serde_json::json!({
-	// 											"status": "error",
-	// 											"message": "Invalid file URI"
-	// 									})
-	// 									.to_string(),
-	// 								);
-	// 								return;
-	// 							}
-	// 						},
-	// 						Err(e) => {
-	// 							let _ = respond_to.send(
-	// 								serde_json::json!({
-	// 										"status": "error",
-	// 										"message": e.to_string()
-	// 								})
-	// 								.to_string(),
-	// 							);
-	// 							return;
-	// 						}
-	// 					},
-	// 					_ => path.clone(),
-	// 				};
-	// 				let analysis_result =
-	// 					revelation::analyzer::Workspace::analyze_ownership_on_click(&system_path, &options);
-
-	// 				match &analysis_result {
-	// 					Ok(report) => {
-	// 						if live {
-	// 							eprintln!("{}", report.formatted_output);
-	// 						}
-	// 					}
-	// 					Err(e) => {
-	// 						eprintln!("===== ANALYSIS ERROR =====");
-	// 						eprintln!("{:?}", e);
-	// 						eprintln!("==========================");
-	// 					}
-	// 				}
-
-	// 				let response_string = match analysis_result {
-	// 					Ok(report) => serde_json::to_string(&report).unwrap_or_else(|e| {
-	// 						serde_json::json!({
-	// 								"status": "error",
-	// 								"message": e.to_string()
-	// 						})
-	// 						.to_string()
-	// 					}),
-	// 					Err(e) => serde_json::json!({
-	// 							"status": "error",
-	// 							"message": e.to_string()
-	// 					})
-	// 					.to_string(),
-	// 				};
-	// 				respond_to.send(response_string);
-	// 			}
-	// 		}
-	// 	}
-	// }
+fn parse_action(buf: Vec<u8>, n: usize) -> Result<IncomingRequest, Error> {
+	let data = String::from_utf8_lossy(&buf[..n]);
+	let trimmed = data.trim();
+	let parsed: IncomingRequest = serde_json::from_str(trimmed).or_else(|_| {
+		let unquoted = trimmed.trim_matches('"').replace("\\\"", "\"");
+		serde_json::from_str(&unquoted)
+	})?;
+	Ok(parsed)
 }
 #[derive(Debug, Default)]
 pub struct DaemonOptions {
 	pub foreground: bool,
 }
-#[derive(Debug, serde::Deserialize)]
-pub struct SocketPayload {
-	pub path: PathBuf,
-	pub subject: Option<AnalyzeSubjectDto>,
-}
-#[derive(Debug, serde::Deserialize)]
-pub struct AnalyzeSubjectDto {
-	pub offset: usize,
-	pub identifier: Option<String>,
-}
+
 #[derive(Deserialize, Debug)]
 struct IncomingRequest {
 	path: PathBuf,
@@ -391,7 +253,18 @@ struct IncomingRequest {
 	column: Option<u32>,
 	mode: Option<String>,
 }
-pub struct DaemonError {}
+// #[derive(Debug, serde::Deserialize)]
+// pub struct SocketPayload {
+// 	pub path: PathBuf,
+// 	pub subject: Option<AnalyzeSubjectDto>,
+// }
+// #[derive(Debug, serde::Deserialize)]
+// pub struct AnalyzeSubjectDto {
+// 	pub offset: usize,
+// 	pub identifier: Option<String>,
+// }
+// pub struct DaemonError {}
+#[derive(Debug)]
 pub enum ActionRequest {
 	Analyze {
 		path: PathBuf,
@@ -511,7 +384,7 @@ impl BackgroundDaemon2 {
 pub enum DaemonMessage {
 	Execute {
 		action: ActionRequest,
-		respond_to: oneshot::Sender<anyhow::Result<DaemonResponse>>,
+		respond_to: oneshot::Sender<Result<DaemonResponse>>,
 	},
 }
 
@@ -528,6 +401,68 @@ impl Default for DaemonResponse {
 			status: "ok".into(),
 			message: None,
 			data: None,
+		}
+	}
+}
+
+async fn serve(listener: TcpListener, runtime: EstateRuntime) {
+	loop {
+		let (mut socket, _) = listener.accept().await.unwrap();
+		let mut buf = [0; 1024];
+		let n = socket.read(&mut buf).await.unwrap();
+		let cmd = String::from_utf8_lossy(&buf[..n]);
+		match cmd.trim() {
+			"status" => {
+				runtime.emit(Event::daemon(EventKind::StatusRequested));
+				let out = serde_json::to_string(&runtime.state).unwrap();
+				socket.write_all(out.as_bytes()).await.unwrap();
+			}
+			other => {
+				runtime.emit(Event::cli(EventKind::CommandExecuted {
+					command: other.to_string(),
+				}));
+			}
+		}
+	}
+}
+
+fn init_runtime_state() {
+	let mut s = DaemonState::load();
+	s.starts += 1;
+	s.started_at = DaemonState::now();
+	DaemonState::save(&s);
+}
+pub struct DaemonServer;
+impl DaemonServer {
+	pub async fn run() {
+		println!("🟢 daemon server running");
+		if Path::new(SOCKET_PATH).exists() {
+			std::fs::remove_file(SOCKET_PATH).unwrap();
+		}
+		let listener = UnixListener::bind(SOCKET_PATH).expect("failed binding socket");
+		println!("listening on {}", SOCKET_PATH);
+		loop {
+			let (stream, _) = listener.accept().await.expect("accept failed");
+			tokio::spawn(async move {
+				Self::handle_client(stream).await;
+			});
+		}
+	}
+	async fn handle_client(stream: UnixStream) {
+		let (reader, mut writer) = stream.into_split();
+		let mut reader = BufReader::new(reader);
+		let mut line = String::new();
+		while reader.read_line(&mut line).await.unwrap() > 0 {
+			let command = line.trim();
+			println!("received command: {}", command);
+			let response = match command {
+				"status" => "daemon alive\n",
+				"shutdown" => "shutdown requested\n",
+				"hello" => "hello from daemon\n",
+				_ => "unknown command\n",
+			};
+			writer.write_all(response.as_bytes()).await.unwrap();
+			line.clear();
 		}
 	}
 }

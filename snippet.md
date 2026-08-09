@@ -13,7 +13,7 @@ pub async fn execute(parsed_cli: cli::Cli, ctx: CliContext, _est_cxt: app::Conte
 		// - normally
 		// cg-rb loi daemon
 		Command::Daemon { live } => {
-			let socket_path = "/tmp/loi_daemon.sock";
+			let socket_path = SOCKET_PATH;
 			let workspace = Workspace::new(); // Or build your workspace from est_cxt if needed
 			let (daemon, _tx) = BackgroundDaemon::new(workspace);
 			if let Err(e) = daemon.run_socket_server(socket_path, live).await {
@@ -23,7 +23,7 @@ pub async fn execute(parsed_cli: cli::Cli, ctx: CliContext, _est_cxt: app::Conte
 		// 2. The Analyze Client Command (pings the socket and prints response)
 		// Inside your Command::Analyze handler:
 		Command::Analyze(args) => {
-			let socket_path = "/tmp/loi_daemon.sock";
+			let socket_path = SOCKET_PATH;
 			let mut stream = match UnixStream::connect(socket_path).await {
 				Ok(s) => s,
 				Err(_) => {

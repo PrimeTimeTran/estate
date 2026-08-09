@@ -1,15 +1,6 @@
-use crate::{
-	_core::*,
-	daemon::{
-		daemon::{Action, ActionRegistry},
-		start::{ActionRequest, DaemonError, DaemonOptions},
-	},
-	vfs::Inode,
-};
+use crate::{_core::*, daemon::daemon::ActionRegistry, vfs::Inode};
 use anyhow::Error;
-use async_trait::async_trait;
 use std::path::Path;
-use tower_lsp::jsonrpc::Response;
 
 //                        ┌─────────────────────┐
 //                        │       Estate        │

@@ -3,7 +3,7 @@ use tokio::{
 	net::UnixStream,
 };
 
-use crate::daemon::{daemon::*, projection::command::*, start::BackgroundDaemon};
+use crate::daemon::{daemon::*, projection::command::*, start::{BackgroundDaemon, SOCKET_PATH}};
 use crate::daemon::{start::DaemonOptions, *};
 // use crate::estate::*;
 use crate::{_core::EstateDiscovery, daemon::start::Daemon};
@@ -36,7 +36,7 @@ pub async fn execute(parsed_cli: cli::Cli, ctx: CliContext, _est_cxt: app::Conte
 		// 2. The Analyze Client Command (pings the socket and prints response)
 		// Inside your Command::Analyze handler:
 		Command::Analyze(args) => {
-			let socket_path = "/tmp/loi_daemon.sock";
+			let socket_path = SOCKET_PATH;
 			let mut stream = match UnixStream::connect(socket_path).await {
 				Ok(s) => s,
 				Err(_) => {
