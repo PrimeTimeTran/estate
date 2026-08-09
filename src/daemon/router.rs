@@ -3,13 +3,15 @@ use tokio::{
 	net::UnixStream,
 };
 
-use crate::daemon::{
-	daemon::*,
-	projection::command::*,
-	start::{BackgroundDaemon, SOCKET_PATH},
+use crate::{
+	_core::EstateDiscovery,
+	daemon::{
+		daemon::*,
+		projection::command::*,
+		start::{BackgroundDaemon, Daemon, DaemonOptions, SOCKET_PATH},
+		*,
+	},
 };
-use crate::daemon::{start::DaemonOptions, *};
-use crate::{_core::EstateDiscovery, daemon::start::Daemon};
 use cli::{CliCommand, Command, Context as CliContext};
 use revelation::analyzer::Workspace;
 

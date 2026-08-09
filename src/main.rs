@@ -1,9 +1,10 @@
 mod _core;
+mod constants;
 mod daemon;
 mod estate;
 mod vfs;
 use crate::daemon::{
-	app::{self, run_tray_daemon},
+	app::{self, App},
 	router,
 };
 use cli::Command;
@@ -21,7 +22,7 @@ async fn main() -> anyhow::Result<()> {
 	let parsed_cli = cli::parse();
 	match parsed_cli.command {
 		Command::Daemon { .. } => {
-			run_tray_daemon().await?;
+			App::run_tray_daemon().await?;
 		}
 		_ => {
 			let estate_ctx = app::Context::new(app::ContextSource::Cli)?;

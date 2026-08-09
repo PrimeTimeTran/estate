@@ -44,3 +44,8 @@ demand = "2.0.5"
 tray-icon = "0.24.2"
 winit = "0.30.13"
 url = "2.5.8"
+resvg = "0.48.1"
+image = "0.25.10"
+
+[build-dependencies]
+resvg = "0.48.1"

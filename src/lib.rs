@@ -2,6 +2,7 @@
 
 // Allows dead code(removes lint warnings)
 pub mod _core;
+pub mod constants;
 #[allow(dead_code)]
 #[allow(unused_imports)] // Silences unused imports
 
@@ -23,5 +24,6 @@ pub mod registry;
 pub mod vfs;
 
 pub use cli::context::*;
+pub use constants::*;
 pub use revelation::*;
 pub use vfs::*;
