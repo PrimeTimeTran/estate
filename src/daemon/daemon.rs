@@ -3,7 +3,9 @@ use cli::{CliCommand, Context as CliContext, FormatArgs};
 use comfy_table::{Cell, Table, presets::UTF8_FULL};
 use revelation::analyzer::*;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::{
+	collections::HashMap,
 	fs,
 	path::PathBuf,
 	time::{SystemTime, UNIX_EPOCH},
@@ -177,7 +179,7 @@ impl AnalyzeLoop {
 			match choice {
 				Ok(selected) => {
 					if let Some(action) = actions.iter().find(|a| a.title == selected) {
-						action.execute(&workspace);
+						action.execute(&workspace, ActionOptions::default());
 					}
 				}
 				Err(_) => break,
@@ -221,6 +223,19 @@ impl AnalyzeLoop {
 ///--------------------------------------------------------------------------------
 /// CLI Tools
 ///--------------------------------------------------------------------------------
+#[derive(Debug, Default)]
+pub struct ActionOptions(HashMap<String, Value>);
+impl ActionOptions {
+	pub fn new() -> Self {
+		Self::default()
+	}
+	pub fn get(&self, key: &str) -> Option<&Value> {
+		self.0.get(key)
+	}
+	pub fn insert(&mut self, key: impl Into<String>, value: Value) {
+		self.0.insert(key.into(), value);
+	}
+}
 pub struct Action {
 	pub id: String,
 	pub title: String,
@@ -230,15 +245,12 @@ pub struct Action {
 	pub category: ActionCategory,
 	pub handler: Option<Handler>,
 }
+pub type Handler = fn(&Workspace, &ActionOptions);
 impl Action {
-	pub fn execute(&self, result: &Workspace) {
-		match &self.handler {
-			Some(handler) => {
-				handler(result);
-			}
-			None => {
-				eprintln!("No handler for {}", self.id);
-			}
+	pub fn execute(&self, workspace: &Workspace, options: ActionOptions) {
+		match self.handler {
+			Some(handler) => handler(workspace, &options),
+			None => eprintln!("No handler for {}", self.id),
 		}
 	}
 }
@@ -252,7 +264,6 @@ pub enum ActionCategory {
 	Git,
 	Build,
 }
-
 pub struct ActionRegistry;
 impl ActionRegistry {
 	pub fn from_analysis(_result: &Workspace) -> Vec<Action> {
@@ -266,7 +277,6 @@ impl ActionRegistry {
 		actions
 	}
 }
-pub type Handler = fn(&Workspace);
 pub fn bootstrap_actions() -> Vec<Action> {
 	vec![
 		Action {
@@ -298,7 +308,7 @@ pub fn analysis_actions() -> Vec<Action> {
 			title: "Analyze Workspace".into(),
 			description: "Build the complete symbol graph.".into(),
 			enabled: true,
-			handler: Some(|analysis| {
+			handler: Some(|analysis, _options| {
 				MetricsRenderer::render(analysis);
 			}),
 		},

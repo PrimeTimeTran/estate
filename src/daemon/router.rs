@@ -1,18 +1,14 @@
+use tokio::{
+	io::{AsyncReadExt, AsyncWriteExt},
+	net::UnixStream,
+};
+
+use crate::daemon::{daemon::*, projection::command::*, start::BackgroundDaemon};
+use crate::daemon::{start::DaemonOptions, *};
+// use crate::estate::*;
+use crate::{_core::EstateDiscovery, daemon::start::Daemon};
 use cli::{CliCommand, Command, Context as CliContext};
-
 use revelation::analyzer::Workspace;
-
-use crate::_core::EstateDiscovery;
-use crate::daemon::daemon::*;
-use crate::daemon::projection::command::*;
-use crate::daemon::start::BackgroundDaemon;
-use crate::daemon::*;
-
-use crate::estate::*;
-// use crate::start::AnalyzeRequest;
-// Update your request type to carry the path
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::UnixStream;
 
 pub async fn execute(parsed_cli: cli::Cli, ctx: CliContext, _est_cxt: app::Context) {
 	// let pi = 3.14;
@@ -28,15 +24,15 @@ pub async fn execute(parsed_cli: cli::Cli, ctx: CliContext, _est_cxt: app::Conte
 		// - normally
 		// cg-rb loi daemon
 		Command::Daemon { live } => {
-			let socket_path = "/tmp/loi_daemon.sock";
-			let workspace = Workspace::new(); // Or build your workspace from est_cxt if needed
-			let (daemon, _tx) = BackgroundDaemon::new(workspace);
-
-			if let Err(e) = daemon.run_socket_server(socket_path, live).await {
+			let workspace = Workspace::new();
+			let mut daemon = BackgroundDaemon::new(workspace);
+			let options = DaemonOptions {
+				foreground: live,
+			};
+			if let Err(e) = daemon.start(options).await {
 				eprintln!("Daemon error: {}", e);
 			}
 		}
-
 		// 2. The Analyze Client Command (pings the socket and prints response)
 		// Inside your Command::Analyze handler:
 		Command::Analyze(args) => {
@@ -48,10 +44,8 @@ pub async fn execute(parsed_cli: cli::Cli, ctx: CliContext, _est_cxt: app::Conte
 					return;
 				}
 			};
-
 			for path in &args.paths {
 				let clean_path = path.canonicalize().unwrap_or_else(|_| path.clone());
-
 				// Just pass the file path and line/offset directly as raw fields
 				let request_payload = serde_json::json!({
 						"path": clean_path,
@@ -59,18 +53,13 @@ pub async fn execute(parsed_cli: cli::Cli, ctx: CliContext, _est_cxt: app::Conte
 						"column": &args.column,
 						"mode": args.mode
 				});
-
 				let payload = format!("{}\n", request_payload);
-
 				if let Err(e) = stream.write_all(payload.as_bytes()).await {
 					eprintln!("Failed to send request: {}", e);
 					break;
 				}
-
-				// Read response from socket server
 				// Read response from socket server
 				let mut buf = Vec::new();
-
 				match stream.read_to_end(&mut buf).await {
 					Ok(_) => {
 						let response = String::from_utf8_lossy(&buf);
