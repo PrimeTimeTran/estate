@@ -1,25 +1,25 @@
-use std::{fs, io::Result, path::PathBuf};
-
+use anyhow::{Error, Result};
 use serde::{Deserialize, Serialize};
+use std::{fs, path::PathBuf};
 
-use crate::daemon::{
-	config::derive_runtime_context,
-	initialize::init,
-	resolver::{engine_data_dir, global_estate_dir},
+use crate::{
+	constants::{ESTATE_VERSION, SCHEMA_VERSION},
+	daemon::{
+		config::derive_runtime_context,
+		initialize::init,
+		resolver::{engine_data_dir, global_estate_dir},
+	},
 };
 
-const ESTATE_VERSION: &str = env!("CARGO_PKG_VERSION");
-const SCHEMA_VERSION: u32 = 1;
-
-fn manifest_path() -> Result<PathBuf> {
+fn manifest_path() -> Result<PathBuf, Error> {
 	Ok(engine_data_dir()?.join("manifest.json"))
 }
 
-fn symbols_path() -> Result<PathBuf> {
+fn symbols_path() -> Result<PathBuf, Error> {
 	Ok(engine_data_dir()?.join("symbols.json"))
 }
 
-fn write_manifest() -> Result<()> {
+fn write_manifest() -> Result<(), Error> {
 	let path = manifest_path()?;
 
 	let manifest = Manifest {
@@ -36,7 +36,7 @@ fn write_manifest() -> Result<()> {
 	Ok(())
 }
 
-fn write_symbols() -> Result<()> {
+fn write_symbols() -> Result<(), Error> {
 	let path = symbols_path()?;
 	let estate = global_estate_dir()?;
 
@@ -67,7 +67,7 @@ fn write_symbols() -> Result<()> {
 	Ok(())
 }
 
-fn create_user_estate() -> Result<()> {
+fn create_user_estate() -> Result<(), Error> {
 	let root = global_estate_dir()?;
 
 	let files = [

@@ -11,7 +11,6 @@ pub mod resolver;
 pub mod router;
 pub mod start;
 pub mod state;
-pub mod status;
 pub mod stop;
 pub use reload::ReloadDaemon;
 pub use stop::StopDaemon;

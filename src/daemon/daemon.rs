@@ -1,4 +1,4 @@
-use crate::daemon::*;
+use crate::{constants::PID_PATH, daemon::*};
 use cli::{CliCommand, Context as CliContext, FormatArgs};
 use comfy_table::{Cell, Table, presets::UTF8_FULL};
 use revelation::analyzer::*;
@@ -67,8 +67,7 @@ impl CliCommand for StatusDaemon {
 	async fn run(&self, _ctx: &CliContext) {
 		DaemonState::record_status_check();
 		let state = DaemonState::load();
-		let pid =
-			std::fs::read_to_string("/tmp/estate-daemon.pid").unwrap_or_else(|_| "unknown".to_string());
+		let pid = std::fs::read_to_string(PID_PATH).unwrap_or_else(|_| "unknown".to_string());
 		println!("📊 Estate Daemon Status");
 		println!("──────────────────────");
 		println!("✅ Status:          OK");

@@ -143,13 +143,10 @@ impl ApplicationHandler for App {
 #[derive(Clone, Debug)]
 pub struct Context {
 	pub source: ContextSource,
-
 	// Where the user is operating
 	pub workspace: PathBuf,
-
 	// Global user estate (~/.estate)
 	pub estate_root: PathBuf,
-
 	// Engine internals (cache, daemon state, registry)
 	pub engine_root: PathBuf,
 }

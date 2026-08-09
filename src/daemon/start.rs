@@ -1,4 +1,4 @@
-use crate::daemon::*;
+use crate::{constants::*, daemon::*};
 use anyhow::{Error, Result};
 use async_trait::async_trait;
 use cli::{CliCommand, Context};
@@ -48,7 +48,6 @@ use tokio::{
 //
 // Inspect
 // ps -p <PID> -o pid,ppid,stat,lstart,etime,command
-pub const SOCKET_PATH: &str = "/tmp/estate-daemon.sock";
 /// Daemon domain API — execute(Action) -> Response, start(), stop().
 /// Daemon transport/lifecycle — Unix socket, Tokio tasks, channels, request parsing.
 #[async_trait]
@@ -92,13 +91,17 @@ impl Daemon for BackgroundDaemon {
 }
 impl BackgroundDaemon {
 	pub fn new(workspace: Workspace, context: app::Context) -> Self {
-		// pub fn new(workspace: Workspace, context: app::Context) -> Self {
 		let (tx, rx) = mpsc::channel(32);
-		Self { workspace, rx, tx,context }
+		Self {
+			workspace,
+			rx,
+			tx,
+			context,
+		}
 		// Self { workspace, rx, tx, context }
 	}
 	pub async fn run(&mut self) -> Result<()> {
-		let tx = self.tx.clone();
+		let _tx = self.tx.clone();
 		// tokio::try_join!(
 		// 	Self::run_socket_server(SOCKET_PATH, tx),
 		// 	self.run_processing_loop(),
@@ -195,6 +198,7 @@ impl BackgroundDaemon {
 		}
 		eprintln!("[daemon] processing loop stopped");
 	}
+
 	fn analyze(
 		&mut self,
 		path: PathBuf,

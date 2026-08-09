@@ -5,10 +5,11 @@ use tokio::{
 
 use crate::{
 	_core::EstateDiscovery,
+	constants::*,
 	daemon::{
 		daemon::*,
 		projection::command::*,
-		start::{BackgroundDaemon, Daemon, DaemonOptions, SOCKET_PATH},
+		start::{BackgroundDaemon, Daemon, DaemonOptions},
 		*,
 	},
 };
@@ -36,8 +37,7 @@ pub async fn execute(parsed_cli: cli::Cli, ctx: CliContext, _est_cxt: app::Conte
 		// 2. The Analyze Client Command (pings the socket and prints response)
 		// Inside your Command::Analyze handler:
 		Command::Analyze(args) => {
-			let socket_path = SOCKET_PATH;
-			let mut stream = match UnixStream::connect(socket_path).await {
+			let mut stream = match UnixStream::connect(SOCKET_PATH).await {
 				Ok(s) => s,
 				Err(_) => {
 					eprintln!("Daemon is not running! Start it first.");
