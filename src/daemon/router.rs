@@ -3,20 +3,17 @@ use tokio::{
 	net::UnixStream,
 };
 
-use crate::daemon::{daemon::*, projection::command::*, start::{BackgroundDaemon, SOCKET_PATH}};
+use crate::daemon::{
+	daemon::*,
+	projection::command::*,
+	start::{BackgroundDaemon, SOCKET_PATH},
+};
 use crate::daemon::{start::DaemonOptions, *};
-// use crate::estate::*;
 use crate::{_core::EstateDiscovery, daemon::start::Daemon};
 use cli::{CliCommand, Command, Context as CliContext};
 use revelation::analyzer::Workspace;
 
 pub async fn execute(parsed_cli: cli::Cli, ctx: CliContext, _est_cxt: app::Context) {
-	// let pi = 3.14;
-	// let result = make_shape(pi);
-	// fn make_shape(number: f64) -> f64 {
-	//     return number;
-	// }
-	// let doubled = result + result;
 	match parsed_cli.command {
 		// 1. The Daemon Server Command (bootstraps your background server)
 		// - live and watch requests come in
@@ -25,10 +22,11 @@ pub async fn execute(parsed_cli: cli::Cli, ctx: CliContext, _est_cxt: app::Conte
 		// cg-rb loi daemon
 		Command::Daemon { live } => {
 			let workspace = Workspace::new();
-			let mut daemon = BackgroundDaemon::new(workspace);
-			let options = DaemonOptions {
-				foreground: live,
-			};
+			let ctx = app::Context::new(app::ContextSource::Cli).expect("failed creating estate context");
+			let mut daemon = BackgroundDaemon::new(workspace, ctx);
+			// OS Menubar
+			// daemon.run().await?;
+			let options = DaemonOptions { foreground: live };
 			if let Err(e) = daemon.start(options).await {
 				eprintln!("Daemon error: {}", e);
 			}

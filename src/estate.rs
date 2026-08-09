@@ -1,7 +1,6 @@
 use crate::{_core::*, daemon::daemon::ActionRegistry, vfs::Inode};
 use anyhow::Error;
 use std::path::Path;
-
 //                        ┌─────────────────────┐
 //                        │       Estate        │
 //                        │  semantic engine    │

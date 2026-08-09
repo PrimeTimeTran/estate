@@ -26,10 +26,10 @@ use tokio::{
 // Check the daemon process directly:
 //   ps aux | grep 'estate*.*daemon'
 // Check whether the Unix socket exists:
-//   ls -l /tmp/loi_daemon.sock
+//   ls -l /tmp/estate-daemon.sock
 //
 // Check which process owns the socket:
-//   lsof /tmp/loi_daemon.sock
+//   lsof /tmp/estate-daemon.sock
 //
 // Inspect the process's open files:
 //   lsof -p <PID>
@@ -58,6 +58,7 @@ pub trait Daemon {
 	async fn stop(&mut self) -> Result<DaemonResponse>;
 }
 pub struct BackgroundDaemon {
+	context: app::Context,
 	workspace: Workspace,
 	rx: mpsc::Receiver<DaemonMessage>,
 	tx: mpsc::Sender<DaemonMessage>,
@@ -90,12 +91,22 @@ impl Daemon for BackgroundDaemon {
 	}
 }
 impl BackgroundDaemon {
-	pub fn new(workspace: Workspace) -> Self {
+	pub fn new(workspace: Workspace, context: app::Context) -> Self {
+		// pub fn new(workspace: Workspace, context: app::Context) -> Self {
 		let (tx, rx) = mpsc::channel(32);
-		Self { workspace, rx, tx }
+		Self { workspace, rx, tx,context }
+		// Self { workspace, rx, tx, context }
+	}
+	pub async fn run(&mut self) -> Result<()> {
+		let tx = self.tx.clone();
+		// tokio::try_join!(
+		// 	Self::run_socket_server(SOCKET_PATH, tx),
+		// 	self.run_processing_loop(),
+		// )?;
+		Ok(())
 	}
 	// cargo run daemon --live
-	async fn run_foreground(&mut self) -> Result<DaemonResponse> {
+	pub async fn run_foreground(&mut self) -> Result<DaemonResponse> {
 		let tx = self.tx.clone();
 		let (socket_result, _processing_result) = tokio::join!(
 			Self::run_socket_server(SOCKET_PATH, tx),
@@ -172,21 +183,16 @@ impl BackgroundDaemon {
 	}
 	pub async fn run_processing_loop(&mut self) {
 		eprintln!("[daemon] processing loop started");
-
 		while let Some(message) = self.rx.recv().await {
 			match message {
 				DaemonMessage::Execute { action, respond_to } => {
 					eprintln!("[daemon] executing action");
-
 					let result = self.execute(action).await;
-
 					eprintln!("[daemon] execute completed");
-
 					let _ = respond_to.send(result);
 				}
 			}
 		}
-
 		eprintln!("[daemon] processing loop stopped");
 	}
 	fn analyze(
@@ -216,8 +222,7 @@ impl BackgroundDaemon {
 			path
 		};
 
-		let report =
-			revelation::analyzer::Workspace::analyze(&system_path, &options)?;
+		let report = revelation::analyzer::Workspace::analyze(&system_path, &options)?;
 
 		Ok(DaemonResponse {
 			data: Some(serde_json::to_value(report)?),
@@ -307,58 +312,58 @@ pub async fn daemon() {
 		event_loop(rx, runtime.clone())
 	);
 }
-pub struct BackgroundDaemon2;
-impl BackgroundDaemon2 {
-	// 1. Find it.
-	// ps aux | grep "daemon-server"
-	// 2. Kill it
-	// kill 17254
-	// 3. Kill harder
-	// kill -9 49189
-	// 4. Remove
-	// rm /tmp/estate-daemon.sock
-	// Add stop
-	// cg-rb loi daemon stop
-	pub async fn run(_ctx: &Context, _args: &cli::FormatArgs) {
-		if Self::daemon_running().await {
-			println!("daemon already running");
-			return;
-		}
-		if Path::new(SOCKET_PATH).exists() {
-			std::fs::remove_file(SOCKET_PATH).expect("failed removing stale socket");
-		}
-		println!("🚀 starting background estate daemon");
-		let exe = std::env::current_exe().expect("failed finding current executable");
-		let child = Command::new(exe)
-			.arg("daemon-server")
-			.stdin(Stdio::null())
-			.stdout(Stdio::null())
-			.stderr(Stdio::null())
-			.spawn()
-			.expect("failed spawning daemon");
-		let pid = child.id();
-		std::fs::write("/tmp/estate-daemon.pid", pid.to_string()).expect("failed writing pid file");
-		// 3. Log file.
-		// use std::fs::OpenOptions;
-		// use std::process::{Command, Stdio};
-		// let log = OpenOptions::new()
-		//     .create(true)
-		//     .append(true)
-		//     .open("/tmp/estate-daemon.log")
-		//     .unwrap();
-		// let child = Command::new(exe)
-		//     .arg("daemon-server")
-		//     .stdin(Stdio::null())
-		//     .stdout(log.try_clone().unwrap())
-		//     .stderr(log)
-		//     .spawn()
-		//     .unwrap();
-		println!("✅ daemon started pid={}", child.id());
-	}
-	async fn daemon_running() -> bool {
-		UnixStream::connect(SOCKET_PATH).await.is_ok()
-	}
-}
+// pub struct BackgroundDaemon2;
+// impl BackgroundDaemon2 {
+// 	// 1. Find it.
+// 	// ps aux | grep "daemon-server"
+// 	// 2. Kill it
+// 	// kill 17254
+// 	// 3. Kill harder
+// 	// kill -9 49189
+// 	// 4. Remove
+// 	// rm /tmp/estate-daemon.sock
+// 	// Add stop
+// 	// cg-rb loi daemon stop
+// 	pub async fn run(_ctx: &Context, _args: &cli::FormatArgs) {
+// 		if Self::daemon_running().await {
+// 			println!("daemon already running");
+// 			return;
+// 		}
+// 		if Path::new(SOCKET_PATH).exists() {
+// 			std::fs::remove_file(SOCKET_PATH).expect("failed removing stale socket");
+// 		}
+// 		println!("🚀 starting background estate daemon");
+// 		let exe = std::env::current_exe().expect("failed finding current executable");
+// 		let child = Command::new(exe)
+// 			.arg("daemon-server")
+// 			.stdin(Stdio::null())
+// 			.stdout(Stdio::null())
+// 			.stderr(Stdio::null())
+// 			.spawn()
+// 			.expect("failed spawning daemon");
+// 		let pid = child.id();
+// 		std::fs::write("/tmp/estate-daemon.pid", pid.to_string()).expect("failed writing pid file");
+// 		// 3. Log file.
+// 		// use std::fs::OpenOptions;
+// 		// use std::process::{Command, Stdio};
+// 		// let log = OpenOptions::new()
+// 		//     .create(true)
+// 		//     .append(true)
+// 		//     .open("/tmp/estate-daemon.log")
+// 		//     .unwrap();
+// 		// let child = Command::new(exe)
+// 		//     .arg("daemon-server")
+// 		//     .stdin(Stdio::null())
+// 		//     .stdout(log.try_clone().unwrap())
+// 		//     .stderr(log)
+// 		//     .spawn()
+// 		//     .unwrap();
+// 		println!("✅ daemon started pid={}", child.id());
+// 	}
+// 	async fn daemon_running() -> bool {
+// 		UnixStream::connect(SOCKET_PATH).await.is_ok()
+// 	}
+// }
 // pub struct ProcessDaemon;
 // impl ProcessDaemon {
 //     pub async fn run(_ctx: &Context, _args: &cli::FormatArgs) {
