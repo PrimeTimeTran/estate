@@ -1,20 +1,11 @@
-use chrono::{DateTime, Local, Utc};
-use lazy_static::lazy_static;
-use serde::{Deserialize, Serialize};
-use std::{
-	collections::HashMap,
-	env, fs,
-	iter::Map,
-	path::{Path, PathBuf},
-};
-use uuid::Uuid;
+use crate::prelude::*;
 //------------------------------------------------------------------------------------
-//#      Node
-//       A node in a semantic graph representation.
-//       In a compiler, what is a parser? Many things. Answer concept, step, series, orchestrator, file and
-//       you wouldn't be wrong.
-//       kind:
-//       description:
+// Node
+// A node in a semantic graph representation.
+// In a compiler, what is a parser? Many things. Answer concept, step, series, orchestrator, file and
+// you wouldn't be wrong.
+// kind:
+// description:
 //------------------------------------------------------------------------------------
 #[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
 pub struct Node {

@@ -1,16 +1,10 @@
-use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::{SystemTime, UNIX_EPOCH};
-use tokio::sync::broadcast;
-use tokio::sync::broadcast::Receiver;
-
-use crate::daemon::*;
+use crate::daemon::daemon::*;
+use crate::prelude::*;
 
 // Events = facts that happened
 // Handlers = reactions to facts
 // Tasks = units of work
 // Commands = requests to do something
-
 /*
 		Tokio provides multiple channel types because they solve different
 		communication problems.
@@ -105,7 +99,7 @@ use crate::daemon::*;
 				(latest snapshot)
 */
 
-pub async fn event_loop(mut rx: Receiver<Event>, runtime: EstateRuntime) {
+pub async fn event_loop(mut rx: broadcast::Receiver<Event>, runtime: EstateRuntime) {
 	let mut dispatcher = EventDispatcher::new();
 	dispatcher.register(LogHandler);
 	dispatcher.register(FileWatcherHandler);
@@ -181,7 +175,7 @@ pub enum EventSource {
 #[derive(Debug, Clone)]
 pub struct EstateRuntime {
 	pub events: EventBus,
-	pub state: DaemonState,
+	pub state: daemon::DaemonState,
 }
 impl Default for EstateRuntime {
 	fn default() -> Self {
@@ -192,12 +186,9 @@ impl Default for EstateRuntime {
 impl EstateRuntime {
 	pub fn new() -> Self {
 		let mut state = DaemonState::load();
-
 		state.starts += 1;
 		state.started_at = DaemonState::now();
-
 		DaemonState::save(&state);
-
 		Self {
 			events: EventBus::new(),
 			state,

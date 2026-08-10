@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use crate::prelude::*;
 
 pub fn home_dir() -> std::io::Result<PathBuf> {
 	dirs::home_dir().ok_or_else(|| {

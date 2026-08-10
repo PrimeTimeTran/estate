@@ -1,20 +1,8 @@
-use crate::{_core::EstateDiscovery, constants::*, daemon::*, estate::Estate};
-use anyhow::{Error, Result};
-use async_trait::async_trait;
-use cli::{CliCommand, Context};
-use revelation::analyzer::{
-	AnalysisTarget, Analyze, Analyzer, AnalyzerOptions, RustAnalyzer, Workspace,
-};
-use serde::{Deserialize, Serialize};
-use std::{
-	path::{Path, PathBuf},
-	process::{Command, Stdio},
-};
-use tokio::{
-	io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
-	net::{TcpListener, UnixListener, UnixStream},
-	sync::{mpsc, oneshot},
-};
+use crate::prelude::{estate, *};
+use revelation::analyzer::*;
+// use revelation::analyzer::{
+// 	AnalysisTarget, Analyze, Analyzer, AnalyzerOptions, RustAnalyzer, Workspace,
+// };
 // cargo run daemon
 // Troubleshooting:
 //
@@ -60,7 +48,7 @@ pub trait Daemon {
 }
 /// Verb layer: format, rename, save, index, analyze, build, search, resolve, organize imports, find references, go to definition
 pub struct EstateDaemon {
-	pub estate: Estate,
+	pub estate: estate::Estate,
 	pub actions: ActionRegistry,
 	pub discovery: EstateDiscovery,
 	// pub vfs: EstateVfs,
@@ -69,7 +57,7 @@ pub struct EstateDaemon {
 	// pub registry: EstateRegistry,
 }
 pub struct BackgroundDaemon {
-	estate: Estate,
+	estate: estate::Estate,
 	actions: ActionRegistry,
 	discovery: EstateDiscovery,
 	context: app::Context,
@@ -77,6 +65,7 @@ pub struct BackgroundDaemon {
 	rx: mpsc::Receiver<DaemonMessage>,
 	pub tx: mpsc::Sender<DaemonMessage>,
 }
+
 #[async_trait]
 impl Daemon for BackgroundDaemon {
 	async fn execute(&mut self, action: ActionRequest) -> Result<DaemonResponse> {
@@ -111,7 +100,7 @@ impl BackgroundDaemon {
 		Self {
 			actions: ActionRegistry::default(),
 			discovery: EstateDiscovery::default(),
-			estate: Estate::default(),
+			estate: estate::Estate::default(),
 			workspace,
 			rx,
 			tx,
@@ -143,11 +132,11 @@ impl BackgroundDaemon {
 	///--------------------------------------------------------------------------------
 	async fn run_background(&mut self) -> Result<DaemonResponse> {
 		let exe = std::env::current_exe()?;
-		let child = Command::new(&exe)
+		let child = process::Command::new(&exe)
 			.args(["daemon", "--live"])
-			.stdin(Stdio::null())
-			.stdout(Stdio::null())
-			.stderr(Stdio::null())
+			.stdin(process::Stdio::null())
+			.stdout(process::Stdio::null())
+			.stderr(process::Stdio::null())
 			.spawn()?;
 
 		let pid = child.id();
@@ -331,8 +320,8 @@ pub enum ActionRequest {
 ///--------------------------------------------------------------------------------
 pub struct StartDaemon;
 #[async_trait::async_trait]
-impl CliCommand for StartDaemon {
-	async fn run(&self, _ctx: &Context) {
+impl cli::CliCommand for StartDaemon {
+	async fn run(&self, _ctx: &cli::Context) {
 		println!("🚀 starting estate daemon");
 		let exe = std::env::current_exe().expect("failed finding current executable");
 		let child = std::process::Command::new(exe)

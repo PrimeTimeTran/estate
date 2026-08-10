@@ -1,22 +1,8 @@
-use tokio::{
-	io::{AsyncReadExt, AsyncWriteExt},
-	net::UnixStream,
-};
-
-use crate::{
-	_core::EstateDiscovery,
-	constants::*,
-	daemon::{
-		daemon::*,
-		projection::command::*,
-		start::{BackgroundDaemon, Daemon, DaemonOptions},
-		*,
-	},
-};
-use cli::{CliCommand, Command, Context as CliContext};
+use crate::prelude::{daemon::projection::command, estate, *};
+use cli::Command;
 use revelation::analyzer::Workspace;
 
-pub async fn execute(parsed_cli: cli::Cli, ctx: CliContext, app: app::Context) {
+pub async fn execute(parsed_cli: cli::Cli, ctx: cli::Context, app: app::Context) {
 	match parsed_cli.command {
 		Command::Foo(_args) => {
 			let _ = EstateDiscovery::init();
@@ -112,17 +98,16 @@ pub async fn execute(parsed_cli: cli::Cli, ctx: CliContext, app: app::Context) {
 			}
 		},
 		Command::Status => StatusDaemon.run(&ctx).await,
-		Command::Stop => StopDaemon.run(&ctx).await,
-		Command::Bookmark => ViewList.run(&ctx).await,
-		Command::Bookmarks => ViewList.run(&ctx).await,
-		Command::Reload => ReloadDaemon.run(&ctx).await,
-		Command::Explain => Explain.run(&ctx).await,
-		Command::ExplainDoc => ExplainDoc.run(&ctx).await,
-		Command::View { name } => View { name }.run(&ctx).await,
-		Command::ViewFork { name } => ViewFork { name }.run(&ctx).await,
-		Command::ViewList => ViewList.run(&ctx).await,
-		Command::Deps { name } => Deps { name }.run(&ctx).await,
-
+		Command::Stop => stop::StopDaemon.run(&ctx).await,
+		Command::Bookmark => command::ViewList.run(&ctx).await,
+		Command::Bookmarks => command::ViewList.run(&ctx).await,
+		Command::Reload => reload::ReloadDaemon.run(&ctx).await,
+		Command::Explain => command::Explain.run(&ctx).await,
+		Command::ExplainDoc => command::ExplainDoc.run(&ctx).await,
+		Command::View { name } => command::View { name }.run(&ctx).await,
+		Command::ViewFork { name } => command::ViewFork { name }.run(&ctx).await,
+		Command::ViewList => command::ViewList.run(&ctx).await,
+		Command::Deps { name } => command::Deps { name }.run(&ctx).await,
 		_ => {
 			todo!("")
 		}

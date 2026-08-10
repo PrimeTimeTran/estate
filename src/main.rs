@@ -1,5 +1,4 @@
-#![allow(warnings)]
-use estate::prelude::*;
+use ::estate::prelude::*;
 
 // #[tokio::main]
 // async fn main2() {
@@ -14,7 +13,7 @@ use estate::prelude::*;
 async fn main() -> anyhow::Result<()> {
 	let parsed_cli = cli::parse();
 	match parsed_cli.command {
-		Command::Daemon { .. } => {
+		cli::Command::Daemon { .. } => {
 			app::App::run_tray_daemon().await?;
 		}
 		_ => {
@@ -25,14 +24,3 @@ async fn main() -> anyhow::Result<()> {
 	}
 	Ok(())
 }
-
-mod test_1 {}
-mod test_2 {}
-mod test_3 {}
-
-pub fn foo1() {}
-pub fn foo2() {}
-pub fn foo3() {}
-pub fn foo4() {}
-pub fn foo5() {}
-pub fn foo6() {}

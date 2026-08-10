@@ -10,7 +10,7 @@ fn main() {
 	let svg = fs::read_to_string("assets/estate.svg").unwrap();
 	let color = env::var("ESTATE_ICON_COLOR").unwrap_or_else(|_| "#000000".to_string());
 	let svg = svg.replace("#ESTATE_COLOR", &color);
-	// let svg = svg.replace("#FFFFFF", "#374957");
+	let svg = svg.replace("#FFFFFF", "#374957");
 	let options = resvg::usvg::Options::default();
 	let tree = resvg::usvg::Tree::from_str(&svg, &options).expect("failed to parse estate.svg");
 

@@ -2,7 +2,7 @@
 
 use std::{env, fs, io, path::Path};
 // https://material-foundation.github.io/material-theme-builder/
-use estate::prelude::*;
+use ::estate::prelude::*;
 
 fn main() -> io::Result<()> {
 	let template_root = Path::new(TEMPLATE_PATH);

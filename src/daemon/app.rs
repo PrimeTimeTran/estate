@@ -1,13 +1,12 @@
+use crate::prelude::*;
 use revelation::analyzer::Workspace;
-use std::{path::PathBuf, thread};
-use tokio::{
-	runtime::Runtime,
-	sync::mpsc::{Receiver, Sender, channel},
-};
+use tokio::runtime::Runtime;
+
 use tray_icon::{
 	Icon, TrayIcon, TrayIconBuilder,
 	menu::{Menu, MenuEvent, MenuItem},
 };
+
 use winit::{
 	application::ApplicationHandler,
 	event::WindowEvent,
@@ -15,14 +14,12 @@ use winit::{
 	platform::macos::{ActivationPolicy, EventLoopBuilderExtMacOS},
 };
 
-use crate::{constants::TRAY_ICON, daemon::start::BackgroundDaemon};
-
 pub struct App {
 	tray: TrayIcon,
 	status: MenuItem,
 	quit: MenuItem,
 	context: Context,
-	daemon_tx: Option<Sender<DaemonCommand>>,
+	daemon_tx: Option<mpsc::Sender<DaemonCommand>>,
 }
 
 impl App {
@@ -52,7 +49,7 @@ impl App {
 		Ok((status, quit, tray))
 	}
 	fn tray_icon() -> Icon {
-		let image = image::load_from_memory(TRAY_ICON)
+		let image = image::load_from_memory(constants::TRAY_ICON)
 			.expect("failed to load generated tray icon")
 			.into_rgba8();
 		let (width, height) = image.dimensions();
@@ -71,7 +68,7 @@ impl App {
 		event_loop.run_app(&mut app).unwrap();
 		Ok(())
 	}
-	fn run_daemon(ctx: Context, mut rx: Receiver<DaemonCommand>) {
+	fn run_daemon(ctx: Context, mut rx: mpsc::Receiver<DaemonCommand>) {
 		let runtime = Runtime::new().unwrap();
 		runtime.block_on(async move {
 			let workspace = Workspace::new();
@@ -124,7 +121,7 @@ impl ApplicationHandler for App {
 		}
 	}
 	fn resumed(&mut self, _event_loop: &ActiveEventLoop) {
-		let (tx, rx) = channel(100);
+		let (tx, rx) = mpsc::channel(100);
 		self.daemon_tx = Some(tx);
 		let context = self.context.clone();
 		thread::spawn(move || {
@@ -176,7 +173,7 @@ impl Context {
 // ActionRequest = "What work should the daemon perform?"
 //
 // Things that can happen to the daemon itself
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 enum DaemonCommand {
 	Stop,
 	// Metrics,

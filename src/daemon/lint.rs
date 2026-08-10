@@ -1,17 +1,6 @@
-use std::{
-	collections::HashMap,
-	fs,
-	io::{self, BufRead, BufReader},
-	ops::Range,
-	path::{Path, PathBuf},
-};
-// I want to re architecture this as a compiler actually. Can u help me with that?
-// 1. check file and determine "block comment prefix.
-// 2. find the block comment ranges.
-// 3. expand block comment beginning and end when necessary.
-// 4. check gutter /align column for "block comment prefix" + 7 columns (space for auto white space and  6 "#"s for all .md depths.
-// 5. Shift chars right if they're inside of those column indexes(excluding # tags)
-// 6. Check the chars remaining, if they're hashing, then shift them left(because I might have edited the row/comment after a previous edit
+use crate::prelude::{daemon::projection::command, estate, *};
+use std::io::{self, BufRead, BufReader};
+
 pub struct DocCompiler {
 	width: usize,
 	configs: HashMap<String, LanguageConfig>,
@@ -290,115 +279,7 @@ impl DocCompiler {
 			format!("{}{}", prefix, clean_content)
 		}
 	}
-	// Step 3, 4, 5, & 6: Transform lines (Expansion, Gutter alignment, Shift right/left idempotency)
-	// pub fn compile_source(&self, input: &str) -> String {
-	//     let lines: Vec<String> = input.lines().map(String::from).collect();
-	//     let rule_line = format!("///{}", "-".repeat(self.width));
-	//     let mut output_lines = Vec::with_capacity(lines.len());
-	//     for line in &lines {
-	//         // Step 3: Expand exact rules
-	//         if line == "///-" {
-	//             output_lines.push(rule_line.clone());
-	//             continue;
-	//         }
-	//         // Preserve existing valid full-line dividers
-	//         if line.starts_with("///-") && line.chars().all(|c| c == '/' || c == '-') {
-	//             output_lines.push(line.clone());
-	//             continue;
-	//         }
-	//         // Process doc comments
-	//         if line.starts_with("///") {
-	//             output_lines.push(self.transform_doc_line(line));
-	//         } else {
-	//             output_lines.push(line.clone());
-	//         }
-	//     }
-	//     output_lines.join("\n") + if input.ends_with('\n') { "\n" } else { "" }
-	// }
-	// fn transform_doc_line(&self, line: &str) -> String {
-	//     let prefix = "///";
-	//     let body = &line[prefix.len()..];
-	//     // If the line is empty after prefix, keep it clean
-	//     if body.is_empty() {
-	//         return line.to_string();
-	//     }
-	//     // Step 4 & 5 & 6: Parse headers vs regular text with gutter awareness & idempotency
-	//     let trimmed_body = body.trim_start();
-	//     if trimmed_body.starts_with('#') {
-	//         // Markdown header handling (up to 6 hashes)
-	//         let hashes: String = trimmed_body.chars().take_while(|&c| c == '#').collect();
-	//         let depth = hashes.len();
-	//         if depth <= 6 {
-	//             let text_after_hashes = trimmed_body[depth..].trim_start();
-	//             // 7 columns allocated for header depth formatting (e.g. pad = 7 - depth)
-	//             let pad = 7_usize.saturating_sub(depth);
-	//             return format!("{}{}{}{}", prefix, hashes, " ".repeat(pad), text_after_hashes);
-	//         }
-	//     }
-	//     // Normal text column check / shift logic (Idempotent left/right adjustment)
-	//     // Find leading spaces of the body relative to column index
-	//     let leading_spaces = body.chars().take_while(|&c| c == ' ').count();
-	//     // Absolute column tracking: prefix takes 3 columns, so body starts at column 4 (1-based index)
-	//     // Gutter alignment target: "prefix" (3 cols) + 7 reserved columns for depth/alignment = column 10 threshold.
-	//     let current_content_pos = leading_spaces + 3;
-	//     let clean_content = body.trim_start();
-	//     if clean_content.is_empty() {
-	//         return line.to_string();
-	//     }
-	//     // If it's already aligned or pushed past the target gutter, normalize it back (Step 6: Shift left if previously over-edited)
-	//     // Or shift right if it falls before column 10 (Step 5)
-	//     let target_col = 10_usize;
-	//     if current_content_pos < target_col {
-	//         let padding_needed = target_col - current_content_pos;
-	//         format!("{}{}{}", prefix, " ".repeat(padding_needed), clean_content)
-	//     } else {
-	//         // Already past or at target, normalize leading space to avoid runaway growth
-	//         format!("{}{}", prefix, clean_content)
-	//     }
-	// }
 }
-// const WIDTH: usize = 80;
-// fn align_doc(line: &str) -> String {
-//     if !line.starts_with("///") {
-//         return line.to_string();
-//     }
-//     let body = &line[3..];
-//     let clean = body.trim_start();
-//     if clean.starts_with('#') {
-//         let hashes: String = clean.chars().take_while(|&c| c == '#').collect();
-//         let depth = hashes.len();
-//         let text = clean[depth..].trim_start();
-//         let pad = 7_usize.saturating_sub(depth);
-//         return format!("///{}{}{}", hashes, " ".repeat(pad), text);
-//     }
-//     // Normal text alignment
-//     if body.is_empty() {
-//         return line.to_string();
-//     }
-//     let leading_spaces = body.chars().take_while(|&c| c == ' ').count();
-//     let pos = leading_spaces + 3; // +2 for /// prefix offset adjustment relative to awk logic
-//     if pos >= 10 {
-//         return line.to_string();
-//     }
-//     let padding_needed = 10 - pos;
-//     format!("///{}{}", " ".repeat(padding_needed), body)
-// }
-// fn process_content<R: BufRead, W: Write>(reader: R, mut writer: W) -> io::Result<()> {
-//     let rule = format!("///{}", "-".repeat(WIDTH));
-//     for line_res in reader.lines() {
-//         let line = line_res?;
-//         if line == "///-" {
-//             writeln!(writer, "{}", rule)?;
-//         } else if line.starts_with("///-") && line.chars().all(|c| c == '/' || c == '-') {
-//             writeln!(writer, "{}", line)?;
-//         } else if line.starts_with("///") {
-//             writeln!(writer, "{}", align_doc(&line))?;
-//         } else {
-//             writeln!(writer, "{}", line)?;
-//         }
-//     }
-//     Ok(())
-// }
 #[derive(Debug, Clone)]
 pub struct LanguageConfig {
 	pub prefix: String,
@@ -419,6 +300,6 @@ impl CommentStyle {
 }
 #[derive(Debug, Clone)]
 pub struct CommentBlock {
-	pub line_range: Range<usize>,
+	pub line_range: ops::Range<usize>,
 	pub style: CommentStyle,
 }

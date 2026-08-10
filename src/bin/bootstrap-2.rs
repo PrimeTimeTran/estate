@@ -1,9 +1,9 @@
 #![allow(warnings)]
-
 use serde::{Deserialize, Serialize};
-use std::env;
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::{
+	env, fs,
+	path::{Path, PathBuf},
+};
 
 // ==========================================
 // 1. DATA STRUCTURES & MANIFESTS
@@ -145,10 +145,7 @@ pub fn materialize_payload(estate_file_path: &Path) -> std::io::Result<()> {
 	if !estate_file_path.exists() {
 		return Err(std::io::Error::new(
 			std::io::ErrorKind::NotFound,
-			format!(
-				"Payload manifest not found at {}",
-				estate_file_path.display()
-			),
+			format!("{:?}", estate_file_path.display().to_string()),
 		));
 	}
 	let content = fs::read_to_string(estate_file_path)?;

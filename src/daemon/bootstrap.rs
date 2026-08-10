@@ -1,15 +1,4 @@
-use anyhow::{Error, Result};
-use serde::{Deserialize, Serialize};
-use std::{fs, path::PathBuf};
-
-use crate::{
-	constants::{ESTATE_VERSION, SCHEMA_VERSION},
-	daemon::{
-		config::derive_runtime_context,
-		initialize::init,
-		resolver::{engine_data_dir, global_estate_dir},
-	},
-};
+use crate::{daemon::config::derive_runtime_context, prelude::*};
 
 fn manifest_path() -> Result<PathBuf, Error> {
 	Ok(engine_data_dir()?.join("manifest.json"))
@@ -38,7 +27,7 @@ fn write_manifest() -> Result<(), Error> {
 
 fn write_symbols() -> Result<(), Error> {
 	let path = symbols_path()?;
-	let estate = global_estate_dir()?;
+	let estate = resolver::global_estate_dir()?;
 
 	let symbols = serde_json::json!({
 			"symbols": [
@@ -50,7 +39,7 @@ fn write_symbols() -> Result<(), Error> {
 					},
 					{
 							"id": "estate.engine",
-							"path": engine_data_dir()?.to_string_lossy(),
+							"path": resolver::engine_data_dir()?.to_string_lossy(),
 							"immutable": true,
 							"doc": "Estate engine runtime directory"
 					},
@@ -139,7 +128,7 @@ fn ensure_initialized() -> Result<()> {
 		//
 		// Engine initialization
 		//
-		init()?;
+		initialize::init()?;
 
 		//
 		// User-facing estate initialization

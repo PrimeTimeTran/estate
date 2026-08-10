@@ -1,5 +1,4 @@
 #![allow(warnings)]
-// Allows dead code(removes lint warnings)
 // #[allow(dead_code)]
 // #[allow(unused_imports)] // Silences unused imports
 
