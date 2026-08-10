@@ -8,6 +8,10 @@ edition = "2024"
 name = "bootstrap"
 path = "src/bin/bootstrap-1.rs"
 
+[[bin]]
+name = "init"
+path = "src/bin/init.rs"
+
 [dependencies]
 # Internal
 macros.workspace = true

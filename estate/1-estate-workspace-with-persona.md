@@ -40,7 +40,7 @@ notes:
 ---
 
 kind: resource
-path: ./
+path: /Users/future/KB/project/crates/estate/tmp
 
 description: Root workspace configuration.
 
@@ -52,25 +52,32 @@ notes:
 
 ---
 
+- src/
+- public/
+- public/docs
+- .estate
 - src/hooks/
 - src/main.py
 - src/main.rs
 - src/main.js
 - src/main.ts
-- src/
-- pkg.loi
+- public/docs/v0.0.1
+- public/docs/v0.0.2
+- public/docs/versions.json
+- public/index.html
 - .estate/settings.json
 - .estate/index.json
 - .estate/view.json
+- pkg.loi
 
 # Language Support
 
 ---
 
 kind: resource
-path: ./
+path: /Users/future/KB/project/crates/estate/tmp
 
-## description: Supported package managers.
+---
 
 - Cargo.toml
 - go.mod
@@ -83,7 +90,7 @@ path: ./
 ---
 
 kind: resource
-path: /Users/future/KB/project/crates/estate/template/public/static
+path: /Users/future/KB/project/crates/estate/tmp/public/docs
 
 description: Core estate documentation.
 
@@ -124,13 +131,16 @@ notes:
 - 18.contributing.md
 - 19.references.md
 - 20.glossary.md
+- v0.0.1/
+- v0.0.2/
+- versions.json
 
 # Public Website
 
 ---
 
 kind: resource
-path: ./public
+path: /Users/future/KB/project/crates/estate/tmp/public
 
 description: Static showcase.
 
