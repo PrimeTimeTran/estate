@@ -1,0 +1,340 @@
+{
+  "entities": [
+    {
+      "uid": "019f8c8a-dde4-7d02-b2c9-e3ee1412fa5a",
+      "kind": "Directory",
+      "path": "/Users/future/.loi/core",
+      "description": "The end goal of this crate is to install everything needed for the DIP toolchain.\nWe want global dirs/files for historic and practical reasons"
+    },
+    {
+      "uid": "019f8c8a-dde4-7d02-b2c9-e3f1dc697941",
+      "kind": "Directory",
+      "path": "/Users/future/.loi/daemon",
+      "description": "The end goal of this crate is to install everything needed for the DIP toolchain.\nWe want global dirs/files for historic and practical reasons"
+    },
+    {
+      "uid": "019f8c8a-dde4-7d02-b2c9-e40bb43dc23b",
+      "kind": "Directory",
+      "path": "/Users/future/.loi/dashboard",
+      "description": "The end goal of this crate is to install everything needed for the DIP toolchain.\nWe want global dirs/files for historic and practical reasons"
+    },
+    {
+      "uid": "019f8c8a-dde4-7d02-b2c9-e41f555e1639",
+      "kind": "Directory",
+      "path": "/Users/future/.loi/executable",
+      "description": "The end goal of this crate is to install everything needed for the DIP toolchain.\nWe want global dirs/files for historic and practical reasons"
+    },
+    {
+      "uid": "019f8c8a-dde4-7d02-b2c9-e421e6e946b1",
+      "kind": "Directory",
+      "path": "/Users/future/.loi/ide",
+      "description": "The end goal of this crate is to install everything needed for the DIP toolchain.\nWe want global dirs/files for historic and practical reasons"
+    },
+    {
+      "uid": "019f8c8a-dde4-7d02-b2c9-e43f11d7880a",
+      "kind": "Directory",
+      "path": "/Users/future/.loi/lsp",
+      "description": "The end goal of this crate is to install everything needed for the DIP toolchain.\nWe want global dirs/files for historic and practical reasons"
+    },
+    {
+      "uid": "019f8c8a-dde4-7d02-b2c9-e44c4b8575d8",
+      "kind": "Directory",
+      "path": "/Users/future/.loi/toolchain",
+      "description": "The end goal of this crate is to install everything needed for the DIP toolchain.\nWe want global dirs/files for historic and practical reasons"
+    },
+    {
+      "uid": "019f8c8a-dde4-7d02-b2c9-e45887c686f5",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./genesis.loi",
+      "description": "No names are finalizes yet but these in the direction.\nGenesis is our estate \"manager\" file. Although that may be a slight misnomer as all files will play some part in management, like this file.\nsettings.json for IDE config\nindex.json for an index/registry of the FS which is maintained in a \"omnipresence\" way, regardless of view. UID, file name, alias, view tags which the index.json will one day hold.\nview.json a top level file because it encapsulates a cornerstone objective of the DIP architecture, the believe that a new view/ruleset/zoom over the same tokens/symbols/materials/artifacts not only enables computers to do new things but for humans to more easily \"shift gears\""
+    },
+    {
+      "uid": "019f8c8a-dde4-7d02-b2c9-e46a8f7fac1b",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./.loi/settings.json",
+      "description": "No names are finalizes yet but these in the direction.\nGenesis is our estate \"manager\" file. Although that may be a slight misnomer as all files will play some part in management, like this file.\nsettings.json for IDE config\nindex.json for an index/registry of the FS which is maintained in a \"omnipresence\" way, regardless of view. UID, file name, alias, view tags which the index.json will one day hold.\nview.json a top level file because it encapsulates a cornerstone objective of the DIP architecture, the believe that a new view/ruleset/zoom over the same tokens/symbols/materials/artifacts not only enables computers to do new things but for humans to more easily \"shift gears\""
+    },
+    {
+      "uid": "019f8c8a-dde4-7d02-b2c9-e47b0758fe78",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./.loi/index.json",
+      "description": "No names are finalizes yet but these in the direction.\nGenesis is our estate \"manager\" file. Although that may be a slight misnomer as all files will play some part in management, like this file.\nsettings.json for IDE config\nindex.json for an index/registry of the FS which is maintained in a \"omnipresence\" way, regardless of view. UID, file name, alias, view tags which the index.json will one day hold.\nview.json a top level file because it encapsulates a cornerstone objective of the DIP architecture, the believe that a new view/ruleset/zoom over the same tokens/symbols/materials/artifacts not only enables computers to do new things but for humans to more easily \"shift gears\""
+    },
+    {
+      "uid": "019f8c8a-dde4-7d02-b2c9-e487a4c3e9a1",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./.loi/view.json",
+      "description": "No names are finalizes yet but these in the direction.\nGenesis is our estate \"manager\" file. Although that may be a slight misnomer as all files will play some part in management, like this file.\nsettings.json for IDE config\nindex.json for an index/registry of the FS which is maintained in a \"omnipresence\" way, regardless of view. UID, file name, alias, view tags which the index.json will one day hold.\nview.json a top level file because it encapsulates a cornerstone objective of the DIP architecture, the believe that a new view/ruleset/zoom over the same tokens/symbols/materials/artifacts not only enables computers to do new things but for humans to more easily \"shift gears\""
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-4e439206028e",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./Cargo.toml",
+      "description": "Our MVP supported languages/runtimes."
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-4e5016381673",
+      "kind": "Directory",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./go.mod",
+      "description": "Our MVP supported languages/runtimes."
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-4e6f85f582c0",
+      "kind": "Directory",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./go.sum",
+      "description": "Our MVP supported languages/runtimes."
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-4e7fe5899635",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./package.json",
+      "description": "Our MVP supported languages/runtimes."
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-4e82045d4a6d",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./pyproject.toml",
+      "description": "Our MVP supported languages/runtimes."
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-4e98e9dffca2",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./docs/(estate)/0.preface.md",
+      "description": "Docs for reference.\nThis will moved to the ~/.loi dir if/when we complete a few templates which showcase the design philosphy of DIP.\nThe path from root for this section of files is ./docs/(estate)/*\nIt follows the convention of \"( )\" representing a logical grouping that isn't exposd in the route.\nThe nesting and then \"()\" wrapped tag not only drives exposure behavior but is human readable explanations as to \"what type\" of doc this is."
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-4ea6134210dd",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./docs/(estate)/1.introduction.md",
+      "description": "Docs for reference.\nThis will moved to the ~/.loi dir if/when we complete a few templates which showcase the design philosphy of DIP.\nThe path from root for this section of files is ./docs/(estate)/*\nIt follows the convention of \"( )\" representing a logical grouping that isn't exposd in the route.\nThe nesting and then \"()\" wrapped tag not only drives exposure behavior but is human readable explanations as to \"what type\" of doc this is."
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-4ebe4614b6a0",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./docs/(estate)/2.prologue.md",
+      "description": "Docs for reference.\nThis will moved to the ~/.loi dir if/when we complete a few templates which showcase the design philosphy of DIP.\nThe path from root for this section of files is ./docs/(estate)/*\nIt follows the convention of \"( )\" representing a logical grouping that isn't exposd in the route.\nThe nesting and then \"()\" wrapped tag not only drives exposure behavior but is human readable explanations as to \"what type\" of doc this is."
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-4ec4225d9e5b",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./docs/(estate)/3.welcome.md",
+      "description": "Docs for reference.\nThis will moved to the ~/.loi dir if/when we complete a few templates which showcase the design philosphy of DIP.\nThe path from root for this section of files is ./docs/(estate)/*\nIt follows the convention of \"( )\" representing a logical grouping that isn't exposd in the route.\nThe nesting and then \"()\" wrapped tag not only drives exposure behavior but is human readable explanations as to \"what type\" of doc this is."
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-4ed5b59f19fd",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./docs/(estate)/4.philosphy.md",
+      "description": "Docs for reference.\nThis will moved to the ~/.loi dir if/when we complete a few templates which showcase the design philosphy of DIP.\nThe path from root for this section of files is ./docs/(estate)/*\nIt follows the convention of \"( )\" representing a logical grouping that isn't exposd in the route.\nThe nesting and then \"()\" wrapped tag not only drives exposure behavior but is human readable explanations as to \"what type\" of doc this is."
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-4ee69b352ac0",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./docs/(estate)/4.philosphy.[zen].md",
+      "description": "Docs for reference.\nThis will moved to the ~/.loi dir if/when we complete a few templates which showcase the design philosphy of DIP.\nThe path from root for this section of files is ./docs/(estate)/*\nIt follows the convention of \"( )\" representing a logical grouping that isn't exposd in the route.\nThe nesting and then \"()\" wrapped tag not only drives exposure behavior but is human readable explanations as to \"what type\" of doc this is."
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-4ef49ee75d41",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./docs/(estate)/4.philosphy.[problem-space].md",
+      "description": "Docs for reference.\nThis will moved to the ~/.loi dir if/when we complete a few templates which showcase the design philosphy of DIP.\nThe path from root for this section of files is ./docs/(estate)/*\nIt follows the convention of \"( )\" representing a logical grouping that isn't exposd in the route.\nThe nesting and then \"()\" wrapped tag not only drives exposure behavior but is human readable explanations as to \"what type\" of doc this is."
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-4f04db44d663",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./docs/(estate)/4.philosphy.[pain-point].md",
+      "description": "Docs for reference.\nThis will moved to the ~/.loi dir if/when we complete a few templates which showcase the design philosphy of DIP.\nThe path from root for this section of files is ./docs/(estate)/*\nIt follows the convention of \"( )\" representing a logical grouping that isn't exposd in the route.\nThe nesting and then \"()\" wrapped tag not only drives exposure behavior but is human readable explanations as to \"what type\" of doc this is."
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-4f109dcfd655",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./docs/(estate)/4.philosphy.[reality].md",
+      "description": "Docs for reference.\nThis will moved to the ~/.loi dir if/when we complete a few templates which showcase the design philosphy of DIP.\nThe path from root for this section of files is ./docs/(estate)/*\nIt follows the convention of \"( )\" representing a logical grouping that isn't exposd in the route.\nThe nesting and then \"()\" wrapped tag not only drives exposure behavior but is human readable explanations as to \"what type\" of doc this is."
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-4f2fe1bbf3fe",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./docs/(estate)/4.philosphy.[friction].md",
+      "description": "Docs for reference.\nThis will moved to the ~/.loi dir if/when we complete a few templates which showcase the design philosphy of DIP.\nThe path from root for this section of files is ./docs/(estate)/*\nIt follows the convention of \"( )\" representing a logical grouping that isn't exposd in the route.\nThe nesting and then \"()\" wrapped tag not only drives exposure behavior but is human readable explanations as to \"what type\" of doc this is."
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-4f37800f0c39",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./docs/(estate)/5.analogy.[deck-of-cards].md",
+      "description": "Docs for reference.\nThis will moved to the ~/.loi dir if/when we complete a few templates which showcase the design philosphy of DIP.\nThe path from root for this section of files is ./docs/(estate)/*\nIt follows the convention of \"( )\" representing a logical grouping that isn't exposd in the route.\nThe nesting and then \"()\" wrapped tag not only drives exposure behavior but is human readable explanations as to \"what type\" of doc this is."
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-4f409d1ce610",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./docs/(estate)/5.analogy.[analog-television].md",
+      "description": "Docs for reference.\nThis will moved to the ~/.loi dir if/when we complete a few templates which showcase the design philosphy of DIP.\nThe path from root for this section of files is ./docs/(estate)/*\nIt follows the convention of \"( )\" representing a logical grouping that isn't exposd in the route.\nThe nesting and then \"()\" wrapped tag not only drives exposure behavior but is human readable explanations as to \"what type\" of doc this is."
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-4f5a518cdebe",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./docs/(estate)/5.analogy.[carrier-pigeon].md",
+      "description": "Docs for reference.\nThis will moved to the ~/.loi dir if/when we complete a few templates which showcase the design philosphy of DIP.\nThe path from root for this section of files is ./docs/(estate)/*\nIt follows the convention of \"( )\" representing a logical grouping that isn't exposd in the route.\nThe nesting and then \"()\" wrapped tag not only drives exposure behavior but is human readable explanations as to \"what type\" of doc this is."
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-4f64ea2973c1",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./docs/(estate)/5.analogy.[open-closed-principle].md",
+      "description": "Docs for reference.\nThis will moved to the ~/.loi dir if/when we complete a few templates which showcase the design philosphy of DIP.\nThe path from root for this section of files is ./docs/(estate)/*\nIt follows the convention of \"( )\" representing a logical grouping that isn't exposd in the route.\nThe nesting and then \"()\" wrapped tag not only drives exposure behavior but is human readable explanations as to \"what type\" of doc this is."
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-4f7d84d8a36b",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./docs/(estate)/4.philosphy.[vision/solution].md",
+      "description": "Docs for reference.\nThis will moved to the ~/.loi dir if/when we complete a few templates which showcase the design philosphy of DIP.\nThe path from root for this section of files is ./docs/(estate)/*\nIt follows the convention of \"( )\" representing a logical grouping that isn't exposd in the route.\nThe nesting and then \"()\" wrapped tag not only drives exposure behavior but is human readable explanations as to \"what type\" of doc this is."
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-4f81baf61e58",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./docs/(estate)/6.philosphy.[goal].md",
+      "description": "Docs for reference.\nThis will moved to the ~/.loi dir if/when we complete a few templates which showcase the design philosphy of DIP.\nThe path from root for this section of files is ./docs/(estate)/*\nIt follows the convention of \"( )\" representing a logical grouping that isn't exposd in the route.\nThe nesting and then \"()\" wrapped tag not only drives exposure behavior but is human readable explanations as to \"what type\" of doc this is."
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-4f941d659674",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./docs/(estate)/7.philosphy.[rationale].md",
+      "description": "Docs for reference.\nThis will moved to the ~/.loi dir if/when we complete a few templates which showcase the design philosphy of DIP.\nThe path from root for this section of files is ./docs/(estate)/*\nIt follows the convention of \"( )\" representing a logical grouping that isn't exposd in the route.\nThe nesting and then \"()\" wrapped tag not only drives exposure behavior but is human readable explanations as to \"what type\" of doc this is."
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-4faa07537a80",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./docs/(estate)/8.philosphy.[principle].md",
+      "description": "Docs for reference.\nThis will moved to the ~/.loi dir if/when we complete a few templates which showcase the design philosphy of DIP.\nThe path from root for this section of files is ./docs/(estate)/*\nIt follows the convention of \"( )\" representing a logical grouping that isn't exposd in the route.\nThe nesting and then \"()\" wrapped tag not only drives exposure behavior but is human readable explanations as to \"what type\" of doc this is."
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-4fbd509db2b2",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./docs/(estate)/9.philosphy.[arch].md",
+      "description": "Docs for reference.\nThis will moved to the ~/.loi dir if/when we complete a few templates which showcase the design philosphy of DIP.\nThe path from root for this section of files is ./docs/(estate)/*\nIt follows the convention of \"( )\" representing a logical grouping that isn't exposd in the route.\nThe nesting and then \"()\" wrapped tag not only drives exposure behavior but is human readable explanations as to \"what type\" of doc this is."
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-4fc0ed84c389",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./docs/(estate)/10.philosphy.[specs].md",
+      "description": "Docs for reference.\nThis will moved to the ~/.loi dir if/when we complete a few templates which showcase the design philosphy of DIP.\nThe path from root for this section of files is ./docs/(estate)/*\nIt follows the convention of \"( )\" representing a logical grouping that isn't exposd in the route.\nThe nesting and then \"()\" wrapped tag not only drives exposure behavior but is human readable explanations as to \"what type\" of doc this is."
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-4fd68a86e4cb",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./docs/(estate)/11.philosphy.[roadmap].md",
+      "description": "Docs for reference.\nThis will moved to the ~/.loi dir if/when we complete a few templates which showcase the design philosphy of DIP.\nThe path from root for this section of files is ./docs/(estate)/*\nIt follows the convention of \"( )\" representing a logical grouping that isn't exposd in the route.\nThe nesting and then \"()\" wrapped tag not only drives exposure behavior but is human readable explanations as to \"what type\" of doc this is."
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-4fec39b5cd3c",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./docs/(estate)/12.guide.md",
+      "description": "Docs for reference.\nThis will moved to the ~/.loi dir if/when we complete a few templates which showcase the design philosphy of DIP.\nThe path from root for this section of files is ./docs/(estate)/*\nIt follows the convention of \"( )\" representing a logical grouping that isn't exposd in the route.\nThe nesting and then \"()\" wrapped tag not only drives exposure behavior but is human readable explanations as to \"what type\" of doc this is."
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-4ff7f0e49abb",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./docs/(estate)/13.best-practices.[open-closed-principle].md",
+      "description": "Docs for reference.\nThis will moved to the ~/.loi dir if/when we complete a few templates which showcase the design philosphy of DIP.\nThe path from root for this section of files is ./docs/(estate)/*\nIt follows the convention of \"( )\" representing a logical grouping that isn't exposd in the route.\nThe nesting and then \"()\" wrapped tag not only drives exposure behavior but is human readable explanations as to \"what type\" of doc this is."
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-50033d1fb606",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./docs/(estate)/14.convention.md",
+      "description": "Docs for reference.\nThis will moved to the ~/.loi dir if/when we complete a few templates which showcase the design philosphy of DIP.\nThe path from root for this section of files is ./docs/(estate)/*\nIt follows the convention of \"( )\" representing a logical grouping that isn't exposd in the route.\nThe nesting and then \"()\" wrapped tag not only drives exposure behavior but is human readable explanations as to \"what type\" of doc this is."
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-501e06683566",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./docs/(estate)/15.cheatsheet.md",
+      "description": "Docs for reference.\nThis will moved to the ~/.loi dir if/when we complete a few templates which showcase the design philosphy of DIP.\nThe path from root for this section of files is ./docs/(estate)/*\nIt follows the convention of \"( )\" representing a logical grouping that isn't exposd in the route.\nThe nesting and then \"()\" wrapped tag not only drives exposure behavior but is human readable explanations as to \"what type\" of doc this is."
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-5027efa3243d",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./docs/(estate)/16.example.md",
+      "description": "Docs for reference.\nThis will moved to the ~/.loi dir if/when we complete a few templates which showcase the design philosphy of DIP.\nThe path from root for this section of files is ./docs/(estate)/*\nIt follows the convention of \"( )\" representing a logical grouping that isn't exposd in the route.\nThe nesting and then \"()\" wrapped tag not only drives exposure behavior but is human readable explanations as to \"what type\" of doc this is."
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-5039bb91f82a",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./docs/(estate)/17.community.md",
+      "description": "Docs for reference.\nThis will moved to the ~/.loi dir if/when we complete a few templates which showcase the design philosphy of DIP.\nThe path from root for this section of files is ./docs/(estate)/*\nIt follows the convention of \"( )\" representing a logical grouping that isn't exposd in the route.\nThe nesting and then \"()\" wrapped tag not only drives exposure behavior but is human readable explanations as to \"what type\" of doc this is."
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-5043300b9f4a",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./docs/(estate)/18.contributing.md",
+      "description": "Docs for reference.\nThis will moved to the ~/.loi dir if/when we complete a few templates which showcase the design philosphy of DIP.\nThe path from root for this section of files is ./docs/(estate)/*\nIt follows the convention of \"( )\" representing a logical grouping that isn't exposd in the route.\nThe nesting and then \"()\" wrapped tag not only drives exposure behavior but is human readable explanations as to \"what type\" of doc this is."
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-505f0cf14391",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./docs/(estate)/19.references.md",
+      "description": "Docs for reference.\nThis will moved to the ~/.loi dir if/when we complete a few templates which showcase the design philosphy of DIP.\nThe path from root for this section of files is ./docs/(estate)/*\nIt follows the convention of \"( )\" representing a logical grouping that isn't exposd in the route.\nThe nesting and then \"()\" wrapped tag not only drives exposure behavior but is human readable explanations as to \"what type\" of doc this is."
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-506ab2c9e1a0",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./docs/(estate)/20.glossary.md",
+      "description": "Docs for reference.\nThis will moved to the ~/.loi dir if/when we complete a few templates which showcase the design philosphy of DIP.\nThe path from root for this section of files is ./docs/(estate)/*\nIt follows the convention of \"( )\" representing a logical grouping that isn't exposd in the route.\nThe nesting and then \"()\" wrapped tag not only drives exposure behavior but is human readable explanations as to \"what type\" of doc this is."
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-507544b275b8",
+      "kind": "Directory",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./public/static",
+      "description": "A POC that we \"get you\" the user and that our \"bottom up\" doc generation does not end at a panel in the ID but crosses the finish line at a web platform compliant bundle which will one day encaptulate any JS framework current or to come in the future.\n"
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-508dd5d284db",
+      "kind": "Directory",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./public/assets",
+      "description": "A POC that we \"get you\" the user and that our \"bottom up\" doc generation does not end at a panel in the ID but crosses the finish line at a web platform compliant bundle which will one day encaptulate any JS framework current or to come in the future.\n"
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-5097dd3e6c9d",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./public/css/style.css",
+      "description": "A POC that we \"get you\" the user and that our \"bottom up\" doc generation does not end at a panel in the ID but crosses the finish line at a web platform compliant bundle which will one day encaptulate any JS framework current or to come in the future.\n"
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-50a6e52e3e44",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./public/js/main.js",
+      "description": "A POC that we \"get you\" the user and that our \"bottom up\" doc generation does not end at a panel in the ID but crosses the finish line at a web platform compliant bundle which will one day encaptulate any JS framework current or to come in the future.\n"
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-50b80a490d08",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./public/js/delta.js",
+      "description": "A POC that we \"get you\" the user and that our \"bottom up\" doc generation does not end at a panel in the ID but crosses the finish line at a web platform compliant bundle which will one day encaptulate any JS framework current or to come in the future.\n"
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-50ca7e6f9ec1",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./public/js/md.js",
+      "description": "A POC that we \"get you\" the user and that our \"bottom up\" doc generation does not end at a panel in the ID but crosses the finish line at a web platform compliant bundle which will one day encaptulate any JS framework current or to come in the future.\n"
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-50dca812d125",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./public/js/mdx.js",
+      "description": "A POC that we \"get you\" the user and that our \"bottom up\" doc generation does not end at a panel in the ID but crosses the finish line at a web platform compliant bundle which will one day encaptulate any JS framework current or to come in the future.\n"
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-50e55767ab77",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./public/js/react.js",
+      "description": "A POC that we \"get you\" the user and that our \"bottom up\" doc generation does not end at a panel in the ID but crosses the finish line at a web platform compliant bundle which will one day encaptulate any JS framework current or to come in the future.\n"
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-50fb7140048b",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./public/js/vue.js",
+      "description": "A POC that we \"get you\" the user and that our \"bottom up\" doc generation does not end at a panel in the ID but crosses the finish line at a web platform compliant bundle which will one day encaptulate any JS framework current or to come in the future.\n"
+    },
+    {
+      "uid": "019f8c8a-dde5-7a83-8182-51002f4ec1d1",
+      "kind": "File",
+      "path": "/Users/future/KB/project/app/loi/crates/loi-zed-lsp/tmp/./public/index.html",
+      "description": "A POC that we \"get you\" the user and that our \"bottom up\" doc generation does not end at a panel in the ID but crosses the finish line at a web platform compliant bundle which will one day encaptulate any JS framework current or to come in the future.\n"
+    }
+  ]
+}

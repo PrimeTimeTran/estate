@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use tokio::sync::mpsc;
 ///--------------------------------------------------------------------------------
@@ -18,20 +19,26 @@ use tokio::sync::mpsc;
 ///--------------------------------------------------------------------------------
 /// Project/FS/Indexer/
 ///--------------------------------------------------------------------------------
+#[derive(Clone, Debug)]
 pub struct EstateDiscovery {
 	pub store: DiscoveryStore,
 	// pub tasks: DiscoveryStore,
 	pub task_tx: mpsc::Sender<Task>,
+}
+impl Default for EstateDiscovery {
+	fn default() -> Self {
+		Self {
+			task_tx: Self::prepare(),
+			store: DiscoveryStore::default(),
+		}
+	}
 }
 impl EstateDiscovery {
 	// pub fn init(probes: ProbeSet) -> std::io::Result<DiscoveryStore> {
 	// [*] Hard coded until discovery is stabilizes
 	pub fn init() -> std::io::Result<DiscoveryStore> {
 		let cwd = std::env::current_dir()?;
-		let mut discovery = EstateDiscovery {
-			store: DiscoveryStore::default(),
-			task_tx: Self::prepare(),
-		};
+		let mut discovery = Self::default();
 		walk_root_to_path(cwd, |dir| {
 			println!("dir {:?}", dir);
 			// for probe in probes {
@@ -114,7 +121,7 @@ impl DiscoverySink for EstateDiscovery {
 }
 #[derive(Debug)]
 pub enum Tool {}
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct DiscoveryStore {
 	pub items: Vec<DiscoveryItem>,
 }
@@ -123,14 +130,14 @@ pub enum DiscoveryEvent {
 	Found(RawDiscovery),
 	StartTask(Task),
 }
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum EditorKind {
 	Zed,
-	NeoVim,
-	Lapce,
-	VSCode,
+	// NeoVim,
+	// Lapce,
+	// VSCode,
 }
-#[derive(Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum DiscoveryItem {
 	Estate(PathBuf),
 	GitRepo(PathBuf),
@@ -401,6 +408,7 @@ impl FsWalker {
 		path.ancestors().last().unwrap().to_path_buf()
 	}
 }
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub enum Location {
 	File {
 		path: PathBuf,
@@ -415,7 +423,6 @@ pub enum Location {
 		uri: String,
 	},
 }
-
 pub struct DiscoveryResult {
 	workspace: Workspace,
 	packages: Vec<Package>,

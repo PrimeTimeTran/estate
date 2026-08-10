@@ -12,7 +12,7 @@ pub fn home_dir() -> std::io::Result<PathBuf> {
 /// User global estate.
 /// Example:
 /// ~/.estate
-pub fn global_estate_dir() -> std::io::Result<PathBuf> {
+pub(crate) fn global_estate_dir() -> std::io::Result<PathBuf> {
 	Ok(home_dir()?.join(".estate"))
 }
 

@@ -1,0 +1,795 @@
+use estate_engine::{
+	ClientState, Workspace,
+	compiler::diagnostic::{
+		Diagnostic as CompilerDiagnostic, RelatedTarget, Severity, Span, Suggestion,
+	},
+	core::SymKind,
+	vfs::vfs::Vfs,
+};
+use serde::{Deserialize, Serialize};
+use std::{
+	collections::HashMap,
+	env, fs,
+	path::{Path, PathBuf},
+	sync::Arc,
+	time::Duration,
+};
+use tokio::sync::Mutex;
+// use tower_lsp::lsp_types::Diagnostic as LspDiagnostic;
+use tower_lsp::{
+	Client, LanguageServer, LspService, Server,
+	jsonrpc::Result,
+	lsp_types,
+	lsp_types::{
+		CodeAction, CodeActionKind, CodeActionParams, CodeActionResponse, CompletionItemKind,
+		Diagnostic as LspDiagnostic, Diagnostic, DiagnosticSeverity, NumberOrString, Position,
+		ProgressParams, ProgressParamsValue, Range, ShowDocumentParams, Url, WorkDoneProgress,
+		WorkDoneProgressBegin, WorkDoneProgressEnd,
+		notification::Progress,
+		request::{GotoImplementationParams, GotoImplementationResponse},
+		*,
+	},
+};
+
+use uuid::Uuid;
+struct LoiLanguageServer {
+	pub client: Client,
+	pub session: Arc<Mutex<learn::core::Session>>,
+}
+#[tower_lsp::async_trait]
+impl LanguageServer for LoiLanguageServer {
+	async fn initialize(&self, _: InitializeParams) -> Result<InitializeResult> {
+		Ok(InitializeResult {
+			capabilities: ServerCapabilities {
+				code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
+				text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
+				implementation_provider: Some(ImplementationProviderCapability::Simple(true)),
+				hover_provider: Some(HoverProviderCapability::Simple(true)),
+				definition_provider: Some(OneOf::Left(true)),
+				references_provider: Some(OneOf::Left(true)),
+				document_symbol_provider: Some(OneOf::Left(true)),
+				completion_provider: Some(CompletionOptions {
+					resolve_provider: Some(false),
+					trigger_characters: Some(vec![".".into()]),
+					..Default::default()
+				}),
+				..Default::default()
+			},
+			..Default::default()
+		})
+	}
+	async fn initialized(&self, _: InitializedParams) {
+		self.log("lsp::initialized").await;
+	}
+	// 2. Document/workspace notifications
+	// IDE -> LSP
+	async fn did_open(&self, params: DidOpenTextDocumentParams) {
+		self.log("lsp::did_open").await;
+		let uri = params.text_document.uri.clone();
+		let source = params.text_document.text.clone();
+		let mut session = self.session.lock().await;
+		let workspace = &mut session.workspace;
+		let loi_diagnostics = workspace.open(uri.clone(), source.clone()).unwrap();
+		let diagnostics: Vec<LspDiagnostic> =
+			loi_diagnostics.into_iter().map(diagnostic_to_lsp).collect();
+	}
+	async fn did_change(&self, params: DidChangeTextDocumentParams) {
+		let count = {
+			let mut session = self.session.lock().await;
+			session.bump_did_change()
+		};
+		self.log(&format!("lsp::did_change #{}", count)).await;
+		let uri = params.text_document.uri;
+		let source = params
+			.content_changes
+			.first()
+			.map(|x| x.text.clone())
+			.unwrap_or_default();
+		let diagnostics = {
+			let mut session = self.session.lock().await;
+			session
+				.workspace
+				.update_file(uri.clone(), source)
+				.into_iter()
+				.map(diagnostic_to_lsp)
+				.collect::<Vec<_>>()
+		};
+		self
+			.client
+			.publish_diagnostics(uri, diagnostics, None)
+			.await;
+	}
+	async fn did_close(&self, params: DidCloseTextDocumentParams) {
+		self.log("lsp::did_close").await;
+		self
+			.client
+			.publish_diagnostics(params.text_document.uri, vec![], None)
+			.await;
+	}
+	async fn code_action(&self, params: CodeActionParams) -> Result<Option<CodeActionResponse>> {
+		self.log("lsp::code_action").await;
+		let mut actions = vec![];
+		self
+			.client
+			.log_message(
+				MessageType::INFO,
+				format!(
+					"code_action called: {} diagnostics",
+					params.context.diagnostics.len()
+				),
+			)
+			.await;
+		for diagnostic in params.context.diagnostics {
+			if let Some(data) = diagnostic.data {
+				let suggestions = data["suggestions"]
+					.as_array()
+					.map(Vec::as_slice)
+					.unwrap_or(&[]);
+				for suggestion in suggestions {
+					let action = CodeAction {
+						title: suggestion["message"].as_str().unwrap().to_string(),
+						kind: Some(CodeActionKind::QUICKFIX),
+						edit: Some(WorkspaceEdit {
+							changes: Some(HashMap::from([(
+								params.text_document.uri.clone(),
+								vec![TextEdit {
+									range: diagnostic.range,
+									new_text: suggestion["replacement"].as_str().unwrap().to_string(),
+								}],
+							)])),
+							..Default::default()
+						}),
+
+						..Default::default()
+					};
+					actions.push(CodeActionOrCommand::CodeAction(action));
+				}
+			}
+		}
+		Ok(Some(actions))
+	}
+	async fn shutdown(&self) -> Result<()> {
+		self.log("lsp::shutdown").await;
+		Ok(())
+	}
+}
+impl LoiLanguageServer {
+	// async fn workspace_symbol(
+	//     &self,
+	//     params: WorkspaceSymbolParams,
+	// ) -> Result<Option<Vec<SymbolInformation>>> {
+	//     Ok(Some(vec![]))
+	// }
+	async fn show_loi_doc(&self, path: PathBuf) {
+		let uri = match Url::from_file_path(path) {
+			Ok(uri) => uri,
+			Err(_) => {
+				self
+					.client
+					.log_message(MessageType::ERROR, "Failed to convert doc path to URI")
+					.await;
+				return;
+			}
+		};
+		self
+			.client
+			.send_request::<tower_lsp::lsp_types::request::ShowDocument>(ShowDocumentParams {
+				uri,
+				external: Some(false),
+				take_focus: Some(true),
+				selection: None,
+			})
+			.await
+			.ok();
+	}
+	async fn implementation(
+		&self,
+		_: GotoImplementationParams,
+	) -> Result<Option<GotoImplementationResponse>> {
+		self
+			.client
+			.log_message(MessageType::INFO, "implementation")
+			.await;
+		let uri =
+			Url::from_file_path(dirs::home_dir().unwrap().join(".loi/examples/drawable.loi")).unwrap();
+
+		Ok(Some(GotoImplementationResponse::Scalar(Location {
+			uri,
+			range: Range {
+				start: Position {
+					line: 25,
+					character: 0,
+				},
+				end: Position {
+					line: 31,
+					character: 1,
+				},
+			},
+		})))
+	}
+	async fn exit(&self) {
+		// terminate process if needed
+	}
+}
+impl LoiLanguageServer {
+	// 3. Requests (user actions)
+	async fn goto_declaration() {}
+	async fn goto_type_definition() {}
+	async fn goto_implementation() {}
+	async fn goto_definition(
+		&self,
+		_: GotoDefinitionParams,
+	) -> Result<Option<GotoDefinitionResponse>> {
+		self.log("lsp::goto_definition").await;
+		let path = dirs::home_dir().unwrap().join(".loi/README.md");
+		let uri = Url::from_file_path(path).unwrap();
+		Ok(Some(GotoDefinitionResponse::Scalar(Location {
+			uri: uri,
+			range: Range {
+				start: Position {
+					line: 10,
+					character: 0,
+				},
+				end: Position {
+					line: 10,
+					character: 5,
+				},
+			},
+		})))
+	}
+
+	fn semantic_tokens_full() {}
+	fn semantic_tokens_full_delta() {}
+	fn semantic_tokens_range() {}
+}
+impl LoiLanguageServer {
+	async fn preview_hover(&self, _: HoverParams) -> Result<Option<Hover>> {
+		self
+			.client
+			.log_message(MessageType::INFO, "preview hover")
+			.await;
+		let path = dirs::home_dir().unwrap().join(".loi/README.md");
+		let markdown = std::fs::read_to_string(path).unwrap_or_else(|_| "No docs found".into());
+		Ok(Some(Hover {
+			contents: HoverContents::Markup(MarkupContent {
+				kind: MarkupKind::Markdown,
+				value: markdown,
+			}),
+			range: None,
+		}))
+	}
+	async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
+		self.log("lsp::hover").await;
+		// self.notify("hi hover".to_owned()).await;
+		let uri = params.text_document_position_params.text_document.uri;
+		let position = params.text_document_position_params.position;
+		let mut session = self.session.lock().await;
+		let workspace = &mut session.workspace;
+		let Some(info) = workspace.hover(uri, position) else {
+			return Ok(None);
+		};
+		Ok(Some(Hover {
+			contents: HoverContents::Markup(MarkupContent {
+				kind: MarkupKind::Markdown,
+				value: format!(
+					r#"
+    ## `{}`
+
+    **Type:** `{}`
+
+    {}
+
+    **Location:** {}:{}
+    "#,
+					info.name,
+					info.ty,
+					info.documentation.unwrap_or_default(),
+					// info.location.file.display(),
+					format!("{}", info.location.file),
+					info.location.start_line + 1,
+				),
+			}),
+			range: Some(Range {
+				start: Position {
+					line: info.location.start_line as u32,
+					character: info.location.start_column as u32,
+				},
+				end: Position {
+					line: info.location.end_line as u32,
+					character: info.location.end_column as u32,
+				},
+			}),
+		}))
+	}
+	async fn references(&self, params: ReferenceParams) -> Result<Option<Vec<Location>>> {
+		self.log("lsp::references").await;
+		self
+			.client
+			.log_message(MessageType::INFO, "references")
+			.await;
+		Ok(Some(vec![]))
+	}
+	async fn document_symbol(
+		&self,
+		params: DocumentSymbolParams,
+	) -> Result<Option<DocumentSymbolResponse>> {
+		self.log("lsp::document_symbol").await;
+		let symbols = {
+			let mut session = self.session.lock().await;
+			let workspace = &mut session.workspace;
+			workspace
+				.symbols(&params.text_document.uri)
+				.into_iter()
+				.filter_map(|symbol| {
+					let span = symbol.span?;
+					Some(DocumentSymbol {
+						name: symbol.name,
+						detail: None,
+						kind: symbol_kind_to_lsp(symbol.kind),
+						range: span_to_range(span),
+						selection_range: span_to_range(span),
+						children: None,
+						tags: None,
+						#[allow(deprecated)]
+						deprecated: Some(false),
+					})
+				})
+				.collect::<Vec<_>>()
+		};
+		Ok(Some(DocumentSymbolResponse::Nested(symbols)))
+	}
+	async fn completion(&self, params: CompletionParams) -> Result<Option<CompletionResponse>> {
+		self.log("lsp::completion").await;
+		let items = {
+			let mut session = self.session.lock().await;
+			let workspace = &mut session.workspace;
+			workspace
+				.completion_items(
+					&params.text_document_position.text_document.uri,
+					params.text_document_position.position,
+				)
+				.into_iter()
+				.map(|item| CompletionItem {
+					label: item.name,
+					detail: item.detail,
+					kind: Some(completion_kind_to_lsp(item.kind)),
+					..Default::default()
+				})
+				.collect::<Vec<_>>()
+		};
+		Ok(Some(CompletionResponse::Array(items)))
+	}
+	async fn signature_help(&self, _: SignatureHelpParams) -> Result<Option<SignatureHelp>> {
+		self.log("lsp::signature_help").await;
+		Ok(Some(SignatureHelp {
+			signatures: vec![SignatureInformation {
+				label: "climbing_stairs(n: int)".into(),
+				documentation: Some(Documentation::String("Memoized implementation".into())),
+				parameters: None,
+				active_parameter: None,
+			}],
+			active_signature: Some(0),
+			active_parameter: Some(0),
+		}))
+	}
+}
+// Diagnostics for user
+impl LoiLanguageServer {
+	async fn log(&self, msg: &str) {
+		self.client.log_message(MessageType::INFO, msg).await;
+	}
+	async fn log_error(&self, message: impl Into<String>) {
+		self
+			.client
+			.log_message(MessageType::ERROR, message.into())
+			.await;
+	}
+	async fn notify(&self, message: String) {
+		self.client.show_message(MessageType::INFO, message).await;
+	}
+	async fn notify_info(&self, message: impl Into<String>) {
+		self
+			.client
+			.show_message(MessageType::INFO, message.into())
+			.await;
+	}
+	async fn notify_warning(&self, message: impl Into<String>) {
+		self
+			.client
+			.show_message(MessageType::WARNING, message.into())
+			.await;
+	}
+	async fn notify_error(&self, message: impl Into<String>) {
+		self
+			.client
+			.show_message(MessageType::ERROR, message.into())
+			.await;
+	}
+	// async fn logg(&self, msg: &str) {
+	// }
+	// async fn log(&self, message: impl Into<String>) {
+	// }
+}
+impl LoiLanguageServer {
+	async fn progress_create(&self, token: &str) {
+		self
+			.client
+			.send_request::<request::WorkDoneProgressCreate>(WorkDoneProgressCreateParams {
+				token: NumberOrString::String(token.into()),
+			})
+			.await
+			.ok();
+	}
+	async fn progress_start(&self, token: &str, title: &str) {
+		self
+			.client
+			.send_notification::<notification::Progress>(ProgressParams {
+				token: NumberOrString::String(token.into()),
+				value: ProgressParamsValue::WorkDone(WorkDoneProgress::Begin(WorkDoneProgressBegin {
+					title: title.into(),
+					cancellable: Some(false),
+					message: None,
+					percentage: None,
+				})),
+			})
+			.await;
+	}
+	async fn progress_end(&self, token: &str) {
+		self
+			.client
+			.send_notification::<notification::Progress>(ProgressParams {
+				token: NumberOrString::String(token.into()),
+				value: ProgressParamsValue::WorkDone(WorkDoneProgress::End(WorkDoneProgressEnd {
+					message: None,
+				})),
+			})
+			.await;
+	}
+	async fn progress_report(&self, token: &str, message: Option<&str>, percentage: Option<u32>) {
+		self
+			.client
+			.send_notification::<notification::Progress>(ProgressParams {
+				token: NumberOrString::String(token.into()),
+				value: ProgressParamsValue::WorkDone(WorkDoneProgress::Report(WorkDoneProgressReport {
+					cancellable: Some(false),
+					message: message.map(|x| x.into()),
+					percentage,
+				})),
+			})
+			.await;
+	}
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Entity {
+	pub uid: Uuid,
+	pub kind: EntityKind,
+	pub path: PathBuf,
+	pub description: Option<String>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum EntityKind {
+	Asset,
+	Config,
+	Directory,
+	Document,
+	File,
+	Source,
+	Unknown,
+}
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SectionConfig {
+	#[serde(default = "default_path")]
+	pub path: String,
+	#[serde(default)]
+	pub description: Option<String>,
+}
+pub struct EstateSection {
+	pub config: SectionConfig,
+	pub items: Vec<String>,
+}
+
+fn default_path() -> String {
+	"./".to_string()
+}
+fn span_to_range(span: learn::compiler::diagnostic::Span) -> Range {
+	Range {
+		start: Position {
+			line: span.start_line as u32,
+			character: span.start_column as u32,
+		},
+		end: Position {
+			line: span.end_line as u32,
+			character: span.end_column as u32,
+		},
+	}
+}
+fn to_lsp_severity(severity: Severity) -> DiagnosticSeverity {
+	match severity {
+		Severity::Error => DiagnosticSeverity::ERROR,
+		Severity::Warning => DiagnosticSeverity::WARNING,
+		Severity::Info => DiagnosticSeverity::INFORMATION,
+		Severity::Hint => DiagnosticSeverity::HINT,
+	}
+}
+fn diagnostic_to_lsp(d: CompilerDiagnostic) -> Diagnostic {
+	let related_information = if d.related.is_empty() {
+		None
+	} else {
+		Some(
+			d.related
+				.into_iter()
+				.filter_map(|related| {
+					let uri = match related.target {
+						RelatedTarget::File(path) => Url::from_file_path(path).ok(),
+						RelatedTarget::Url(url) => Url::parse(&url).ok(),
+					}?;
+
+					Some(DiagnosticRelatedInformation {
+						location: Location {
+							uri,
+							range: span_to_range(related.span),
+						},
+						message: related.message,
+					})
+				})
+				.collect(),
+		)
+	};
+
+	let data = if d.suggestions.is_empty() {
+		None
+	} else {
+		Some(serde_json::json!({
+				"suggestions": d.suggestions
+						.iter()
+						.map(|s| {
+								serde_json::json!({
+										"message": s.message,
+										"replacement": s.replacement,
+										"span": {
+												"start": s.span.unwrap().start,
+												"end": s.span.unwrap().end,
+										}
+								})
+						})
+						.collect::<Vec<_>>()
+		}))
+	};
+	Diagnostic {
+		range: span_to_range(d.span),
+		severity: Some(to_lsp_severity(d.severity)),
+		code: d.code.map(NumberOrString::String),
+		source: Some("loi".into()),
+		message: d.message,
+		related_information,
+		data,
+		..Default::default()
+	}
+}
+fn sym_kind_to_completion_kind(kind: SymKind) -> CompletionItemKind {
+	match kind {
+		SymKind::Function => CompletionItemKind::FUNCTION,
+		SymKind::Variable => CompletionItemKind::VARIABLE,
+		SymKind::Parameter => CompletionItemKind::VALUE,
+		SymKind::Const => CompletionItemKind::CONSTANT,
+	}
+}
+fn symbol_kind_to_lsp(kind: SymKind) -> SymbolKind {
+	match kind {
+		SymKind::Function => SymbolKind::FUNCTION,
+		SymKind::Variable => SymbolKind::VARIABLE,
+		SymKind::Parameter => SymbolKind::VARIABLE,
+		SymKind::Const => SymbolKind::CONSTANT,
+	}
+}
+fn suggestion_to_code_action(suggestion: &learn::compiler::diagnostic::Suggestion) -> CodeAction {
+	CodeAction {
+		title: suggestion.message.clone(),
+		kind: Some(CodeActionKind::QUICKFIX),
+		is_preferred: Some(true),
+		..Default::default()
+	}
+}
+fn symbol_kind_to_lsp_symbol(kind: SymKind) -> lsp_types::SymbolKind {
+	match kind {
+		SymKind::Function => lsp_types::SymbolKind::FUNCTION,
+		SymKind::Variable => lsp_types::SymbolKind::VARIABLE,
+		SymKind::Parameter => lsp_types::SymbolKind::VARIABLE,
+		SymKind::Const => lsp_types::SymbolKind::CONSTANT,
+	}
+}
+fn completion_kind_to_lsp(kind: SymKind) -> CompletionItemKind {
+	match kind {
+		SymKind::Function => CompletionItemKind::FUNCTION,
+		SymKind::Variable => CompletionItemKind::VARIABLE,
+		SymKind::Const => CompletionItemKind::CONSTANT,
+		SymKind::Parameter => CompletionItemKind::VARIABLE,
+	}
+}
+fn test_span(line_idx: usize, line: &str) -> Span {
+	Span {
+		start: 0,
+		end: line.len(),
+		start_line: line_idx,
+		start_column: 0,
+		end_line: line_idx,
+		end_column: line.len(),
+	}
+}
+fn is_lsp_test(source: &str) -> bool {
+	source.lines().any(|line| line.trim().starts_with("???"))
+}
+fn lsp_test_diagnostics(source: &str) -> Vec<CompilerDiagnostic> {
+	let mut diagnostics = Vec::new();
+	for (line_idx, line) in source.lines().enumerate() {
+		let make_span = || Span {
+			start: 0,
+			end: line.len(),
+			start_line: line_idx,
+			start_column: 0,
+			end_line: line_idx,
+			end_column: line.len(),
+		};
+		if line.contains("???fix") {
+			diagnostics.push(
+				CompilerDiagnostic::error("Replace this with a fix", make_span())
+					.with_code("LSP005")
+					.with_suggestion("Replace trigger", make_span(), "fixed"),
+			);
+		}
+		if line.contains("???error") {
+			diagnostics.push(
+				CompilerDiagnostic::error("LSP test error", make_span())
+					.with_code("LSP001")
+					.with_note("Generated by LSP test trigger"),
+			);
+		}
+		if line.contains("???warning") {
+			diagnostics
+				.push(CompilerDiagnostic::warning("LSP test warning", make_span()).with_code("LSP002"));
+		}
+		if line.contains("???info") {
+			diagnostics
+				.push(CompilerDiagnostic::info("LSP test information", make_span()).with_code("LSP003"));
+		}
+		if line.contains("???hint") {
+			diagnostics.push(CompilerDiagnostic::hint("LSP test hint", make_span()).with_code("LSP004"));
+		}
+
+		if line.contains("???link") {
+			diagnostics.push(
+				CompilerDiagnostic::error("Invalid symbol", make_span())
+					.with_code("LSP006")
+					.with_related_file("Defined here", "/Users/future/.loi/README.md", make_span()),
+			);
+		}
+		if line.contains("???web") {
+			diagnostics.push(
+				CompilerDiagnostic::error(
+					"Invalid syntax. See https://loi-lang.org/errors/LSP007",
+					make_span(),
+				)
+				.with_code("LSP007"),
+			);
+		}
+		if line.contains("???link-web") {
+			diagnostics.push(
+				CompilerDiagnostic::error(
+					"Invalid syntax. See https://loi-lang.org/errors/LSP007",
+					make_span(),
+				)
+				.with_note("Docs: https://kb-blog-primetimetran.vercel.app/"),
+			);
+		}
+	}
+	diagnostics
+}
+fn lsp_test_hover(source: &str, line: usize, character: usize) -> Option<Hover> {
+	let lines: Vec<&str> = source.lines().collect();
+	let current_line = lines.get(line)?;
+	if current_line.contains("my_test_variable") {
+		return Some(Hover {
+			contents: HoverContents::Markup(MarkupContent {
+				kind: MarkupKind::Markdown,
+				value: r#"
+## `my_test_variable`
+```loi
+let my_test_variable: Int
+Type: Int
+Value: 10
+Defined in: main.loi
+"#
+				.into(),
+			}),
+			range: None,
+		});
+	}
+	None
+}
+fn lsp_test_commands(source: &str) -> LspTestResult {
+	let mut result = LspTestResult::default();
+	for (line_idx, line) in source.lines().enumerate() {
+		let span = test_span(line_idx, line);
+		if line.contains("???error") {
+			result.diagnostics.push(
+				CompilerDiagnostic::error("LSP test error", span)
+					.with_code("LSP001")
+					.with_note("Generated by LSP test trigger"),
+			);
+		}
+		if line.contains("???warning") {
+			result
+				.diagnostics
+				.push(CompilerDiagnostic::warning("LSP test warning", span).with_code("LSP002"));
+		}
+		if line.contains("???info") {
+			result
+				.diagnostics
+				.push(CompilerDiagnostic::info("LSP test information", span).with_code("LSP003"));
+		}
+		if line.contains("???hint") {
+			result
+				.diagnostics
+				.push(CompilerDiagnostic::hint("LSP test hint", span).with_code("LSP004"));
+		}
+		if line.contains("???fix") {
+			result.diagnostics.push(
+				CompilerDiagnostic::error("Replace this with a fix", span)
+					.with_code("LSP005")
+					.with_suggestion("Replace trigger", span, "fixed"),
+			);
+		}
+		if line.contains("???notify") {
+			result.notifications.push("LOI test notification".into());
+		}
+		if line.contains("???progress") {
+			result.progress.push(LspProgressTest {
+				token: "lsp-test".into(),
+				title: "LOI indexing test".into(),
+				duration_ms: 2000,
+			});
+		}
+		if line.contains("???codeaction") {
+			result.diagnostics.push(
+				CompilerDiagnostic::error("This has a code action", span)
+					.with_code("LSP006")
+					.with_suggestion("Replace with fixed", span, "fixed"),
+			);
+		}
+	}
+	result
+}
+
+#[derive(Debug, Default)]
+struct LspTestResult {
+	pub diagnostics: Vec<CompilerDiagnostic>,
+	pub notifications: Vec<String>,
+	pub progress: Vec<LspProgressTest>,
+}
+
+#[derive(Debug, Clone)]
+struct LspProgressTest {
+	pub token: String,
+	pub title: String,
+	pub duration_ms: u64,
+}
+
+#[tokio::main]
+async fn main() {
+	let stdin = tokio::io::stdin();
+	let stdout = tokio::io::stdout();
+	// let vfs = Vfs::from_root(PathBuf::from("/path/to/project"));
+	let vfs = Vfs::from_root(PathBuf::from("/Users/future/KB/project/app/loi"));
+	let workspace = Workspace::new(vfs);
+	let session = Arc::new(Mutex::new(learn::core::Session {
+		workspace,
+		client: ClientState::default(),
+		did_change_count: 0,
+	}));
+	let (service, socket) = LspService::new(|client| LoiLanguageServer {
+		client,
+		session: session.clone(),
+	});
+	Server::new(stdin, stdout, socket).serve(service).await;
+}

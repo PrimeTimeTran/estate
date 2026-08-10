@@ -1,0 +1,1836 @@
+{
+  "uid": "00000000-0000-0000-0000-000000000000",
+  "name": "",
+  "parent": null,
+  "scope": {
+    "owner": null,
+    "visibility": "Public"
+  },
+  "nodes": [
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-cfc1a75fc127",
+      "kind": "Directory",
+      "name": "core",
+      "description": "Global files shared by every workspace.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-cfe059998a4e",
+      "kind": "Directory",
+      "name": "daemon",
+      "description": "Global files shared by every workspace.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d0065f473044",
+      "kind": "Directory",
+      "name": "dashboard",
+      "description": "Global files shared by every workspace.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d02152ffd40c",
+      "kind": "Directory",
+      "name": "executable",
+      "description": "Global files shared by every workspace.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d04a1264be96",
+      "kind": "Directory",
+      "name": "ide",
+      "description": "Global files shared by every workspace.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d0674ea195d1",
+      "kind": "Directory",
+      "name": "lsp",
+      "description": "Global files shared by every workspace.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d08ea061cb1a",
+      "kind": "Directory",
+      "name": "toolchain",
+      "description": "Global files shared by every workspace.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d0a52a90c186",
+      "kind": "File",
+      "name": "README.md",
+      "description": "Global files shared by every workspace.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d0c0b6e72ea1",
+      "kind": "Directory",
+      "name": "docs",
+      "description": "Global files shared by every workspace.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d0e70dd7e7ac",
+      "kind": "File",
+      "name": "001.md",
+      "description": "Global files shared by every workspace.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d101006571f4",
+      "kind": "Directory",
+      "name": "hooks",
+      "description": "Root workspace configuration.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d12461526199",
+      "kind": "File",
+      "name": "main.py",
+      "description": "Root workspace configuration.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d1434c324a8d",
+      "kind": "File",
+      "name": "main.rs",
+      "description": "Root workspace configuration.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d168b735df99",
+      "kind": "File",
+      "name": "main.js",
+      "description": "Root workspace configuration.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d182c731f2cf",
+      "kind": "File",
+      "name": "main.ts",
+      "description": "Root workspace configuration.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d1a7bf867ad7",
+      "kind": "Directory",
+      "name": "src",
+      "description": "Root workspace configuration.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d1cec14f62fe",
+      "kind": "File",
+      "name": "pkg.loi",
+      "description": "Root workspace configuration.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d1e4034ff46b",
+      "kind": "File",
+      "name": "settings.json",
+      "description": "Root workspace configuration.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d20d00c28d26",
+      "kind": "File",
+      "name": "index.json",
+      "description": "Root workspace configuration.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d22925cbcc2b",
+      "kind": "File",
+      "name": "view.json",
+      "description": "Root workspace configuration.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d2483b4ec8dd",
+      "kind": "File",
+      "name": "Cargo.toml",
+      "description": "Supported package managers.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d2671bf2c7da",
+      "kind": "Directory",
+      "name": "go.mod",
+      "description": "Supported package managers.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d282aff3c517",
+      "kind": "Directory",
+      "name": "go.sum",
+      "description": "Supported package managers.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d2abf95fca53",
+      "kind": "File",
+      "name": "package.json",
+      "description": "Supported package managers.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d2cbd06cd1be",
+      "kind": "File",
+      "name": "pyproject.toml",
+      "description": "Supported package managers.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d2e2c3f0ae45",
+      "kind": "File",
+      "name": "0.preface.md",
+      "description": "Core estate documentation.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d306ebcc0321",
+      "kind": "File",
+      "name": "1.introduction.md",
+      "description": "Core estate documentation.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d3236d8e7eef",
+      "kind": "File",
+      "name": "2.prologue.md",
+      "description": "Core estate documentation.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d34c9355c1d9",
+      "kind": "File",
+      "name": "3.welcome.md",
+      "description": "Core estate documentation.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d36b7221675f",
+      "kind": "File",
+      "name": "4.philosophy.md",
+      "description": "Core estate documentation.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d389e9e252bd",
+      "kind": "File",
+      "name": "4.philosophy.[zen].md",
+      "description": "Core estate documentation.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d3a65f9ddb47",
+      "kind": "File",
+      "name": "4.philosophy.[problem-space].md",
+      "description": "Core estate documentation.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d3cded63cbc4",
+      "kind": "File",
+      "name": "4.philosophy.[pain-point].md",
+      "description": "Core estate documentation.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d3e463d483fe",
+      "kind": "File",
+      "name": "4.philosophy.[reality].md",
+      "description": "Core estate documentation.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d40745d4a07b",
+      "kind": "File",
+      "name": "4.philosophy.[friction].md",
+      "description": "Core estate documentation.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d42ca8a1fca2",
+      "kind": "File",
+      "name": "4.philosophy.[vision].md",
+      "description": "Core estate documentation.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d441250e9e2b",
+      "kind": "File",
+      "name": "5.analogy.[deck-of-cards].md",
+      "description": "Core estate documentation.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d46b7a197d01",
+      "kind": "File",
+      "name": "5.analogy.[analog-television].md",
+      "description": "Core estate documentation.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d48f19dc9e3a",
+      "kind": "File",
+      "name": "5.analogy.[carrier-pigeon].md",
+      "description": "Core estate documentation.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d4acfee3a556",
+      "kind": "File",
+      "name": "5.analogy.[open-closed-principle].md",
+      "description": "Core estate documentation.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d4c6b838eb39",
+      "kind": "File",
+      "name": "6.goal.md",
+      "description": "Core estate documentation.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d4e81495bd6b",
+      "kind": "File",
+      "name": "7.rationale.md",
+      "description": "Core estate documentation.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d502e745fbfd",
+      "kind": "File",
+      "name": "8.principles.md",
+      "description": "Core estate documentation.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d52d30480378",
+      "kind": "File",
+      "name": "9.architecture.md",
+      "description": "Core estate documentation.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d54e5101e720",
+      "kind": "File",
+      "name": "10.specification.md",
+      "description": "Core estate documentation.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d566122f5226",
+      "kind": "File",
+      "name": "11.roadmap.md",
+      "description": "Core estate documentation.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d581c446e05d",
+      "kind": "File",
+      "name": "12.guide.md",
+      "description": "Core estate documentation.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d5a21a4b51a0",
+      "kind": "File",
+      "name": "13.best-practices.[open-closed-principle].md",
+      "description": "Core estate documentation.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d5cda9c6a113",
+      "kind": "File",
+      "name": "14.conventions.md",
+      "description": "Core estate documentation.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d5e8a295a95e",
+      "kind": "File",
+      "name": "15.cheatsheet.md",
+      "description": "Core estate documentation.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d60d43d6967c",
+      "kind": "File",
+      "name": "16.examples.md",
+      "description": "Core estate documentation.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d62a95ec6c0b",
+      "kind": "File",
+      "name": "17.community.md",
+      "description": "Core estate documentation.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d649f19d3c72",
+      "kind": "File",
+      "name": "18.contributing.md",
+      "description": "Core estate documentation.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d66b508ea529",
+      "kind": "File",
+      "name": "19.references.md",
+      "description": "Core estate documentation.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d68da7318601",
+      "kind": "File",
+      "name": "20.glossary.md",
+      "description": "Core estate documentation.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d6ad3dd705d8",
+      "kind": "Directory",
+      "name": "assets",
+      "description": "Static showcase.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d6c29db43768",
+      "kind": "File",
+      "name": "style.css",
+      "description": "Static showcase.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d6e115479672",
+      "kind": "File",
+      "name": "main.js",
+      "description": "Static showcase.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d7014232dfa9",
+      "kind": "File",
+      "name": "delta.js",
+      "description": "Static showcase.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d720dc38fbaa",
+      "kind": "File",
+      "name": "md.js",
+      "description": "Static showcase.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d740ca7d3196",
+      "kind": "File",
+      "name": "mdx.js",
+      "description": "Static showcase.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d7621c1f14f5",
+      "kind": "File",
+      "name": "react.js",
+      "description": "Static showcase.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d781d1c975b2",
+      "kind": "File",
+      "name": "vue.js",
+      "description": "Static showcase.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d7a5732ca236",
+      "kind": "Directory",
+      "name": "static",
+      "description": "Static showcase.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d7cf679e18c2",
+      "kind": "File",
+      "name": "index.html",
+      "description": "Static showcase.",
+      "scope": {
+        "owner": "",
+        "visibility": "Personal"
+      },
+      "tags": [],
+      "created_at": "2026-07-26T12:50:45.525260Z",
+      "updated_at": "2026-07-26T12:50:45.525260Z"
+    }
+  ],
+  "resources": [
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-cfd5ac34d40c",
+      "kind": "Directory",
+      "location": {
+        "Directory": "/Users/future/.loi/core"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-cff4d1109775",
+      "kind": "Directory",
+      "location": {
+        "Directory": "/Users/future/.loi/daemon"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d012632b5b40",
+      "kind": "Directory",
+      "location": {
+        "Directory": "/Users/future/.loi/dashboard"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d030bc77a9ef",
+      "kind": "Directory",
+      "location": {
+        "Directory": "/Users/future/.loi/executable"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d052cbd8f20d",
+      "kind": "Directory",
+      "location": {
+        "Directory": "/Users/future/.loi/ide"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d072972208fb",
+      "kind": "Directory",
+      "location": {
+        "Directory": "/Users/future/.loi/lsp"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d09e48686245",
+      "kind": "Directory",
+      "location": {
+        "Directory": "/Users/future/.loi/toolchain"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d0b9a86214cf",
+      "kind": "Document",
+      "location": {
+        "File": "/Users/future/.loi/README.md"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d0df41d53f15",
+      "kind": "Directory",
+      "location": {
+        "Directory": "/Users/future/.loi/docs"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d0fd3bedb3cf",
+      "kind": "Document",
+      "location": {
+        "File": "/Users/future/.loi/errors/001.md"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d110d4c0721f",
+      "kind": "Directory",
+      "location": {
+        "Directory": "/Users/future/KB/project/app/loi/crates/learn/gen/./src/hooks"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d130283d30d2",
+      "kind": "Generated",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/./src/main.py"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d1522d5647d8",
+      "kind": "Source",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/./src/main.rs"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d17bfd849c06",
+      "kind": "Generated",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/./src/main.js"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d194a9334c0a",
+      "kind": "Generated",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/./src/main.ts"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d1bf1e5d6416",
+      "kind": "Directory",
+      "location": {
+        "Directory": "/Users/future/KB/project/app/loi/crates/learn/gen/./src"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d1d7ebfc0619",
+      "kind": "Generated",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/./pkg.loi"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d1f827051343",
+      "kind": "Config",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/./.loi/settings.json"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d2199a20db88",
+      "kind": "Config",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/./.loi/index.json"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d23126e4cc22",
+      "kind": "Config",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/./.loi/view.json"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d2508e595c3d",
+      "kind": "Config",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/./Cargo.toml"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d27cc65d507a",
+      "kind": "Directory",
+      "location": {
+        "Directory": "/Users/future/KB/project/app/loi/crates/learn/gen/./go.mod"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d294ad990040",
+      "kind": "Directory",
+      "location": {
+        "Directory": "/Users/future/KB/project/app/loi/crates/learn/gen/./go.sum"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d2bca71321a1",
+      "kind": "Config",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/./package.json"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d2deb2e012a1",
+      "kind": "Config",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/./pyproject.toml"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d2f5da5ede87",
+      "kind": "Document",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/public/static/0.preface.md"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d3100c81a08a",
+      "kind": "Document",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/public/static/1.introduction.md"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d3397e96d6b3",
+      "kind": "Document",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/public/static/2.prologue.md"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d35033b2c687",
+      "kind": "Document",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/public/static/3.welcome.md"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d373a364b8d5",
+      "kind": "Document",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/public/static/4.philosophy.md"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d39071a74086",
+      "kind": "Document",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/public/static/4.philosophy.[zen].md"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d3be8ec4319c",
+      "kind": "Document",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/public/static/4.philosophy.[problem-space].md"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d3ddbd1c2313",
+      "kind": "Document",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/public/static/4.philosophy.[pain-point].md"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d3fda81cfdda",
+      "kind": "Document",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/public/static/4.philosophy.[reality].md"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d4178454de5b",
+      "kind": "Document",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/public/static/4.philosophy.[friction].md"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d4313fa7d87d",
+      "kind": "Document",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/public/static/4.philosophy.[vision].md"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d45ee3a43163",
+      "kind": "Document",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/public/static/5.analogy.[deck-of-cards].md"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d472a8562427",
+      "kind": "Document",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/public/static/5.analogy.[analog-television].md"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d493d9a34860",
+      "kind": "Document",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/public/static/5.analogy.[carrier-pigeon].md"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d4b8fbb8412a",
+      "kind": "Document",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/public/static/5.analogy.[open-closed-principle].md"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d4d8f87522cc",
+      "kind": "Document",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/public/static/6.goal.md"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d4f9c6a1bc65",
+      "kind": "Document",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/public/static/7.rationale.md"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d5115930bece",
+      "kind": "Document",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/public/static/8.principles.md"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d53642582183",
+      "kind": "Document",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/public/static/9.architecture.md"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d559b54e03f4",
+      "kind": "Document",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/public/static/10.specification.md"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d57ce39a7a82",
+      "kind": "Document",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/public/static/11.roadmap.md"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d5995bb2992f",
+      "kind": "Document",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/public/static/12.guide.md"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d5bec1f1a5f2",
+      "kind": "Document",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/public/static/13.best-practices.[open-closed-principle].md"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d5d0fc630e40",
+      "kind": "Document",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/public/static/14.conventions.md"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d5f4aab9f1d6",
+      "kind": "Document",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/public/static/15.cheatsheet.md"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d6187286c4c1",
+      "kind": "Document",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/public/static/16.examples.md"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d63848ca0783",
+      "kind": "Document",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/public/static/17.community.md"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d65da91600e0",
+      "kind": "Document",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/public/static/18.contributing.md"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d676b14ebf7c",
+      "kind": "Document",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/public/static/19.references.md"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d694bf88aefb",
+      "kind": "Document",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/public/static/20.glossary.md"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d6b76b7a13b1",
+      "kind": "Directory",
+      "location": {
+        "Directory": "/Users/future/KB/project/app/loi/crates/learn/gen/./public/assets"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d6d994c912af",
+      "kind": "Generated",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/./public/css/style.css"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d6faec73f7c0",
+      "kind": "Generated",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/./public/js/main.js"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d71abba151b0",
+      "kind": "Generated",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/./public/js/delta.js"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d73abd74cf71",
+      "kind": "Generated",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/./public/js/md.js"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d75eff6aeaa7",
+      "kind": "Generated",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/./public/js/mdx.js"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d77da02b95b0",
+      "kind": "Generated",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/./public/js/react.js"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d796bcdfbcde",
+      "kind": "Generated",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/./public/js/vue.js"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d7bb676a8c10",
+      "kind": "Directory",
+      "location": {
+        "Directory": "/Users/future/KB/project/app/loi/crates/learn/gen/./public/static"
+      },
+      "range": null,
+      "git": null
+    },
+    {
+      "uid": "019f9e7a-5695-7b72-9afa-d7d0d980074f",
+      "kind": "Generated",
+      "location": {
+        "File": "/Users/future/KB/project/app/loi/crates/learn/gen/./public/index.html"
+      },
+      "range": null,
+      "git": null
+    }
+  ],
+  "relations": [],
+  "bindings": [
+    {
+      "node": "019f9e7a-5695-7b72-9afa-cfc1a75fc127",
+      "resource": "019f9e7a-5695-7b72-9afa-cfd5ac34d40c",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-cfe059998a4e",
+      "resource": "019f9e7a-5695-7b72-9afa-cff4d1109775",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d0065f473044",
+      "resource": "019f9e7a-5695-7b72-9afa-d012632b5b40",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d02152ffd40c",
+      "resource": "019f9e7a-5695-7b72-9afa-d030bc77a9ef",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d04a1264be96",
+      "resource": "019f9e7a-5695-7b72-9afa-d052cbd8f20d",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d0674ea195d1",
+      "resource": "019f9e7a-5695-7b72-9afa-d072972208fb",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d08ea061cb1a",
+      "resource": "019f9e7a-5695-7b72-9afa-d09e48686245",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d0a52a90c186",
+      "resource": "019f9e7a-5695-7b72-9afa-d0b9a86214cf",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d0c0b6e72ea1",
+      "resource": "019f9e7a-5695-7b72-9afa-d0df41d53f15",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d0e70dd7e7ac",
+      "resource": "019f9e7a-5695-7b72-9afa-d0fd3bedb3cf",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d101006571f4",
+      "resource": "019f9e7a-5695-7b72-9afa-d110d4c0721f",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d12461526199",
+      "resource": "019f9e7a-5695-7b72-9afa-d130283d30d2",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d1434c324a8d",
+      "resource": "019f9e7a-5695-7b72-9afa-d1522d5647d8",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d168b735df99",
+      "resource": "019f9e7a-5695-7b72-9afa-d17bfd849c06",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d182c731f2cf",
+      "resource": "019f9e7a-5695-7b72-9afa-d194a9334c0a",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d1a7bf867ad7",
+      "resource": "019f9e7a-5695-7b72-9afa-d1bf1e5d6416",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d1cec14f62fe",
+      "resource": "019f9e7a-5695-7b72-9afa-d1d7ebfc0619",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d1e4034ff46b",
+      "resource": "019f9e7a-5695-7b72-9afa-d1f827051343",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d20d00c28d26",
+      "resource": "019f9e7a-5695-7b72-9afa-d2199a20db88",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d22925cbcc2b",
+      "resource": "019f9e7a-5695-7b72-9afa-d23126e4cc22",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d2483b4ec8dd",
+      "resource": "019f9e7a-5695-7b72-9afa-d2508e595c3d",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d2671bf2c7da",
+      "resource": "019f9e7a-5695-7b72-9afa-d27cc65d507a",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d282aff3c517",
+      "resource": "019f9e7a-5695-7b72-9afa-d294ad990040",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d2abf95fca53",
+      "resource": "019f9e7a-5695-7b72-9afa-d2bca71321a1",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d2cbd06cd1be",
+      "resource": "019f9e7a-5695-7b72-9afa-d2deb2e012a1",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d2e2c3f0ae45",
+      "resource": "019f9e7a-5695-7b72-9afa-d2f5da5ede87",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d306ebcc0321",
+      "resource": "019f9e7a-5695-7b72-9afa-d3100c81a08a",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d3236d8e7eef",
+      "resource": "019f9e7a-5695-7b72-9afa-d3397e96d6b3",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d34c9355c1d9",
+      "resource": "019f9e7a-5695-7b72-9afa-d35033b2c687",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d36b7221675f",
+      "resource": "019f9e7a-5695-7b72-9afa-d373a364b8d5",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d389e9e252bd",
+      "resource": "019f9e7a-5695-7b72-9afa-d39071a74086",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d3a65f9ddb47",
+      "resource": "019f9e7a-5695-7b72-9afa-d3be8ec4319c",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d3cded63cbc4",
+      "resource": "019f9e7a-5695-7b72-9afa-d3ddbd1c2313",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d3e463d483fe",
+      "resource": "019f9e7a-5695-7b72-9afa-d3fda81cfdda",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d40745d4a07b",
+      "resource": "019f9e7a-5695-7b72-9afa-d4178454de5b",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d42ca8a1fca2",
+      "resource": "019f9e7a-5695-7b72-9afa-d4313fa7d87d",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d441250e9e2b",
+      "resource": "019f9e7a-5695-7b72-9afa-d45ee3a43163",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d46b7a197d01",
+      "resource": "019f9e7a-5695-7b72-9afa-d472a8562427",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d48f19dc9e3a",
+      "resource": "019f9e7a-5695-7b72-9afa-d493d9a34860",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d4acfee3a556",
+      "resource": "019f9e7a-5695-7b72-9afa-d4b8fbb8412a",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d4c6b838eb39",
+      "resource": "019f9e7a-5695-7b72-9afa-d4d8f87522cc",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d4e81495bd6b",
+      "resource": "019f9e7a-5695-7b72-9afa-d4f9c6a1bc65",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d502e745fbfd",
+      "resource": "019f9e7a-5695-7b72-9afa-d5115930bece",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d52d30480378",
+      "resource": "019f9e7a-5695-7b72-9afa-d53642582183",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d54e5101e720",
+      "resource": "019f9e7a-5695-7b72-9afa-d559b54e03f4",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d566122f5226",
+      "resource": "019f9e7a-5695-7b72-9afa-d57ce39a7a82",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d581c446e05d",
+      "resource": "019f9e7a-5695-7b72-9afa-d5995bb2992f",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d5a21a4b51a0",
+      "resource": "019f9e7a-5695-7b72-9afa-d5bec1f1a5f2",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d5cda9c6a113",
+      "resource": "019f9e7a-5695-7b72-9afa-d5d0fc630e40",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d5e8a295a95e",
+      "resource": "019f9e7a-5695-7b72-9afa-d5f4aab9f1d6",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d60d43d6967c",
+      "resource": "019f9e7a-5695-7b72-9afa-d6187286c4c1",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d62a95ec6c0b",
+      "resource": "019f9e7a-5695-7b72-9afa-d63848ca0783",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d649f19d3c72",
+      "resource": "019f9e7a-5695-7b72-9afa-d65da91600e0",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d66b508ea529",
+      "resource": "019f9e7a-5695-7b72-9afa-d676b14ebf7c",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d68da7318601",
+      "resource": "019f9e7a-5695-7b72-9afa-d694bf88aefb",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d6ad3dd705d8",
+      "resource": "019f9e7a-5695-7b72-9afa-d6b76b7a13b1",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d6c29db43768",
+      "resource": "019f9e7a-5695-7b72-9afa-d6d994c912af",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d6e115479672",
+      "resource": "019f9e7a-5695-7b72-9afa-d6faec73f7c0",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d7014232dfa9",
+      "resource": "019f9e7a-5695-7b72-9afa-d71abba151b0",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d720dc38fbaa",
+      "resource": "019f9e7a-5695-7b72-9afa-d73abd74cf71",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d740ca7d3196",
+      "resource": "019f9e7a-5695-7b72-9afa-d75eff6aeaa7",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d7621c1f14f5",
+      "resource": "019f9e7a-5695-7b72-9afa-d77da02b95b0",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d781d1c975b2",
+      "resource": "019f9e7a-5695-7b72-9afa-d796bcdfbcde",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d7a5732ca236",
+      "resource": "019f9e7a-5695-7b72-9afa-d7bb676a8c10",
+      "range": null,
+      "git": null
+    },
+    {
+      "node": "019f9e7a-5695-7b72-9afa-d7cf679e18c2",
+      "resource": "019f9e7a-5695-7b72-9afa-d7d0d980074f",
+      "range": null,
+      "git": null
+    }
+  ]
+}

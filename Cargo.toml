@@ -1,12 +1,17 @@
 [package]
-name = "estate-engine"
+name = "estate"
 version = "0.1.0"
 edition = "2024"
 
+
+[[bin]]
+name = "bootstrap"
+path = "src/bin/bootstrap-1.rs"
+
 [dependencies]
 # Internal
-macros-decl.workspace = true
 macros.workspace = true
+macros-decl.workspace = true
 macros-proc.workspace = true
 cli = { path = "../cli" }
 revelation = { path = "../revelation" }
@@ -35,17 +40,17 @@ thiserror.workspace = true
 toml.workspace = true
 tower-lsp.workspace = true
 turbovault-parser.workspace = true
+tray-icon.workspace = true
+winit.workspace = true
+url.workspace = true
+resvg.workspace = true
+image.workspace = true
+demand.workspace = true
+comfy-table.workspace = true
 
-comfy-table = "7.2.2"
 strum = { version = "0.28.0", features = ["derive"] }
 tokio = { version = "1", features = ["full"] }
 uuid = { version = "1.24.0", features = ["v7", "serde"] }
-demand = "2.0.5"
-tray-icon = "0.24.2"
-winit = "0.30.13"
-url = "2.5.8"
-resvg = "0.48.1"
-image = "0.25.10"
 
 [build-dependencies]
-resvg = "0.48.1"
+resvg.workspace = true

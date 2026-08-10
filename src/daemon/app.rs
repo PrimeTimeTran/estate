@@ -165,6 +165,7 @@ impl Context {
 			source,
 			workspace: std::env::current_dir()?,
 			estate_root: crate::daemon::resolver::global_estate_dir()?,
+			// estate_root: global_estate_dir()?,
 			engine_root: crate::daemon::resolver::engine_data_dir()?,
 		})
 	}
@@ -178,6 +179,7 @@ impl Context {
 #[derive(Debug)]
 enum DaemonCommand {
 	Stop,
+	// Metrics,
 	// Restart,
 	// Refresh,
 	// Enable,

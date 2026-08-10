@@ -17,6 +17,7 @@ use cli::Command;
 // 	let cli_ctx = cli::Context::new();
 // 	router::execute(parsed_cli, cli_ctx, estate_ctx).await;
 // }
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
 	let parsed_cli = cli::parse();
@@ -32,3 +33,14 @@ async fn main() -> anyhow::Result<()> {
 	}
 	Ok(())
 }
+
+mod test_1 {}
+mod test_2 {}
+mod test_3 {}
+
+pub fn foo1() {}
+pub fn foo2() {}
+pub fn foo3() {}
+pub fn foo4() {}
+pub fn foo5() {}
+pub fn foo6() {}

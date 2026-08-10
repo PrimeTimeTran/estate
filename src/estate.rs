@@ -1,6 +1,8 @@
-use crate::{_core::*, daemon::daemon::ActionRegistry, vfs::Inode};
+use crate::{_core::*, vfs::Inode};
 use anyhow::Error;
+use serde::{Deserialize, Serialize};
 use std::path::Path;
+
 //                        ┌─────────────────────┐
 //                        │       Estate        │
 //                        │  semantic engine    │
@@ -66,9 +68,9 @@ pub trait Index {
 /// Resolver
 ///     "What does C mean?"
 pub trait Resolver {
-	fn resolve(&self, id: EstateId) -> Option<Resource>;
-	fn lookup(&self, reference: &str, scope: EstateScope) -> Vec<Resolution>;
+	fn resolve(&self, reference: &Reference, context: &ResolveContext) -> Vec<Resolution>;
 }
+
 /// Initialization
 /// - I installed estate engine
 /// - I opened the estate IDE
@@ -114,15 +116,17 @@ pub trait Vfs {
 /// Abstraction for ranking responses which are not deteminitic.
 /// - "Give me package.json" can produce many results
 /// - "Give me available" commnands can produce different results depending on file .ext, settings.json, UI focus, and state.
+#[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
 pub struct Resolution {
 	pub id: EstateId,
 	pub confidence: f32,
+	pub resource: Resource,
+	pub fragment: Option<String>,
 	// pub reason: ResolutionReason,
 }
 
 ///--------------------------------------------------------------------------------
 /// Estate:
-///
 /// - install root personal estate
 /// - init workspace/project
 /// - init framework repo
@@ -177,18 +181,31 @@ pub struct Resolution {
 // }
 
 /// LSP, Linter, FS Registry/index,
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum EstateScope {
 	System,
 	User,
+	#[default]
 	Workspace,
 }
-
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub struct Resource {
 	pub id: EstateId,
 	pub kind: ResourceKind,
 	pub locations: Vec<Location>,
 	pub aliases: Vec<String>,
 }
+impl Default for Resource {
+	fn default() -> Self {
+		Self {
+			id: EstateId::new(),
+			kind: ResourceKind::File,
+			locations: vec![],
+			aliases: vec![],
+		}
+	}
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ResourceKind {
 	File,
 	Symbol,
@@ -197,21 +214,29 @@ pub enum ResourceKind {
 	Project,
 	Generated,
 }
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub struct ResourceMetadata {
 	pub created_at: u64,
 	pub updated_at: u64,
 	pub scope: EstateScope,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub struct EstateId(u64);
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+use std::sync::atomic::{AtomicU64, Ordering};
+static NEXT_ESTATE_ID: AtomicU64 = AtomicU64::new(1);
+impl EstateId {
+	pub fn new() -> Self {
+		Self(NEXT_ESTATE_ID.fetch_add(1, Ordering::Relaxed))
+	}
+}
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub struct Node;
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub struct NodeId;
 
 /// Estate owns the capabilities and domain model; the daemon exposes those capabilities as a long-lived service.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub struct Estate {
 	pub registry: EstateRegistry,
 	pub index: EstateIndex,
@@ -223,30 +248,7 @@ pub struct Estate {
 	pub search: SearchService,
 	pub analysis: AnalysisService,
 }
-
-/// Verb layer: format, rename, save, index, analyze, build, search, resolve, organize imports, find references, go to definition
-pub struct EstateDaemon {
-	pub estate: Estate,
-	// pub vfs: EstateVfs,
-	// pub graph: EstateGraph,
-	pub actions: ActionRegistry,
-	pub discovery: EstateDiscovery,
-	// pub actions: ActionRegistry,
-	// pub resolver: EstateResolver,
-	// pub registry: EstateRegistry,
-}
-// impl Daemon for EstateDaemon {
-// 	fn execute(&mut self, _action: Action) -> Result<Response, Error> {
-// 		todo!("")
-// 	}
-// 	fn start(&mut self) -> Result<(), Error> {
-// 		todo!("")
-// 	}
-// 	fn stop(&mut self) -> Result<(), Error> {
-// 		todo!("")
-// 	}
-// }
-
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Change {
 	Created(NodeId),
 	Modified(NodeId),
@@ -255,11 +257,13 @@ pub enum Change {
 	ConfigChanged,
 	WorkspaceChanged,
 }
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Query {
 	pub text: String,
 	pub scope: EstateScope,
 	pub context: ResolutionContext,
 }
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
 struct ResolutionContext;
 
 /// Data / truth
@@ -281,25 +285,49 @@ struct ResolutionContext;
 /// - IPC
 /// - watchers
 /// - retry
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
 struct EstateRegistry;
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
 struct EstateIndex;
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
 struct EstateResolver;
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
 struct EstateGraph;
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
 struct EstateDiscovery;
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
 struct EstateVfs;
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub struct AnchorService {
 	registry: EstateRegistry,
 	index: EstateIndex,
 	resolver: EstateResolver,
 }
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
 struct SearchService;
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
 struct AnalysisService;
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
+pub enum ReferenceKind {
+	#[default]
+	File,
+	Link,
+	Embed,
+	Relative,
+	// potentially:
+	Anchor,
+	Asset,
+}
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
+pub struct Reference<'a> {
+	pub target: &'a str,
+	pub fragment: Option<&'a str>,
+	pub kind: ReferenceKind,
+}
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
+pub struct ResolveContext {
+	pub scope: EstateScope,
+	pub from: EstateId,
+}

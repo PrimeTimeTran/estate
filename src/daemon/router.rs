@@ -16,27 +16,38 @@ use crate::{
 use cli::{CliCommand, Command, Context as CliContext};
 use revelation::analyzer::Workspace;
 
-pub async fn execute(parsed_cli: cli::Cli, ctx: CliContext, _est_cxt: app::Context) {
+pub async fn execute(parsed_cli: cli::Cli, ctx: CliContext, app: app::Context) {
 	match parsed_cli.command {
-		// 1. The Daemon Server Command (bootstraps your background server)
-		// - live and watch requests come in
-		// $ cg-rb loi daemon --live
-		// - normally
-		// cg-rb loi daemon
+		Command::Foo(_args) => {
+			let _ = EstateDiscovery::init();
+		}
+		Command::Format(args) => {
+			LintDaemon.run(&ctx, &args).await;
+		}
+		Command::Metrics(args) => match AnalyzeDaemon.run(&ctx, &args).await {
+			Ok(workspace) => {
+				// "/Users/future/KB/project/crates/estate-engine/src/main.rs"
+				// $ cargo run metrics "/Users/future/KB/project/crates/estate-engine/src/main.rs"
+				AnalyzeLoop::run_cli(workspace).await;
+			}
+			Err(err) => {
+				eprintln!("Analyze failed: {err}");
+				std::process::exit(1);
+			}
+		},
 		Command::Daemon { live } => {
 			let workspace = Workspace::new();
 			let ctx = app::Context::new(app::ContextSource::Cli).expect("failed creating estate context");
-			let mut daemon = BackgroundDaemon::new(workspace, ctx);
 			// OS Menubar
 			// daemon.run().await?;
+			let mut daemon = BackgroundDaemon::new(workspace, ctx);
 			let options = DaemonOptions { foreground: live };
 			if let Err(e) = daemon.start(options).await {
 				eprintln!("Daemon error: {}", e);
 			}
 		}
-		// 2. The Analyze Client Command (pings the socket and prints response)
-		// Inside your Command::Analyze handler:
 		Command::Analyze(args) => {
+			eprint!("analyze");
 			let mut stream = match UnixStream::connect(SOCKET_PATH).await {
 				Ok(s) => s,
 				Err(_) => {
@@ -47,13 +58,13 @@ pub async fn execute(parsed_cli: cli::Cli, ctx: CliContext, _est_cxt: app::Conte
 			for path in &args.paths {
 				let clean_path = path.canonicalize().unwrap_or_else(|_| path.clone());
 				// Just pass the file path and line/offset directly as raw fields
-				let request_payload = serde_json::json!({
+				let request = serde_json::json!({
 						"path": clean_path,
 						"line": args.line,
 						"column": &args.column,
 						"mode": args.mode
 				});
-				let payload = format!("{}\n", request_payload);
+				let payload = format!("{}\n", request);
 				if let Err(e) = stream.write_all(payload.as_bytes()).await {
 					eprintln!("Failed to send request: {}", e);
 					break;
@@ -71,9 +82,6 @@ pub async fn execute(parsed_cli: cli::Cli, ctx: CliContext, _est_cxt: app::Conte
 				}
 			}
 		}
-		Command::Foo(_args) => {
-			let _ = EstateDiscovery::init();
-		}
 		Command::Bar(args) => {
 			LintDaemon.run(&ctx, &args).await;
 		}
@@ -81,44 +89,6 @@ pub async fn execute(parsed_cli: cli::Cli, ctx: CliContext, _est_cxt: app::Conte
 			LintDaemon.run(&ctx, &args).await;
 		}
 		Command::Ham(args) => {
-			LintDaemon.run(&ctx, &args).await;
-		}
-
-		// Command::Analyze(args) =>  {
-		//     let workspace = Workspace::new();
-		//     // 1. Initialize the daemon and get the message sender handle
-		//     let (daemon, tx) = start::BackgroundDaemon::new(workspace);
-
-		//     // 2. Spawn the daemon into the background so it doesn't block the CLI
-		//     tokio::spawn(async move {
-		//         daemon.run().await;
-		//     });
-
-		//     // 3. Send an initial request to trigger it immediately (if desired)
-		//     if let Err(e) = tx.send(AnalyzeRequest::RunAnalysis).await {
-		//         eprintln!("Failed to send analysis request to background daemon: {}", e);
-		//     }
-
-		//     // start::BackgroundDaemon::run(&ctx, &args).await;
-		//     // let workspace = Workspace::new();
-		//     // AnalyzeLoop::run();
-		//     // Ok(workspace) => {
-		//     // }
-		//     // Err(err) => {
-		//     //     eprintln!("Analyze failed: {err}");
-		//     //     std::process::exit(1);
-		//     // }
-		// },
-		// Command::Analyze(args) => match AnalyzeDaemon.run(&ctx, &args).await {
-		//     Ok(workspace) => {
-		//         AnalyzeLoop::run(workspace).await;
-		//     }
-		//     Err(err) => {
-		//         eprintln!("Analyze failed: {err}");
-		//         std::process::exit(1);
-		//     }
-		// },
-		Command::Format(args) => {
 			LintDaemon.run(&ctx, &args).await;
 		}
 		// Server
@@ -152,6 +122,7 @@ pub async fn execute(parsed_cli: cli::Cli, ctx: CliContext, _est_cxt: app::Conte
 		Command::ViewFork { name } => ViewFork { name }.run(&ctx).await,
 		Command::ViewList => ViewList.run(&ctx).await,
 		Command::Deps { name } => Deps { name }.run(&ctx).await,
+
 		_ => {
 			todo!("")
 		}

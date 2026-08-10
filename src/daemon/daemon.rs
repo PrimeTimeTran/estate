@@ -1,4 +1,7 @@
-use crate::{constants::PID_PATH, daemon::*};
+use crate::{
+	constants::*,
+	daemon::{start::*, *},
+};
 use cli::{CliCommand, Context as CliContext, FormatArgs};
 use comfy_table::{Cell, Table, presets::UTF8_FULL};
 use revelation::analyzer::*;
@@ -10,7 +13,11 @@ use std::{
 	path::PathBuf,
 	time::{SystemTime, UNIX_EPOCH},
 };
-use tokio::sync::mpsc;
+use tokio::{
+	io::{AsyncReadExt as _, AsyncWriteExt as _},
+	net::UnixStream,
+	sync::mpsc,
+};
 ///--------------------------------------------------------------------------------
 /// Daemon
 ///--------------------------------------------------------------------------------
@@ -95,7 +102,7 @@ impl CliCommand for StatusDaemon {
 		// }
 		use tokio::io::{AsyncReadExt, AsyncWriteExt};
 		// 1. Daemon
-		match tokio::net::UnixStream::connect("/tmp/estate-daemon.sock").await {
+		match tokio::net::UnixStream::connect(SOCKET_PATH).await {
 			Ok(mut stream) => {
 				stream.write_all(b"status\n").await.unwrap();
 				let mut buf = vec![0; 1024];
@@ -124,15 +131,14 @@ impl AnalyzeDaemon {
 	pub async fn run(
 		&self,
 		_ctx: &CliContext,
-		args: &cli::FormatArgs,
+		args: &cli::AnalyzeArgs,
 	) -> Result<Workspace, AnalysisError> {
-		let target_path = PathBuf::from(&args.path);
+		let target_path = PathBuf::from(&args.paths[0]);
 		let request = Analyze {
 			target: AnalysisTarget::File(target_path.clone()),
 			subject: None,
 		};
 		let analyzer = RustAnalyzer;
-
 		let options = AnalyzerOptions::default();
 		let workspace = analyzer.analyze(request, &options)?;
 		let _metrics = workspace.metrics();
@@ -152,7 +158,6 @@ impl AnalyzeLoop {
 	// [Request] handler
 	pub async fn run(mut self) {
 		let actions = ActionRegistry::from_analysis(&self.workspace);
-
 		// This loop pauses completely until a message is sent over the channel
 		while let Some(request) = self.rx.recv().await {
 			match request {
@@ -263,7 +268,15 @@ pub enum ActionCategory {
 	Git,
 	Build,
 }
-pub struct ActionRegistry;
+pub struct ActionRegistry {
+	actions: Vec<Action>,
+}
+impl Default for ActionRegistry {
+	fn default() -> Self {
+		let actions = Vec::new();
+		Self { actions }
+	}
+}
 impl ActionRegistry {
 	pub fn from_analysis(_result: &Workspace) -> Vec<Action> {
 		let mut actions = Vec::new();
@@ -577,5 +590,30 @@ impl ConsoleTheme {
 		let mut table = Table::new();
 		table.load_preset(UTF8_FULL).set_header(headers);
 		table
+	}
+}
+
+pub struct DaemonClient {
+	socket_path: &'static str,
+}
+
+impl DaemonClient {
+	pub fn new() -> Self {
+		Self {
+			socket_path: SOCKET_PATH,
+		}
+	}
+	pub async fn execute(&self, action: ActionRequest) -> anyhow::Result<DaemonResponse> {
+		let mut stream = UnixStream::connect(self.socket_path).await?;
+		let request = serde_json::to_string(&action)?;
+		stream.write_all(request.as_bytes()).await?;
+		stream.write_all(b"\n").await?;
+
+		let mut buf = Vec::new();
+		stream.read_to_end(&mut buf).await?;
+
+		let response: DaemonResponse = serde_json::from_slice(&buf)?;
+
+		Ok(response)
 	}
 }

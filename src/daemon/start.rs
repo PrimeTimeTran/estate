@@ -1,8 +1,10 @@
-use crate::{constants::*, daemon::*};
+use crate::{_core::EstateDiscovery, constants::*, daemon::*, estate::Estate};
 use anyhow::{Error, Result};
 use async_trait::async_trait;
 use cli::{CliCommand, Context};
-use revelation::analyzer::{AnalyzerOptions, Workspace};
+use revelation::analyzer::{
+	AnalysisTarget, Analyze, Analyzer, AnalyzerOptions, RustAnalyzer, Workspace,
+};
 use serde::{Deserialize, Serialize};
 use std::{
 	path::{Path, PathBuf},
@@ -56,11 +58,24 @@ pub trait Daemon {
 	async fn start(&mut self, options: DaemonOptions) -> Result<DaemonResponse>;
 	async fn stop(&mut self) -> Result<DaemonResponse>;
 }
+/// Verb layer: format, rename, save, index, analyze, build, search, resolve, organize imports, find references, go to definition
+pub struct EstateDaemon {
+	pub estate: Estate,
+	pub actions: ActionRegistry,
+	pub discovery: EstateDiscovery,
+	// pub vfs: EstateVfs,
+	// pub graph: EstateGraph,
+	// pub resolver: EstateResolver,
+	// pub registry: EstateRegistry,
+}
 pub struct BackgroundDaemon {
+	estate: Estate,
+	actions: ActionRegistry,
+	discovery: EstateDiscovery,
 	context: app::Context,
 	workspace: Workspace,
 	rx: mpsc::Receiver<DaemonMessage>,
-	tx: mpsc::Sender<DaemonMessage>,
+	pub tx: mpsc::Sender<DaemonMessage>,
 }
 #[async_trait]
 impl Daemon for BackgroundDaemon {
@@ -74,6 +89,7 @@ impl Daemon for BackgroundDaemon {
 				column,
 				mode,
 			} => self.analyze(path, line, column, mode),
+			ActionRequest::Metrics { path } => self.metrics(path),
 			ActionRequest::ScanWorkspace { path } => self.scan_workspace(path),
 			ActionRequest::InitializeEstate { path } => self.initialize_estate(path),
 		}
@@ -93,6 +109,9 @@ impl BackgroundDaemon {
 	pub fn new(workspace: Workspace, context: app::Context) -> Self {
 		let (tx, rx) = mpsc::channel(32);
 		Self {
+			actions: ActionRegistry::default(),
+			discovery: EstateDiscovery::default(),
+			estate: Estate::default(),
 			workspace,
 			rx,
 			tx,
@@ -199,6 +218,21 @@ impl BackgroundDaemon {
 		eprintln!("[daemon] processing loop stopped");
 	}
 
+	fn metrics(&mut self, path: PathBuf) -> Result<DaemonResponse> {
+		let request = Analyze {
+			target: AnalysisTarget::File(path),
+			subject: None,
+		};
+		let analyzer = RustAnalyzer;
+		let options = AnalyzerOptions::default();
+		let workspace = analyzer.analyze(request, &options)?;
+		let metrics = workspace.metrics();
+		Ok(DaemonResponse {
+			data: Some(serde_json::to_value(metrics)?),
+			..Default::default()
+		})
+	}
+
 	fn analyze(
 		&mut self,
 		path: PathBuf,
@@ -254,7 +288,6 @@ fn parse_action(buf: Vec<u8>, n: usize) -> Result<IncomingRequest, Error> {
 pub struct DaemonOptions {
 	pub foreground: bool,
 }
-
 #[derive(Deserialize, Debug)]
 struct IncomingRequest {
 	path: PathBuf,
@@ -273,7 +306,7 @@ struct IncomingRequest {
 // 	pub identifier: Option<String>,
 // }
 // pub struct DaemonError {}
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum ActionRequest {
 	Analyze {
 		path: PathBuf,
@@ -283,6 +316,9 @@ pub enum ActionRequest {
 	},
 
 	ScanWorkspace {
+		path: PathBuf,
+	},
+	Metrics {
 		path: PathBuf,
 	},
 
