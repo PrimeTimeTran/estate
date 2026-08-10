@@ -1,11 +1,7 @@
-// #![allow(warnings)] // "dont allow warnings"
+#![allow(warnings)]
 // Allows dead code(removes lint warnings)
-pub mod _core;
-pub mod _shared;
-pub mod _static;
-pub mod constants;
-#[allow(dead_code)]
-#[allow(unused_imports)] // Silences unused imports
+// #[allow(dead_code)]
+// #[allow(unused_imports)] // Silences unused imports
 
 // #![allow(unused_must_use)]
 // #![allow(unused_variables)]
@@ -19,12 +15,14 @@ pub mod constants;
 // #![warn(unused_assignments)]
 // #![warn(unused_imports)]
 // #![warn(unused_variables)]
+
+pub mod _core;
+pub mod _shared;
+pub mod _static;
+pub mod constants;
+pub mod core;
 pub mod daemon;
 pub mod estate;
+pub mod prelude;
 pub mod registry;
 pub mod vfs;
-
-pub use cli::context::*;
-pub use constants::*;
-pub use revelation::*;
-pub use vfs::*;

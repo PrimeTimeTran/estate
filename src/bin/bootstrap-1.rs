@@ -1,3 +1,4 @@
+#![allow(warnings)]
 //  1. Workspace
 //  cargo install --bin bootstrap --path .
 //  bootstrap-1 --manifest ../estate/1-estate-workspace-with-persona.md -f 2
@@ -8,9 +9,17 @@
 //  cargo install --bin bootstrap-1 --path . && bootstrap-1 --manifest estate/1-estate-diagram.md
 //  bootstrap-1 -m estate/1-estate-diagram.md -f 2
 use chrono::Utc;
-use estate::{ _shared::*, _static::*, constants::{ PIPELINE_DIAGRAM, PIPELINE_ESTATE_WORKSPACE } };
+use estate::{
+	_shared::*,
+	_static::*,
+	constants::{PIPELINE_DIAGRAM, PIPELINE_ESTATE_WORKSPACE},
+};
 use lazy_static::lazy_static;
-use std::{ collections::HashMap, env, fs, path::{ Path, PathBuf } };
+use std::{
+	collections::HashMap,
+	env, fs,
+	path::{Path, PathBuf},
+};
 use uuid::Uuid;
 
 lazy_static! {
@@ -32,41 +41,40 @@ lazy_static! {
 }
 
 fn main() -> std::io::Result<()> {
-  let args: Vec<String> = env::args().collect();
-  let manifest_arg = args
-    .windows(2)
-    .find(|w| (w[0] == "-m" || w[0] == "--manifest"))
-    .map(|w| PathBuf::from(&w[1]));
-  let manifest_path = match manifest_arg {
-    Some(path) => path,
-    None => {
-      let manifest_dir = env
-        ::var("CARGO_MANIFEST_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| env::current_dir().unwrap());
-      println!("manifest_dir {:?}", manifest_dir);
-      manifest_dir.join(PATHS["workspace-1"])
-    }
-  };
-  println!("⚡ Initializing Delta Integral Paradigm (DIP) Bootstrap Daemon...");
-  let focus = args
-    .windows(2)
-    .find(|w| (w[0] == "-f" || w[0] == "--focus"))
-    .and_then(|w| w[1].parse::<u32>().ok())
-    .unwrap_or(1);
-  if focus == 1 {
-    // 1. Estate Workspace, loi language src, templates workflow
-    let document = parse_root(&manifest_path)?;
-    let estate = build_estate(document);
-    compile_registry(&estate)?;
-    compile_bundle(&estate)?;
-  } else if focus == 2 {
-    // 2. Teacher/Youtuber/Animator flow
-    println!("⚡ Initializing DIP Diagram Compiler...");
-    let document = parse_root(&manifest_path)?;
-    compile_diagrams(&document)?;
-  }
-  Ok(())
+	let args: Vec<String> = env::args().collect();
+	let manifest_arg = args
+		.windows(2)
+		.find(|w| w[0] == "-m" || w[0] == "--manifest")
+		.map(|w| PathBuf::from(&w[1]));
+	let manifest_path = match manifest_arg {
+		Some(path) => path,
+		None => {
+			let manifest_dir = env::var("CARGO_MANIFEST_DIR")
+				.map(PathBuf::from)
+				.unwrap_or_else(|_| env::current_dir().unwrap());
+			println!("manifest_dir {:?}", manifest_dir);
+			manifest_dir.join(PATHS["workspace-1"])
+		}
+	};
+	println!("⚡ Initializing Delta Integral Paradigm (DIP) Bootstrap Daemon...");
+	let focus = args
+		.windows(2)
+		.find(|w| w[0] == "-f" || w[0] == "--focus")
+		.and_then(|w| w[1].parse::<u32>().ok())
+		.unwrap_or(1);
+	if focus == 1 {
+		// 1. Estate Workspace, loi language src, templates workflow
+		let document = parse_root(&manifest_path)?;
+		let estate = build_estate(document);
+		compile_registry(&estate)?;
+		compile_bundle(&estate)?;
+	} else if focus == 2 {
+		// 2. Teacher/Youtuber/Animator flow
+		println!("⚡ Initializing DIP Diagram Compiler...");
+		let document = parse_root(&manifest_path)?;
+		compile_diagrams(&document)?;
+	}
+	Ok(())
 }
 ///--------------------------------------------------------------------------------
 ///###### The is the left most padded line thats possible inside of a code block.
@@ -109,412 +117,416 @@ fn main() -> std::io::Result<()> {
 ///
 ///------------------------------------------------------------------------------------
 pub fn parse_root(manifest_path: &PathBuf) -> std::io::Result<EstateDocument> {
-  let content = fs::read_to_string(manifest_path)?;
-  if content.trim().is_empty() {
-    return Ok(EstateDocument {
-      frontmatter: SectionConfig::default(),
-      sections: Vec::new(),
-    });
-  }
-  let mut sections = Vec::new();
-  let mut document_frontmatter = SectionConfig::default();
-  let mut current_config = SectionConfig::default();
-  let mut current_heading = String::new();
-  let mut current_items = Vec::new();
-  let mut seen_heading = false;
-  let mut in_frontmatter = false;
-  let mut frontmatter_is_document = false;
-  let mut frontmatter_buffer = String::new();
-  let mut collecting_items = false;
-  for line in content.lines() {
-    let trimmed = line.trim();
-    if trimmed == "---" {
-      if in_frontmatter {
-        in_frontmatter = false;
-        println!("FRONTMATTER BUFFER:\n{}", frontmatter_buffer);
-        let config = parse_config(&frontmatter_buffer);
-        println!("SECTION CONFIG: {:?}", config);
-        frontmatter_buffer.clear();
+	let content = fs::read_to_string(manifest_path)?;
+	if content.trim().is_empty() {
+		return Ok(EstateDocument {
+			frontmatter: SectionConfig::default(),
+			sections: Vec::new(),
+		});
+	}
+	let mut sections = Vec::new();
+	let mut document_frontmatter = SectionConfig::default();
+	let mut current_config = SectionConfig::default();
+	let mut current_heading = String::new();
+	let mut current_items = Vec::new();
+	let mut seen_heading = false;
+	let mut in_frontmatter = false;
+	let mut frontmatter_is_document = false;
+	let mut frontmatter_buffer = String::new();
+	let mut collecting_items = false;
+	for line in content.lines() {
+		let trimmed = line.trim();
+		if trimmed == "---" {
+			if in_frontmatter {
+				in_frontmatter = false;
+				println!("FRONTMATTER BUFFER:\n{}", frontmatter_buffer);
+				let config = parse_config(&frontmatter_buffer);
+				println!("SECTION CONFIG: {:?}", config);
+				frontmatter_buffer.clear();
 
-        if frontmatter_is_document {
-          document_frontmatter = config;
-        } else {
-          current_config = config;
-          collecting_items = true;
-        }
-      } else {
-        in_frontmatter = true;
-        frontmatter_buffer.clear();
-        frontmatter_is_document = !seen_heading;
-      }
-      continue;
-    }
-    if in_frontmatter {
-      frontmatter_buffer.push_str(line);
-      frontmatter_buffer.push('\n');
-      continue;
-    }
-    if trimmed.starts_with("# ") || trimmed.starts_with("## ") {
-      if !current_heading.is_empty() {
-        sections.push(RawSection {
-          heading: current_heading.clone(),
-          frontmatter: current_config.clone(),
-          items: current_items.clone(),
-        });
+				if frontmatter_is_document {
+					document_frontmatter = config;
+				} else {
+					current_config = config;
+					collecting_items = true;
+				}
+			} else {
+				in_frontmatter = true;
+				frontmatter_buffer.clear();
+				frontmatter_is_document = !seen_heading;
+			}
+			continue;
+		}
+		if in_frontmatter {
+			frontmatter_buffer.push_str(line);
+			frontmatter_buffer.push('\n');
+			continue;
+		}
+		if trimmed.starts_with("# ") || trimmed.starts_with("## ") {
+			if !current_heading.is_empty() {
+				sections.push(RawSection {
+					heading: current_heading.clone(),
+					frontmatter: current_config.clone(),
+					items: current_items.clone(),
+				});
 
-        current_items.clear();
-      }
-      current_heading = trimmed.trim_start_matches('#').trim().to_string();
-      current_config = SectionConfig::default();
-      collecting_items = false;
-      seen_heading = true;
+				current_items.clear();
+			}
+			current_heading = trimmed.trim_start_matches('#').trim().to_string();
+			current_config = SectionConfig::default();
+			collecting_items = false;
+			seen_heading = true;
 
-      continue;
-    }
-    if collecting_items && (trimmed.starts_with('-') || trimmed.starts_with('*')) {
-      let item = trimmed.trim_start_matches('-').trim_start_matches('*').trim().to_string();
-      if !item.is_empty() {
-        current_items.push(item);
-      }
-    }
-  }
-  if !current_heading.is_empty() {
-    sections.push(RawSection {
-      heading: current_heading,
-      frontmatter: current_config,
-      items: current_items,
-    });
-  }
-  Ok(EstateDocument {
-    frontmatter: document_frontmatter,
-    sections,
-  })
+			continue;
+		}
+		if collecting_items && (trimmed.starts_with('-') || trimmed.starts_with('*')) {
+			let item = trimmed
+				.trim_start_matches('-')
+				.trim_start_matches('*')
+				.trim()
+				.to_string();
+			if !item.is_empty() {
+				current_items.push(item);
+			}
+		}
+	}
+	if !current_heading.is_empty() {
+		sections.push(RawSection {
+			heading: current_heading,
+			frontmatter: current_config,
+			items: current_items,
+		});
+	}
+	Ok(EstateDocument {
+		frontmatter: document_frontmatter,
+		sections,
+	})
 }
 pub fn compile_diagrams(document: &EstateDocument) -> std::io::Result<()> {
-  let document_title = document.frontmatter.title.clone().unwrap_or_else(|| "Diagram".to_string());
-  let mut output = format!("# {}\n\n", document_title);
-  for section in &document.sections {
-    output.push_str(&format!("# {}\n\n", section.heading));
-    let metadata = &section.frontmatter.metadata;
-    let axis = metadata
-      .get("axis")
-      .and_then(|v| v.as_str())
-      .map(normalize_axis)
-      .unwrap_or("TD");
-    let content = metadata
-      .get("content")
-      .and_then(|v| v.as_str())
-      .unwrap_or("");
-    output.push_str("```mermaid\n");
-    output.push_str(&format!("flowchart {}\n", axis));
-    let nodes: Vec<&str> = content
-      .split(',')
-      .map(|x| x.trim())
-      .filter(|x| !x.is_empty())
-      .collect();
-    for node in &nodes {
-      output.push_str(&format!("    {}[{}]\n", node, node));
-    }
-    for pair in nodes.windows(2) {
-      output.push_str(&format!("    {} --> {}\n", pair[0], pair[1]));
-    }
-    output.push_str("```\n\n");
-  }
-  // 1.
-  // fs::write(PATHS.get("diagrams").unwrap_or(&"default/path/here"), output)?;
-  // 2.
-  fs::write(&PATHS["diagrams"], output)?;
-  Ok(())
+	let document_title = document
+		.frontmatter
+		.title
+		.clone()
+		.unwrap_or_else(|| "Diagram".to_string());
+	let mut output = format!("# {}\n\n", document_title);
+	for section in &document.sections {
+		output.push_str(&format!("# {}\n\n", section.heading));
+		let metadata = &section.frontmatter.metadata;
+		let axis = metadata
+			.get("axis")
+			.and_then(|v| v.as_str())
+			.map(normalize_axis)
+			.unwrap_or("TD");
+		let content = metadata
+			.get("content")
+			.and_then(|v| v.as_str())
+			.unwrap_or("");
+		output.push_str("```mermaid\n");
+		output.push_str(&format!("flowchart {}\n", axis));
+		let nodes: Vec<&str> = content
+			.split(',')
+			.map(|x| x.trim())
+			.filter(|x| !x.is_empty())
+			.collect();
+		for node in &nodes {
+			output.push_str(&format!("    {}[{}]\n", node, node));
+		}
+		for pair in nodes.windows(2) {
+			output.push_str(&format!("    {} --> {}\n", pair[0], pair[1]));
+		}
+		output.push_str("```\n\n");
+	}
+	// 1.
+	// fs::write(PATHS.get("diagrams").unwrap_or(&"default/path/here"), output)?;
+	// 2.
+	fs::write(&PATHS["diagrams"], output)?;
+	Ok(())
 }
 pub fn compile_bundle(estate: &Estate) -> std::io::Result<()> {
-  for node in &estate.nodes {
-    let Some(resource) = estate.resources
-      .iter()
-      .find(|r| {
-        estate.bindings.iter().any(|b| b.node == node.uid && b.resource == r.uid)
-      }) else {
-      continue;
-    };
-    match &resource.location {
-      ResourceLocation::Directory(path) => {
-        fs::create_dir_all(path)?;
-        println!("[dir] {}", path.display());
-      }
-      ResourceLocation::File(path) =>
-        match resource.kind {
-          | ResourceKind::Config
-          | ResourceKind::Source
-          | ResourceKind::Document
-          | ResourceKind::Generated => {
-            if let Some(parent) = path.parent() {
-              fs::create_dir_all(parent)?;
-            }
-            if !path.exists() || matches!(resource.kind, ResourceKind::Generated) {
-              fs::write(path, default_contents(node, resource))?;
-              println!("[+] {}", path.display());
-            } else {
-              println!("[=] {}", path.display());
-            }
-          }
-          _ => {}
-        }
-      _ => {}
-    }
-  }
-  Ok(())
+	for node in &estate.nodes {
+		let Some(resource) = estate.resources.iter().find(|r| {
+			estate
+				.bindings
+				.iter()
+				.any(|b| b.node == node.uid && b.resource == r.uid)
+		}) else {
+			continue;
+		};
+		match &resource.location {
+			ResourceLocation::Directory(path) => {
+				fs::create_dir_all(path)?;
+				println!("[dir] {}", path.display());
+			}
+			ResourceLocation::File(path) => match resource.kind {
+				ResourceKind::Config
+				| ResourceKind::Source
+				| ResourceKind::Document
+				| ResourceKind::Generated => {
+					if let Some(parent) = path.parent() {
+						fs::create_dir_all(parent)?;
+					}
+					if !path.exists() || matches!(resource.kind, ResourceKind::Generated) {
+						fs::write(path, default_contents(node, resource))?;
+						println!("[+] {}", path.display());
+					} else {
+						println!("[=] {}", path.display());
+					}
+				}
+				_ => {}
+			},
+			_ => {}
+		}
+	}
+	Ok(())
 }
 pub fn compile_registry(estate: &Estate) -> std::io::Result<()> {
-  let registry = PathBuf::from(".estate/registry.json");
-  if let Some(parent) = registry.parent() {
-    fs::create_dir_all(parent)?;
-  }
-  let json = serde_json::to_string_pretty(estate)?;
-  fs::write(registry, json)?;
-  Ok(())
+	let registry = PathBuf::from(".estate/registry.json");
+	if let Some(parent) = registry.parent() {
+		fs::create_dir_all(parent)?;
+	}
+	let json = serde_json::to_string_pretty(estate)?;
+	fs::write(registry, json)?;
+	Ok(())
 }
 pub fn build_estate(document: EstateDocument) -> Estate {
-  let mut estate = Estate::default();
-  let now = Utc::now();
-  let sections = resolve_sections(&document.frontmatter, document.sections);
-  for section in &sections {
-    println!(
-      "RESOLVED SECTION {} => {:?}",
-      section.config.description.as_deref().unwrap_or(""),
-      section.config.path
-    );
-  }
-  for section in sections {
-    let Some(path) = section.config.path.as_ref() else {
-      println!(
-        "SKIPPING SECTION WITHOUT PATH: description={:?}, items={}",
-        section.config.description,
-        section.items.len()
-      );
-      continue;
-    };
-    let base = resolve_target_base(path);
+	let mut estate = Estate::default();
+	let now = Utc::now();
+	let sections = resolve_sections(&document.frontmatter, document.sections);
+	for section in &sections {
+		println!(
+			"RESOLVED SECTION {} => {:?}",
+			section.config.description.as_deref().unwrap_or(""),
+			section.config.path
+		);
+	}
+	for section in sections {
+		let Some(path) = section.config.path.as_ref() else {
+			println!(
+				"SKIPPING SECTION WITHOUT PATH: description={:?}, items={}",
+				section.config.description,
+				section.items.len()
+			);
+			continue;
+		};
+		let base = resolve_target_base(path);
 
-    let scope = Scope {
-      visibility: Visibility::Personal,
-      owner: Some("".to_string()),
-    };
-    for item in section.items {
-      let is_dir = item.ends_with('/') || !is_file(&item);
-      let clean = item.trim_end_matches('/');
-      let path = base.join(clean);
-      let uid = Uuid::now_v7();
-      let name = path
-        .file_name()
-        .map(|n| n.to_string_lossy().to_string())
-        .unwrap_or_default();
-      let node = Node {
-        uid,
-        kind: if is_dir {
-          NodeKind::Directory
-        } else {
-          NodeKind::File
-        },
-        name,
-        description: section.config.description.clone(),
-        tags: Some(vec![]),
-        scope: scope.clone(),
-        created_at: now,
-        updated_at: now,
-      };
-      let resource_uid = Uuid::now_v7();
-      let resource_kind = if is_dir {
-        ResourceKind::Directory
-      } else {
-        ResourceKind::from_path(&path)
-      };
-      let resource = Resource {
-        uid: resource_uid,
-        kind: resource_kind,
-        location: if is_dir {
-          ResourceLocation::Directory(path.clone())
-        } else {
-          ResourceLocation::File(path.clone())
-        },
-        range: None,
-        git: None,
-      };
-      let binding = Binding {
-        node: uid,
-        resource: resource_uid,
-        range: None,
-        git: None,
-      };
-      estate.nodes.push(node);
-      estate.resources.push(resource);
-      estate.bindings.push(binding);
-    }
-  }
-  estate
+		let scope = Scope {
+			visibility: Visibility::Personal,
+			owner: Some("".to_string()),
+		};
+		for item in section.items {
+			let is_dir = item.ends_with('/') || !is_file(&item);
+			let clean = item.trim_end_matches('/');
+			let path = base.join(clean);
+			let uid = Uuid::now_v7();
+			let name = path
+				.file_name()
+				.map(|n| n.to_string_lossy().to_string())
+				.unwrap_or_default();
+			let node = Node {
+				uid,
+				kind: if is_dir {
+					NodeKind::Directory
+				} else {
+					NodeKind::File
+				},
+				name,
+				description: section.config.description.clone(),
+				tags: Some(vec![]),
+				scope: scope.clone(),
+				created_at: now,
+				updated_at: now,
+			};
+			let resource_uid = Uuid::now_v7();
+			let resource_kind = if is_dir {
+				ResourceKind::Directory
+			} else {
+				ResourceKind::from_path(&path)
+			};
+			let resource = Resource {
+				uid: resource_uid,
+				kind: resource_kind,
+				location: if is_dir {
+					ResourceLocation::Directory(path.clone())
+				} else {
+					ResourceLocation::File(path.clone())
+				},
+				range: None,
+				git: None,
+			};
+			let binding = Binding {
+				node: uid,
+				resource: resource_uid,
+				range: None,
+				git: None,
+			};
+			estate.nodes.push(node);
+			estate.resources.push(resource);
+			estate.bindings.push(binding);
+		}
+	}
+	estate
 }
 pub fn normalize_axis(axis: &str) -> &str {
-  match axis.to_lowercase().as_str() {
-    "ltr" | "left-to-right" | "left right" => "LR",
-    "rtl" | "right-to-left" => "RL",
-    "td" | "top-down" | "top down" => "TD",
-    "b t" | "bottom-to-top" => "BT",
-    _ => "TD",
-  }
+	match axis.to_lowercase().as_str() {
+		"ltr" | "left-to-right" | "left right" => "LR",
+		"rtl" | "right-to-left" => "RL",
+		"td" | "top-down" | "top down" => "TD",
+		"b t" | "bottom-to-top" => "BT",
+		_ => "TD",
+	}
 }
 
 fn parse_config(buffer: &str) -> SectionConfig {
-  println!("PARSING CONFIG:\n{}", buffer);
-  let yaml: serde_yaml::Value = match serde_yaml::from_str(buffer) {
-    Ok(value) => value,
-    Err(err) => {
-      eprintln!("YAML ERROR: {:?}", err);
-      eprintln!("BUFFER:\n{}", buffer);
-      return SectionConfig::default();
-    }
-  };
-  println!("YAML VALUE: {:?}", yaml);
-  let get_string = |key: &str| {
-    yaml
-      .get(key)
-      .and_then(|v| v.as_str())
-      .map(|s| s.to_string())
-  };
-  SectionConfig {
-    title: get_string("title"),
-    kind: get_string("kind"),
-    path: get_string("path"),
-    description: get_string("description"),
-    metadata: yaml,
-    relations: serde_yaml::Value::Null,
-  }
+	println!("PARSING CONFIG:\n{}", buffer);
+	let yaml: serde_yaml::Value = match serde_yaml::from_str(buffer) {
+		Ok(value) => value,
+		Err(err) => {
+			eprintln!("YAML ERROR: {:?}", err);
+			eprintln!("BUFFER:\n{}", buffer);
+			return SectionConfig::default();
+		}
+	};
+	println!("YAML VALUE: {:?}", yaml);
+	let get_string = |key: &str| {
+		yaml
+			.get(key)
+			.and_then(|v| v.as_str())
+			.map(|s| s.to_string())
+	};
+	SectionConfig {
+		title: get_string("title"),
+		kind: get_string("kind"),
+		path: get_string("path"),
+		description: get_string("description"),
+		metadata: yaml,
+		relations: serde_yaml::Value::Null,
+	}
 }
 ///--------------------------------------------------------------------------------
 ///       3. PROJECTION ENGINE
 ///------------------------------------------------------------------------------------
 fn resolve_target_base(path_expr: &str) -> PathBuf {
-  if path_expr.starts_with("~/") || path_expr == "~" {
-    let home_dir = env
-      ::var("HOME")
-      .or_else(|_| env::var("USERPROFILE"))
-      .unwrap_or_else(|_| ".".to_string());
-    if path_expr == "~" {
-      PathBuf::from(home_dir)
-    } else {
-      Path::new(&home_dir).join(&path_expr[2..])
-    }
-  } else {
-    env
-      ::current_dir()
-      .unwrap_or_else(|_| PathBuf::from("."))
-      .join(path_expr)
-  }
+	if path_expr.starts_with("~/") || path_expr == "~" {
+		let home_dir = env::var("HOME")
+			.or_else(|_| env::var("USERPROFILE"))
+			.unwrap_or_else(|_| ".".to_string());
+		if path_expr == "~" {
+			PathBuf::from(home_dir)
+		} else {
+			Path::new(&home_dir).join(&path_expr[2..])
+		}
+	} else {
+		env::current_dir()
+			.unwrap_or_else(|_| PathBuf::from("."))
+			.join(path_expr)
+	}
 }
 fn comment_prefix(path: &Path) -> &'static str {
-  match path.extension().and_then(|e| e.to_str()) {
-    Some("rs") => "//",
-    Some("c") => "//",
-    Some("cpp") => "//",
-    Some("h") => "//",
-    Some("hpp") => "//",
-    Some("js") => "//",
-    Some("ts") => "//",
-    Some("json") => "//",
-    //
-    Some("loi") => "#",
-    Some("py") => "#",
-    Some("sh") => "#",
-    Some("yaml") => "#",
-    Some("yml") => "#",
-    Some("toml") => "#",
-    //
-    Some("html") => "<!--",
-    Some("xml") => "<!--",
-    //
-    Some("css") => "/*",
-    //
-    _ => "//",
-  }
+	match path.extension().and_then(|e| e.to_str()) {
+		Some("rs") => "//",
+		Some("c") => "//",
+		Some("cpp") => "//",
+		Some("h") => "//",
+		Some("hpp") => "//",
+		Some("js") => "//",
+		Some("ts") => "//",
+		Some("json") => "//",
+		//
+		Some("loi") => "#",
+		Some("py") => "#",
+		Some("sh") => "#",
+		Some("yaml") => "#",
+		Some("yml") => "#",
+		Some("toml") => "#",
+		//
+		Some("html") => "<!--",
+		Some("xml") => "<!--",
+		//
+		Some("css") => "/*",
+		//
+		_ => "//",
+	}
 }
 pub fn default_contents(node: &Node, resource: &Resource) -> String {
-  let uid = node.uid;
-  let ResourceLocation::File(path) = &resource.location else {
-    return String::new();
-  };
-  match path.extension().and_then(|e| e.to_str()) {
-    Some("html") | Some("xml") =>
-      format!(
-        "<!--\n\
+	let uid = node.uid;
+	let ResourceLocation::File(path) = &resource.location else {
+		return String::new();
+	};
+	match path.extension().and_then(|e| e.to_str()) {
+		Some("html") | Some("xml") => format!(
+			"<!--\n\
                 Generated by Delta Integral Paradigm\n\
                 Node: {uid}\n\
                 -->\n"
-      ),
-    Some("css") =>
-      format!(
-        "/*\n\
+		),
+		Some("css") => format!(
+			"/*\n\
                 Generated by Delta Integral Paradigm\n\
                 Node: {uid}\n\
                 */\n"
-      ),
-    Some("md") =>
-      format!(
-        "<!--\n\
+		),
+		Some("md") => format!(
+			"<!--\n\
                 Generated by Delta Integral Paradigm\n\
                 Node: {uid}\n\
                 -->\n"
-      ),
-    Some("json") => format!("// Generated by Delta Integral Paradigm
-// Node: {uid}"),
-    _ => {
-      let c = comment_prefix(path);
+		),
+		Some("json") => format!(
+			"// Generated by Delta Integral Paradigm
+// Node: {uid}"
+		),
+		_ => {
+			let c = comment_prefix(path);
 
-      format!("{c} Generated by Delta Integral Paradigm\n\
-                    {c} Node: {uid}\n")
-    }
-  }
+			format!(
+				"{c} Generated by Delta Integral Paradigm\n\
+                    {c} Node: {uid}\n"
+			)
+		}
+	}
 }
 fn merge_section_config(mut base: SectionConfig, override_: SectionConfig) -> SectionConfig {
-  if override_.kind.is_some() {
-    base.kind = override_.kind;
-  }
-  if override_.path != Some("./".to_string()) {
-    base.path = override_.path;
-  }
-  if override_.description.is_some() {
-    base.description = override_.description;
-  }
-  if override_.metadata != serde_yaml::Value::Null {
-    base.metadata = override_.metadata;
-  }
-  if override_.relations != serde_yaml::Value::Null {
-    base.relations = override_.relations;
-  }
-  base
+	if override_.kind.is_some() {
+		base.kind = override_.kind;
+	}
+	if override_.path != Some("./".to_string()) {
+		base.path = override_.path;
+	}
+	if override_.description.is_some() {
+		base.description = override_.description;
+	}
+	if override_.metadata != serde_yaml::Value::Null {
+		base.metadata = override_.metadata;
+	}
+	if override_.relations != serde_yaml::Value::Null {
+		base.relations = override_.relations;
+	}
+	base
 }
 fn resolve_sections(document: &SectionConfig, sections: Vec<RawSection>) -> Vec<EstateSection> {
-  sections
-    .into_iter()
-    .map(|section| {
-      let mut config = section.frontmatter;
-      if config.path.is_none() {
-        config.path = document.path.clone();
-      }
-      EstateSection {
-        config,
-        items: section.items,
-      }
-    })
-    .collect()
+	sections
+		.into_iter()
+		.map(|section| {
+			let mut config = section.frontmatter;
+			if config.path.is_none() {
+				config.path = document.path.clone();
+			}
+			EstateSection {
+				config,
+				items: section.items,
+			}
+		})
+		.collect()
 }
 fn is_file(item: &str) -> bool {
-  let path = Path::new(item);
-  let name = path
-    .file_name()
-    .and_then(|n| n.to_str())
-    .unwrap_or("");
-  if FILE_NAMES.contains(&name) {
-    return true;
-  }
-  match path.extension().and_then(|e| e.to_str()) {
-    Some(ext) => FILE_EXTENSIONS.contains(&ext),
-    None => false,
-  }
+	let path = Path::new(item);
+	let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+	if FILE_NAMES.contains(&name) {
+		return true;
+	}
+	match path.extension().and_then(|e| e.to_str()) {
+		Some(ext) => FILE_EXTENSIONS.contains(&ext),
+		None => false,
+	}
 }

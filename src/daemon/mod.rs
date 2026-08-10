@@ -15,6 +15,7 @@ pub mod stop;
 pub use reload::ReloadDaemon;
 pub use stop::StopDaemon;
 
+use app::*;
 use daemon::*;
 use event::*;
 use lint::*;

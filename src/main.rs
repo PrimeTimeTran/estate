@@ -1,13 +1,5 @@
-mod _core;
-mod constants;
-mod daemon;
-mod estate;
-mod vfs;
-use crate::daemon::{
-	app::{self, App},
-	router,
-};
-use cli::Command;
+#![allow(warnings)]
+use estate::prelude::*;
 
 // #[tokio::main]
 // async fn main2() {
@@ -23,7 +15,7 @@ async fn main() -> anyhow::Result<()> {
 	let parsed_cli = cli::parse();
 	match parsed_cli.command {
 		Command::Daemon { .. } => {
-			App::run_tray_daemon().await?;
+			app::App::run_tray_daemon().await?;
 		}
 		_ => {
 			let estate_ctx = app::Context::new(app::ContextSource::Cli)?;

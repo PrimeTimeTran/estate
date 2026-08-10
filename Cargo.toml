@@ -3,7 +3,6 @@ name = "estate"
 version = "0.1.0"
 edition = "2024"
 
-
 [[bin]]
 name = "bootstrap"
 path = "src/bin/bootstrap-1.rs"
@@ -14,6 +13,7 @@ path = "src/bin/init.rs"
 
 [dependencies]
 # Internal
+foo.workspace = true
 macros.workspace = true
 macros-decl.workspace = true
 macros-proc.workspace = true

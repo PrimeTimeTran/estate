@@ -1,14 +1,12 @@
+#![allow(warnings)]
+
 use std::{env, fs, io, path::Path};
 // https://material-foundation.github.io/material-theme-builder/
-use estate::constants::*;
+use estate::prelude::*;
 
 fn main() -> io::Result<()> {
 	let template_root = Path::new(TEMPLATE_PATH);
 	let destination = env::current_dir()?;
-	// TODO:
-	// let document = parse_root(...)?;
-	// let estate = build_estate(document)?;
-	// initialize_structure(&estate)?;
 	materialize_static(template_root, &destination)?;
 	materialize_rendered(template_root, &destination)?;
 	// generate_artifacts(
@@ -70,17 +68,6 @@ fn materialize_rendered(template_root: &Path, destination: &Path) -> io::Result<
 	Ok(())
 }
 
-// fn generate_artifacts(estate: &Estate, destination: &Path) -> io::Result<()> {
-// 	let registry_path = destination.join(".estate").join("registry.json");
-// 	if let Some(parent) = registry_path.parent() {
-// 		fs::create_dir_all(parent)?;
-// 	}
-// 	let registry = serde_json::to_string_pretty(&estate)?;
-// 	fs::write(registry_path, registry)?;
-// 	Ok(())
-// }
-
-fn main2() {}
 pub struct Template {
 	pub name: &'static str,
 	pub root: &'static str,
