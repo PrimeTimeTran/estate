@@ -1,5 +1,5 @@
 use crate::prelude::{daemon::projection::command, estate, *};
-use cli::Command;
+use cli::prelude::{Command, *};
 use revelation::analyzer::Workspace;
 
 pub async fn execute(parsed_cli: cli::Cli, ctx: cli::Context, app: app::Context) {

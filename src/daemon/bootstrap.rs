@@ -19,9 +19,7 @@ fn write_manifest() -> Result<(), Error> {
 			.unwrap()
 			.as_secs() as i64,
 	};
-
 	fs::write(path, serde_json::to_string_pretty(&manifest)?)?;
-
 	Ok(())
 }
 
@@ -82,9 +80,7 @@ This file describes my global workspace.
 "#,
 		),
 	];
-
 	fs::create_dir_all(&root)?;
-
 	for (path, content) in files {
 		if !path.exists() {
 			fs::write(path, content)?;
@@ -110,7 +106,6 @@ fn run_migrations(from: u32) -> Result<()> {
 
 fn run_version_migrations(from: &str) -> Result<()> {
 	println!("Upgrading estate {from} → {ESTATE_VERSION}");
-
 	Ok(())
 }
 
@@ -123,7 +118,6 @@ struct Manifest {
 
 fn ensure_initialized() -> Result<()> {
 	let manifest_file = manifest_path()?;
-
 	if !manifest_file.exists() {
 		//
 		// Engine initialization
@@ -152,7 +146,6 @@ fn ensure_initialized() -> Result<()> {
 		run_version_migrations(&manifest.installed_version)?;
 		write_manifest()?;
 	}
-
 	Ok(())
 }
 

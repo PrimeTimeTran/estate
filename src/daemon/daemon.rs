@@ -1,5 +1,5 @@
 pub use crate::prelude::*;
-use cli::{CliCommand, Context as CliContext, FormatArgs};
+use cli::prelude::{CliCommand, Context as CliContext, FormatArgs};
 use revelation::analyzer::*;
 ///--------------------------------------------------------------------------------
 /// Daemon
@@ -17,8 +17,8 @@ impl DaemonState {
 		println!("💾 save_workspace not implemented yet: {:?}", path);
 	}
 	pub fn now() -> u64 {
-		SystemTime::now()
-			.duration_since(UNIX_EPOCH)
+		std::time::SystemTime::now()
+			.duration_since(std::time::UNIX_EPOCH)
 			.unwrap()
 			.as_secs()
 	}

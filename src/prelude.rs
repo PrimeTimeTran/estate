@@ -11,7 +11,7 @@ pub use crate::vfs::*;
 pub use anyhow::{Error, Result};
 pub use async_trait::async_trait;
 pub use chrono::{DateTime, Local, Utc};
-pub use cli::{context::*, *};
+pub use cli::{self, context::*, prelude::*, *};
 pub use revelation::*;
 pub use serde::*;
 pub use serde_json::Value;
@@ -21,9 +21,7 @@ pub use std::{
 	iter::Map,
 	path::*,
 	sync::atomic::{AtomicU64, Ordering},
-	thread,
-	time::{SystemTime, UNIX_EPOCH},
-	*,
+	thread, *,
 };
 pub use tokio::{
 	io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},

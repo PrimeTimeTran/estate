@@ -1,4 +1,4 @@
-use cli::{CliCommand, Context};
+use cli::prelude::{CliCommand, Context};
 
 // =========================
 // VIEW COMMANDS

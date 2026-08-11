@@ -110,8 +110,8 @@ pub async fn event_loop(mut rx: broadcast::Receiver<Event>, runtime: EstateRunti
 static EVENT_ID: AtomicU64 = AtomicU64::new(1);
 
 fn now() -> u64 {
-	SystemTime::now()
-		.duration_since(UNIX_EPOCH)
+	std::time::SystemTime::now()
+		.duration_since(std::time::UNIX_EPOCH)
 		.unwrap()
 		.as_secs()
 }
