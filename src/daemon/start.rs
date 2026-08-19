@@ -1,15 +1,13 @@
-use crate::prelude::{estate, *};
+use crate::prelude::{engine::*, *};
 use revelation::analyzer::*;
-// use revelation::analyzer::{
-// 	AnalysisTarget, Analyze, Analyzer, AnalyzerOptions, RustAnalyzer, Workspace,
-// };
 // cargo run daemon
 // Troubleshooting:
 //
 // Check whether the process is still running:
-//   ps -p <PID> -o pid,ppid,stat,command
-//   ps -p 35762 -o pid,ppid,stat,command
-//
+//  ps -p <PID> -o pid,ppid,stat,command
+//  ps -p 35762 -o pid,ppid,stat,command
+//  pgrep -af 'estate.*daemon'
+//  ps aux | grep '[e]state.*daemon'
 // Example:
 //   ps -p {} -o pid,ppid,stat,command
 //
@@ -48,7 +46,7 @@ pub trait Daemon {
 }
 /// Verb layer: format, rename, save, index, analyze, build, search, resolve, organize imports, find references, go to definition
 pub struct EstateDaemon {
-	pub estate: estate::Estate,
+	pub estate: EstateEngine,
 	pub actions: ActionRegistry,
 	pub discovery: EstateDiscovery,
 	// pub vfs: EstateVfs,
@@ -57,10 +55,10 @@ pub struct EstateDaemon {
 	// pub registry: EstateRegistry,
 }
 pub struct BackgroundDaemon {
-	estate: estate::Estate,
+	estate: EstateEngine,
 	actions: ActionRegistry,
 	discovery: EstateDiscovery,
-	context: app::Context,
+	// context: app::Context,
 	workspace: Workspace,
 	rx: mpsc::Receiver<DaemonMessage>,
 	pub tx: mpsc::Sender<DaemonMessage>,
@@ -95,16 +93,16 @@ impl Daemon for BackgroundDaemon {
 	}
 }
 impl BackgroundDaemon {
-	pub fn new(workspace: Workspace, context: app::Context) -> Self {
+	pub fn new(engine: EstateEngine) -> Self {
 		let (tx, rx) = mpsc::channel(32);
 		Self {
 			actions: ActionRegistry::default(),
 			discovery: EstateDiscovery::default(),
-			estate: estate::Estate::default(),
-			workspace,
+			estate: EstateEngine::new().unwrap(),
+			workspace: engine.workspace,
 			rx,
 			tx,
-			context,
+			// context,
 		}
 		// Self { workspace, rx, tx, context }
 	}

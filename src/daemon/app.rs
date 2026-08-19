@@ -19,14 +19,16 @@ pub struct App {
 	status: MenuItem,
 	quit: MenuItem,
 	context: Context,
+	engine: EstateEngine,
 	daemon_tx: Option<mpsc::Sender<DaemonCommand>>,
 }
-
 impl App {
-	fn new(context: Context) -> anyhow::Result<Self> {
+	fn new(context: Context, engine: EstateEngine) -> anyhow::Result<Self> {
 		let (status, quit, tray) = Self::bootstrap()?;
+
 		Ok(Self {
 			context,
+			engine,
 			tray,
 			status,
 			quit,
@@ -56,59 +58,103 @@ impl App {
 		Icon::from_rgba(image.into_raw(), width, height).expect("failed to create tray icon")
 	}
 }
-
 impl App {
-	pub async fn run_tray_daemon() -> anyhow::Result<()> {
-		let context = Context::new(ContextSource::Cli)?;
+	pub fn spawn_tray_process() -> anyhow::Result<()> {
+		let exe = std::env::current_exe()?;
+		std::process::Command::new(exe).arg("tray").spawn()?;
+		Ok(())
+	}
+	pub fn spawn_tray_daemon(engine: EstateEngine) -> anyhow::Result<()> {
+		std::thread::Builder::new()
+			.name("estate-tray".into())
+			.spawn(move || {
+				if let Err(err) = Self::run_tray_daemon(engine) {
+					eprintln!("Estate tray error: {err}");
+				}
+			})?;
+
+		Ok(())
+	}
+
+	pub fn run_tray_daemon(engine: EstateEngine) -> anyhow::Result<()> {
+		let context = Context::new(RuntimeMode::Cli)?;
+
+		let event_loop = EventLoop::builder()
+			.with_activation_policy(ActivationPolicy::Accessory)
+			.build()?;
+
+		let mut app = Self::new(context, engine)?;
+
+		event_loop.run_app(&mut app)?;
+
+		Ok(())
+	}
+	fn run_tray_daemon_blocking(engine: EstateEngine) -> anyhow::Result<()> {
+		let context = Context::new(RuntimeMode::Cli)?;
+
 		let event_loop = EventLoop::builder()
 			.with_activation_policy(ActivationPolicy::Accessory)
 			.build()
-			.unwrap();
-		let mut app = App::new(context)?;
-		event_loop.run_app(&mut app).unwrap();
+			.map_err(|e| anyhow::anyhow!("failed to create event loop: {e}"))?;
+
+		let mut app = App::new(context, engine)?;
+
+		event_loop
+			.run_app(&mut app)
+			.map_err(|e| anyhow::anyhow!("event loop failed: {e}"))?;
+
 		Ok(())
 	}
-	fn run_daemon(ctx: Context, mut rx: mpsc::Receiver<DaemonCommand>) {
+	// pub async fn run_tray_daemon(engine: EstateEngine) -> anyhow::Result<()> {
+	// 	let context = Context::new(RuntimeMode::Cli)?;
+
+	// 	let event_loop = EventLoop::builder()
+	// 		.with_activation_policy(ActivationPolicy::Accessory)
+	// 		.build()
+	// 		.map_err(|e| anyhow::anyhow!("failed to create event loop: {e}"))?;
+
+	// 	let mut app = App::new(context, engine)?;
+
+	// 	event_loop
+	// 		.run_app(&mut app)
+	// 		.map_err(|e| anyhow::anyhow!("event loop failed: {e}"))?;
+
+	// 	Ok(())
+	// }
+	fn run_daemon(engine: EstateEngine, mut rx: mpsc::Receiver<DaemonCommand>) {
 		let runtime = Runtime::new().unwrap();
+
 		runtime.block_on(async move {
-			let workspace = Workspace::new();
-			let daemon = BackgroundDaemon::new(workspace, ctx);
-			let mut daemon_task = tokio::spawn(async move {
-				let mut daemon = daemon;
+			let mut daemon = BackgroundDaemon::new(engine);
+
+			let daemon_task = tokio::spawn(async move {
 				if let Err(e) = daemon.run_foreground().await {
-					eprintln!("Daemon error: {}", e);
+					eprintln!("Daemon error: {e}");
 				}
 			});
+
 			tokio::select! {
-				result = &mut daemon_task => {
-					match result {
-						Ok(()) => eprintln!("Daemon exited"),
-						Err(e) => eprintln!("Daemon task failed: {}", e),
+					result = daemon_task => {
+							match result {
+									Ok(()) => eprintln!("Daemon exited"),
+									Err(e) => eprintln!("Daemon task failed: {e}"),
+							}
 					}
-				}
-				command = rx.recv() => {
-					match command {
-						Some(DaemonCommand::Stop) => {
-							eprintln!("Stopping daemon...");
-							daemon_task.abort();
-							let _ = daemon_task.await;
-							eprintln!("Daemon stopped");
-						}
-						None => {
-							eprintln!("Daemon command channel closed");
-							daemon_task.abort();
-							let _ = daemon_task.await;
-						}
-						// _ => {
-						// 	todo!("commands")
-						// }
+
+					command = rx.recv() => {
+							match command {
+									Some(DaemonCommand::Stop) => {
+											eprintln!("Stopping daemon...");
+									}
+									None => {
+											eprintln!("Daemon command channel closed");
+									}
+							}
 					}
-				}
 			}
 		});
 	}
 }
-
 impl ApplicationHandler for App {
 	fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
 		if let Ok(event) = MenuEvent::receiver().try_recv() {
@@ -123,9 +169,9 @@ impl ApplicationHandler for App {
 	fn resumed(&mut self, _event_loop: &ActiveEventLoop) {
 		let (tx, rx) = mpsc::channel(100);
 		self.daemon_tx = Some(tx);
-		let context = self.context.clone();
+		let engine = self.engine.clone();
 		thread::spawn(move || {
-			Self::run_daemon(context, rx);
+			Self::run_daemon(engine, rx);
 		});
 	}
 	fn window_event(
@@ -139,7 +185,7 @@ impl ApplicationHandler for App {
 
 #[derive(Clone, Debug)]
 pub struct Context {
-	pub source: ContextSource,
+	pub source: RuntimeMode,
 	// Where the user is operating
 	pub workspace: PathBuf,
 	// Global user estate (~/.estate)
@@ -147,22 +193,22 @@ pub struct Context {
 	// Engine internals (cache, daemon state, registry)
 	pub engine_root: PathBuf,
 }
-
 #[derive(Clone, Debug)]
-pub enum ContextSource {
+pub enum RuntimeMode {
 	Cli,
+	Daemon,
+	Lsp,
+	Tray,
 	// ZedEditor,
 	// CompilerPipeline,
 	// KnowledgeBase,
 }
-
 impl Context {
-	pub fn new(source: ContextSource) -> std::io::Result<Self> {
+	pub fn new(source: RuntimeMode) -> std::io::Result<Self> {
 		Ok(Self {
 			source,
 			workspace: std::env::current_dir()?,
 			estate_root: crate::daemon::resolver::global_estate_dir()?,
-			// estate_root: global_estate_dir()?,
 			engine_root: crate::daemon::resolver::engine_data_dir()?,
 		})
 	}

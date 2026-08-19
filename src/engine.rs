@@ -1,5 +1,3 @@
-use crate::prelude::*;
-
 //                        ┌─────────────────────┐
 //                        │       Estate        │
 //                        │  semantic engine    │
@@ -26,6 +24,8 @@ use crate::prelude::*;
 //                        ┌──────────┼──────────┐
 //                        ▼          ▼          ▼
 //                      Zed       VS Code      CLI
+use crate::prelude::*;
+use revelation::analyzer::Workspace;
 
 pub trait Engine {
 	// IDE anchors/bookmarks
@@ -71,7 +71,7 @@ pub trait Resolver {
 /// Initialization
 /// - I installed estate engine
 /// - I opened the estate IDE
-trait Discovery {
+pub trait Discovery {
 	fn discover(&self, root: &Path) -> Result<DiscoveryResult, Error>;
 }
 // #[async_trait]
@@ -232,18 +232,47 @@ pub struct Node;
 pub struct NodeId;
 
 /// Estate owns the capabilities and domain model; the daemon exposes those capabilities as a long-lived service.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-pub struct Estate {
-	pub registry: EstateRegistry,
-	pub index: EstateIndex,
-	pub resolver: EstateResolver,
-	pub graph: EstateGraph,
-	pub discovery: EstateDiscovery,
-	pub vfs: EstateVfs,
-	pub anchors: AnchorService,
-	pub search: SearchService,
-	pub analysis: AnalysisService,
+#[derive(Clone, Debug, Hash)]
+pub struct EstateEngine {
+	pub estate: Estate, // domain model
+
+	pub vfs: EstateVfs,     // infrastructure
+	pub index: EstateIndex, // infrastructure
+
+	pub workspace: Workspace, // domain/context
+	// pub index: OnceCell<EstateIndex>,
+	// pub search: OnceCell<SearchService>,
+	// pub  analysis: OnceCell<AnalysisService>,
+	pub graph: EstateGraph,         // domain representation
+	pub registry: EstateRegistry,   // persistence/coordination
+	pub resolver: EstateResolver,   // capability
+	pub discovery: EstateDiscovery, // capability
+	pub anchors: AnchorService,     // capability
+	pub search: SearchService,      // capability
+	pub analysis: AnalysisService,  // capability
 }
+impl EstateEngine {
+	pub fn new() -> anyhow::Result<Self> {
+		Ok(Self {
+			estate: Estate::default(),
+			workspace: Workspace::new(),
+			registry: EstateRegistry::default(),
+			index: EstateIndex::default(),
+			resolver: EstateResolver::default(),
+			graph: EstateGraph::default(),
+			discovery: EstateDiscovery::default(),
+			vfs: EstateVfs::default(),
+			anchors: AnchorService::default(),
+			search: SearchService::default(),
+			analysis: AnalysisService::default(),
+		})
+	}
+	pub async fn format(self, args: &FormatArgs) -> anyhow::Result<String, anyhow::Error> {
+		LintDaemon.run(&args).await;
+		Ok("Success".to_string())
+	}
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Change {
 	Created(NodeId),

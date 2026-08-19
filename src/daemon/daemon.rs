@@ -101,7 +101,7 @@ impl CliCommand for StatusDaemon {
 }
 pub struct LintDaemon;
 impl LintDaemon {
-	pub async fn run(&self, _ctx: &CliContext, args: &FormatArgs) {
+	pub async fn run(&self, args: &FormatArgs) {
 		let compiler = DocCompiler::default();
 		match compiler.run(&args.path) {
 			Ok(_) => println!("Successfully formatted: {:?}", args.path),

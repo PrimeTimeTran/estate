@@ -8,7 +8,6 @@ pub mod lint;
 pub mod projection;
 pub mod reload;
 pub mod resolver;
-pub mod router;
 pub mod shell;
 pub mod start;
 pub mod stop;

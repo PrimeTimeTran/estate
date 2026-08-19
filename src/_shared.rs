@@ -7,7 +7,7 @@ use crate::prelude::*;
 // kind:
 // description:
 //------------------------------------------------------------------------------------
-#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct Node {
 	pub uid: Uuid,
 	pub kind: NodeKind,
@@ -51,7 +51,7 @@ impl Node {
 		}
 	}
 }
-#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum NodeKind {
 	#[default]
 	Generic,
@@ -68,7 +68,7 @@ pub enum NodeKind {
 	Source,
 }
 // "What named thing exists?"
-#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct Relation {
 	pub from: Uuid,
 	pub to: Uuid,
@@ -79,7 +79,7 @@ impl Relation {
 		Self { from, to, kind }
 	}
 }
-#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum RelationKind {
 	#[default]
 	Null,
@@ -96,14 +96,14 @@ pub enum RelationKind {
 	GeneratedFrom,
 	RelatedTo,
 }
-#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct View {
 	pub uid: Uuid,
 	pub name: String,
 	pub filters: Vec<ViewFilter>,
 	pub layout: Layout,
 }
-#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum ViewFilter {
 	#[default]
 	Developer,
@@ -115,7 +115,7 @@ pub enum ViewFilter {
 	NameContains(String),
 	CreatedAfter(DateTime<Utc>),
 }
-#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum Layout {
 	#[default]
 	List,
@@ -126,7 +126,7 @@ pub enum Layout {
 	Timeline,
 	Kanban,
 }
-#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct Estate {
 	pub uid: Uuid,
 	pub name: String,
@@ -152,13 +152,13 @@ impl Estate {
 		}
 	}
 }
-#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct Artifact {
 	pub uid: Uuid,
 	pub kind: ArtifactKind,
 	pub resource: Uuid,
 }
-#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum ArtifactKind {
 	#[default]
 	File,
@@ -168,17 +168,17 @@ pub enum ArtifactKind {
 	CodeExample,
 	TestCase,
 }
-#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct TextRange {
 	pub start: TextPosition,
 	pub end: TextPosition,
 }
-#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct TextPosition {
 	pub line: u32,
 	pub column: u32,
 }
-#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum Visibility {
 	#[default]
 	Public,
@@ -186,13 +186,13 @@ pub enum Visibility {
 	Private,
 	Team,
 }
-#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct Scope {
 	pub owner: Option<String>,
 	pub visibility: Visibility,
 }
 //######"What bytes exist?"
-#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct Resource {
 	pub uid: Uuid,
 	pub kind: ResourceKind,
@@ -211,7 +211,7 @@ impl Resource {
 		}
 	}
 }
-#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum ResourceKind {
 	#[default]
 	Source,
@@ -238,7 +238,7 @@ impl ResourceKind {
 		}
 	}
 }
-#[derive(Clone, Debug, Deserialize, Serialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum ResourceLocation {
 	File(PathBuf),
 	Directory(PathBuf),
@@ -250,19 +250,19 @@ impl Default for ResourceLocation {
 		Self::File(PathBuf::new())
 	}
 }
-#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct Tag {
 	pub uid: Uuid,
 	pub name: String,
 	pub caption: String,
 	pub body: String,
 }
-#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct TagBinding {
 	pub tag: Uuid,
 	pub target: Uuid,
 }
-#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct Binding {
 	pub node: Uuid,
 	pub resource: Uuid,
@@ -279,7 +279,7 @@ impl Binding {
 		}
 	}
 }
-#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct Bookmark {
 	pub uid: Uuid,
 	// What am I returning to?
@@ -305,7 +305,7 @@ impl Bookmark {
 		}
 	}
 }
-#[derive(Clone, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct GitAnchor {
 	pub repository: String,
 	pub commit: String,

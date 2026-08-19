@@ -1,4 +1,4 @@
-use crate::prelude::{daemon::projection::command, estate, *};
+use crate::prelude::{daemon::projection::command, *};
 use std::io::{self, BufRead, BufReader};
 
 pub struct DocCompiler {

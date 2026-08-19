@@ -77,7 +77,6 @@ impl Template {
 		name: "workspace",
 		root: "templates/workspace",
 	};
-
 	pub const LOI: Self = Self {
 		name: "loi",
 		root: "templates/loi",
