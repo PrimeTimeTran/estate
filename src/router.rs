@@ -56,16 +56,13 @@ pub async fn execute(
 	engine: EstateEngine,
 ) -> anyhow::Result<(), anyhow::Error> {
 	match parsed_cli.command {
-		cli::Command::Daemon { live } => {
-			if live {
-				// Explicit foreground mode.
-				let mut daemon = BackgroundDaemon::new(engine);
-
-				daemon.start(DaemonOptions { foreground: true }).await?;
-			} else {
-				// Normal daemon mode = tray application.
-				app::App::spawn_tray_daemon(engine)?;
-			}
+		/// estate -- daemon
+		/// estate -- daemon --live
+		Command::Daemon { live: false } => {
+			app::App::spawn_tray_process();
+		}
+		Command::Tray => {
+			App::run_tray_daemon(engine)?;
 		}
 		Command::Format(args) => {
 			// estate format path/to/file.rs

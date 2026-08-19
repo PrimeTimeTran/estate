@@ -108,11 +108,10 @@ impl BackgroundDaemon {
 	}
 	pub async fn run(&mut self) -> Result<()> {
 		let _tx = self.tx.clone();
-		// tokio::try_join!(
-		// 	Self::run_socket_server(SOCKET_PATH, tx),
-		// 	self.run_processing_loop(),
-		// )?;
 		Ok(())
+	}
+	pub async fn is_running() -> bool {
+		UnixStream::connect(SOCKET_PATH).await.is_ok()
 	}
 	// cargo run daemon --live
 	pub async fn run_foreground(&mut self) -> Result<DaemonResponse> {

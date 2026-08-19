@@ -15,28 +15,28 @@ use ::estate::{prelude::*, router};
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
 	let parsed_cli = cli::parse();
-
+	let engine = EstateEngine::new()?;
 	match parsed_cli.command {
 		cli::Command::Tray => {
-			let engine = EstateEngine::new()?;
-			app::App::run_tray_daemon(engine)?;
+			App::run_tray_daemon(engine)?;
 		}
-
+		// cli::Command::Daemon { live } => {
+		// 	App::spawn_tray_process().await?;
+		// 	if live {
+		// 		let mut daemon = BackgroundDaemon::new(engine);
+		// 		daemon.start(DaemonOptions { foreground: true }).await?;
+		// 	}
+		// }
 		cli::Command::Daemon { live: true } => {
-			let engine = EstateEngine::new()?;
+			App::spawn_tray_process().await?;
 			let mut daemon = BackgroundDaemon::new(engine);
-
 			daemon.start(DaemonOptions { foreground: true }).await?;
 		}
-
 		cli::Command::Daemon { live: false } => {
-			App::spawn_tray_process()?;
+			App::spawn_tray_process().await?;
 		}
-
 		_ => {
 			let cli_ctx = cli::Context::new();
-			let engine = EstateEngine::new()?;
-
 			router::execute(parsed_cli, cli_ctx, engine).await?;
 		}
 	}

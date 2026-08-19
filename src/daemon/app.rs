@@ -59,23 +59,24 @@ impl App {
 	}
 }
 impl App {
-	pub fn spawn_tray_process() -> anyhow::Result<()> {
+	pub async fn spawn_tray_process() -> anyhow::Result<()> {
+		if BackgroundDaemon::is_running().await {
+			return Ok(());
+		}
+
 		let exe = std::env::current_exe()?;
-		std::process::Command::new(exe).arg("tray").spawn()?;
-		Ok(())
-	}
-	pub fn spawn_tray_daemon(engine: EstateEngine) -> anyhow::Result<()> {
-		std::thread::Builder::new()
-			.name("estate-tray".into())
-			.spawn(move || {
-				if let Err(err) = Self::run_tray_daemon(engine) {
-					eprintln!("Estate tray error: {err}");
-				}
-			})?;
+
+		std::process::Command::new(exe)
+			.arg("tray")
+			.stdin(std::process::Stdio::null())
+			.stdout(std::process::Stdio::null())
+			.stderr(std::process::Stdio::null())
+			.spawn()?;
 
 		Ok(())
 	}
 
+	/// Run the tray application in the current process.
 	pub fn run_tray_daemon(engine: EstateEngine) -> anyhow::Result<()> {
 		let context = Context::new(RuntimeMode::Cli)?;
 
@@ -89,38 +90,6 @@ impl App {
 
 		Ok(())
 	}
-	fn run_tray_daemon_blocking(engine: EstateEngine) -> anyhow::Result<()> {
-		let context = Context::new(RuntimeMode::Cli)?;
-
-		let event_loop = EventLoop::builder()
-			.with_activation_policy(ActivationPolicy::Accessory)
-			.build()
-			.map_err(|e| anyhow::anyhow!("failed to create event loop: {e}"))?;
-
-		let mut app = App::new(context, engine)?;
-
-		event_loop
-			.run_app(&mut app)
-			.map_err(|e| anyhow::anyhow!("event loop failed: {e}"))?;
-
-		Ok(())
-	}
-	// pub async fn run_tray_daemon(engine: EstateEngine) -> anyhow::Result<()> {
-	// 	let context = Context::new(RuntimeMode::Cli)?;
-
-	// 	let event_loop = EventLoop::builder()
-	// 		.with_activation_policy(ActivationPolicy::Accessory)
-	// 		.build()
-	// 		.map_err(|e| anyhow::anyhow!("failed to create event loop: {e}"))?;
-
-	// 	let mut app = App::new(context, engine)?;
-
-	// 	event_loop
-	// 		.run_app(&mut app)
-	// 		.map_err(|e| anyhow::anyhow!("event loop failed: {e}"))?;
-
-	// 	Ok(())
-	// }
 	fn run_daemon(engine: EstateEngine, mut rx: mpsc::Receiver<DaemonCommand>) {
 		let runtime = Runtime::new().unwrap();
 
