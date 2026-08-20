@@ -102,14 +102,6 @@ pub trait Graph {
 	fn parents(&self, id: EstateId) -> Vec<EstateId>;
 	fn dependencies(&self, id: EstateId) -> Vec<EstateId>;
 }
-/// Handles Disk operations and virtual one day (if a web version were needed)
-pub trait Vfs {
-	// fn open(&self, node: NodeId) -> Result<FileHandle, Error>;
-	// fn stat(&self, node: NodeId) -> Result<Metadata, Error>;
-	// fn watch(&self, node: NodeId) -> Result<WatchHandle, Error>;
-	fn resolve_inode(&self, inode: Inode) -> Node;
-	fn invalidate(&mut self, node: NodeId);
-}
 /// Abstraction for ranking responses which are not deteminitic.
 /// - "Give me package.json" can produce many results
 /// - "Give me available" commnands can produce different results depending on file .ext, settings.json, UI focus, and state.
@@ -185,38 +177,6 @@ pub enum EstateScope {
 	#[default]
 	Workspace,
 }
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Deserialize, Serialize)]
-pub struct Resource {
-	pub id: EstateId,
-	pub kind: ResourceKind,
-	pub locations: Vec<Location>,
-	pub aliases: Vec<String>,
-}
-impl Default for Resource {
-	fn default() -> Self {
-		Self {
-			id: EstateId::new(),
-			kind: ResourceKind::File,
-			locations: vec![],
-			aliases: vec![],
-		}
-	}
-}
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum ResourceKind {
-	File,
-	Symbol,
-	Anchor,
-	Workspace,
-	Project,
-	Generated,
-}
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-pub struct ResourceMetadata {
-	pub created_at: u64,
-	pub updated_at: u64,
-	pub scope: EstateScope,
-}
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub struct EstateId(u64);
@@ -226,23 +186,17 @@ impl EstateId {
 		Self(NEXT_ESTATE_ID.fetch_add(1, Ordering::Relaxed))
 	}
 }
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-pub struct Node;
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-pub struct NodeId;
-
 /// Estate owns the capabilities and domain model; the daemon exposes those capabilities as a long-lived service.
 #[derive(Clone, Debug, Hash)]
 pub struct EstateEngine {
-	pub estate: Estate, // domain model
-
-	pub vfs: EstateVfs,     // infrastructure
-	pub index: EstateIndex, // infrastructure
-
+	pub estate: Estate,       // domain model
+	pub vfs: EstateVfs,       // infrastructure
+	pub index: EstateIndex,   // infrastructure
 	pub workspace: Workspace, // domain/context
+
 	// pub index: OnceCell<EstateIndex>,
 	// pub search: OnceCell<SearchService>,
-	// pub  analysis: OnceCell<AnalysisService>,
+	// pub analysis: OnceCell<AnalysisService>,
 	pub graph: EstateGraph,         // domain representation
 	pub registry: EstateRegistry,   // persistence/coordination
 	pub resolver: EstateResolver,   // capability
@@ -275,10 +229,10 @@ impl EstateEngine {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Change {
-	Created(NodeId),
-	Modified(NodeId),
-	Deleted(NodeId),
-	Renamed { from: NodeId, to: NodeId },
+	Created(Uuid),
+	Modified(Uuid),
+	Deleted(Uuid),
+	Renamed { from: Uuid, to: Uuid },
 	ConfigChanged,
 	WorkspaceChanged,
 }
@@ -330,7 +284,6 @@ pub struct AnchorService {
 }
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
 struct SearchService;
-
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
 struct AnalysisService;
 

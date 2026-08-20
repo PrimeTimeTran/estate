@@ -20,13 +20,6 @@ async fn main() -> anyhow::Result<()> {
 		cli::Command::Tray => {
 			App::run_tray_daemon(engine)?;
 		}
-		// cli::Command::Daemon { live } => {
-		// 	App::spawn_tray_process().await?;
-		// 	if live {
-		// 		let mut daemon = BackgroundDaemon::new(engine);
-		// 		daemon.start(DaemonOptions { foreground: true }).await?;
-		// 	}
-		// }
 		cli::Command::Daemon { live: true } => {
 			App::spawn_tray_process().await?;
 			let mut daemon = BackgroundDaemon::new(engine);

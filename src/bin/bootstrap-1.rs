@@ -8,19 +8,8 @@
 //  bootstrap-1 --manifest estate/1-estate-diagram.md
 //  cargo install --bin bootstrap-1 --path . && bootstrap-1 --manifest estate/1-estate-diagram.md
 //  bootstrap-1 -m estate/1-estate-diagram.md -f 2
-use chrono::Utc;
-use estate::{
-	_shared::*,
-	_static::*,
-	constants::{PIPELINE_DIAGRAM, PIPELINE_ESTATE_WORKSPACE},
-};
+use estate::prelude::*;
 use lazy_static::lazy_static;
-use std::{
-	collections::HashMap,
-	env, fs,
-	path::{Path, PathBuf},
-};
-use uuid::Uuid;
 
 lazy_static! {
 		static ref PATHS: HashMap<&'static str, &'static str> = {
@@ -248,33 +237,45 @@ pub fn compile_bundle(estate: &Estate) -> std::io::Result<()> {
 			estate
 				.bindings
 				.iter()
-				.any(|b| b.node == node.uid && b.resource == r.uid)
+				.any(|b| b.node == node.id && b.resource == r.id)
 		}) else {
 			continue;
 		};
-		match &resource.location {
-			ResourceLocation::Directory(path) => {
-				fs::create_dir_all(path)?;
-				println!("[dir] {}", path.display());
-			}
-			ResourceLocation::File(path) => match resource.kind {
-				ResourceKind::Config
-				| ResourceKind::Source
-				| ResourceKind::Document
-				| ResourceKind::Generated => {
-					if let Some(parent) = path.parent() {
-						fs::create_dir_all(parent)?;
-					}
-					if !path.exists() || matches!(resource.kind, ResourceKind::Generated) {
-						fs::write(path, default_contents(node, resource))?;
-						println!("[+] {}", path.display());
-					} else {
-						println!("[=] {}", path.display());
-					}
+		for location in &resource.locations {
+			match location {
+				ResourceLocation::Directory(path) => {
+					fs::create_dir_all(path)?;
+					println!("[dir] {}", path.display());
 				}
-				_ => {}
-			},
-			_ => {}
+
+				ResourceLocation::File(path) => match resource.kind {
+					ResourceKind::Config
+					| ResourceKind::Source
+					| ResourceKind::Document
+					| ResourceKind::Generated => {
+						if let Some(parent) = path.parent() {
+							fs::create_dir_all(parent)?;
+						}
+
+						if !path.exists() || matches!(resource.kind, ResourceKind::Generated) {
+							fs::write(path, default_contents(node, path))?;
+							println!("[+] {}", path.display());
+						} else {
+							println!("[=] {}", path.display());
+						}
+					}
+
+					_ => {}
+				},
+
+				ResourceLocation::Url(url) => {
+					// handle URL
+				}
+
+				ResourceLocation::External { provider, id } => {
+					// handle external resource
+				}
+			}
 		}
 	}
 	Ok(())
@@ -290,17 +291,12 @@ pub fn compile_registry(estate: &Estate) -> std::io::Result<()> {
 }
 pub fn build_estate(document: EstateDocument) -> Estate {
 	let mut estate = Estate::default();
+
 	let now = Utc::now();
 	let sections = resolve_sections(&document.frontmatter, document.sections);
-	for section in &sections {
-		println!(
-			"RESOLVED SECTION {} => {:?}",
-			section.config.description.as_deref().unwrap_or(""),
-			section.config.path
-		);
-	}
+
 	for section in sections {
-		let Some(path) = section.config.path.as_ref() else {
+		let Some(section_path) = section.config.path.as_ref() else {
 			println!(
 				"SKIPPING SECTION WITHOUT PATH: description={:?}, items={}",
 				section.config.description,
@@ -308,63 +304,94 @@ pub fn build_estate(document: EstateDocument) -> Estate {
 			);
 			continue;
 		};
-		let base = resolve_target_base(path);
+
+		let base = resolve_target_base(section_path);
 
 		let scope = Scope {
 			visibility: Visibility::Personal,
-			owner: Some("".to_string()),
+			owner: Some(String::new()),
 		};
+
 		for item in section.items {
-			let is_dir = item.ends_with('/') || !is_file(&item);
 			let clean = item.trim_end_matches('/');
 			let path = base.join(clean);
-			let uid = Uuid::now_v7();
+
+			let is_dir = item.ends_with('/') || !is_file(&path);
+
 			let name = path
 				.file_name()
-				.map(|n| n.to_string_lossy().to_string())
+				.map(|n| n.to_string_lossy().into_owned())
 				.unwrap_or_default();
+
+			// ---------------------------------------------------------
+			// Node
+			// ---------------------------------------------------------
+
+			let node_id = Uuid::now_v7();
+
 			let node = Node {
-				uid,
+				id: node_id,
 				kind: if is_dir {
 					NodeKind::Directory
 				} else {
 					NodeKind::File
 				},
-				name,
+				name: name.clone(),
 				description: section.config.description.clone(),
 				tags: Some(vec![]),
 				scope: scope.clone(),
 				created_at: now,
 				updated_at: now,
 			};
-			let resource_uid = Uuid::now_v7();
-			let resource_kind = if is_dir {
-				ResourceKind::Directory
-			} else {
-				ResourceKind::from_path(&path)
-			};
+
+			// ---------------------------------------------------------
+			// Resource
+			// ---------------------------------------------------------
+
+			// ResourceId currently doesn't have new(), so use whatever
+			// constructor/default mechanism the shared type provides.
+			//
+			// For now, if ResourceId is a u64 type alias, this works:
+			let resource_id = Uuid::now_v7();
+
 			let resource = Resource {
-				uid: resource_uid,
-				kind: resource_kind,
-				location: if is_dir {
-					ResourceLocation::Directory(path.clone())
+				id: resource_id,
+				kind: if is_dir {
+					// ResourceKind currently has no Directory variant.
+					// Treat directories as File for the bootstrap POC.
+					ResourceKind::File
 				} else {
-					ResourceLocation::File(path.clone())
+					ResourceKind::File
 				},
-				range: None,
-				git: None,
+				locations: vec![ResourceLocation::File(path.clone())],
+				aliases: vec![Alias {
+					name: name.clone(),
+					resource: resource_id,
+				}],
+				meta: ResourceMetadata {
+					created_at: now.timestamp() as u64,
+					updated_at: now.timestamp() as u64,
+					scope: scope.clone(),
+				},
 			};
+
+			// ---------------------------------------------------------
+			// Binding
+			// ---------------------------------------------------------
+
 			let binding = Binding {
-				node: uid,
-				resource: resource_uid,
+				node: node_id,
+				resource: resource_id,
 				range: None,
 				git: None,
 			};
+
 			estate.nodes.push(node);
 			estate.resources.push(resource);
 			estate.bindings.push(binding);
 		}
 	}
+
 	estate
 }
 pub fn normalize_axis(axis: &str) -> &str {
@@ -448,44 +475,6 @@ fn comment_prefix(path: &Path) -> &'static str {
 		_ => "//",
 	}
 }
-pub fn default_contents(node: &Node, resource: &Resource) -> String {
-	let uid = node.uid;
-	let ResourceLocation::File(path) = &resource.location else {
-		return String::new();
-	};
-	match path.extension().and_then(|e| e.to_str()) {
-		Some("html") | Some("xml") => format!(
-			"<!--\n\
-                Generated by Delta Integral Paradigm\n\
-                Node: {uid}\n\
-                -->\n"
-		),
-		Some("css") => format!(
-			"/*\n\
-                Generated by Delta Integral Paradigm\n\
-                Node: {uid}\n\
-                */\n"
-		),
-		Some("md") => format!(
-			"<!--\n\
-                Generated by Delta Integral Paradigm\n\
-                Node: {uid}\n\
-                -->\n"
-		),
-		Some("json") => format!(
-			"// Generated by Delta Integral Paradigm
-// Node: {uid}"
-		),
-		_ => {
-			let c = comment_prefix(path);
-
-			format!(
-				"{c} Generated by Delta Integral Paradigm\n\
-                    {c} Node: {uid}\n"
-			)
-		}
-	}
-}
 fn merge_section_config(mut base: SectionConfig, override_: SectionConfig) -> SectionConfig {
 	if override_.kind.is_some() {
 		base.kind = override_.kind;
@@ -519,8 +508,7 @@ fn resolve_sections(document: &SectionConfig, sections: Vec<RawSection>) -> Vec<
 		})
 		.collect()
 }
-fn is_file(item: &str) -> bool {
-	let path = Path::new(item);
+fn is_file(path: &Path) -> bool {
 	let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
 	if FILE_NAMES.contains(&name) {
 		return true;
@@ -528,5 +516,89 @@ fn is_file(item: &str) -> bool {
 	match path.extension().and_then(|e| e.to_str()) {
 		Some(ext) => FILE_EXTENSIONS.contains(&ext),
 		None => false,
+	}
+}
+fn materialize_file(node: &Node, resource: &Resource, path: &Path) -> anyhow::Result<()> {
+	match resource.kind {
+		ResourceKind::Config
+		| ResourceKind::Source
+		| ResourceKind::Document
+		| ResourceKind::Generated => {
+			if let Some(parent) = path.parent() {
+				fs::create_dir_all(parent)?;
+			}
+
+			if !path.exists() || matches!(resource.kind, ResourceKind::Generated) {
+				fs::write(path, default_contents(node, path))?;
+				println!("[+] {}", path.display());
+			} else {
+				println!("[=] {}", path.display());
+			}
+		}
+
+		_ => {}
+	}
+
+	Ok(())
+}
+fn materialize_location(
+	node: &Node,
+	resource: &Resource,
+	location: &ResourceLocation,
+) -> anyhow::Result<()> {
+	match location {
+		ResourceLocation::Directory(path) => {
+			fs::create_dir_all(path)?;
+			println!("[dir] {}", path.display());
+		}
+
+		ResourceLocation::File(path) => {
+			materialize_file(node, resource, path)?;
+		}
+
+		ResourceLocation::Url(url) => {
+			// URL isn't something we materialize locally
+		}
+
+		ResourceLocation::External { provider, id } => {
+			// delegate to provider
+		}
+	}
+	Ok(())
+}
+pub fn default_contents(node: &Node, path: &Path) -> String {
+	let id = node.id;
+
+	match path.extension().and_then(|e| e.to_str()) {
+		Some("html") | Some("xml") => format!(
+			"<!--\n\
+                Generated by Delta Integral Paradigm\n\
+                Node: {id}\n\
+                -->\n"
+		),
+		Some("css") => format!(
+			"/*\n\
+                Generated by Delta Integral Paradigm\n\
+                Node: {id}\n\
+                */\n"
+		),
+		Some("md") => format!(
+			"<!--\n\
+                Generated by Delta Integral Paradigm\n\
+                Node: {id}\n\
+                -->\n"
+		),
+		Some("json") => format!(
+			"// Generated by Delta Integral Paradigm\n\
+			// Node: {id}"
+		),
+		_ => {
+			let c = comment_prefix(path);
+
+			format!(
+				"{c} Generated by Delta Integral Paradigm\n\
+				{c} Node: {id}\n"
+			)
+		}
 	}
 }

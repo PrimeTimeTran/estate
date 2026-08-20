@@ -19,6 +19,7 @@ path = "src/bin/init.rs"
 # Internal
 cli.workspace = true
 foo.workspace = true
+# vfs.workspace = true
 macros-decl.workspace = true
 macros-proc.workspace = true
 macros.workspace = true
@@ -42,8 +43,8 @@ resvg.workspace = true
 image.workspace = true
 demand.workspace = true
 comfy-table.workspace = true
+uuid.workspace = true
 tokio = { version = "1", features = ["full", "macros", "rt-multi-thread"] }
-uuid = { version = "1.24.0", features = ["v7", "serde"] }
 
 [build-dependencies]
 resvg.workspace = true

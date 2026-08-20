@@ -1,4 +1,52 @@
 use crate::prelude::*;
+use revelation::analyzer::Workspace;
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub struct Estate {
+	pub id: Uuid,
+	pub name: String,
+	pub parent: Option<Uuid>,
+	pub scope: Scope,
+	pub nodes: Vec<Node>,
+	// pub nodes: Vec<Uuid>,
+	pub resources: Vec<Resource>,
+	pub relations: Vec<Relation>,
+	pub bindings: Vec<Binding>,
+}
+impl Estate {
+	pub fn new(name: String, scope: Scope) -> Self {
+		Self {
+			id: Uuid::now_v7(),
+			name,
+			parent: None,
+			scope,
+			nodes: Vec::new(),
+			resources: Vec::new(),
+			relations: Vec::new(),
+			bindings: Vec::new(),
+		}
+	}
+}
+impl Estate {
+	pub fn create_resource(&mut self, resource: Resource) -> Uuid {
+		let id = resource.id;
+		self.resources.push(resource);
+		id
+	}
+
+	pub fn resource(&self, id: Uuid) -> Option<&Resource> {
+		self.resources.iter().find(|r| r.id == id)
+	}
+
+	pub fn resource_mut(&mut self, id: Uuid) -> Option<&mut Resource> {
+		self.resources.iter_mut().find(|r| r.id == id)
+	}
+
+	pub fn remove_resource(&mut self, id: Uuid) -> Option<Resource> {
+		let index = self.resources.iter().position(|r| r.id == id)?;
+		Some(self.resources.remove(index))
+	}
+}
 
 ///--------------------------------------------------------------------------------
 /// Profiles
@@ -182,165 +230,6 @@ pub struct Probe {
 	pub kind: ProbeKind,
 }
 pub type ProbeSet = &'static [Probe];
-pub const PROBES_MINIMAL: ProbeSet = &[
-	Probe {
-		id: "git",
-		name: ".git",
-		kind: ProbeKind::Directory,
-	},
-	Probe {
-		id: "cargo",
-		name: "Cargo.toml",
-		kind: ProbeKind::File,
-	},
-];
-pub const PROBES_NODE: ProbeSet = &[
-	Probe {
-		id: "estate",
-		name: ".estate",
-		kind: ProbeKind::Directory,
-	},
-	Probe {
-		id: "git",
-		name: ".git",
-		kind: ProbeKind::Directory,
-	},
-	Probe {
-		id: "vscode",
-		name: ".vscode",
-		kind: ProbeKind::Directory,
-	},
-	Probe {
-		id: "npm",
-		name: "package.json",
-		kind: ProbeKind::File,
-	},
-	Probe {
-		id: "lockfile",
-		name: "package-lock.json",
-		kind: ProbeKind::File,
-	},
-	Probe {
-		id: "prettier",
-		name: ".prettierrc",
-		kind: ProbeKind::File,
-	},
-];
-pub const PROBES_RUST_ZED: ProbeSet = &[
-	Probe {
-		id: "estate",
-		name: ".estate",
-		kind: ProbeKind::Directory,
-	},
-	Probe {
-		id: "git",
-		name: ".git",
-		kind: ProbeKind::Directory,
-	},
-	Probe {
-		id: "zed",
-		name: ".zed",
-		kind: ProbeKind::Directory,
-	},
-	Probe {
-		id: "cargo",
-		name: "Cargo.toml",
-		kind: ProbeKind::File,
-	},
-	Probe {
-		id: "rust_lock",
-		name: "Cargo.lock",
-		kind: ProbeKind::File,
-	},
-];
-pub const PROBES_PERSONAL: ProbeSet = &[
-	Probe {
-		id: "estate",
-		name: ".estate",
-		kind: ProbeKind::Directory,
-	},
-	Probe {
-		id: "bookmarks",
-		name: "bookmarks",
-		kind: ProbeKind::Directory,
-	},
-	Probe {
-		id: "knowledge",
-		name: "knowledge",
-		kind: ProbeKind::Directory,
-	},
-	Probe {
-		id: "commands",
-		name: "commands",
-		kind: ProbeKind::Directory,
-	},
-];
-pub const REACT_CONFIGS: ProbeSet = &[
-	Probe {
-		id: "js",
-		name: "next.config.js",
-		kind: ProbeKind::File,
-	},
-	Probe {
-		id: "ts",
-		name: "next.config.ts",
-		kind: ProbeKind::File,
-	},
-];
-pub const PROBES_MONOREPO: ProbeSet = &[
-	Probe {
-		id: "estate",
-		name: ".estate",
-		kind: ProbeKind::Directory,
-	},
-	Probe {
-		id: "git",
-		name: ".git",
-		kind: ProbeKind::Directory,
-	},
-	Probe {
-		id: "workspace",
-		name: "pnpm-workspace.yaml",
-		kind: ProbeKind::File,
-	},
-	Probe {
-		id: "cargo",
-		name: "Cargo.toml",
-		kind: ProbeKind::File,
-	},
-	Probe {
-		id: "npm",
-		name: "package.json",
-		kind: ProbeKind::File,
-	},
-];
-pub const PROBES: ProbeSet = &[
-	Probe {
-		id: "estate",
-		name: ".estate",
-		kind: ProbeKind::Directory,
-	},
-	Probe {
-		id: "git",
-		name: ".git",
-		kind: ProbeKind::Directory,
-	},
-	Probe {
-		id: "vscode",
-		name: ".vscode",
-		kind: ProbeKind::Directory,
-	},
-	Probe {
-		id: "zed",
-		name: ".zed",
-		kind: ProbeKind::Directory,
-	},
-	Probe {
-		id: "cargo",
-		name: "Cargo.toml",
-		kind: ProbeKind::File,
-	},
-];
 #[derive(Debug)]
 pub enum Task {
 	Index(PathBuf),
@@ -427,5 +316,5 @@ pub struct DiscoveryResult {
 	files: Vec<PathBuf>,
 	ignored: Vec<PathBuf>,
 }
-struct Workspace;
+// struct Workspace;
 struct Package;
