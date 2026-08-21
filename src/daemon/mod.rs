@@ -82,7 +82,6 @@
 //! The module structure is intentionally subject to change while the daemon
 //! architecture is being refined. Consumers should prefer the re-exported
 //! API where possible.
-pub mod app;
 pub mod bootstrap;
 pub mod config;
 pub mod daemon;
@@ -95,7 +94,6 @@ pub mod resolver;
 pub mod shell;
 pub mod start;
 
-pub use app::*;
 pub use daemon::*;
 pub use event::*;
 pub use lint::*;

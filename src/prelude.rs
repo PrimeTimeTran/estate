@@ -4,6 +4,8 @@
 //!
 pub use crate::_shared::*;
 pub use crate::_static::*;
+pub use crate::agent::{self, *};
+pub use crate::app::*;
 pub use crate::constants::{self, *};
 pub use crate::core::*;
 pub use crate::daemon::{self, daemon::*, start::*, *};
@@ -11,6 +13,7 @@ pub use crate::engine::{self, *};
 pub use crate::graph::*;
 pub use crate::registry::*;
 pub use crate::vfs::*;
+pub use crate::logger::*;
 
 pub use anyhow::{Error, Result};
 pub use async_trait::async_trait;

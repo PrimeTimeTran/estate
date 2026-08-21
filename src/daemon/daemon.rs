@@ -5,7 +5,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 ///--------------------------------------------------------------------------------
 /// Daemon
 ///--------------------------------------------------------------------------------
-#[derive(Clone, Default, Debug, Serialize, Deserialize)]
+#[derive(Clone, Default, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct DaemonState {
 	pub longest_run: u64,
 	pub starts: u64,

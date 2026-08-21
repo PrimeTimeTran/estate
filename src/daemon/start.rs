@@ -1,4 +1,5 @@
 use crate::prelude::{engine::*, *};
+use chrono::Duration;
 use revelation::analyzer::*;
 // cargo run daemon
 // Troubleshooting:
@@ -39,36 +40,28 @@ use revelation::analyzer::*;
 /// Daemon domain API — execute(Action) -> Response, start(), stop().
 /// Daemon transport/lifecycle — Unix socket, Tokio tasks, channels, request parsing.
 #[async_trait]
-pub trait Daemon {
+pub trait EstateDaemon {
 	async fn execute(&mut self, action: ActionRequest) -> Result<DaemonResponse>;
 	async fn start(&mut self, options: DaemonOptions) -> Result<DaemonResponse>;
 	async fn stop(&mut self) -> Result<DaemonResponse>;
 }
-/// Verb layer: format, rename, save, index, analyze, build, search, resolve, organize imports, find references, go to definition
-pub struct EstateDaemon {
-	pub estate: EstateEngine,
-	pub actions: ActionRegistry,
-	pub discovery: EstateDiscovery,
-	// pub vfs: EstateVfs,
-	// pub graph: EstateGraph,
-	// pub resolver: EstateResolver,
-	// pub registry: EstateRegistry,
-}
-pub struct BackgroundDaemon {
+pub struct Daemon {
+	id: Uuid,
+
 	estate: EstateEngine,
 	actions: ActionRegistry,
 	discovery: EstateDiscovery,
-	// context: app::Context,
 	workspace: Workspace,
+
+	tasks: TaskManager,
+
 	rx: mpsc::Receiver<DaemonMessage>,
 	pub tx: mpsc::Sender<DaemonMessage>,
 }
 
 #[async_trait]
-impl Daemon for BackgroundDaemon {
+impl EstateDaemon for Daemon {
 	async fn execute(&mut self, action: ActionRequest) -> Result<DaemonResponse> {
-		eprintln!("[daemon] execute: {:?}", action);
-
 		match action {
 			ActionRequest::Analyze {
 				path,
@@ -92,19 +85,25 @@ impl Daemon for BackgroundDaemon {
 		todo!("stop")
 	}
 }
-impl BackgroundDaemon {
+impl Daemon {
 	pub fn new(engine: EstateEngine) -> Self {
 		let (tx, rx) = mpsc::channel(32);
+		let id = Uuid::now_v7();
+		tracing::info!(
+				target: "estate::daemon",
+				%id,
+				"daemon created"
+		);
 		Self {
-			actions: ActionRegistry::default(),
-			discovery: EstateDiscovery::default(),
-			estate: EstateEngine::new().unwrap(),
-			workspace: engine.workspace,
+			id,
 			rx,
 			tx,
-			// context,
+			estate: engine.clone(),
+			workspace: engine.workspace,
+			tasks: TaskManager::default(),
+			actions: ActionRegistry::default(),
+			discovery: EstateDiscovery::default(),
 		}
-		// Self { workspace, rx, tx, context }
 	}
 	pub async fn run(&mut self) -> Result<()> {
 		let _tx = self.tx.clone();
@@ -115,27 +114,95 @@ impl BackgroundDaemon {
 	}
 	// cargo run daemon --live
 	pub async fn run_foreground(&mut self) -> Result<DaemonResponse> {
+		tracing::info!(
+				target: "estate::daemon",
+				socket = SOCKET_PATH,
+				"starting foreground daemon"
+		);
+
 		let tx = self.tx.clone();
+
 		let (socket_result, _processing_result) = tokio::join!(
 			Self::run_socket_server(SOCKET_PATH, tx),
 			self.run_processing_loop(),
 		);
+
+		tracing::info!(
+				target: "estate::daemon",
+				"foreground daemon stopped"
+		);
+
 		socket_result?;
+
 		Ok(DaemonResponse::default())
+	}
+	pub async fn run_processing_loop(&mut self) {
+		tracing::info!(
+				target: "estate::daemon::processing",
+				"processing loop started"
+		);
+
+		while let Some(message) = self.rx.recv().await {
+			match message {
+				DaemonMessage::Execute { action, respond_to } => {
+					let flow_id = Uuid::now_v7();
+
+					tracing::info!(
+							target: "estate::daemon::processing",
+							%flow_id,
+							action = ?action,
+							"executing action"
+					);
+
+					let result = self.execute(action).await;
+
+					match &result {
+						Ok(_) => {
+							tracing::info!(
+									target: "estate::daemon::processing",
+									%flow_id,
+									"action completed"
+							);
+						}
+						Err(error) => {
+							tracing::error!(
+									target: "estate::daemon::processing",
+									%flow_id,
+									error = %error,
+									"action failed"
+							);
+						}
+					}
+
+					let _ = respond_to.send(result);
+				}
+			}
+		}
+
+		tracing::info!(
+				target: "estate::daemon::processing",
+				"processing loop stopped"
+		);
 	}
 	///--------------------------------------------------------------------------------
 	/// Long lived runner ready todo something
 	/// cargo run daemon
 	///--------------------------------------------------------------------------------
 	async fn run_background(&mut self) -> Result<DaemonResponse> {
+		tracing::info!("Run Background");
 		let exe = std::env::current_exe()?;
-		let child = process::Command::new(&exe)
-			.args(["daemon", "--live"])
-			.stdin(process::Stdio::null())
-			.stdout(process::Stdio::null())
-			.stderr(process::Stdio::null())
+		// let child = process::Command::new(&exe)
+		// 	.args(["daemon", "--live"])
+		// 	.stdin(process::Stdio::null())
+		// 	.stdout(process::Stdio::null())
+		// 	.stderr(process::Stdio::null())
+		// 	.spawn()?;
+		let child = std::process::Command::new(exe)
+			.arg("tray")
+			.stdin(std::process::Stdio::inherit())
+			.stdout(std::process::Stdio::inherit())
+			.stderr(std::process::Stdio::inherit())
 			.spawn()?;
-
 		let pid = child.id();
 
 		eprintln!("Daemon started");
@@ -151,20 +218,68 @@ impl BackgroundDaemon {
 	/// Spawns the Unix socket listener and routes incoming connections into the daemon's channel
 	pub async fn run_socket_server(socket_path: &str, tx: mpsc::Sender<DaemonMessage>) -> Result<()> {
 		let _ = std::fs::remove_file(socket_path);
+
 		let listener = UnixListener::bind(socket_path)?;
-		eprintln!("[daemon] listening on {}", socket_path);
+
+		tracing::info!(
+				target: "estate::daemon::socket",
+				socket = socket_path,
+				"socket server listening"
+		);
 
 		loop {
 			let (mut socket, _) = listener.accept().await?;
+
+			tracing::debug!(
+					target: "estate::daemon::socket",
+					"client connected"
+			);
+
 			let tx = tx.clone();
+
 			tokio::spawn(async move {
+				tracing::debug!(
+						target: "estate::daemon::socket",
+						"processing socket request"
+				);
+
 				let mut buf = vec![0; 8192];
+
 				let n = socket.read(&mut buf).await?;
+
+				tracing::debug!(
+						target: "estate::daemon::socket",
+						bytes = n,
+						"request received"
+				);
+
 				if n == 0 {
+					tracing::debug!(
+							target: "estate::daemon::socket",
+							"client sent empty request"
+					);
+
 					return Ok(());
 				}
+
 				let parsed = parse_action(buf, n)?;
+
+				tracing::info!(
+						target: "estate::daemon::socket",
+						path = ?parsed.path,
+						line = ?parsed.line,
+						column = ?parsed.column,
+						mode = ?parsed.mode,
+						"request parsed"
+				);
+
 				let (resp_tx, resp_rx) = oneshot::channel();
+
+				tracing::debug!(
+						target: "estate::daemon::socket",
+						"dispatching request to processing loop"
+				);
+
 				tx.send(DaemonMessage::Execute {
 					action: ActionRequest::Analyze {
 						path: parsed.path,
@@ -175,35 +290,55 @@ impl BackgroundDaemon {
 					respond_to: resp_tx,
 				})
 				.await?;
+
+				tracing::debug!(
+						target: "estate::daemon::socket",
+						"waiting for action response"
+				);
+
 				let result = resp_rx.await?;
+
+				tracing::debug!(
+						target: "estate::daemon::socket",
+						"action response received"
+				);
+
 				let payload = match result {
-					Ok(response) => serde_json::to_string(&response)?,
-					Err(error) => serde_json::to_string(&serde_json::json!({
-							"status": "error",
-							"message": error.to_string(),
-					}))?,
+					Ok(response) => {
+						tracing::debug!(
+								target: "estate::daemon::socket",
+								"serializing successful response"
+						);
+
+						serde_json::to_string(&response)?
+					}
+
+					Err(error) => {
+						tracing::error!(
+								target: "estate::daemon::socket",
+								error = %error,
+								"action failed"
+						);
+
+						serde_json::to_string(&serde_json::json!({
+								"status": "error",
+								"message": error.to_string(),
+						}))?
+					}
 				};
+
 				socket.write_all(payload.as_bytes()).await?;
 				socket.write_all(b"\n").await?;
+
+				tracing::debug!(
+						target: "estate::daemon::socket",
+						"response sent"
+				);
+
 				Ok::<(), anyhow::Error>(())
 			});
 		}
 	}
-	pub async fn run_processing_loop(&mut self) {
-		eprintln!("[daemon] processing loop started");
-		while let Some(message) = self.rx.recv().await {
-			match message {
-				DaemonMessage::Execute { action, respond_to } => {
-					eprintln!("[daemon] executing action");
-					let result = self.execute(action).await;
-					eprintln!("[daemon] execute completed");
-					let _ = respond_to.send(result);
-				}
-			}
-		}
-		eprintln!("[daemon] processing loop stopped");
-	}
-
 	fn metrics(&mut self, path: PathBuf) -> Result<DaemonResponse> {
 		let request = Analyze {
 			target: AnalysisTarget::File(path),
@@ -270,6 +405,16 @@ fn parse_action(buf: Vec<u8>, n: usize) -> Result<IncomingRequest, Error> {
 	})?;
 	Ok(parsed)
 }
+/// Verb layer: format, rename, save, index, analyze, build, search, resolve, organize imports, find references, go to definition
+// pub struct EstateDaemon {
+// 	pub estate: EstateEngine,
+// 	pub actions: ActionRegistry,
+// 	pub discovery: EstateDiscovery,
+// 	// pub vfs: EstateVfs,
+// 	// pub graph: EstateGraph,
+// 	// pub resolver: EstateResolver,
+// 	// pub registry: EstateRegistry,
+// }
 #[derive(Debug, Default)]
 pub struct DaemonOptions {
 	pub foreground: bool,
@@ -338,80 +483,6 @@ pub async fn daemon() {
 		event_loop(rx, runtime.clone())
 	);
 }
-// pub struct BackgroundDaemon2;
-// impl BackgroundDaemon2 {
-// 	// 1. Find it.
-// 	// ps aux | grep "daemon-server"
-// 	// 2. Kill it
-// 	// kill 17254
-// 	// 3. Kill harder
-// 	// kill -9 49189
-// 	// 4. Remove
-// 	// rm /tmp/estate-daemon.sock
-// 	// Add stop
-// 	// cg-rb loi daemon stop
-// 	pub async fn run(_ctx: &Context, _args: &cli::FormatArgs) {
-// 		if Self::daemon_running().await {
-// 			println!("daemon already running");
-// 			return;
-// 		}
-// 		if Path::new(SOCKET_PATH).exists() {
-// 			std::fs::remove_file(SOCKET_PATH).expect("failed removing stale socket");
-// 		}
-// 		println!("🚀 starting background estate daemon");
-// 		let exe = std::env::current_exe().expect("failed finding current executable");
-// 		let child = Command::new(exe)
-// 			.arg("daemon-server")
-// 			.stdin(Stdio::null())
-// 			.stdout(Stdio::null())
-// 			.stderr(Stdio::null())
-// 			.spawn()
-// 			.expect("failed spawning daemon");
-// 		let pid = child.id();
-// 		std::fs::write("/tmp/estate-daemon.pid", pid.to_string()).expect("failed writing pid file");
-// 		// 3. Log file.
-// 		// use std::fs::OpenOptions;
-// 		// use std::process::{Command, Stdio};
-// 		// let log = OpenOptions::new()
-// 		//     .create(true)
-// 		//     .append(true)
-// 		//     .open("/tmp/estate-daemon.log")
-// 		//     .unwrap();
-// 		// let child = Command::new(exe)
-// 		//     .arg("daemon-server")
-// 		//     .stdin(Stdio::null())
-// 		//     .stdout(log.try_clone().unwrap())
-// 		//     .stderr(log)
-// 		//     .spawn()
-// 		//     .unwrap();
-// 		println!("✅ daemon started pid={}", child.id());
-// 	}
-// 	async fn daemon_running() -> bool {
-// 		UnixStream::connect(SOCKET_PATH).await.is_ok()
-// 	}
-// }
-// pub struct ProcessDaemon;
-// impl ProcessDaemon {
-//     pub async fn run(_ctx: &Context, _args: &cli::FormatArgs) {
-//         println!("🚀 starting estate daemon");
-//         let exe = std::env::current_exe().expect("failed finding current executable");
-//         let child = Command::new(exe)
-//             .arg("daemon")
-//             .stdin(Stdio::null())
-//             .stdout(Stdio::null())
-//             .stderr(Stdio::null())
-//             .spawn()
-//             .expect("failed starting daemon");
-//         println!("✅ daemon started pid={}", child.id());
-//     }
-// }
-// async fn process_loop() {
-//     loop {
-//         println!("daemon heartbeat");
-//         tokio::time::sleep(std::time::Duration::from_secs(10)).await;
-//     }
-// }
-
 pub enum DaemonMessage {
 	Execute {
 		action: ActionRequest,
@@ -496,4 +567,14 @@ impl DaemonServer {
 			line.clear();
 		}
 	}
+}
+
+#[derive(Debug, Clone)]
+pub struct DaemonMetrics {
+	pub starts: u64,
+	pub uptime: Duration,
+	pub tasks_total: usize,
+	pub tasks_running: usize,
+	pub tasks_completed: usize,
+	pub tasks_failed: usize,
 }

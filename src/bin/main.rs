@@ -14,50 +14,48 @@
 //! ```sh
 //! estate fmt path/to/file.rs
 //! ```
-//!
-//! ```sh
-//!
-//! ```
-//!
-//! ```sh
-//!
-//! ```
-//!
-//! ```sh
-//!
-//! ```
-//!
-//! ```sh
-//!
-//! ```
-//!
-//! ```sh
-//!
-//! ```
-//!
 
-use ::estate::{prelude::*, router};
+use ::estate::{prelude::*, router, logger};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
 	let parsed_cli = cli::context::parse();
+
+	logger::init_logging(matches!(
+		parsed_cli.command,
+		cli::context::Command::Start { tail: true }
+	))?;
+
+	tracing::info!(target: "estate", "starting Estate");
+
 	let engine = EstateEngine::new()?;
+
 	match parsed_cli.command {
 		cli::context::Command::Tray => {
 			App::run_tray_daemon(engine)?;
 		}
+
 		cli::context::Command::Start { tail: true } => {
+			tracing::info!(target: "estate", "spawning tray");
+
 			App::spawn_tray_process().await?;
-			let mut daemon = BackgroundDaemon::new(engine);
+
+			tracing::info!(target: "estate", "starting foreground daemon");
+
+			let mut daemon = Daemon::new(engine);
+
 			daemon.start(DaemonOptions { foreground: true }).await?;
 		}
+
 		cli::context::Command::Start { tail: false } => {
 			App::spawn_tray_process().await?;
 		}
+
 		_ => {
 			let cli_ctx = cli::context::Context::new();
 			router::execute(parsed_cli, cli_ctx, engine).await?;
 		}
 	}
+
 	Ok(())
 }
