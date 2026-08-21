@@ -100,7 +100,7 @@ fn render_symbols(json: &serde_json::Value) -> String {
 pub fn generate_explain_doc() -> Result<()> {
 	let workspace = project_root()?;
 
-	DaemonState::save_workspace(&workspace);
+	EstateState::save_workspace(&workspace);
 
 	let out = workspace.join("explain.md");
 

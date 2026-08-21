@@ -15,18 +15,18 @@
 //! estate fmt path/to/file.rs
 //! ```
 
-use ::estate::{prelude::*, router, logger};
+use ::estate::{logger, prelude::*, router};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
 	let parsed_cli = cli::context::parse();
+	// let log_config = logger::LogConfig::load(&parsed_cli)?;
+	// logger::init_logging(&log_config)?;
+	// tracing::info!(target: "estate", "starting Estate");
 
-	logger::init_logging(matches!(
-		parsed_cli.command,
-		cli::context::Command::Start { tail: true }
-	))?;
-
-	tracing::info!(target: "estate", "starting Estate");
+	let mut config = LogConfig::load()?;
+	config.apply_cli(&parsed_cli)?;
+	logger::init_logging(&config)?;
 
 	let engine = EstateEngine::new()?;
 

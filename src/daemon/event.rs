@@ -175,7 +175,7 @@ pub enum EventSource {
 #[derive(Debug, Clone)]
 pub struct EstateRuntime {
 	pub events: EventBus,
-	pub state: daemon::DaemonState,
+	pub state: daemon::EstateState,
 }
 impl Default for EstateRuntime {
 	fn default() -> Self {
@@ -185,10 +185,10 @@ impl Default for EstateRuntime {
 
 impl EstateRuntime {
 	pub fn new() -> Self {
-		let mut state = DaemonState::load();
+		let mut state = EstateState::load();
 		state.starts += 1;
-		state.started_at = DaemonState::now();
-		DaemonState::save(&state);
+		state.started_at = EstateState::now();
+		EstateState::save(&state);
 		Self {
 			events: EventBus::new(),
 			state,

@@ -11,24 +11,27 @@ pub use crate::core::*;
 pub use crate::daemon::{self, daemon::*, start::*, *};
 pub use crate::engine::{self, *};
 pub use crate::graph::*;
+pub use crate::logger::*;
 pub use crate::registry::*;
 pub use crate::vfs::*;
-pub use crate::logger::*;
 
 pub use anyhow::{Error, Result};
 pub use async_trait::async_trait;
 pub use chrono::{DateTime, Local, Utc};
 pub use cli::{self, context::*, prelude::*, *};
 pub use futures::{FutureExt, future::BoxFuture};
-pub use revelation::{analyzer::Workspace, *};
+pub use revelation::{analyzer::{*, Workspace}, *};
 pub use serde::*;
 pub use serde_json::Value;
 pub use std::{
 	collections::*,
-	env, fs,
+	env, fs::{self, OpenOptions},
 	iter::Map,
 	path::*,
-	sync::atomic::{AtomicU64, Ordering},
+	sync::{
+		Arc,
+		atomic::{AtomicU64, Ordering},
+	},
 	thread, *,
 };
 pub use tokio::{

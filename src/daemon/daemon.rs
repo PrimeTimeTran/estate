@@ -1,19 +1,15 @@
 pub use crate::prelude::*;
 use cli::prelude::{CliCommand, Context as CliContext, FormatArgs};
-use revelation::analyzer::*;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-///--------------------------------------------------------------------------------
-/// Daemon
-///--------------------------------------------------------------------------------
+
 #[derive(Clone, Default, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct DaemonState {
-	pub longest_run: u64,
+pub struct EstateState {
 	pub starts: u64,
+	pub longest_run: u64,
 	#[serde(default)]
 	pub status_checks: u64,
 	pub started_at: u64,
 }
-impl DaemonState {
+impl EstateState {
 	pub fn save_workspace(path: &PathBuf) {
 		println!("💾 save_workspace not implemented yet: {:?}", path);
 	}
@@ -24,7 +20,7 @@ impl DaemonState {
 			.as_secs()
 	}
 }
-impl DaemonState {
+impl EstateState {
 	fn path() -> std::io::Result<PathBuf> {
 		Ok(engine_data_dir()?.join("state.json"))
 	}
@@ -56,8 +52,8 @@ pub struct StatusDaemon;
 #[async_trait::async_trait]
 impl CliCommand for StatusDaemon {
 	async fn run(&self, _ctx: &CliContext) {
-		DaemonState::record_status_check();
-		let state = DaemonState::load();
+		EstateState::record_status_check();
+		let state = EstateState::load();
 		let pid = std::fs::read_to_string(PID_PATH).unwrap_or_else(|_| "unknown".to_string());
 		println!("📊 Estate Daemon Status");
 		println!("──────────────────────");

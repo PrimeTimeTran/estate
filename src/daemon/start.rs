@@ -529,10 +529,10 @@ async fn serve(listener: TcpListener, runtime: EstateRuntime) {
 }
 
 fn init_runtime_state() {
-	let mut s = DaemonState::load();
+	let mut s = EstateState::load();
 	s.starts += 1;
-	s.started_at = DaemonState::now();
-	DaemonState::save(&s);
+	s.started_at = EstateState::now();
+	EstateState::save(&s);
 }
 pub struct DaemonServer;
 impl DaemonServer {

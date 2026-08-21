@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::prelude::*;
 use egui::{Context as EguiContext, PopupAnchor::Position, TexturesDelta, Ui};
 use egui_wgpu::{
@@ -7,28 +5,42 @@ use egui_wgpu::{
 	wgpu::{self, hal::InstanceDescriptor},
 };
 use egui_winit::State as EguiState;
-use tokio::runtime::Runtime;
 use tracing::instrument::WithSubscriber;
 use tray_icon::{
 	Icon, TrayIcon, TrayIconBuilder,
 	menu::{Menu, MenuEvent, MenuItem, Submenu},
 };
-use wgpu::{ExperimentalFeatures, SurfaceColorSpace, SurfaceConfiguration};
+use wgpu::{Adapter, Device, ExperimentalFeatures, SurfaceColorSpace, SurfaceConfiguration};
 use winit::{
 	application::ApplicationHandler,
-	dpi::{LogicalPosition, LogicalSize, PhysicalSize},
+	dpi::{LogicalPosition, LogicalSize, PhysicalPosition, PhysicalSize},
 	event::WindowEvent,
 	event_loop::{ActiveEventLoop, EventLoop},
 	platform::macos::{ActivationPolicy, EventLoopBuilderExtMacOS},
-	window::{Window, WindowAttributes, WindowId},
+	window::{Window, WindowAttributes, WindowId, WindowLevel},
 };
 
+/// Top-level application state.
+///
+/// Owns the system tray integration, application context, Estate engine,
+/// daemon communication channel, and optional development window.
 pub struct App {
+	/// The system tray icon owned by the application.
 	tray: TrayIcon,
+
+	/// The system tray menu and its associated menu items.
 	menu: TrayMenu,
+
+	/// Shared application context and runtime state.
 	context: Context,
+
+	/// The Estate engine responsible for the application's core functionality.
 	engine: EstateEngine,
+
+	/// Channel used to send commands to the Estate daemon, when available.
 	daemon_tx: Option<mpsc::Sender<DaemonCommand>>,
+
+	/// The development window, when it has been opened.
 	dev_window: Option<DevWindow>,
 }
 impl App {
@@ -46,9 +58,7 @@ impl App {
 	}
 	fn bootstrap() -> anyhow::Result<(TrayMenu, TrayIcon)> {
 		let menu = Menu::new();
-
 		let status = MenuItem::new("● Estate Daemon Running", false, None);
-
 		let dev = MenuItem::new("Dev Info", true, None);
 
 		// ─────────────────────────────────────────────
@@ -115,38 +125,34 @@ impl App {
 	)]
 	pub async fn scan_workspace(&mut self, path: &Path) -> anyhow::Result<()> {
 		tracing::info!("starting workspace scan");
-
 		self.discover(path).await?;
-
 		tracing::debug!("discovery complete");
-
 		self.analyze().await?;
-
 		tracing::debug!("analysis complete");
-
 		self.build_graph().await?;
-
 		tracing::info!("workspace scan complete");
-
 		Ok(())
 	}
 
 	#[tracing::instrument(target = "estate::discovery", skip(self, path))]
 	pub async fn discover(&mut self, path: &Path) -> anyhow::Result<()> {
 		tracing::debug!(path = %path.display(), "discovering workspace");
-
-		// TODO
-
 		Ok(())
 	}
 
 	#[tracing::instrument(target = "estate::analysis", skip(self))]
 	pub async fn analyze(&mut self) -> anyhow::Result<()> {
 		tracing::debug!("analyzing workspace");
-
-		// TODO
-
 		Ok(())
+	}
+	fn show_tasks(&self) {
+		println!("Estate Tasks");
+	}
+	fn new_task(&mut self) {
+		println!("Creating task...");
+	}
+	fn clear_tasks(&mut self) {
+		println!("Clearing tasks...");
 	}
 
 	#[tracing::instrument(target = "estate::graph", skip(self))]
@@ -250,285 +256,229 @@ impl App {
 			}
 		}
 	}
-	fn show_tasks(&self) {
-		println!("Estate Tasks");
-	}
-	fn new_task(&mut self) {
-		println!("Creating task...");
-	}
-	fn clear_tasks(&mut self) {
-		println!("Clearing tasks...");
-	}
 }
 impl ApplicationHandler for App {
 	fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
 		while let Ok(event) = MenuEvent::receiver().try_recv() {
-			eprintln!(">>> MENU EVENT: {:?}", event.id());
 			self.handle_menu_event(event, event_loop);
 		}
 	}
 	fn resumed(&mut self, _event_loop: &ActiveEventLoop) {
 		let (tx, rx) = mpsc::channel(100);
 		self.daemon_tx = Some(tx);
-
 		let engine = self.engine.clone();
-
 		thread::spawn(move || {
 			Self::run_daemon(engine, rx);
 		});
 	}
-
 	fn window_event(
 		&mut self,
 		event_loop: &ActiveEventLoop,
 		window_id: WindowId,
 		event: WindowEvent,
 	) {
-		if let Some(dev_window) = &mut self.dev_window {
-			if dev_window.window.id() != window_id {
-				return;
-			}
-			match event {
-				WindowEvent::RedrawRequested => {
-					if dev_window.occluded {
-						tracing::info!("DEV >>> Redraw skipped: occluded");
-						return;
-					}
+		let Some(dev_window) = &mut self.dev_window else {
+			return;
+		};
 
-					tracing::info!("DEV >>> RedrawRequested");
+		if dev_window.window.id() != window_id {
+			return;
+		}
 
-					if let Err(e) = dev_window.draw() {
-						tracing::error!("DEV >>> draw failed: {e:#}");
-					}
+		let response = dev_window
+			.egui_state
+			.on_window_event(&dev_window.window, &event);
+
+		// tracing::info!(
+		// 	"EGUI EVENT: {:?}, consumed={}, repaint={}",
+		// 	event,
+		// 	response.consumed,
+		// 	response.repaint
+		// );
+
+		if response.repaint {
+			dev_window.window.request_redraw();
+		}
+		match event {
+			WindowEvent::RedrawRequested => {
+				if dev_window.occluded {
+					// Very noisy on loop render
+					// tracing::info!("DEV Redraw skipped: occluded");
+					return;
 				}
-				WindowEvent::Focused(true) => {
+
+				// tracing::info!("DEV >>> RedrawRequested");
+
+				if let Err(e) = dev_window.draw() {
+					tracing::error!("DEV >>> draw failed: {e:#}");
+				}
+			}
+			WindowEvent::Focused(true) => {
+				dev_window.window.request_redraw();
+			}
+			WindowEvent::Occluded(occluded) => {
+				tracing::info!("DEV >>> Occluded({occluded})");
+				dev_window.occluded = occluded;
+
+				if !occluded {
 					dev_window.window.request_redraw();
 				}
-				WindowEvent::Occluded(occluded) => {
-					tracing::info!("DEV >>> Occluded({occluded})");
-
-					dev_window.occluded = occluded;
-
-					if !occluded {
-						tracing::info!("DEV >>> WINDOW IS NOW DRAWABLE — requesting redraw");
-						dev_window.window.request_redraw();
-					}
-				}
-				WindowEvent::Resized(size) => {
-					tracing::info!("DEV >>> Resized({}x{})", size.width, size.height);
-				}
-
-				WindowEvent::CloseRequested => {
-					tracing::info!("DEV >>> CloseRequested");
-				}
-
-				other => {
-					tracing::debug!("DEV >>> {:?}", other);
-				}
 			}
+			WindowEvent::Resized(size) => {
+				tracing::info!("DEV >>> Resized({}x{})", size.width, size.height);
 
-			return;
+				if size.width == 0 || size.height == 0 {
+					return;
+				}
+
+				dev_window.config.width = size.width;
+				dev_window.config.height = size.height;
+
+				dev_window
+					.surface
+					.configure(&dev_window.device, &dev_window.config);
+
+				dev_window.needs_resize = false;
+				dev_window.window.request_redraw();
+			}
+			WindowEvent::CloseRequested => {
+				tracing::info!("DEV >>> CloseRequested");
+			}
+			_ => {}
 		}
 	}
 }
 
-// #[derive(Debug)]
+/// The development/debug window for the Estate application.
+///
+/// Owns the native window, egui state, wgpu rendering resources, and the
+/// application state required to render and interact with the development UI.
 pub struct DevWindow {
+	/// The native window handle.
 	window: Arc<Window>,
-	egui_ctx: egui::Context,
-	egui_state: EguiState,
-	surface: wgpu::Surface<'static>,
-	device: wgpu::Device,
-	queue: wgpu::Queue,
-	renderer: egui_wgpu::Renderer,
-	config: wgpu::SurfaceConfiguration,
-	top_tab: DevTopTab,
-	side_tab: DevSideTab,
-	state: DaemonState,
-	occluded: bool,
-	pending_textures: egui::TexturesDelta,
-}
 
+	/// The egui context used to build and render the UI.
+	egui_ctx: egui::Context,
+
+	/// Translates native window events and input into egui input.
+	egui_state: EguiState,
+
+	/// The wgpu surface associated with the native window.
+	surface: wgpu::Surface<'static>,
+
+	/// The GPU device used to create rendering resources.
+	device: wgpu::Device,
+
+	/// The GPU queue used to submit rendering commands.
+	queue: wgpu::Queue,
+
+	/// The egui renderer backed by wgpu.
+	renderer: egui_wgpu::Renderer,
+
+	/// Configuration used to configure the wgpu surface.
+	config: wgpu::SurfaceConfiguration,
+
+	/// The currently selected top-level development view.
+	top_tab: DevTopTab,
+
+	/// The currently selected side-panel development view.
+	side_tab: DevSideTab,
+
+	/// Current Estate daemon/application state displayed by the development UI.
+	state: EstateState,
+
+	/// Whether the window's surface is currently occluded and therefore cannot
+	/// be rendered to.
+	occluded: bool,
+
+	/// Texture updates produced by egui that have not yet been uploaded to the
+	/// GPU.
+	pending_textures: egui::TexturesDelta,
+
+	needs_resize: bool,
+}
 impl DevWindow {
 	pub fn new(event_loop: &ActiveEventLoop) -> anyhow::Result<Self> {
-		let monitor = event_loop
-			.primary_monitor()
-			.ok_or_else(|| anyhow::anyhow!("no primary monitor found"))?;
-		let monitor_size = monitor.size();
-		let width = 900;
-		let height = 600;
-		let x = (monitor_size.width.saturating_sub(width)) / 2;
-		let y = (monitor_size.height.saturating_sub(height)) / 2;
-		let window = Arc::new(
-			event_loop.create_window(
-				WindowAttributes::default()
-					.with_title("Estate — Dev")
-					.with_inner_size(PhysicalSize::new(900, 600))
-					.with_resizable(true),
-			)?,
-		);
-		window.set_visible(true);
-		window.focus_window();
-		// window.focus_window();
-		// // let window = Arc::new(
-		// // 	event_loop.create_window(
-		// // 		WindowAttributes::default()
-		// // 			.with_title("Estate — Dev")
-		// // 			.with_inner_size(PhysicalSize::new(900, 600))
-		// // 			.with_resizable(true)
-		// // 			.with_visible(true),
-		// // 	)?,
-		// // );
-		// window.set_visible(true);
-		// window.focus_window();
-		// window.request_redraw();
-		// window.with_current_subscriber();
-		// window.with_subscriber(subscriber);
-		// window.request_redraw();
-		// dev_window.draw()?;
-		tracing::info!(
-			"window after setup: visible={} focused={} minimized={} size={:?}",
-			window.is_visible().unwrap_or(false),
-			window.has_focus(),
-			window.is_minimized().unwrap_or(false),
-			window.inner_size(),
-		);
-		let egui_ctx = egui::Context::default();
-		let egui_state = EguiState::new(
-			egui_ctx.clone(),
-			egui::ViewportId::ROOT,
-			event_loop,
-			None,
-			None,
-			None,
-		);
-		let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle());
-		let surface = unsafe { instance.create_surface(window.clone())? };
-		let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
-			apply_limit_buckets: true,
-			power_preference: wgpu::PowerPreference::HighPerformance,
-			compatible_surface: Some(&surface),
-			force_fallback_adapter: false,
-		}))
-		.map_err(|e| anyhow::anyhow!("failed to find suitable GPU adapter: {e}"))?;
-		let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
-			experimental_features: wgpu::ExperimentalFeatures::disabled(),
-			label: Some("estate-dev-device"),
-			required_features: wgpu::Features::empty(),
-			required_limits: wgpu::Limits::default(),
-			memory_hints: wgpu::MemoryHints::Performance,
-			trace: wgpu::Trace::Off,
-		}))?;
+		let (egui_ctx, egui_state) = build_egui(event_loop);
+		let (window, instance, surface) = create_gpu_surface(&event_loop)?;
+		let (adapter, device, queue) = initialize_gpu(&instance, &surface)?;
 		let size = window.inner_size();
-		let caps = surface.get_capabilities(&adapter);
-		let format = caps
-			.formats
-			.iter()
-			.copied()
-			.find(|format| {
-				matches!(
-					format,
-					wgpu::TextureFormat::Bgra8Unorm | wgpu::TextureFormat::Rgba8Unorm
-				)
-			})
-			.or_else(|| caps.formats.first().copied())
-			.ok_or_else(|| anyhow::anyhow!("GPU surface has no supported formats"))?;
-		let present_mode = caps
-			.present_modes
-			.iter()
-			.copied()
-			.find(|mode| *mode == wgpu::PresentMode::Fifo)
-			.unwrap_or(wgpu::PresentMode::Fifo);
-		let alpha_mode = caps
-			.alpha_modes
-			.first()
-			.copied()
-			.ok_or_else(|| anyhow::anyhow!("GPU surface has no alpha modes"))?;
-		let config = wgpu::SurfaceConfiguration {
-			color_space: SurfaceColorSpace::Auto,
-			usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-			format,
-			width: size.width.max(1),
-			height: size.height.max(1),
-			present_mode,
-			alpha_mode,
-			view_formats: vec![],
-			desired_maximum_frame_latency: 2,
-		};
-		surface.configure(&device, &config);
-		let renderer = Renderer::new(&device, format, egui_wgpu::RendererOptions::default());
+		let (config, renderer) = build_renderer(&surface, adapter, &device, size)?;
 		Ok(Self {
-			window,
+			queue,
+			config,
+			device,
+			surface,
+			renderer,
 			egui_ctx,
 			egui_state,
-			config,
-			surface,
-			device,
-			queue,
-			renderer,
 			occluded: true,
-			pending_textures: TexturesDelta::default(),
+			needs_resize: false,
+			window: window.clone(),
+			state: EstateState::load(),
 			top_tab: DevTopTab::Status,
 			side_tab: DevSideTab::Overview,
-			state: DaemonState::load(),
+			pending_textures: TexturesDelta::default(),
 		})
 	}
-	fn reconfigure_surface(&mut self) {
-		let size = self.window.inner_size();
-
-		if size.width == 0 || size.height == 0 {
-			return;
-		}
-
-		self.config.width = size.width;
-		self.config.height = size.height;
-
-		self.surface.configure(&self.device, &self.config);
-	}
 	pub fn draw(&mut self) -> anyhow::Result<()> {
-		let raw_input = self.egui_state.take_egui_input(&self.window);
-
-		self.egui_ctx.begin_pass(raw_input);
-
+		self.begin_egui();
+		let output = self.build_ui();
+		let Some(surface_texture) = self.acquire_surface()? else {
+			return Ok(());
+		};
+		self.render_egui(surface_texture, output)?;
+		Ok(())
+	}
+	fn begin_egui(&mut self) {
+		let input = self.egui_state.take_egui_input(&self.window);
+		self.egui_ctx.begin_pass(input);
+	}
+	fn build_ui(&mut self) -> egui::FullOutput {
 		let mut ui = egui::Ui::new(
 			self.egui_ctx.clone(),
 			egui::Id::new("dev_root"),
 			egui::UiBuilder::new(),
 		);
-
-		egui::CentralPanel::default().show(&mut ui, |ui| {
-			ui.heading("🔥 ESTATE DEV WINDOW");
-			ui.label("If you see this, egui + wgpu is working.");
-
-			ui.separator();
-
-			ui.horizontal(|ui| {
-				ui.label("Status:");
-				ui.colored_label(egui::Color32::GREEN, "CONNECTED");
-			});
-
-			ui.add_space(20.0);
-
-			if ui.button("TEST BUTTON").clicked() {
-				tracing::info!("TEST BUTTON CLICKED");
+		// self.foo_layout_infinite_scroll(&mut ui);
+		// self.foo_layout_sidebar_top(&mut ui);
+		// self.foo_layout_three_columns(&mut ui);
+		self.draw_ui(&mut ui);
+		self.egui_ctx.end_pass()
+	}
+	fn acquire_surface(&mut self) -> anyhow::Result<Option<wgpu::SurfaceTexture>> {
+		match self.surface.get_current_texture() {
+			wgpu::CurrentSurfaceTexture::Success(texture)
+			| wgpu::CurrentSurfaceTexture::Suboptimal(texture) => {
+				// tracing::info!("SURFACE ACQUIRED");
+				Ok(Some(texture))
 			}
-
-			ui.add_space(20.0);
-
-			let (rect, _) = ui.allocate_exact_size(egui::vec2(200.0, 100.0), egui::Sense::hover());
-
-			ui.painter()
-				.rect_filled(rect, 10.0, egui::Color32::from_rgb(255, 0, 0));
-
-			ui.painter().text(
-				rect.center(),
-				egui::Align2::CENTER_CENTER,
-				"HELLO GPU",
-				egui::FontId::proportional(24.0),
-				egui::Color32::WHITE,
-			);
-		});
-
+			wgpu::CurrentSurfaceTexture::Occluded => {
+				tracing::warn!("SURFACE OCCLUDED");
+				Ok(None)
+			}
+			wgpu::CurrentSurfaceTexture::Timeout => Ok(None),
+			wgpu::CurrentSurfaceTexture::Outdated | wgpu::CurrentSurfaceTexture::Lost => {
+				self.reconfigure_surface();
+				Ok(None)
+			}
+			wgpu::CurrentSurfaceTexture::Validation => Err(anyhow::anyhow!("surface validation error")),
+		}
+	}
+	fn reconfigure_surface(&mut self) {
+		let size = self.window.inner_size();
+		if size.width == 0 || size.height == 0 {
+			return;
+		}
+		self.config.width = size.width;
+		self.config.height = size.height;
+		self.surface.configure(&self.device, &self.config);
+	}
+	fn render_egui(
+		&mut self,
+		surface_texture: wgpu::SurfaceTexture,
+		output: egui::FullOutput,
+	) -> anyhow::Result<()> {
 		let egui::FullOutput {
 			platform_output: _,
 			textures_delta,
@@ -536,62 +486,12 @@ impl DevWindow {
 			pixels_per_point,
 			viewport_output: _,
 			..
-		} = self.egui_ctx.end_pass();
-
+		} = output;
 		self.pending_textures.append(textures_delta);
-
-		tracing::info!(
-			"egui output: shapes={} texture_sets={} texture_frees={} pixels_per_point={}",
-			shapes.len(),
-			self.pending_textures.set.len(),
-			self.pending_textures.free.len(),
-			pixels_per_point,
-		);
-
-
-		let surface_texture = match self.surface.get_current_texture() {
-			wgpu::CurrentSurfaceTexture::Success(texture)
-			| wgpu::CurrentSurfaceTexture::Suboptimal(texture) => {
-				tracing::info!("SURFACE ACQUIRED");
-				texture
-			}
-			wgpu::CurrentSurfaceTexture::Occluded => {
-				tracing::warn!("SURFACE OCCLUDED");
-				return Ok(());
-			}
-			wgpu::CurrentSurfaceTexture::Timeout => {
-				return Ok(());
-			}
-			wgpu::CurrentSurfaceTexture::Outdated | wgpu::CurrentSurfaceTexture::Lost => {
-				self.reconfigure_surface();
-				return Ok(());
-			}
-			wgpu::CurrentSurfaceTexture::Validation => {
-				return Err(anyhow::anyhow!("surface validation error"));
-			}
-		};
-
 		let view = surface_texture
 			.texture
 			.create_view(&wgpu::TextureViewDescriptor::default());
 		let clipped_primitives = self.egui_ctx.tessellate(shapes, pixels_per_point);
-		tracing::info!("EGUI: {} clipped primitives", clipped_primitives.len());
-		for (i, primitive) in clipped_primitives.iter().enumerate() {
-			match &primitive.primitive {
-				egui::epaint::Primitive::Mesh(mesh) => {
-					tracing::info!(
-						"EGUI primitive {}: vertices={} indices={} clip_rect={:?}",
-						i,
-						mesh.vertices.len(),
-						mesh.indices.len(),
-						primitive.clip_rect,
-					);
-				}
-				egui::epaint::Primitive::Callback(_) => {
-					tracing::info!("EGUI primitive {}: CALLBACK", i);
-				}
-			}
-		}
 		let screen_descriptor = egui_wgpu::ScreenDescriptor {
 			size_in_pixels: [
 				self.window.inner_size().width,
@@ -599,24 +499,12 @@ impl DevWindow {
 			],
 			pixels_per_point,
 		};
-		for (id, image_deltas) in &self.pending_textures.set {
-			for image_delta in image_deltas {
-				self
-					.renderer
-					.update_texture(&self.device, &self.queue, *id, image_delta);
-			}
-		}
-
-		self.pending_textures.clear();
-
-		// Create ONE encoder.
+		self.upload_textures();
 		let mut encoder = self
 			.device
 			.create_command_encoder(&wgpu::CommandEncoderDescriptor {
 				label: Some("egui-render"),
 			});
-
-		// Prepare egui buffers.
 		self.renderer.update_buffers(
 			&self.device,
 			&self.queue,
@@ -624,389 +512,53 @@ impl DevWindow {
 			&clipped_primitives,
 			&screen_descriptor,
 		);
-
-		tracing::info!("EGUI: {} clipped primitives", clipped_primitives.len());
-
-		{
-			let render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-				label: Some("egui-render-pass"),
-				color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-					view: &view,
-					depth_slice: None,
-					resolve_target: None,
-					ops: wgpu::Operations {
-						load: wgpu::LoadOp::Clear(wgpu::Color {
-							r: 0.08,
-							g: 0.08,
-							b: 0.08,
-							a: 1.0,
-						}),
-						store: wgpu::StoreOp::Store,
-					},
-				})],
-				depth_stencil_attachment: None,
-				timestamp_writes: None,
-				occlusion_query_set: None,
-				multiview_mask: None,
-			});
-
-			let mut render_pass = render_pass.forget_lifetime();
-
-			tracing::info!("EGUI: BEFORE renderer.render");
-
-			self
-				.renderer
-				.render(&mut render_pass, &clipped_primitives, &screen_descriptor);
-
-			tracing::info!("EGUI: AFTER renderer.render");
-		}
-		// Submit GPU commands.
+		self.render_pass(&mut encoder, &view, &clipped_primitives, &screen_descriptor);
 		self.queue.submit(Some(encoder.finish()));
-		// Present THIS surface texture.
 		self.queue.present(surface_texture);
-
 		Ok(())
 	}
-
-	// pub fn draw2(&mut self) -> anyhow::Result<()> {
-	// 	tracing::info!("draw: START");
-
-	// 	// ------------------------------------------------------------
-	// 	// Input
-	// 	// ------------------------------------------------------------
-
-	// 	tracing::info!("draw: taking egui input");
-	// 	let raw_input = self.egui_state.take_egui_input(&self.window);
-	// 	tracing::info!("draw: got egui input");
-
-	// 	// ------------------------------------------------------------
-	// 	// Begin egui pass
-	// 	// ------------------------------------------------------------
-
-	// 	tracing::info!("draw: begin_pass");
-	// 	self.egui_ctx.begin_pass(raw_input);
-	// 	tracing::info!("draw: begin_pass complete");
-
-	// 	// ------------------------------------------------------------
-	// 	// Build UI
-	// 	// ------------------------------------------------------------
-
-	// 	tracing::info!("draw: creating root UI");
-	// 	let mut ui = egui::Ui::new(
-	// 		self.egui_ctx.clone(),
-	// 		egui::Id::new("dev_root"),
-	// 		egui::UiBuilder::new(),
-	// 	);
-
-	// 	tracing::info!("draw: building UI");
-
-	// 	egui::CentralPanel::default().show(&mut ui, |ui| {
-	// 		ui.heading("🔥 ESTATE DEV WINDOW");
-	// 		ui.label("If you see this, egui + wgpu is working.");
-
-	// 		ui.separator();
-
-	// 		ui.horizontal(|ui| {
-	// 			ui.label("Status:");
-	// 			ui.colored_label(egui::Color32::GREEN, "CONNECTED");
-	// 		});
-
-	// 		ui.add_space(20.0);
-
-	// 		if ui.button("TEST BUTTON").clicked() {
-	// 			tracing::info!("TEST BUTTON CLICKED");
-	// 		}
-
-	// 		ui.add_space(20.0);
-
-	// 		let (rect, _) = ui.allocate_exact_size(egui::vec2(200.0, 100.0), egui::Sense::hover());
-
-	// 		ui.painter()
-	// 			.rect_filled(rect, 10.0, egui::Color32::from_rgb(255, 0, 0));
-
-	// 		ui.painter().text(
-	// 			rect.center(),
-	// 			egui::Align2::CENTER_CENTER,
-	// 			"HELLO GPU",
-	// 			egui::FontId::proportional(24.0),
-	// 			egui::Color32::WHITE,
-	// 		);
-	// 	});
-
-	// 	tracing::info!("draw: UI built");
-	// 	// self.ui_counter(&mut ui, &mut 42i32);
-	// 	// self.draw_ui(&mut ui);
-
-	// 	tracing::info!("draw: draw_ui complete");
-
-	// 	// ------------------------------------------------------------
-	// 	// End egui pass
-	// 	// ------------------------------------------------------------
-
-	// 	tracing::info!("draw: end_pass");
-
-	// 	let mut full_output = self.egui_ctx.end_pass();
-
-	// 	tracing::info!(
-	// 		"draw: end_pass complete shapes={} texture_sets={} texture_frees={}",
-	// 		full_output.shapes.len(),
-	// 		full_output.textures_delta.set.len(),
-	// 		full_output.textures_delta.free.len(),
-	// 	);
-
-	// 	// ------------------------------------------------------------
-	// 	// Tessellate
-	// 	// ------------------------------------------------------------
-
-	// 	tracing::info!("draw: tessellating");
-
-	// 	let clipped_primitives = self
-	// 		.egui_ctx
-	// 		.tessellate(full_output.shapes.clone(), full_output.pixels_per_point);
-
-	// 	tracing::info!(
-	// 		"draw: tessellate complete primitives={}",
-	// 		clipped_primitives.len()
-	// 	);
-
-	// 	// ------------------------------------------------------------
-	// 	// Texture uploads
-	// 	// ------------------------------------------------------------
-
-	// 	tracing::info!(
-	// 		"draw: uploading {} texture sets",
-	// 		full_output.textures_delta.set.len()
-	// 	);
-
-	// 	for (id, image_deltas) in &full_output.textures_delta.set {
-	// 		tracing::info!("draw: texture id={:?}, deltas={}", id, image_deltas.len());
-
-	// 		for (index, image_delta) in image_deltas.iter().enumerate() {
-	// 			tracing::info!("draw: updating texture id={:?}, delta={}", id, index);
-
-	// 			self
-	// 				.renderer
-	// 				.update_texture(&self.device, &self.queue, *id, image_delta);
-
-	// 			tracing::info!("draw: updated texture id={:?}, delta={}", id, index);
-	// 		}
-	// 	}
-
-	// 	tracing::info!("draw: texture uploads complete");
-
-	// 	// ------------------------------------------------------------
-	// 	// Surface
-	// 	// ----------------------------
-	// 	tracing::info!("draw: BEFORE get_current_texture");
-	// 	// let surface_texture = match self.surface.get_current_texture() {
-	// 	// 	wgpu::CurrentSurfaceTexture::Success(texture)
-	// 	// 	| wgpu::CurrentSurfaceTexture::Suboptimal(texture) => texture,
-
-	// 	// 	wgpu::CurrentSurfaceTexture::Timeout => {
-	// 	// 		tracing::info!("draw: surface = Timeout");
-	// 	// 		full_output.textures_delta.clear();
-	// 	// 		return Ok(());
-	// 	// 	}
-
-	// 	// 	wgpu::CurrentSurfaceTexture::Occluded => {
-	// 	// 		tracing::info!("draw: surface = Occluded");
-	// 	// 		full_output.textures_delta.clear();
-	// 	// 		return Ok(());
-	// 	// 	}
-
-	// 	// 	wgpu::CurrentSurfaceTexture::Outdated => {
-	// 	// 		tracing::info!("draw: surface = Outdated");
-	// 	// 		full_output.textures_delta.clear();
-	// 	// 		self.reconfigure_surface();
-	// 	// 		return Ok(());
-	// 	// 	}
-
-	// 	// 	wgpu::CurrentSurfaceTexture::Lost => {
-	// 	// 		tracing::info!("draw: surface = Lost");
-	// 	// 		full_output.textures_delta.clear();
-	// 	// 		self.reconfigure_surface();
-	// 	// 		return Ok(());
-	// 	// 	}
-
-	// 	// 	wgpu::CurrentSurfaceTexture::Validation => {
-	// 	// 		tracing::error!("draw: surface = Validation");
-	// 	// 		full_output.textures_delta.clear();
-	// 	// 		return Err(anyhow::anyhow!("surface validation error"));
-	// 	// 	}
-	// 	// };
-	// 	let surface_texture = match self.surface.get_current_texture() {
-	// 		wgpu::CurrentSurfaceTexture::Success(texture)
-	// 		| wgpu::CurrentSurfaceTexture::Suboptimal(texture) => texture,
-
-	// 		wgpu::CurrentSurfaceTexture::Timeout => {
-	// 			return Ok(());
-	// 		}
-
-	// 		wgpu::CurrentSurfaceTexture::Occluded => {
-	// 			tracing::warn!("draw skipped: surface is occluded");
-	// 			return Ok(());
-	// 		}
-
-	// 		wgpu::CurrentSurfaceTexture::Outdated | wgpu::CurrentSurfaceTexture::Lost => {
-	// 			self.reconfigure_surface();
-	// 			return Ok(());
-	// 		}
-
-	// 		wgpu::CurrentSurfaceTexture::Validation => {
-	// 			return Err(anyhow::anyhow!("surface validation error"));
-	// 		}
-	// 	};
-	// 	tracing::info!("draw: SURFACE TEXTURE ACQUIRED");
-
-	// 	// ------------------------------------------------------------
-	// 	// Texture view
-	// 	// ------------------------------------------------------------
-
-	// 	tracing::info!("draw: creating texture view");
-	// 	let view = surface_texture
-	// 		.texture
-	// 		.create_view(&wgpu::TextureViewDescriptor::default());
-
-	// 	let view = surface_texture
-	// 		.texture
-	// 		.create_view(&wgpu::TextureViewDescriptor::default());
-	// 	// ------------------------------------------------------------
-	// 	// Command encoder
-	// 	// ------------------------------------------------------------
-	// 	tracing::info!("draw: creating command encoder");
-
-	// 	let mut encoder = self
-	// 		.device
-	// 		.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-	// 			label: Some("estate-dev-egui-encoder"),
-	// 		});
-
-	// 	tracing::info!("draw: command encoder created");
-
-	// 	tracing::info!("draw: update_buffers");
-	// 	let screen_descriptor = egui_wgpu::ScreenDescriptor {
-	// 		size_in_pixels: [
-	// 			self.window.inner_size().width,
-	// 			self.window.inner_size().height,
-	// 		],
-	// 		pixels_per_point: full_output.pixels_per_point,
-	// 	};
-	// 	self.renderer.update_buffers(
-	// 		&self.device,
-	// 		&self.queue,
-	// 		&mut encoder,
-	// 		&clipped_primitives,
-	// 		&screen_descriptor,
-	// 	);
-
-	// 	tracing::info!("draw: update_buffers complete");
-
-	// 	tracing::info!("draw: creating render pass");
-
-	// 	let color_attachments = [Some(wgpu::RenderPassColorAttachment {
-	// 		view: &view,
-	// 		depth_slice: None,
-	// 		resolve_target: None,
-	// 		ops: wgpu::Operations {
-	// 			load: wgpu::LoadOp::Clear(wgpu::Color {
-	// 				r: 0.05,
-	// 				g: 0.05,
-	// 				b: 0.05,
-	// 				a: 1.0,
-	// 			}),
-	// 			store: wgpu::StoreOp::Store,
-	// 		},
-	// 	})];
-
-	// 	let render_pass_descriptor = wgpu::RenderPassDescriptor {
-	// 		label: Some("estate-dev-egui-render-pass"),
-	// 		color_attachments: &color_attachments,
-	// 		depth_stencil_attachment: None,
-	// 		timestamp_writes: None,
-	// 		occlusion_query_set: None,
-	// 		multiview_mask: None,
-	// 	};
-
-	// 	let render_pass = encoder.begin_render_pass(&render_pass_descriptor);
-	// 	let mut render_pass = render_pass.forget_lifetime();
-
-	// 	tracing::info!("draw: render pass created");
-
-	// 	tracing::info!("draw: calling renderer.render");
-
-	// 	self
-	// 		.renderer
-	// 		.render(&mut render_pass, &clipped_primitives, &screen_descriptor);
-
-	// 	tracing::info!("draw: renderer.render complete");
-
-	// 	drop(render_pass);
-	// 	tracing::info!("draw: finishing encoder");
-	// 	let command_buffer = encoder.finish();
-	// 	tracing::info!("draw: encoder finished");
-	// 	self.queue.submit(Some(command_buffer));
-	// 	tracing::info!("draw: queue submitted");
-	// 	self.window.request_redraw();
-	// 	tracing::info!("draw: redraw requested");
-	// 	Ok(())
-	// }
-
-	fn draw_ui(&mut self, ui: &mut egui::Ui) {
-		// Top tab bar
-		ui.horizontal(|ui| {
-			ui.selectable_value(&mut self.top_tab, DevTopTab::Status, "Status");
-
-			ui.selectable_value(&mut self.top_tab, DevTopTab::Tasks, "Tasks");
-
-			ui.selectable_value(&mut self.top_tab, DevTopTab::Logs, "Logs");
-
-			ui.selectable_value(&mut self.top_tab, DevTopTab::Config, "Config");
-		});
-
-		ui.separator();
-
-		// Main area
-		ui.horizontal(|ui| {
-			// Sidebar
-			ui.allocate_ui_with_layout(
-				egui::vec2(180.0, ui.available_height()),
-				egui::Layout::top_down(egui::Align::LEFT),
-				|ui| {
-					ui.heading("Estate");
-					ui.separator();
-
-					ui.selectable_value(&mut self.side_tab, DevSideTab::Overview, "Overview");
-
-					ui.selectable_value(&mut self.side_tab, DevSideTab::Daemon, "Daemon");
-
-					ui.selectable_value(&mut self.side_tab, DevSideTab::Engine, "Engine");
-
-					ui.selectable_value(&mut self.side_tab, DevSideTab::Workspace, "Workspace");
-
-					ui.selectable_value(&mut self.side_tab, DevSideTab::Runtime, "Runtime");
-				},
-			);
-
-			ui.separator();
-
-			// Main content
-			ui.vertical(|ui| {
-				self.draw_content(ui);
-			});
-		});
+	fn upload_textures(&mut self) {
+		for (id, image_deltas) in &self.pending_textures.set {
+			for image_delta in image_deltas {
+				self
+					.renderer
+					.update_texture(&self.device, &self.queue, *id, image_delta);
+			}
+		}
+		self.pending_textures.clear();
 	}
-	fn ui_counter(&mut self, ui: &mut egui::Ui, counter: &mut i32) {
-		ui.horizontal(|ui| {
-			if ui.button("−").clicked() {
-				*counter -= 1;
-			}
-
-			ui.label(counter.to_string());
-
-			if ui.button("+").clicked() {
-				*counter += 1;
-			}
+	fn render_pass(
+		&mut self,
+		encoder: &mut wgpu::CommandEncoder,
+		view: &wgpu::TextureView,
+		primitives: &[egui::ClippedPrimitive],
+		screen_descriptor: &egui_wgpu::ScreenDescriptor,
+	) {
+		let render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+			label: Some("egui-render-pass"),
+			color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+				view,
+				depth_slice: None,
+				resolve_target: None,
+				ops: wgpu::Operations {
+					load: wgpu::LoadOp::Clear(wgpu::Color {
+						r: 0.08,
+						g: 0.08,
+						b: 0.08,
+						a: 1.0,
+					}),
+					store: wgpu::StoreOp::Store,
+				},
+			})],
+			depth_stencil_attachment: None,
+			timestamp_writes: None,
+			occlusion_query_set: None,
+			multiview_mask: None,
 		});
+		let mut render_pass = render_pass.forget_lifetime();
+		self
+			.renderer
+			.render(&mut render_pass, primitives, screen_descriptor);
 	}
 	fn draw_content(&mut self, ui: &mut egui::Ui) {
 		match self.top_tab {
@@ -1016,56 +568,81 @@ impl DevWindow {
 			DevTopTab::Config => self.draw_config(ui),
 		}
 	}
-	fn resize(&mut self, width: u32, height: u32) {
-		if width == 0 || height == 0 {
-			return;
+	fn draw_ui(&mut self, ui: &mut egui::Ui) {
+		self.draw_side_tabs(ui);
+
+		egui::CentralPanel::default().show_inside(ui, |ui| {
+			self.draw_status(ui);
+		});
+	}
+	fn draw_side_tabs(&mut self, ui: &mut egui::Ui) {
+		ui.heading("Estate");
+		ui.separator();
+		for &tab in DevSideTab::ALL {
+			let response = ui.selectable_label(self.side_tab == tab, tab.label());
+
+			// tracing::info!(
+			// 	"TAB {} rect={:?} hovered={} clicked={} contains_pointer={}",
+			// 	tab.label(),
+			// 	response.rect,
+			// 	response.hovered(),
+			// 	response.clicked(),
+			// 	response.contains_pointer(),
+			// );
+
+			if response.clicked() {
+				tracing::info!(">>> TAB CLICKED: {:?}", tab);
+				self.side_tab = tab;
+			}
 		}
-
-		tracing::info!("DevWindow resize: {}x{}", width, height);
-
-		self.config.width = width;
-		self.config.height = height;
-
-		self.surface.configure(&self.device, &self.config);
 	}
 	fn draw_status(&self, ui: &mut egui::Ui) {
-		ui.heading("Status");
-		ui.separator();
-
 		match self.side_tab {
-			DevSideTab::Overview => {
-				ui.label("Estate Daemon");
-				ui.label("Status: Running");
-
-				ui.separator();
-
-				ui.label(format!("Starts: {}", self.state.starts));
-				ui.label(format!("Status checks: {}", self.state.status_checks));
-				ui.label(format!("Started at: {}", self.state.started_at));
-				ui.label(format!("Longest run: {}s", self.state.longest_run));
-			}
-
-			DevSideTab::Daemon => {
-				ui.heading("Daemon");
-				ui.label("Running");
-				ui.label(format!("Starts: {}", self.state.starts));
-			}
-
-			DevSideTab::Engine => {
-				ui.heading("Engine");
-				ui.label("Engine information placeholder");
-			}
-
-			DevSideTab::Workspace => {
-				ui.heading("Workspace");
-				ui.label("Workspace information placeholder");
-			}
-
-			DevSideTab::Runtime => {
-				ui.heading("Runtime");
-				ui.label("Runtime information placeholder");
-			}
+			DevSideTab::Overview => self.draw_overview(ui),
+			DevSideTab::Registry => self.draw_registry(ui),
+			DevSideTab::Daemon => self.draw_daemon(ui),
+			DevSideTab::Engine => self.draw_engine(ui),
+			DevSideTab::Workspace => self.draw_workspace(ui),
+			DevSideTab::Runtime => self.draw_runtime(ui),
 		}
+	}
+	fn draw_overview(&self, ui: &mut egui::Ui) {
+		ui.heading("Overview");
+		ui.separator();
+		ui.label(format!("Starts: {}", self.state.starts));
+		ui.label(format!("Status checks: {}", self.state.status_checks));
+		ui.label(format!("Started at: {}", self.state.started_at));
+		ui.label(format!("Longest run: {}s", self.state.longest_run));
+	}
+	fn draw_registry(&self, ui: &mut egui::Ui) {
+		ui.heading("Registry");
+		ui.separator();
+		ui.label("Registry view");
+	}
+
+	fn draw_daemon(&self, ui: &mut egui::Ui) {
+		ui.heading("Daemon");
+		ui.separator();
+		ui.label("Daemon view");
+	}
+
+	fn draw_engine(&self, ui: &mut egui::Ui) {
+		ui.heading("Engine");
+		ui.separator();
+		ui.label("Engine view");
+	}
+
+	fn draw_workspace(&self, ui: &mut egui::Ui) {
+		ui.heading("Workspace");
+		ui.separator();
+		ui.label("Workspace view");
+	}
+
+	fn draw_runtime(&self, ui: &mut egui::Ui) {
+		todo!("Error!");
+		ui.heading("Runtime");
+		ui.separator();
+		ui.label("Runtime view");
 	}
 	fn draw_tasks(&self, ui: &mut egui::Ui) {
 		ui.heading("Tasks");
@@ -1083,6 +660,142 @@ impl DevWindow {
 		ui.label("Configuration coming soon.");
 	}
 }
+
+fn initialize_gpu(
+	instance: &wgpu::Instance,
+	surface: &wgpu::Surface<'_>,
+) -> anyhow::Result<(Adapter, Device, wgpu::Queue)> {
+	let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
+		apply_limit_buckets: true,
+		power_preference: wgpu::PowerPreference::HighPerformance,
+		compatible_surface: Some(&surface),
+		force_fallback_adapter: false,
+	}))
+	.map_err(|e| anyhow::anyhow!("failed to find suitable GPU adapter: {e}"))?;
+	let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
+		experimental_features: wgpu::ExperimentalFeatures::disabled(),
+		label: Some("estate-dev-device"),
+		required_features: wgpu::Features::empty(),
+		required_limits: wgpu::Limits::default(),
+		memory_hints: wgpu::MemoryHints::Performance,
+		trace: wgpu::Trace::Off,
+	}))?;
+	Ok((adapter, device, queue))
+}
+fn create_gpu_surface(
+	event_loop: &ActiveEventLoop,
+) -> anyhow::Result<(Arc<Window>, wgpu::Instance, wgpu::Surface<'static>)> {
+	let window = build_window(event_loop)?;
+	let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle());
+	let surface = unsafe { instance.create_surface(window.clone())? };
+	Ok((window, instance, surface))
+}
+
+fn build_egui(event_loop: &ActiveEventLoop) -> (EguiContext, EguiState) {
+	let egui_ctx = egui::Context::default();
+
+	let egui_state = EguiState::new(
+		egui_ctx.clone(),
+		egui::ViewportId::ROOT,
+		event_loop,
+		None,
+		None,
+		None,
+	);
+	(egui_ctx, egui_state)
+}
+fn build_egui2(event_loop: &ActiveEventLoop) -> (EguiContext, EguiState) {
+	// let monitor = event_loop
+	// 	.primary_monitor()
+	// 	.ok_or_else(|| anyhow::anyhow!("no primary monitor found"))?;
+	// let monitor_size = monitor.size();
+	// let width = 900;
+	// let height = 600;
+	// let x = (monitor_size.width.saturating_sub(width)) / 2;
+	// let y = (monitor_size.height.saturating_sub(height)) / 2;
+	// let attrs = Window::default_attributes()
+	// 	.with_title("Estate Dev")
+	// 	.with_inner_size(PhysicalSize::new(900, 600))
+	// 	.with_position(PhysicalPosition::new(x, y))
+	// 	.with_window_level(WindowLevel::AlwaysOnTop);
+
+	// let x = (monitor_size.width.saturating_sub(width)) / 2;
+	// let y = (monitor_size.height.saturating_sub(height)) / 2;
+
+	let egui_ctx = egui::Context::default();
+	let egui_state = EguiState::new(
+		egui_ctx.clone(),
+		egui::ViewportId::ROOT,
+		event_loop,
+		None,
+		None,
+		None,
+	);
+	(egui_ctx, egui_state)
+}
+fn build_window(event_loop: &ActiveEventLoop) -> anyhow::Result<Arc<Window>> {
+	let attrs = Window::default_attributes()
+		.with_title("Estate Dev")
+		.with_inner_size(PhysicalSize::new(900, 600))
+		.with_window_level(WindowLevel::AlwaysOnTop)
+		.with_position(PhysicalPosition::new(0, 0));
+
+	let window = event_loop.create_window(attrs)?;
+
+	Ok(Arc::new(window))
+}
+fn build_renderer(
+	surface: &wgpu::Surface<'_>,
+	adapter: wgpu::Adapter,
+	device: &wgpu::Device,
+	size: PhysicalSize<u32>,
+) -> Result<
+	(
+		wgpu::wgt::SurfaceConfiguration<Vec<wgpu::TextureFormat>>,
+		Renderer,
+	),
+	Error,
+> {
+	let caps = surface.get_capabilities(&adapter);
+	let format = caps
+		.formats
+		.iter()
+		.copied()
+		.find(|format| {
+			matches!(
+				format,
+				wgpu::TextureFormat::Bgra8Unorm | wgpu::TextureFormat::Rgba8Unorm
+			)
+		})
+		.or_else(|| caps.formats.first().copied())
+		.ok_or_else(|| anyhow::anyhow!("GPU surface has no supported formats"))?;
+	let present_mode = caps
+		.present_modes
+		.iter()
+		.copied()
+		.find(|mode| *mode == wgpu::PresentMode::Fifo)
+		.unwrap_or(wgpu::PresentMode::Fifo);
+	let alpha_mode = caps
+		.alpha_modes
+		.first()
+		.copied()
+		.ok_or_else(|| anyhow::anyhow!("GPU surface has no alpha modes"))?;
+	let config = wgpu::SurfaceConfiguration {
+		format,
+		alpha_mode,
+		present_mode,
+		view_formats: vec![],
+		width: size.width.max(1),
+		height: size.height.max(1),
+		desired_maximum_frame_latency: 2,
+		color_space: SurfaceColorSpace::Auto,
+		usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+	};
+	surface.configure(device, &config);
+	let renderer = Renderer::new(device, format, egui_wgpu::RendererOptions::default());
+	Ok((config, renderer))
+}
+
 #[derive(Clone, Debug)]
 pub struct Context {
 	pub source: RuntimeMode,
@@ -1113,11 +826,6 @@ impl Context {
 		})
 	}
 }
-// Command = "What does this executable invocation mean?"
-// DaemonCommand = "What should happen to the running daemon?"
-// ActionRequest = "What work should the daemon perform?"
-//
-// Things that can happen to the daemon itself
 #[derive(Clone, Debug)]
 enum DaemonCommand {
 	Stop,
@@ -1128,7 +836,6 @@ enum DaemonCommand {
 	// Disable,
 	// Status,
 }
-
 struct TrayMenu {
 	status: MenuItem,
 	dev: MenuItem,
@@ -1168,21 +875,612 @@ enum DevTopTab {
 	Config,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum DevSideTab {
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum DevSideTab {
+	#[default]
 	Overview,
+	Registry,
 	Daemon,
 	Engine,
 	Workspace,
 	Runtime,
 }
 
-// pub struct WorkspaceContext {
-// 	pub root: PathBuf,
-// 	pub estate: Option<PathBuf>,
-// }
+impl DevSideTab {
+	const ALL: &[Self] = &[
+		Self::Overview,
+		Self::Registry,
+		Self::Daemon,
+		Self::Engine,
+		Self::Workspace,
+		Self::Runtime,
+	];
 
-// pub struct RuntimeContext {
-// 	pub engine_dir: PathBuf,
-// 	pub connected: bool,
-// }
+	fn label(self) -> &'static str {
+		match self {
+			Self::Overview => "Overview",
+			Self::Registry => "Registry",
+			Self::Daemon => "Daemon",
+			Self::Engine => "Engine",
+			Self::Workspace => "Workspace",
+			Self::Runtime => "Runtime",
+		}
+	}
+}
+
+// 80/20 curriculum. The goal isn't to build every subsystem completely; it's to learn where the boundaries are.
+
+// ### 1. Hot reloading
+
+// * **Goal:** Change a JSON/config file on disk → Estate notices it → reloads state → UI reflects it.
+// * **Stage 1 — File model**
+
+//   * Define the file being watched.
+//   * Define the deserialized config/state type.
+//   * Define defaults and validation.
+// * **Stage 2 — Watcher**
+
+//   * Use a filesystem watcher (`notify` is the obvious Rust choice).
+//   * Boundary: watcher only reports **"this path changed."**
+//   * It should not know anything about egui or Estate business logic.
+// * **Stage 3 — Reload boundary**
+
+//   * `reload_config(path) -> Result<Config>`.
+//   * Read → parse → validate.
+//   * Keep this synchronous/simple initially.
+// * **Stage 4 — Event propagation**
+
+//   * Watcher sends something like `AppEvent::ConfigChanged`.
+//   * App/engine receives it.
+//   * Engine reloads the configuration.
+// * **Stage 5 — UI update**
+
+//   * DevWindow observes the updated state.
+//   * Request redraw.
+// * **Parameters worth learning**
+
+//   * Debouncing.
+//   * Atomic writes/temp files.
+//   * Invalid JSON.
+//   * File deleted/recreated.
+//   * Watcher lifetime.
+// * **Boundary to aim for:**
+
+//   * `filesystem → watcher → application event → state → UI`
+//   * Not `filesystem → egui`.
+
+// ---
+
+// ### 2. Tab state / navigation
+
+// * **Goal:** Top tabs and sidebar tabs actually control what is rendered.
+// * **Stage 1 — State**
+
+//   * `DevTopTab`
+//   * `DevSideTab`
+//   * Store selected values in `DevWindow`.
+// * **Stage 2 — Input**
+
+//   * Render each tab as an egui `selectable_label`, button, etc.
+//   * On click, mutate the enum.
+// * **Stage 3 — Rendering**
+
+//   * `draw_top_bar()`
+//   * `draw_sidebar()`
+//   * `draw_content()`
+// * **Stage 4 — Dispatch**
+
+//   * `draw_content()` matches on `self.side_tab`.
+//   * Each variant delegates to its own renderer.
+// * **Stage 5 — Persistence, optionally**
+
+//   * Remember the last selected tab.
+//   * This is a good tiny exercise in state persistence.
+// * **Parameters**
+
+//   * Enum vs string IDs.
+//   * Selection state.
+//   * `egui::Id`.
+//   * Redraw/invalidation.
+// * **Boundary:**
+
+//   * **State determines UI; UI does not own the state.**
+
+// This one is probably your most important egui exercise.
+
+// ---
+
+// ### 3. OS app switcher / `Cmd+Tab`
+
+// * **Goal:** Estate behaves like a real macOS application/window.
+// * **Stage 1 — Window identity**
+
+//   * Give the window a proper title.
+//   * Set application/window metadata.
+// * **Stage 2 — macOS application identity**
+
+//   * Ensure the `.app` bundle has the correct:
+
+//     * bundle identifier
+//     * executable
+//     * application name
+//     * icon
+// * **Stage 3 — Icon**
+
+//   * Create `.icns`.
+//   * Add it to the application bundle.
+//   * Set the appropriate bundle metadata.
+// * **Stage 4 — Activation**
+
+//   * Verify clicking Estate in `Cmd+Tab` activates the existing window.
+//   * Don't accidentally create a second window.
+// * **Stage 5 — Multi-window behavior**
+
+//   * Understand:
+
+//     * application
+//     * window
+//     * process
+//     * activation
+// * **Parameters**
+
+//   * macOS `Info.plist`
+//   * bundle ID
+//   * application icon
+//   * window activation
+// * **Boundary:**
+
+//   * This is mostly **OS/application packaging**, not egui/wgpu.
+
+// This is a particularly useful thing to learn because it separates *"I can render a window"* from *"I built an actual desktop application."*
+
+// ---
+
+// ### 4. Real Estate Engine metrics
+
+// * **Goal:** Turn your existing engine state into a useful dashboard.
+// * **Stage 1 — Define metrics**
+
+//   * Start with things you already have:
+
+//     * uptime
+//     * starts
+//     * status checks
+//     * longest run
+//     * resources
+//     * nodes
+//     * registry size
+// * **Stage 2 — Metrics model**
+
+//   * Create something like:
+
+//   `EngineMetrics`
+
+//   rather than making the UI inspect random engine internals.
+// * **Stage 3 — Collection**
+
+//   * Engine exposes a snapshot:
+
+//     * `engine.metrics() -> EngineMetrics`
+// * **Stage 4 — UI**
+
+//   * Cards/stat rows:
+
+//     * `Uptime`
+//     * `Resources`
+//     * `Nodes`
+//     * `Status`
+//     * etc.
+// * **Stage 5 — Refresh**
+
+//   * Periodically update metrics.
+//   * Learn egui repaint timing.
+// * **Stage 6 — Historical metrics**
+
+//   * Optional:
+
+//     * requests/sec
+//     * index operations
+//     * average latency
+//     * memory
+// * **Parameters**
+
+//   * Snapshot vs live references.
+//   * Counters vs gauges.
+//   * Refresh frequency.
+//   * Thread safety.
+// * **Boundary:**
+
+//   `Engine → MetricsSnapshot → DevWindow`
+
+//   The UI shouldn't reach deep into the engine.
+
+// ---
+
+// ### 5. Logs UI
+
+// * **Goal:** Make the DevWindow itself useful for debugging Estate.
+// * **Stage 1 — Log capture**
+
+//   * Create an application-owned logging layer.
+//   * Capture tracing events.
+// * **Stage 2 — Log model**
+
+//   * Something like:
+
+//   `LogEntry { timestamp, level, target, message }`
+// * **Stage 3 — Buffer**
+
+//   * Store recent entries in a bounded buffer.
+//   * e.g. last 1,000/5,000 messages.
+// * **Stage 4 — UI**
+
+//   * `ScrollArea::vertical()`
+//   * timestamp
+//   * level
+//   * target
+//   * message
+// * **Stage 5 — Filtering**
+
+//   * `TRACE`
+//   * `DEBUG`
+//   * `INFO`
+//   * `WARN`
+//   * `ERROR`
+// * **Stage 6 — Search**
+
+//   * Filter by text.
+// * **Stage 7 — Auto-scroll**
+
+//   * Follow newest messages unless the user scrolls upward.
+// * **Stage 8 — Clear/export**
+
+//   * Clear buffer.
+//   * Optionally save logs.
+// * **Parameters**
+
+//   * `tracing_subscriber`
+//   * channel/buffer architecture
+//   * bounded memory
+//   * UI repaint on incoming logs
+// * **Boundary:**
+
+//   `tracing event → log collector → LogEntry buffer → egui`
+
+// This one teaches you a **very real desktop-app pattern**: background events feeding a UI.
+
+// ---
+
+// ### 6. Embedded WebViews
+
+// This is the most interesting one because it connects directly to the stuff you've already been experimenting with.
+// * **Goal:** Render HTML/CSS/JS inside your Estate desktop application.
+// * **Stage 1 — WebView**
+
+//   * Embed a native WebView.
+//   * Get a static HTML page rendering.
+// * **Stage 2 — Local content**
+
+//   * Load HTML/CSS/JS from disk or memory.
+// * **Stage 3 — Communication**
+
+//   * Rust → JavaScript
+//   * JavaScript → Rust
+// * **Stage 4 — Estate bridge**
+
+//   * Expose carefully selected operations:
+
+//     * `get_status()`
+//     * `get_resources()`
+//     * `resolve_node()`
+//     * etc.
+// * **Stage 5 — UI integration**
+
+//   * Decide whether WebView is:
+
+//     * a separate window
+//     * a panel
+//     * a tab
+//     * a full application view
+// * **Stage 6 — Asset loading**
+
+//   * CSS
+//   * JS
+//   * images
+//   * fonts
+//   * local resources
+// * **Stage 7 — Security boundary**
+
+//   * Decide exactly what JavaScript is allowed to call.
+//   * Don't expose arbitrary filesystem/process access.
+// * **Parameters**
+
+//   * WebView lifecycle.
+//   * navigation.
+//   * IPC.
+//   * origin/security.
+//   * local asset resolution.
+//   * native ↔ JS serialization.
+// * **Boundary:**
+
+//   `egui/native UI ↔ WebView ↔ JS application`
+
+//   with a deliberately tiny:
+
+//   `Rust ↔ JS API`
+
+// ---
+
+// ## The order I'd actually do them
+// I'd slightly reorder your list:
+// 1. **Tab state**
+
+//    * Learn application state → rendering.
+// 2. **Real engine metrics**
+
+//    * Learn backend state → UI state.
+// 3. **Logs**
+
+//    * Learn asynchronous events → UI.
+// 4. **Hot reload**
+
+//    * Learn filesystem events → application state.
+// 5. **Cmd+Tab / app icon**
+
+//    * Learn OS/application packaging.
+// 6. **WebView**
+
+//    * Learn native UI ↔ another rendering runtime.
+// That gives you a pretty nice progression:
+// ```text
+//                 ┌──────────────┐
+//                 │   Estate     │
+//                 │    Engine    │
+//                 └──────┬───────┘
+//                        │
+//                  state / events
+//                        │
+//                        ▼
+//               ┌─────────────────┐
+//               │   App / Model   │
+//               └───────┬─────────┘
+//                       │
+//           ┌───────────┼────────────┐
+//           ▼           ▼            ▼
+//        egui UI      logs        WebView
+//           │
+//           ▼
+//        wgpu
+//           │
+//           ▼
+//      native window
+//           │
+//           ▼
+//        macOS
+// ```
+impl DevWindow {
+	fn foo_layout_sidebar_top(&mut self, ui: &mut egui::Ui) {
+		// ┌─────────────────────────────────────────────┐
+		// │                    TOP                      │
+		// ├──────────────┬──────────────────────────────┤
+		// │              │                              │
+		// │   SIDEBAR    │             MAIN             │
+		// │              │                              │
+		// └──────────────┴──────────────────────────────┘
+
+		egui::containers::Panel::top(ui.id()).show(ui, |ui| {
+			let layout = egui::Layout {
+				main_dir: egui::Direction::LeftToRight,
+				main_wrap: false,
+				main_align: egui::Align::Center,
+				main_justify: true,
+				cross_align: egui::Align::Center,
+				cross_justify: false,
+			};
+
+			let mut top = ui.new_child(egui::UiBuilder::new().layout(layout));
+
+			top.label("ESTATE");
+			top.label("STATUS");
+			top.label("REGISTRY");
+			top.label("RUNTIME");
+		});
+
+		egui::containers::Panel::left(ui.id()).show(ui, |ui| {
+			let layout = egui::Layout {
+				main_dir: egui::Direction::TopDown,
+				main_wrap: false,
+				main_align: egui::Align::Min,
+				main_justify: false,
+				cross_align: egui::Align::Min,
+				cross_justify: true,
+			};
+
+			let mut sidebar = ui.new_child(egui::UiBuilder::new().layout(layout));
+
+			sidebar.label("Overview");
+			sidebar.label("Registry");
+			sidebar.label("Daemon");
+			sidebar.label("Engine");
+			sidebar.label("Workspace");
+		});
+
+		let layout = egui::Layout {
+			main_dir: egui::Direction::TopDown,
+			main_wrap: false,
+			main_align: egui::Align::Min,
+			main_justify: false,
+			cross_align: egui::Align::Min,
+			cross_justify: true,
+		};
+
+		let mut main = ui.new_child(egui::UiBuilder::new().layout(layout));
+		main.heading("MAIN");
+		main.label("This area consumes the remaining space.");
+	}
+	fn foo_layout_three_columns(&mut self, ui: &mut egui::Ui) {
+		// ┌─────────────────────────────────────────────┐
+		// │                    TOP                      │
+		// ├──────────┬─────────────────────┬────────────┤
+		// │          │                     │            │
+		// │ SIDEBAR  │        MAIN         │   ASIDE    │
+		// │          │                     │            │
+		// ├──────────┴─────────────────────┴────────────┤
+		// │                   FOOTER                    │
+		// └─────────────────────────────────────────────┘
+
+		egui::containers::Panel::top(ui.id()).show(ui, |ui| {
+			let layout = egui::Layout {
+				main_dir: egui::Direction::LeftToRight,
+				main_wrap: false,
+				main_align: egui::Align::Center,
+				main_justify: true,
+				cross_align: egui::Align::Center,
+				cross_justify: false,
+			};
+
+			let mut top = ui.new_child(egui::UiBuilder::new().layout(layout));
+
+			top.label("ESTATE");
+			top.label("PROJECT");
+			top.label("COMMANDS");
+		});
+
+		egui::containers::Panel::bottom(ui.id()).show(ui, |ui| {
+			let layout = egui::Layout {
+				main_dir: egui::Direction::LeftToRight,
+				main_wrap: false,
+				main_align: egui::Align::Center,
+				main_justify: true,
+				cross_align: egui::Align::Center,
+				cross_justify: false,
+			};
+
+			let mut footer = ui.new_child(egui::UiBuilder::new().layout(layout));
+
+			footer.label("Connected");
+			footer.label("v0.1.0");
+		});
+
+		egui::containers::Panel::left(ui.id()).show(ui, |ui| {
+			let layout = egui::Layout {
+				main_dir: egui::Direction::TopDown,
+				main_wrap: false,
+				main_align: egui::Align::Min,
+				main_justify: false,
+				cross_align: egui::Align::Min,
+				cross_justify: true,
+			};
+
+			let mut sidebar = ui.new_child(egui::UiBuilder::new().layout(layout));
+
+			sidebar.label("Files");
+			sidebar.label("Registry");
+			sidebar.label("Resources");
+		});
+
+		egui::containers::Panel::right(ui.id()).show(ui, |ui| {
+			let layout = egui::Layout {
+				main_dir: egui::Direction::TopDown,
+				main_wrap: false,
+				main_align: egui::Align::Min,
+				main_justify: false,
+				cross_align: egui::Align::Min,
+				cross_justify: true,
+			};
+
+			let mut aside = ui.new_child(egui::UiBuilder::new().layout(layout));
+
+			aside.label("Inspector");
+			aside.label("Properties");
+			aside.label("Details");
+		});
+
+		let layout = egui::Layout {
+			main_dir: egui::Direction::TopDown,
+			main_wrap: false,
+			main_align: egui::Align::Min,
+			main_justify: false,
+			cross_align: egui::Align::Min,
+			cross_justify: true,
+		};
+
+		let mut main = ui.new_child(egui::UiBuilder::new().layout(layout));
+
+		main.heading("MAIN");
+		main.label("The remaining space belongs to the main content.");
+	}
+	fn foo_layout_infinite_scroll(&mut self, ui: &mut egui::Ui) {
+		// ┌─────────────────────────────────────────────┐
+		// │                    TOP                      │
+		// ├─────────────────────────────────────────────┤
+		// │                                             │
+		// │                  SCROLLER                   │
+		// │                  ↓                          │
+		// │               content 1                     │
+		// │               content 2                     │
+		// │               content 3                     │
+		// │                  ...                        │
+		// │                                             │
+		// ├─────────────────────────────────────────────┤
+		// │                   FOOTER                    │
+		// └─────────────────────────────────────────────┘
+
+		egui::containers::Panel::top(ui.id()).show(ui, |ui| {
+			let layout = egui::Layout {
+				main_dir: egui::Direction::LeftToRight,
+				main_wrap: false,
+				main_align: egui::Align::Center,
+				main_justify: true,
+				cross_align: egui::Align::Center,
+				cross_justify: false,
+			};
+
+			let mut top = ui.new_child(egui::UiBuilder::new().layout(layout));
+
+			top.label("ESTATE");
+			top.label("SEARCH");
+			top.label("FILTER");
+		});
+
+		egui::containers::Panel::bottom(ui.id()).show(ui, |ui| {
+			let layout = egui::Layout {
+				main_dir: egui::Direction::LeftToRight,
+				main_wrap: false,
+				main_align: egui::Align::Center,
+				main_justify: true,
+				cross_align: egui::Align::Center,
+				cross_justify: false,
+			};
+
+			let mut footer = ui.new_child(egui::UiBuilder::new().layout(layout));
+
+			footer.label("Status");
+			footer.label("Connected");
+		});
+
+		egui::ScrollArea::vertical()
+			.id_salt("infinite_content")
+			.auto_shrink([false, false])
+			.show(ui, |ui| {
+				let layout = egui::Layout {
+					main_dir: egui::Direction::TopDown,
+					main_wrap: false,
+					main_align: egui::Align::Min,
+					main_justify: false,
+					cross_align: egui::Align::Min,
+					cross_justify: true,
+				};
+
+				let mut content = ui.new_child(egui::UiBuilder::new().layout(layout));
+
+				for i in 0..1000 {
+					content.horizontal(|ui| {
+						ui.label(format!("{:04}", i));
+						ui.separator();
+						ui.label(format!("Resource {}", i));
+					});
+				}
+			});
+	}
+}
