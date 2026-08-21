@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{prelude::*, router};
 use egui::{Context as EguiContext, PopupAnchor::Position, TexturesDelta, Ui};
 use egui_wgpu::{
 	Renderer, SurfaceConfig,
@@ -26,10 +26,10 @@ use winit::{
 /// daemon communication channel, and optional development window.
 pub struct App {
 	/// The system tray icon owned by the application.
-	tray: TrayIcon,
+	tray: Option<TrayIcon>,
 
 	/// The system tray menu and its associated menu items.
-	menu: TrayMenu,
+	menu: Option<TrayMenu>,
 
 	/// Shared application context and runtime state.
 	context: Context,
@@ -38,35 +38,142 @@ pub struct App {
 	engine: EstateEngine,
 
 	/// Channel used to send commands to the Estate daemon, when available.
-	daemon_tx: Option<mpsc::Sender<DaemonCommand>>,
+	// daemon_tx: Option<mpsc::Sender<DaemonCommand>>,
 
 	/// The development window, when it has been opened.
 	dev_window: Option<DevWindow>,
+
+	// daemon: Option<DaemonHandle>,
+	daemon: Option<Daemon>,
+	daemon_tx: mpsc::Sender<DaemonCommand>,
+	daemon_rx: Option<mpsc::Receiver<DaemonCommand>>,
 }
 impl App {
-	fn new(context: Context, engine: EstateEngine) -> anyhow::Result<Self> {
-		let (menu, tray) = Self::bootstrap()?;
-
+	pub fn new() -> anyhow::Result<Self> {
+		let engine = EstateEngine::new()?;
+		let context = Context::default();
+		let (daemon_tx, daemon_rx) = mpsc::channel(100);
 		Ok(Self {
+			tray: None,
+			menu: None,
 			context,
 			engine,
-			tray,
-			menu,
 			dev_window: None,
-			daemon_tx: None,
+			daemon: None,
+			daemon_tx,
+			daemon_rx: Some(daemon_rx),
 		})
+	}
+	pub fn run(&mut self, cli: Cli) -> anyhow::Result<()> {
+		match cli.command {
+			Command::Start { .. } | Command::Tray => self.run_application(),
+			_ => {
+				let runtime = tokio::runtime::Runtime::new()?;
+
+				runtime.block_on(async {
+					let ctx = cli::context::Context::new();
+					router::execute(cli, ctx, self.engine.clone()).await
+				})
+			}
+		}
+	}
+	fn run_application(&mut self) -> anyhow::Result<()> {
+		let event_loop = EventLoop::builder()
+			.with_activation_policy(ActivationPolicy::Accessory)
+			.build()?;
+
+		let rx = self
+			.daemon_rx
+			.take()
+			.expect("daemon receiver already consumed");
+
+		let engine = self.engine.clone();
+
+		std::thread::spawn(move || {
+			let runtime = tokio::runtime::Runtime::new().expect("failed to create Tokio runtime");
+
+			runtime.block_on(async move {
+				let mut rx = rx;
+				let mut daemon = Daemon::new(engine);
+
+				tokio::select! {
+					result = daemon.run_foreground() => {
+						if let Err(error) = result {
+							tracing::error!(%error, "daemon exited");
+						}
+					}
+
+					_ = tokio::signal::ctrl_c() => {
+						tracing::info!("Ctrl-C received");
+
+						if let Err(error) = daemon.shutdown().await {
+							tracing::error!(%error, "daemon shutdown failed");
+						}
+					}
+
+					command = rx.recv() => {
+						match command {
+							Some(DaemonCommand::Stop) => {
+								tracing::info!("stopping daemon");
+								let _ = daemon.shutdown().await;
+							}
+
+							None => {
+								tracing::warn!("daemon command channel closed");
+								let _ = daemon.shutdown().await;
+							}
+						}
+					}
+				}
+			});
+		});
+
+		event_loop.run_app(self)?;
+
+		Ok(())
+	}
+	async fn start_daemon(&self, mut rx: mpsc::Receiver<DaemonCommand>) -> anyhow::Result<()> {
+		tracing::info!("start_daemon");
+		let mut daemon = Daemon::new(self.engine.clone());
+
+		tokio::select! {
+			result = daemon.run_foreground() => {
+				result?;
+			}
+
+			_ = tokio::signal::ctrl_c() => {
+				tracing::info!("Ctrl-C received");
+				daemon.shutdown().await?;
+			}
+
+			command = rx.recv() => {
+				match command {
+					Some(DaemonCommand::Stop) => {
+						tracing::info!("stopping daemon");
+						daemon.shutdown().await?;
+					}
+
+					None => {
+						tracing::warn!("daemon command channel closed");
+						daemon.shutdown().await?;
+					}
+				}
+			}
+		}
+
+		Ok(())
 	}
 	fn bootstrap() -> anyhow::Result<(TrayMenu, TrayIcon)> {
 		let menu = Menu::new();
+
 		let status = MenuItem::new("● Estate Daemon Running", false, None);
+
 		let dev = MenuItem::new("Dev Info", true, None);
 
-		// ─────────────────────────────────────────────
-		// Tasks submenu
-		// ─────────────────────────────────────────────
-
 		let new_task = MenuItem::new("New Task", true, None);
+
 		let list_tasks = MenuItem::new("List Tasks", true, None);
+
 		let clear_tasks = MenuItem::new("Clear Tasks", true, None);
 
 		let tasks = Submenu::new("Tasks", true);
@@ -74,10 +181,6 @@ impl App {
 		tasks.append(&new_task)?;
 		tasks.append(&list_tasks)?;
 		tasks.append(&clear_tasks)?;
-
-		// ─────────────────────────────────────────────
-		// Root menu
-		// ─────────────────────────────────────────────
 
 		let quit = MenuItem::new("Quit", true, None);
 
@@ -95,56 +198,27 @@ impl App {
 
 		Ok((
 			TrayMenu {
-				status,
-				dev,
-				tasks,
-				new_task,
-				list_tasks,
 				clear_tasks,
+				dev,
+				list_tasks,
+				new_task,
 				quit,
+				status,
+				tasks,
 			},
 			tray,
 		))
 	}
-	fn tray_icon() -> Icon {
-		let image = image::load_from_memory(constants::TRAY_ICON)
-			.expect("failed to load generated tray icon")
-			.into_rgba8();
-
-		let (width, height) = image.dimensions();
-
-		Icon::from_rgba(image.into_raw(), width, height).expect("failed to create tray icon")
+	async fn shutdown(&mut self) -> anyhow::Result<()> {
+		tracing::info!(
+			target: "estate::app",
+			"shutting down"
+		);
+		self.daemon_tx.send(DaemonCommand::Stop).await?;
+		Ok(())
 	}
 }
 impl App {
-	#[tracing::instrument(
-		target = "estate::discovery",
-		name = "scan_workspace",
-		skip(self),
-		fields(flow_id = %Uuid::now_v7())
-	)]
-	pub async fn scan_workspace(&mut self, path: &Path) -> anyhow::Result<()> {
-		tracing::info!("starting workspace scan");
-		self.discover(path).await?;
-		tracing::debug!("discovery complete");
-		self.analyze().await?;
-		tracing::debug!("analysis complete");
-		self.build_graph().await?;
-		tracing::info!("workspace scan complete");
-		Ok(())
-	}
-
-	#[tracing::instrument(target = "estate::discovery", skip(self, path))]
-	pub async fn discover(&mut self, path: &Path) -> anyhow::Result<()> {
-		tracing::debug!(path = %path.display(), "discovering workspace");
-		Ok(())
-	}
-
-	#[tracing::instrument(target = "estate::analysis", skip(self))]
-	pub async fn analyze(&mut self) -> anyhow::Result<()> {
-		tracing::debug!("analyzing workspace");
-		Ok(())
-	}
 	fn show_tasks(&self) {
 		println!("Estate Tasks");
 	}
@@ -154,101 +228,113 @@ impl App {
 	fn clear_tasks(&mut self) {
 		println!("Clearing tasks...");
 	}
-
+	fn tray_icon() -> Icon {
+		let image = image::load_from_memory(constants::TRAY_ICON)
+			.expect("failed to load generated tray icon")
+			.into_rgba8();
+		let (width, height) = image.dimensions();
+		Icon::from_rgba(image.into_raw(), width, height).expect("failed to create tray icon")
+	}
+	#[tracing::instrument(
+		target = "estate::discovery",
+		name = "scan_workspace",
+		skip(self),
+		fields(flow_id = %Uuid::now_v7())
+	)]
+	async fn scan_workspace(&mut self, path: &Path) -> anyhow::Result<()> {
+		tracing::info!("starting workspace scan");
+		self.discover(path).await?;
+		tracing::debug!("discovery complete");
+		self.analyze().await?;
+		tracing::debug!("analysis complete");
+		self.build_graph().await?;
+		tracing::info!("workspace scan complete");
+		Ok(())
+	}
+	#[tracing::instrument(target = "estate::discovery", skip(self, path))]
+	async fn discover(&mut self, path: &Path) -> anyhow::Result<()> {
+		tracing::debug!(path = %path.display(), "discovering workspace");
+		Ok(())
+	}
+	#[tracing::instrument(target = "estate::analysis", skip(self))]
+	async fn analyze(&mut self) -> anyhow::Result<()> {
+		tracing::debug!("analyzing workspace");
+		Ok(())
+	}
 	#[tracing::instrument(target = "estate::graph", skip(self))]
-	pub async fn build_graph(&mut self) -> anyhow::Result<()> {
+	async fn build_graph(&mut self) -> anyhow::Result<()> {
 		tracing::debug!("building semantic graph");
-
-		// TODO
-
 		Ok(())
 	}
-	pub async fn spawn_tray_process() -> anyhow::Result<()> {
-		eprintln!(">>> spawn_tray_process");
-		if Daemon::is_running().await {
-			return Ok(());
-		}
-		let exe = std::env::current_exe()?;
-		eprintln!(">>> spawning tray: {}", exe.display());
-		std::process::Command::new(exe)
-			.arg("tray")
-			.stdin(std::process::Stdio::inherit())
-			.stdout(std::process::Stdio::inherit())
-			.stderr(std::process::Stdio::inherit())
-			.spawn()?;
-		eprintln!(">>> tray process spawned");
-		Ok(())
-	}
-	/// Run the tray application in the current process.
-	pub fn run_tray_daemon(engine: EstateEngine) -> anyhow::Result<()> {
-		let context = Context::new(RuntimeMode::Cli)?;
 
-		let event_loop = EventLoop::builder()
-			.with_activation_policy(ActivationPolicy::Accessory)
-			.build()?;
+	// fn handle_menu_event(&mut self, event: MenuEvent, event_loop: &ActiveEventLoop) {
+	// 	let Some(menu) = self.menu.as_ref() else {
+	// 		tracing::warn!("menu event received before menu initialization");
+	// 		return;
+	// 	};
 
-		let mut app = Self::new(context, engine)?;
+	// 	if event.id() == menu.quit.id() {
+	// 		tracing::info!(">>> quit menu item");
 
-		event_loop.run_app(&mut app)?;
-
-		Ok(())
-	}
-	fn run_daemon(engine: EstateEngine, mut rx: mpsc::Receiver<DaemonCommand>) {
-		let runtime = Runtime::new().unwrap();
-
-		runtime.block_on(async move {
-			let mut daemon = Daemon::new(engine);
-
-			let daemon_task = tokio::spawn(async move {
-				if let Err(e) = daemon.run_foreground().await {
-					eprintln!("Daemon error: {e}");
-				}
-			});
-
-			tokio::select! {
-					result = daemon_task => {
-							match result {
-									Ok(()) => eprintln!("Daemon exited"),
-									Err(e) => eprintln!("Daemon task failed: {e}"),
-							}
-					}
-
-					command = rx.recv() => {
-							match command {
-									Some(DaemonCommand::Stop) => {
-											eprintln!("Stopping daemon...");
-									}
-									None => {
-											eprintln!("Daemon command channel closed");
-									}
-							}
-					}
-			}
-		});
-	}
+	// 		let _ = self.daemon_tx.try_send(DaemonCommand::Stop);
+	// 		event_loop.exit();
+	// 	} else if event.id() == menu.dev.id() {
+	// 		self.show_dev_info(event_loop);
+	// 	} else if event.id() == menu.new_task.id() {
+	// 		tracing::info!(">>> new task");
+	// 		self.new_task();
+	// 	} else if event.id() == menu.list_tasks.id() {
+	// 		tracing::info!(">>> list tasks");
+	// 		self.show_tasks();
+	// 	} else if event.id() == menu.clear_tasks.id() {
+	// 		tracing::info!(">>> clear tasks");
+	// 		self.clear_tasks();
+	// 	}
+	// }
 	fn handle_menu_event(&mut self, event: MenuEvent, event_loop: &ActiveEventLoop) {
-		if event.id() == self.menu.quit.id() {
-			if let Some(tx) = &self.daemon_tx {
-				let _ = tx.send(DaemonCommand::Stop);
+		let Some(menu) = self.menu.as_ref() else {
+			return;
+		};
+
+		match () {
+			_ if event.id() == menu.quit.id() => {
+				let _ = self.daemon_tx.try_send(DaemonCommand::Stop);
+				event_loop.exit();
 			}
-			event_loop.exit();
-		} else if event.id() == self.menu.dev.id() {
-			tracing::info!("processing loop started");
-			eprintln!(">>> DEV INFO CLICKED");
-			self.show_dev_info(event_loop);
-		} else if event.id() == self.menu.new_task.id() {
-			self.new_task();
-		} else if event.id() == self.menu.list_tasks.id() {
-			self.show_tasks();
-		} else if event.id() == self.menu.clear_tasks.id() {
-			self.clear_tasks();
+
+			_ if event.id() == menu.dev.id() => {
+				self.show_dev_info(event_loop);
+			}
+
+			_ if event.id() == menu.new_task.id() => {
+				self.new_task();
+			}
+
+			_ if event.id() == menu.list_tasks.id() => {
+				self.show_tasks();
+			}
+
+			_ if event.id() == menu.clear_tasks.id() => {
+				self.clear_tasks();
+			}
+
+			_ => {}
 		}
 	}
 	fn show_dev_info(&mut self, event_loop: &ActiveEventLoop) {
-		tracing::info!("show_dev_info");
 		match DevWindow::new(event_loop) {
 			Ok(window) => {
 				tracing::info!(">>> DevWindow created: {:?}", window.window.id());
+				self
+					.engine
+					.runtime
+					.emit(Event::app(EventKind::CommandExecuted {
+						command: "dev_info".into(),
+					}));
+				// self
+				// 	.engine
+				// 	.runtime
+				// 	.emit(Event::daemon(EventKind::StatusRequested));
 				self.dev_window = Some(window);
 			}
 			Err(e) => {
@@ -264,12 +350,22 @@ impl ApplicationHandler for App {
 		}
 	}
 	fn resumed(&mut self, _event_loop: &ActiveEventLoop) {
-		let (tx, rx) = mpsc::channel(100);
-		self.daemon_tx = Some(tx);
-		let engine = self.engine.clone();
-		thread::spawn(move || {
-			Self::run_daemon(engine, rx);
-		});
+		if self.tray.is_some() {
+			return;
+		}
+
+		let (menu, tray) = match Self::bootstrap() {
+			Ok(value) => value,
+			Err(error) => {
+				tracing::error!(%error, "failed to bootstrap tray");
+				return;
+			}
+		};
+
+		self.menu = Some(menu);
+		self.tray = Some(tray);
+
+		tracing::info!("🔥 tray initialized");
 	}
 	fn window_event(
 		&mut self,
@@ -280,11 +376,9 @@ impl ApplicationHandler for App {
 		let Some(dev_window) = &mut self.dev_window else {
 			return;
 		};
-
 		if dev_window.window.id() != window_id {
 			return;
 		}
-
 		let response = dev_window
 			.egui_state
 			.on_window_event(&dev_window.window, &event);
@@ -607,39 +701,72 @@ impl DevWindow {
 		}
 	}
 	fn draw_overview(&self, ui: &mut egui::Ui) {
-		ui.heading("Overview");
+		ui.horizontal(|ui| {
+			ui.heading("Overview");
+			ui.label(format!("Pointer: {:?}", ui.ctx().pointer_latest_pos()));
+			let response = ui.button("📋 Copy");
+
+			tracing::info!(
+				target: "estate::app",
+				"Copy button: hovered={} clicked={} enabled={}",
+				response.hovered(),
+				response.clicked(),
+				response.enabled(),
+			);
+
+			if response.clicked() {
+				tracing::info!(target: "estate::app", "CLICKED COPY");
+
+				let json =
+					serde_json::to_string_pretty(&self.state).expect("failed to serialize estate state");
+
+				ui.output_mut(|o| {
+					o.commands.push(egui::OutputCommand::CopyText(json));
+				});
+			}
+		});
+
 		ui.separator();
-		ui.label(format!("Starts: {}", self.state.starts));
-		ui.label(format!("Status checks: {}", self.state.status_checks));
-		ui.label(format!("Started at: {}", self.state.started_at));
-		ui.label(format!("Longest run: {}s", self.state.longest_run));
+
+		let metrics = [
+			("Starts", self.state.starts.to_string()),
+			("Longest run", format!("{}s", self.state.longest_run)),
+			("Status checks", self.state.status_checks.to_string()),
+			("Started at", self.state.started_at.to_string()),
+			("Events processed", self.state.events_processed.to_string()),
+			("Tasks created", self.state.tasks_created.to_string()),
+			("Tasks completed", self.state.tasks_completed.to_string()),
+			("Files indexed", self.state.files_indexed.to_string()),
+		];
+
+		for (name, value) in metrics {
+			ui.horizontal(|ui| {
+				ui.label(name);
+				ui.monospace(value);
+			});
+		}
 	}
 	fn draw_registry(&self, ui: &mut egui::Ui) {
 		ui.heading("Registry");
 		ui.separator();
 		ui.label("Registry view");
 	}
-
 	fn draw_daemon(&self, ui: &mut egui::Ui) {
 		ui.heading("Daemon");
 		ui.separator();
 		ui.label("Daemon view");
 	}
-
 	fn draw_engine(&self, ui: &mut egui::Ui) {
 		ui.heading("Engine");
 		ui.separator();
 		ui.label("Engine view");
 	}
-
 	fn draw_workspace(&self, ui: &mut egui::Ui) {
 		ui.heading("Workspace");
 		ui.separator();
 		ui.label("Workspace view");
 	}
-
 	fn draw_runtime(&self, ui: &mut egui::Ui) {
-		todo!("Error!");
 		ui.heading("Runtime");
 		ui.separator();
 		ui.label("Runtime view");
@@ -693,7 +820,6 @@ fn create_gpu_surface(
 
 fn build_egui(event_loop: &ActiveEventLoop) -> (EguiContext, EguiState) {
 	let egui_ctx = egui::Context::default();
-
 	let egui_state = EguiState::new(
 		egui_ctx.clone(),
 		egui::ViewportId::ROOT,
@@ -704,44 +830,14 @@ fn build_egui(event_loop: &ActiveEventLoop) -> (EguiContext, EguiState) {
 	);
 	(egui_ctx, egui_state)
 }
-fn build_egui2(event_loop: &ActiveEventLoop) -> (EguiContext, EguiState) {
-	// let monitor = event_loop
-	// 	.primary_monitor()
-	// 	.ok_or_else(|| anyhow::anyhow!("no primary monitor found"))?;
-	// let monitor_size = monitor.size();
-	// let width = 900;
-	// let height = 600;
-	// let x = (monitor_size.width.saturating_sub(width)) / 2;
-	// let y = (monitor_size.height.saturating_sub(height)) / 2;
-	// let attrs = Window::default_attributes()
-	// 	.with_title("Estate Dev")
-	// 	.with_inner_size(PhysicalSize::new(900, 600))
-	// 	.with_position(PhysicalPosition::new(x, y))
-	// 	.with_window_level(WindowLevel::AlwaysOnTop);
 
-	// let x = (monitor_size.width.saturating_sub(width)) / 2;
-	// let y = (monitor_size.height.saturating_sub(height)) / 2;
-
-	let egui_ctx = egui::Context::default();
-	let egui_state = EguiState::new(
-		egui_ctx.clone(),
-		egui::ViewportId::ROOT,
-		event_loop,
-		None,
-		None,
-		None,
-	);
-	(egui_ctx, egui_state)
-}
 fn build_window(event_loop: &ActiveEventLoop) -> anyhow::Result<Arc<Window>> {
 	let attrs = Window::default_attributes()
 		.with_title("Estate Dev")
 		.with_inner_size(PhysicalSize::new(900, 600))
 		.with_window_level(WindowLevel::AlwaysOnTop)
 		.with_position(PhysicalPosition::new(0, 0));
-
 	let window = event_loop.create_window(attrs)?;
-
 	Ok(Arc::new(window))
 }
 fn build_renderer(
@@ -796,7 +892,7 @@ fn build_renderer(
 	Ok((config, renderer))
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Context {
 	pub source: RuntimeMode,
 	// Where the user is operating
@@ -806,8 +902,10 @@ pub struct Context {
 	// Engine internals (cache, daemon state, registry)
 	pub engine_root: PathBuf,
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub enum RuntimeMode {
+	#[default]
+	App,
 	Cli,
 	Daemon,
 	Lsp,
@@ -826,16 +924,16 @@ impl Context {
 		})
 	}
 }
-#[derive(Clone, Debug)]
-enum DaemonCommand {
-	Stop,
-	// Metrics,
-	// Restart,
-	// Refresh,
-	// Enable,
-	// Disable,
-	// Status,
-}
+// #[derive(Clone, Debug)]
+// pub enum DaemonCommand {
+// 	Stop,
+// 	// Metrics,
+// 	// Restart,
+// 	// Refresh,
+// 	// Enable,
+// 	// Disable,
+// 	// Status,
+// }
 struct TrayMenu {
 	status: MenuItem,
 	dev: MenuItem,

@@ -191,12 +191,13 @@ pub enum EstateScope {
 // 	}
 // }
 /// Estate owns the capabilities and domain model; the daemon exposes those capabilities as a long-lived service.
-#[derive(Clone, Debug, Hash)]
+#[derive(Clone, Debug)]
 pub struct EstateEngine {
-	pub estate: Estate,       // domain model
-	pub vfs: EstateVfs,       // infrastructure
-	pub index: EstateIndex,   // infrastructure
-	pub workspace: Workspace, // domain/context
+	pub estate: Estate,         // domain model
+	pub runtime: EstateRuntime, // capability
+	pub vfs: EstateVfs,         // infrastructure
+	pub index: EstateIndex,     // infrastructure
+	pub workspace: Workspace,   // domain/context
 
 	// pub index: OnceCell<EstateIndex>,
 	// pub search: OnceCell<SearchService>,
@@ -211,7 +212,9 @@ pub struct EstateEngine {
 }
 impl EstateEngine {
 	pub fn new() -> anyhow::Result<Self> {
+		let runtime = EstateRuntime::new();
 		Ok(Self {
+			runtime,
 			estate: Estate::default(),
 			workspace: Workspace::new(),
 			registry: EstateRegistry::default(),

@@ -107,6 +107,7 @@ pub mod registry;
 pub mod router;
 pub mod vfs;
 pub mod logger;
+pub mod state;
 
 // #[allow(dead_code)]
 // #[allow(unused_imports)] // Silences unused imports

@@ -92,11 +92,9 @@ pub mod projection;
 pub mod reload;
 pub mod resolver;
 pub mod shell;
-pub mod start;
 
 pub use daemon::*;
 pub use event::*;
 pub use lint::*;
 pub use resolver::*;
 pub use shell::*;
-pub use start::*;

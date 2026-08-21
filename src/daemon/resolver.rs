@@ -66,3 +66,9 @@ pub fn engine_cache_dir() -> std::io::Result<PathBuf> {
 			)
 		})
 }
+
+pub fn path() -> std::io::Result<PathBuf> {
+	let path = engine_data_dir()?.join("state.json");
+	println!("STATE PATH: {}", path.display());
+	Ok(path)
+}

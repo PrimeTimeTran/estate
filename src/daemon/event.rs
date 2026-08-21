@@ -1,5 +1,5 @@
-use crate::daemon::daemon::*;
-use crate::prelude::*;
+use crate::prelude::{daemon::daemon::*, *};
+use std::sync::{Arc, RwLock};
 
 // Events = facts that happened
 // Handlers = reactions to facts
@@ -99,27 +99,7 @@ use crate::prelude::*;
 				(latest snapshot)
 */
 
-pub async fn event_loop(mut rx: broadcast::Receiver<Event>, runtime: EstateRuntime) {
-	let mut dispatcher = EventDispatcher::new();
-	dispatcher.register(LogHandler);
-	dispatcher.register(FileWatcherHandler);
-	while let Ok(event) = rx.recv().await {
-		dispatcher.dispatch(event, &runtime).await;
-	}
-}
-static EVENT_ID: AtomicU64 = AtomicU64::new(1);
-
-fn now() -> u64 {
-	std::time::SystemTime::now()
-		.duration_since(std::time::UNIX_EPOCH)
-		.unwrap()
-		.as_secs()
-}
-
-///--------------------------------------------------------------------------------
-///#      Hi
-///--------------------------------------------------------------------------------
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Hash, Serialize)]
 pub struct Event {
 	pub id: u64,
 	pub timestamp: u64,
@@ -148,12 +128,18 @@ impl Event {
 	pub fn editor(kind: EventKind) -> Self {
 		Self::new(EventSource::Editor, kind)
 	}
+	pub fn app(kind: EventKind) -> Self {
+		Self::new(EventSource::App, kind)
+	}
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Hash, Serialize)]
 pub enum EventKind {
 	DaemonStarted,
+	DaemonStopped,
 	StatusRequested,
+	TaskRequested { task: Task },
+	TaskCompleted { task: Task },
 	CommandExecuted { command: String },
 	FileCreated { path: String },
 	FileModified { path: String },
@@ -164,19 +150,21 @@ pub enum EventKind {
 	CacheInvalidated { reason: String },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Hash, Serialize)]
 pub enum EventSource {
-	Daemon,
+	App,
 	Cli,
-	Filesystem,
+	Daemon,
 	Editor,
+	Filesystem,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct EstateRuntime {
 	pub events: EventBus,
-	pub state: daemon::EstateState,
+	pub state: Arc<RwLock<EstateState>>,
 }
+
 impl Default for EstateRuntime {
 	fn default() -> Self {
 		Self::new()
@@ -185,16 +173,11 @@ impl Default for EstateRuntime {
 
 impl EstateRuntime {
 	pub fn new() -> Self {
-		let mut state = EstateState::load();
-		state.starts += 1;
-		state.started_at = EstateState::now();
-		EstateState::save(&state);
 		Self {
 			events: EventBus::new(),
-			state,
+			state: Arc::new(RwLock::new(EstateState::load())),
 		}
 	}
-
 	pub fn emit(&self, event: Event) {
 		self.events.emit(event);
 	}
@@ -205,6 +188,11 @@ pub struct EventBus {
 	sender: broadcast::Sender<Event>,
 }
 
+impl std::hash::Hash for EventBus {
+	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+		self.sender.same_channel(&self.sender).hash(state);
+	}
+}
 impl Default for EventBus {
 	fn default() -> Self {
 		Self::new()
@@ -214,7 +202,6 @@ impl Default for EventBus {
 impl EventBus {
 	pub fn new() -> Self {
 		let (sender, _) = broadcast::channel(256);
-
 		Self { sender }
 	}
 	pub fn emit(&self, event: Event) {
@@ -280,29 +267,179 @@ impl EventHandler for FileWatcherHandler {
 		}
 	}
 }
-#[derive(Debug)]
-pub enum Task {
-	RebuildIndex,
-	GenerateView(String),
-	SyncBookmarks,
+
+pub struct TaskHandler;
+#[async_trait::async_trait]
+impl EventHandler for TaskHandler {
+	async fn handle(&self, event: &Event, runtime: &EstateRuntime) {
+		let EventKind::TaskRequested { task } = &event.kind else {
+			return;
+		};
+
+		println!("🔥 TaskHandler received: {:?}", task);
+
+		let task = task.clone();
+		let runtime = runtime.clone();
+
+		tokio::spawn(async move {
+			println!("🔥 TaskRunner starting: {:?}", task);
+			match TaskRunner::execute(task.clone()).await {
+				Ok(()) => {
+					println!("✅ TaskRunner completed: {:?}", task);
+					runtime.emit(Event::daemon(EventKind::TaskCompleted { task }));
+				}
+				Err(error) => {
+					eprintln!("❌ TaskRunner failed: {error:?}");
+				}
+			}
+		});
+	}
 }
 
-pub struct TaskRunner;
+pub struct StateHandler;
+#[async_trait::async_trait]
+impl EventHandler for StateHandler {
+	async fn handle(&self, event: &Event, runtime: &EstateRuntime) {
+		println!("🔥 StateHandler received: {:?}", event.kind);
 
-impl TaskRunner {
-	pub async fn execute(task: Task) {
-		match task {
-			Task::RebuildIndex => {
-				println!("building index");
+		let mut state = runtime.state.write().unwrap();
+
+		match &event.kind {
+			EventKind::DaemonStarted => {
+				state.starts += 1;
+				state.started_at = event.timestamp;
 			}
 
-			Task::GenerateView(name) => {
-				println!("generating {}", name);
+			EventKind::StatusRequested => {
+				state.status_checks += 1;
 			}
 
-			Task::SyncBookmarks => {
-				println!("syncing bookmarks");
+			EventKind::IndexUpdated { files_changed } => {
+				state.files_indexed += files_changed;
+			}
+
+			EventKind::TaskCompleted { .. } => {
+				state.tasks_completed += 1;
+			}
+
+			EventKind::CommandExecuted { .. } => {
+				state.tasks_created += 1;
+			}
+
+			_ => {}
+		}
+
+		EstateState::save(&state);
+	}
+}
+
+pub struct CommandHandler;
+#[async_trait::async_trait]
+impl EventHandler for CommandHandler {
+	async fn handle(&self, event: &Event, runtime: &EstateRuntime) {
+		let EventKind::CommandExecuted { command } = &event.kind else {
+			return;
+		};
+
+		println!("🔥 CommandHandler received: {command}");
+
+		match command.as_str() {
+			"dev_info" => {
+				runtime.emit(Event::daemon(EventKind::TaskRequested {
+					task: Task::BuildEstatePrototype,
+				}));
+			}
+
+			"rebuild_index" => {
+				runtime.emit(Event::daemon(EventKind::TaskRequested {
+					task: Task::RebuildIndex,
+				}));
+			}
+
+			"sync_bookmarks" => {
+				runtime.emit(Event::daemon(EventKind::TaskRequested {
+					task: Task::SyncBookmarks,
+				}));
+			}
+
+			"generate_dashboard" => {
+				runtime.emit(Event::daemon(EventKind::TaskRequested {
+					task: Task::GenerateView("dashboard".into()),
+				}));
+			}
+
+			_ => {
+				println!("⚠️ unknown command: {command}");
 			}
 		}
 	}
 }
+
+#[derive(Debug, Clone, Deserialize, Hash, Serialize)]
+pub enum Task {
+	RebuildIndex,
+	GenerateView(String),
+	SyncBookmarks,
+	BuildEstatePrototype,
+}
+
+/// "Given this task, actually perform it."
+pub struct TaskRunner;
+
+impl TaskRunner {
+	pub async fn execute(task: Task) -> anyhow::Result<()> {
+		println!("🔥 TaskRunner execute: {:?}", task);
+
+		match task {
+			Task::RebuildIndex => {
+				println!("🔨 rebuilding index");
+
+				// TODO: perform index rebuild
+				tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+
+				println!("✅ index rebuild complete");
+			}
+
+			Task::GenerateView(name) => {
+				println!("👁️ generating view: {name}");
+
+				// TODO: generate the requested view
+				tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+
+				println!("✅ view generated: {name}");
+			}
+
+			Task::SyncBookmarks => {
+				println!("🔖 syncing bookmarks");
+
+				// TODO: synchronize bookmarks
+				tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+
+				println!("✅ bookmark sync complete");
+			}
+
+			Task::BuildEstatePrototype => {
+				println!("🚧 starting BuildEstatePrototype");
+
+				for i in 1..=10 {
+					tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+
+					println!("🚧 prototype task: {i}/10");
+				}
+
+				println!("✅ BuildEstatePrototype complete");
+			}
+		}
+
+		Ok(())
+	}
+}
+
+fn now() -> u64 {
+	std::time::SystemTime::now()
+		.duration_since(std::time::UNIX_EPOCH)
+		.unwrap()
+		.as_secs()
+}
+
+static EVENT_ID: AtomicU64 = AtomicU64::new(1);

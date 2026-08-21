@@ -102,7 +102,7 @@ impl LogConfig {
 		if let Some(global) = Self::load_global()? {
 			config.merge(global);
 		}
-		println!("LOADED LOG CONFIG: {config:#?}");
+		// println!("LOADED LOG CONFIG: {config:#?}");
 		Ok(config)
 	}
 	pub fn load_from_cargo() -> anyhow::Result<Option<LogConfig>> {

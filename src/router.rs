@@ -57,13 +57,12 @@ pub async fn execute(
 		/// estate start
 		/// estate start --live
 		Command::Start { tail: false } => {
-			app::App::spawn_tray_process();
+			// app::App::spawn_tray_process();
 		}
 		Command::Tray => {
-			App::run_tray_daemon(engine)?;
+			// App::start_app(engine)?;
 		}
 		Command::Format(args) => {
-			// estate format path/to/file.rs
 			engine.format(&args).await;
 		}
 		Command::Metrics(args) => {
@@ -134,7 +133,7 @@ pub async fn execute(
 		//     start::BackgroundDaemon::run(&ctx, &args).await;
 		// }
 		Command::DaemonServer => {
-			start::DaemonServer::run().await;
+			daemon::DaemonServer::run().await;
 		}
 		Command::Capabilities(args) => match AnalyzeDaemon.run(&ctx, &args).await {
 			Ok(result) => {

@@ -55,6 +55,7 @@ winit.workspace = true
 egui-wgpu = "0.36.1"
 pollster = "1.0.1"
 wgpu = "30.0.0"
+tokio-util = "0.7.19"
 
 
 [build-dependencies]
