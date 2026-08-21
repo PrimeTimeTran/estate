@@ -1,11 +1,20 @@
+//! A virtual filesystem abstraction over Estate's resources.
+//! The VFS provides a unified way to resolve, access, and navigate files and
+//! directories represented within an Estate, independent of their underlying
+//! storage or physical location.
+//!
+//! # VFS
+//!
+//! A virtual filesystem abstraction for navigating and accessing Estate
+//! resources.
+//!
+//! The VFS presents Estate's resources through a filesystem-like interface,
+//! decoupling consumers from the underlying storage, filesystem, or resource
+//! representation.
+//!
+//! It provides the foundation for resolving paths and nodes, accessing
+//! resources, and maintaining filesystem state as the Estate changes.
 use crate::prelude::*;
-use anyhow::Result;
-use serde::{Deserialize, Serialize};
-use std::{
-	collections::{HashMap, HashSet},
-	path::{Path, PathBuf},
-};
-use uuid::Uuid;
 
 #[derive(Debug, Clone, Default)]
 pub struct Namespace {

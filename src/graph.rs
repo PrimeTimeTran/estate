@@ -96,4 +96,7 @@ pub enum RelationKind {
 	DerivedFrom,
 	GeneratedFrom,
 	RelatedTo,
+	References,
+	Imports,
+	Calls,
 }

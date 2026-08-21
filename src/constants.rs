@@ -1,3 +1,5 @@
+//! Static definitions shared by estate dependencies
+//! # Description
 use crate::core::{Probe, ProbeKind, ProbeSet};
 
 pub const TEMPLATE_PATH: &str = "/Users/future/KB/project/crates/estate/template";

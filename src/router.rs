@@ -1,11 +1,4 @@
-use crate::{
-	prelude::{daemon::projection::command, *},
-	router,
-};
-use cli::prelude::{Command, *};
-use futures::FutureExt;
-use futures::future::BoxFuture;
-use revelation::analyzer::Workspace;
+use crate::{prelude::daemon::projection::command, prelude::*};
 
 /// # Estate Engine CLI
 ///
@@ -51,14 +44,19 @@ use revelation::analyzer::Workspace;
 /// estate format path/to/file.rs
 /// ```
 pub async fn execute(
-	parsed_cli: cli::Cli,
-	ctx: cli::Context,
+	parsed_cli: Cli,
+	ctx: Context,
 	engine: EstateEngine,
 ) -> anyhow::Result<(), anyhow::Error> {
 	match parsed_cli.command {
-		/// estate -- daemon
-		/// estate -- daemon --live
-		Command::Daemon { live: false } => {
+		/// [Dev]
+		/// cargo run --bin estate -- start
+		/// cargo run --bin estate -- start --live
+		///
+		/// [Release]
+		/// estate start
+		/// estate start --live
+		Command::Start { tail: false } => {
 			app::App::spawn_tray_process();
 		}
 		Command::Tray => {
@@ -128,9 +126,9 @@ pub async fn execute(
 			}
 		}
 		// Server
-		Command::Start => {
-			start::daemon().await;
-		}
+		// Command::Start => {
+		// 	start::daemon().await;
+		// }
 		// Background process/app
 		// Command::Process(args) => {
 		//     start::BackgroundDaemon::run(&ctx, &args).await;
@@ -148,22 +146,19 @@ pub async fn execute(
 			}
 		},
 		Command::Status => StatusDaemon.run(&ctx).await,
-		Command::Stop => stop::StopDaemon.run(&ctx).await,
 		Command::Bookmark => command::ViewList.run(&ctx).await,
 		Command::Bookmarks => command::ViewList.run(&ctx).await,
 		Command::Reload => reload::ReloadDaemon.run(&ctx).await,
 		Command::Explain => command::Explain.run(&ctx).await,
 		Command::ExplainDoc => command::ExplainDoc.run(&ctx).await,
-		Command::View { name } => command::View { name }.run(&ctx).await,
-		Command::ViewFork { name } => command::ViewFork { name }.run(&ctx).await,
+		Command::View { name } => (command::View { name }).run(&ctx).await,
+		Command::ViewFork { name } => (command::ViewFork { name }).run(&ctx).await,
 		Command::ViewList => command::ViewList.run(&ctx).await,
-		Command::Deps { name } => command::Deps { name }.run(&ctx).await,
+		Command::Deps { name } => (command::Deps { name }).run(&ctx).await,
 		Command::Foo(_args) => {
 			let _ = EstateDiscovery::init();
 		}
-		// --help
 		// --info
-		// --version
 		// --doctor
 		_ => {
 			todo!("Command not found");

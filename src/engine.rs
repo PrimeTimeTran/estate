@@ -1,3 +1,7 @@
+//! Wrapper struct for core components & services used by the Estate Engine
+//!
+//! # Description
+
 //                        ┌─────────────────────┐
 //                        │       Estate        │
 //                        │  semantic engine    │
@@ -49,14 +53,14 @@ pub trait Engine {
 }
 /// Registry = authoritative knowledge.
 pub trait Registry {
-	fn get(&self, id: EstateId) -> Option<Resource>;
+	fn get(&self, id: Uuid) -> Option<Resource>;
 	fn upsert(&mut self, resource: Resource);
-	fn remove(&mut self, id: EstateId);
+	fn remove(&mut self, id: Uuid);
 }
 /// Index = derived structure optimized for finding that knowledge.
 pub trait Index {
 	fn generation(&self) -> u64;
-	fn lookup(&self, query: &Query) -> Vec<EstateId>;
+	fn lookup(&self, query: &Query) -> Vec<Uuid>;
 	fn invalidate(&mut self, change: &Change);
 }
 /// I have foo but I want bar
@@ -89,25 +93,25 @@ pub trait Discovery {
 /// Anchor/bookmark store...? FS store...? Asset store?
 /// - "I need a thing, give it to me"
 // pub trait Store {
-// 	fn get(&self, id: EstateId) -> Option<Resource>;
+// 	fn get(&self, id: Uuid) -> Option<Resource>;
 // 	fn insert(&mut self, resource: Resource);
 // 	fn update(&mut self, resource: Resource);
-// 	fn remove(&mut self, id: EstateId);
+// 	fn remove(&mut self, id: Uuid);
 // }
 /// Graph
 ///     "What is A connected to?"
 /// - I created an estate .md file which wikilinks to 5 other estate files. Do I do a full table scan of the registry every time? No, the resolver should take in an estate id and context and give me back what it is I'm looking for. If I've opened the IDE from a repo/workspace then the link will look differently to resolve.
 pub trait Graph {
-	fn children(&self, id: EstateId) -> Vec<EstateId>;
-	fn parents(&self, id: EstateId) -> Vec<EstateId>;
-	fn dependencies(&self, id: EstateId) -> Vec<EstateId>;
+	fn children(&self, id: Uuid) -> Vec<Uuid>;
+	fn parents(&self, id: Uuid) -> Vec<Uuid>;
+	fn dependencies(&self, id: Uuid) -> Vec<Uuid>;
 }
 /// Abstraction for ranking responses which are not deteminitic.
 /// - "Give me package.json" can produce many results
 /// - "Give me available" commnands can produce different results depending on file .ext, settings.json, UI focus, and state.
 #[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
 pub struct Resolution {
-	pub id: EstateId,
+	pub id: Uuid,
 	pub confidence: f32,
 	pub resource: Resource,
 	pub fragment: Option<String>,
@@ -126,9 +130,9 @@ pub struct Resolution {
 // User types:
 //     @my-pipeline
 // Resolver:
-//     @my-pipeline -> EstateId(55)
+//     @my-pipeline -> Uuid(55)
 // Store:
-//     EstateId(55) -> Resource
+//     Uuid(55) -> Resource
 // Resource:
 //     Location::File(".estate/pipelines/build.json")
 // VFS:
@@ -145,12 +149,12 @@ pub struct Resolution {
 // vfs.get(wikilink)
 //
 // pub trait EstateStore {
-// 	fn get(&self, id: EstateId) -> Option<Resource>;
+// 	fn get(&self, id: Uuid) -> Option<Resource>;
 // 	fn find(&self, query: ResourceQuery) -> Vec<Resource>;
 // 	fn put(&mut self, resource: Resource);
 
 // 	/// Resolve a stable identity to a resource.
-// 	fn resolve(&self, id: EstateId) -> Option<Resource>;
+// 	fn resolve(&self, id: Uuid) -> Option<Resource>;
 
 // 	/// Resolve a user-facing reference:
 // 	/// path, alias, wikilink, symbol, anchor, etc.
@@ -160,13 +164,13 @@ pub struct Resolution {
 // 	fn upsert(&mut self, resource: Resource);
 
 // 	/// Remove a resource.
-// 	fn remove(&mut self, id: EstateId);
+// 	fn remove(&mut self, id: Uuid);
 
 // 	/// Query children.
-// 	fn children(&self, id: EstateId) -> Vec<Resource>;
+// 	fn children(&self, id: Uuid) -> Vec<Resource>;
 
 // 	/// Get metadata.
-// 	fn metadata(&self, id: EstateId) -> ResourceMetadata;
+// 	fn metadata(&self, id: Uuid) -> ResourceMetadata;
 // }
 
 /// LSP, Linter, FS Registry/index,
@@ -178,14 +182,14 @@ pub enum EstateScope {
 	Workspace,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-pub struct EstateId(u64);
-static NEXT_ESTATE_ID: AtomicU64 = AtomicU64::new(1);
-impl EstateId {
-	pub fn new() -> Self {
-		Self(NEXT_ESTATE_ID.fetch_add(1, Ordering::Relaxed))
-	}
-}
+// #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
+// pub struct Uuid(u64);
+// static NEXT_ESTATE_ID: AtomicU64 = AtomicU64::new(1);
+// impl Uuid {
+// 	pub fn new() -> Self {
+// 		Self(NEXT_ESTATE_ID.fetch_add(1, Ordering::Relaxed))
+// 	}
+// }
 /// Estate owns the capabilities and domain model; the daemon exposes those capabilities as a long-lived service.
 #[derive(Clone, Debug, Hash)]
 pub struct EstateEngine {
@@ -264,6 +268,7 @@ struct ResolutionContext;
 /// - IPC
 /// - watchers
 /// - retry
+/// The root entity containing the complete Estate project state.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
 struct EstateRegistry;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
@@ -307,5 +312,5 @@ pub struct Reference<'a> {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub struct ResolveContext {
 	pub scope: EstateScope,
-	pub from: EstateId,
+	pub from: Uuid,
 }

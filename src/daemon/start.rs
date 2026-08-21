@@ -317,8 +317,8 @@ pub enum ActionRequest {
 ///--------------------------------------------------------------------------------
 pub struct StartDaemon;
 #[async_trait::async_trait]
-impl cli::CliCommand for StartDaemon {
-	async fn run(&self, _ctx: &cli::Context) {
+impl ::cli::command::CliCommand for StartDaemon {
+	async fn run(&self, _ctx: &cli::context::Context) {
 		println!("🚀 starting estate daemon");
 		let exe = std::env::current_exe().expect("failed finding current executable");
 		let child = std::process::Command::new(exe)

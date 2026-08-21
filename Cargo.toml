@@ -8,12 +8,12 @@ name = "estate"
 path = "src/bin/main.rs"
 
 [[bin]]
-name = "bootstrap"
-path = "src/bin/bootstrap-1.rs"
-
-[[bin]]
 name = "init"
 path = "src/bin/init.rs"
+
+[[bin]]
+name = "bootstrap"
+path = "src/bin/bootstrap-1.rs"
 
 [dependencies]
 # Internal

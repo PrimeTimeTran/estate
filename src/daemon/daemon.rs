@@ -1,6 +1,7 @@
 pub use crate::prelude::*;
 use cli::prelude::{CliCommand, Context as CliContext, FormatArgs};
 use revelation::analyzer::*;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 ///--------------------------------------------------------------------------------
 /// Daemon
 ///--------------------------------------------------------------------------------
@@ -66,25 +67,6 @@ impl CliCommand for StatusDaemon {
 		println!("🔎 Status checks:   {}", state.status_checks);
 		println!("🕒 Started at:      {}", state.started_at);
 		println!("⏱ Longest run:     {}s", state.longest_run);
-		// 1. Server
-		// match tokio::net::TcpStream::connect("127.0.0.1:7788").await {
-		//     Ok(mut stream) => {
-		//         tokio::io::AsyncWriteExt::write_all(&mut stream, b"status")
-		//             .await
-		//             .unwrap();
-		//         let mut buf = vec![];
-		//         tokio::io::AsyncReadExt::read_to_end(&mut stream, &mut buf)
-		//             .await
-		//             .unwrap();
-		//         println!("Daemon response:");
-		//         println!("{}", String::from_utf8_lossy(&buf));
-		//     }
-		//     Err(err) => {
-		//         println!("❌ Daemon socket unavailable: {}", err);
-		//     }
-		// }
-		use tokio::io::{AsyncReadExt, AsyncWriteExt};
-		// 1. Daemon
 		match tokio::net::UnixStream::connect(SOCKET_PATH).await {
 			Ok(mut stream) => {
 				stream.write_all(b"status\n").await.unwrap();
@@ -114,7 +96,7 @@ impl AnalyzeDaemon {
 	pub async fn run(
 		&self,
 		_ctx: &CliContext,
-		args: &cli::AnalyzeArgs,
+		args: &cli::context::AnalyzeArgs,
 	) -> Result<Workspace, AnalysisError> {
 		let target_path = PathBuf::from(&args.paths[0]);
 		let request = Analyze {

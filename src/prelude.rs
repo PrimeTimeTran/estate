@@ -1,3 +1,7 @@
+//! Centralized dependency exposure & visibilities definitions for both internal and external use.
+//!
+//! # Description
+//!
 pub use crate::_shared::*;
 pub use crate::_static::*;
 pub use crate::constants::{self, *};
@@ -12,7 +16,8 @@ pub use anyhow::{Error, Result};
 pub use async_trait::async_trait;
 pub use chrono::{DateTime, Local, Utc};
 pub use cli::{self, context::*, prelude::*, *};
-pub use revelation::*;
+pub use futures::{FutureExt, future::BoxFuture};
+pub use revelation::{analyzer::Workspace, *};
 pub use serde::*;
 pub use serde_json::Value;
 pub use std::{

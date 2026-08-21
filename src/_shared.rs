@@ -53,7 +53,6 @@ impl Default for Resource {
 	fn default() -> Self {
 		Self {
 			id: Uuid::now_v7(),
-			// id: EstateId::new(),
 			kind: ResourceKind::File,
 			locations: vec![],
 			aliases: vec![],

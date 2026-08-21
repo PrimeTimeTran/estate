@@ -1,5 +1,8 @@
 pub use crate::prelude::*;
-use cli::{CliCommand, Context as CliContext, FormatArgs};
+use cli::{
+	command::CliCommand,
+	context::{Context as CliContext, FormatArgs},
+};
 pub use comfy_table::{Cell, Table, presets::UTF8_FULL};
 use revelation::analyzer::*;
 ///--------------------------------------------------------------------------------
