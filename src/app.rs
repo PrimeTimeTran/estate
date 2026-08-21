@@ -15,7 +15,7 @@ use winit::{
 	application::ApplicationHandler,
 	dpi::{LogicalPosition, LogicalSize, PhysicalPosition, PhysicalSize},
 	event::WindowEvent,
-	event_loop::{ActiveEventLoop, EventLoop},
+	event_loop::{ActiveEventLoop, EventLoop, EventLoopProxy},
 	platform::macos::{ActivationPolicy, EventLoopBuilderExtMacOS},
 	window::{Window, WindowAttributes, WindowId, WindowLevel},
 };
@@ -78,9 +78,11 @@ impl App {
 		}
 	}
 	fn run_application(&mut self) -> anyhow::Result<()> {
-		let event_loop = EventLoop::builder()
+		let event_loop = EventLoop::<AppEvent>::with_user_event()
 			.with_activation_policy(ActivationPolicy::Accessory)
 			.build()?;
+
+		let proxy = event_loop.create_proxy();
 
 		let rx = self
 			.daemon_rx
@@ -89,11 +91,21 @@ impl App {
 
 		let engine = self.engine.clone();
 
+		// Tokio daemon
+		Self::start_daemon(engine, rx);
+
+		// Ctrl+C → winit
+		Self::start_signal_handler(proxy);
+
+		event_loop.run_app(self)?;
+
+		Ok(())
+	}
+	fn start_daemon(engine: EstateEngine, mut rx: mpsc::Receiver<DaemonCommand>) {
 		std::thread::spawn(move || {
 			let runtime = tokio::runtime::Runtime::new().expect("failed to create Tokio runtime");
 
 			runtime.block_on(async move {
-				let mut rx = rx;
 				let mut daemon = Daemon::new(engine);
 
 				tokio::select! {
@@ -103,23 +115,21 @@ impl App {
 						}
 					}
 
-					_ = tokio::signal::ctrl_c() => {
-						tracing::info!("Ctrl-C received");
-
-						if let Err(error) = daemon.shutdown().await {
-							tracing::error!(%error, "daemon shutdown failed");
-						}
-					}
-
 					command = rx.recv() => {
 						match command {
 							Some(DaemonCommand::Stop) => {
-								tracing::info!("stopping daemon");
-								let _ = daemon.shutdown().await;
+								tracing::info!("🛑 daemon stop requested");
+
+								if let Err(error) = daemon.shutdown().await {
+									tracing::error!(
+										%error,
+										"daemon shutdown failed"
+									);
+								}
 							}
 
 							None => {
-								tracing::warn!("daemon command channel closed");
+								tracing::info!("daemon command channel closed");
 								let _ = daemon.shutdown().await;
 							}
 						}
@@ -127,41 +137,24 @@ impl App {
 				}
 			});
 		});
-
-		event_loop.run_app(self)?;
-
-		Ok(())
 	}
-	async fn start_daemon(&self, mut rx: mpsc::Receiver<DaemonCommand>) -> anyhow::Result<()> {
-		tracing::info!("start_daemon");
-		let mut daemon = Daemon::new(self.engine.clone());
-
-		tokio::select! {
-			result = daemon.run_foreground() => {
-				result?;
-			}
-
-			_ = tokio::signal::ctrl_c() => {
-				tracing::info!("Ctrl-C received");
-				daemon.shutdown().await?;
-			}
-
-			command = rx.recv() => {
-				match command {
-					Some(DaemonCommand::Stop) => {
-						tracing::info!("stopping daemon");
-						daemon.shutdown().await?;
-					}
-
-					None => {
-						tracing::warn!("daemon command channel closed");
-						daemon.shutdown().await?;
-					}
+	fn start_signal_handler(proxy: EventLoopProxy<AppEvent>) {
+		std::thread::spawn(move || {
+			let runtime = tokio::runtime::Runtime::new().expect("failed to create Tokio runtime");
+			runtime.block_on(async move {
+				if let Err(error) = tokio::signal::ctrl_c().await {
+					tracing::error!(
+						%error,
+						"failed to listen for Ctrl+C"
+					);
+					return;
 				}
-			}
-		}
 
-		Ok(())
+				tracing::info!("🛑 Ctrl+C received");
+
+				let _ = proxy.send_event(AppEvent::Shutdown);
+			});
+		});
 	}
 	fn bootstrap() -> anyhow::Result<(TrayMenu, TrayIcon)> {
 		let menu = Menu::new();
@@ -209,141 +202,32 @@ impl App {
 			tray,
 		))
 	}
-	async fn shutdown(&mut self) -> anyhow::Result<()> {
-		tracing::info!(
-			target: "estate::app",
-			"shutting down"
-		);
-		self.daemon_tx.send(DaemonCommand::Stop).await?;
-		Ok(())
+	fn shutdown(&mut self, event_loop: &ActiveEventLoop) {
+		tracing::info!("🛑 App shutting down");
+		let _ = self.daemon_tx.try_send(DaemonCommand::Stop);
+		event_loop.exit();
 	}
-}
-impl App {
-	fn show_tasks(&self) {
-		println!("Estate Tasks");
-	}
-	fn new_task(&mut self) {
-		println!("Creating task...");
-	}
-	fn clear_tasks(&mut self) {
-		println!("Clearing tasks...");
-	}
-	fn tray_icon() -> Icon {
-		let image = image::load_from_memory(constants::TRAY_ICON)
-			.expect("failed to load generated tray icon")
-			.into_rgba8();
-		let (width, height) = image.dimensions();
-		Icon::from_rgba(image.into_raw(), width, height).expect("failed to create tray icon")
-	}
-	#[tracing::instrument(
-		target = "estate::discovery",
-		name = "scan_workspace",
-		skip(self),
-		fields(flow_id = %Uuid::now_v7())
-	)]
-	async fn scan_workspace(&mut self, path: &Path) -> anyhow::Result<()> {
-		tracing::info!("starting workspace scan");
-		self.discover(path).await?;
-		tracing::debug!("discovery complete");
-		self.analyze().await?;
-		tracing::debug!("analysis complete");
-		self.build_graph().await?;
-		tracing::info!("workspace scan complete");
-		Ok(())
-	}
-	#[tracing::instrument(target = "estate::discovery", skip(self, path))]
-	async fn discover(&mut self, path: &Path) -> anyhow::Result<()> {
-		tracing::debug!(path = %path.display(), "discovering workspace");
-		Ok(())
-	}
-	#[tracing::instrument(target = "estate::analysis", skip(self))]
-	async fn analyze(&mut self) -> anyhow::Result<()> {
-		tracing::debug!("analyzing workspace");
-		Ok(())
-	}
-	#[tracing::instrument(target = "estate::graph", skip(self))]
-	async fn build_graph(&mut self) -> anyhow::Result<()> {
-		tracing::debug!("building semantic graph");
-		Ok(())
-	}
-
-	// fn handle_menu_event(&mut self, event: MenuEvent, event_loop: &ActiveEventLoop) {
-	// 	let Some(menu) = self.menu.as_ref() else {
-	// 		tracing::warn!("menu event received before menu initialization");
-	// 		return;
-	// 	};
-
-	// 	if event.id() == menu.quit.id() {
-	// 		tracing::info!(">>> quit menu item");
-
-	// 		let _ = self.daemon_tx.try_send(DaemonCommand::Stop);
-	// 		event_loop.exit();
-	// 	} else if event.id() == menu.dev.id() {
-	// 		self.show_dev_info(event_loop);
-	// 	} else if event.id() == menu.new_task.id() {
-	// 		tracing::info!(">>> new task");
-	// 		self.new_task();
-	// 	} else if event.id() == menu.list_tasks.id() {
-	// 		tracing::info!(">>> list tasks");
-	// 		self.show_tasks();
-	// 	} else if event.id() == menu.clear_tasks.id() {
-	// 		tracing::info!(">>> clear tasks");
-	// 		self.clear_tasks();
-	// 	}
-	// }
 	fn handle_menu_event(&mut self, event: MenuEvent, event_loop: &ActiveEventLoop) {
 		let Some(menu) = self.menu.as_ref() else {
 			return;
 		};
-
-		match () {
-			_ if event.id() == menu.quit.id() => {
-				let _ = self.daemon_tx.try_send(DaemonCommand::Stop);
-				event_loop.exit();
-			}
-
-			_ if event.id() == menu.dev.id() => {
-				self.show_dev_info(event_loop);
-			}
-
-			_ if event.id() == menu.new_task.id() => {
-				self.new_task();
-			}
-
-			_ if event.id() == menu.list_tasks.id() => {
-				self.show_tasks();
-			}
-
-			_ if event.id() == menu.clear_tasks.id() => {
-				self.clear_tasks();
-			}
-
-			_ => {}
-		}
-	}
-	fn show_dev_info(&mut self, event_loop: &ActiveEventLoop) {
-		match DevWindow::new(event_loop) {
-			Ok(window) => {
-				tracing::info!(">>> DevWindow created: {:?}", window.window.id());
-				self
-					.engine
-					.runtime
-					.emit(Event::app(EventKind::CommandExecuted {
-						command: "dev_info".into(),
-					}));
-				// self
-				// 	.engine
-				// 	.runtime
-				// 	.emit(Event::daemon(EventKind::StatusRequested));
-				self.dev_window = Some(window);
-			}
-			Err(e) => {
-				tracing::error!(">>> DevWindow creation failed: {e:#}");
-			}
+		let id = event.id();
+		if id == menu.quit.id() {
+			tracing::info!("🛑 Quit requested");
+			let _ = self.daemon_tx.try_send(DaemonCommand::Stop);
+			event_loop.exit();
+		} else if id == menu.dev.id() {
+			self.show_dev_info(event_loop);
+		} else if id == menu.new_task.id() {
+			self.new_task();
+		} else if id == menu.list_tasks.id() {
+			self.show_tasks();
+		} else if id == menu.clear_tasks.id() {
+			self.clear_tasks();
 		}
 	}
 }
-impl ApplicationHandler for App {
+impl ApplicationHandler<AppEvent> for App {
 	fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
 		while let Ok(event) = MenuEvent::receiver().try_recv() {
 			self.handle_menu_event(event, event_loop);
@@ -439,6 +323,84 @@ impl ApplicationHandler for App {
 				tracing::info!("DEV >>> CloseRequested");
 			}
 			_ => {}
+		}
+	}
+	fn user_event(&mut self, event_loop: &ActiveEventLoop, event: AppEvent) {
+		match event {
+			AppEvent::Shutdown => {
+				self.shutdown(event_loop);
+			}
+		}
+	}
+}
+impl App {
+	fn show_tasks(&self) {
+		println!("Estate Tasks");
+	}
+	fn new_task(&mut self) {
+		println!("Creating task...");
+	}
+	fn clear_tasks(&mut self) {
+		println!("Clearing tasks...");
+	}
+	fn tray_icon() -> Icon {
+		let image = image::load_from_memory(constants::TRAY_ICON)
+			.expect("failed to load generated tray icon")
+			.into_rgba8();
+		let (width, height) = image.dimensions();
+		Icon::from_rgba(image.into_raw(), width, height).expect("failed to create tray icon")
+	}
+	#[tracing::instrument(
+		target = "estate::discovery",
+		name = "scan_workspace",
+		skip(self),
+		fields(flow_id = %Uuid::now_v7())
+	)]
+	async fn scan_workspace(&mut self, path: &Path) -> anyhow::Result<()> {
+		tracing::info!("starting workspace scan");
+		self.discover(path).await?;
+		tracing::debug!("discovery complete");
+		self.analyze().await?;
+		tracing::debug!("analysis complete");
+		self.build_graph().await?;
+		tracing::info!("workspace scan complete");
+		Ok(())
+	}
+	#[tracing::instrument(target = "estate::discovery", skip(self, path))]
+	async fn discover(&mut self, path: &Path) -> anyhow::Result<()> {
+		tracing::debug!(path = %path.display(), "discovering workspace");
+		Ok(())
+	}
+	#[tracing::instrument(target = "estate::analysis", skip(self))]
+	async fn analyze(&mut self) -> anyhow::Result<()> {
+		tracing::debug!("analyzing workspace");
+		Ok(())
+	}
+	#[tracing::instrument(target = "estate::graph", skip(self))]
+	async fn build_graph(&mut self) -> anyhow::Result<()> {
+		tracing::debug!("building semantic graph");
+		Ok(())
+	}
+
+	fn show_dev_info(&mut self, event_loop: &ActiveEventLoop) {
+		match DevWindow::new(event_loop) {
+			Ok(window) => {
+				tracing::info!(">>> DevWindow created: {:?}", window.window.id());
+				self
+					.engine
+					.runtime
+					.emit(Event::app(EventKind::CommandExecuted {
+						command: "dev_info".into(),
+					}));
+				// self
+				// 	.engine
+				// 	.runtime
+				// 	.emit(Event::daemon(EventKind::StatusRequested));
+				self.dev_window = Some(window);
+			}
+			Err(e) => {
+				tracing::error!(">>> DevWindow creation failed: {e:#}");
+			}
 		}
 	}
 }
@@ -1581,4 +1543,9 @@ impl DevWindow {
 				}
 			});
 	}
+}
+
+#[derive(Debug)]
+enum AppEvent {
+	Shutdown,
 }
