@@ -1,4 +1,5 @@
 use crate::{prelude::*, router, ve};
+
 use egui::{Context as EguiContext, PopupAnchor::Position, TexturesDelta, Ui};
 use egui_wgpu::{
 	Renderer, SurfaceConfig,
@@ -66,7 +67,10 @@ pub struct App {
 	pub windows: Vec<Window>,
 	pub dashboard_window: Option<Window>,
 	pub telemetry_window: Option<Window>,
+	pub clock: Option<Window>,
 }
+use std::sync::atomic::{AtomicBool, Ordering};
+static HOTKEY_INITIALIZED: AtomicBool = AtomicBool::new(false);
 impl App {
 	pub fn new() -> anyhow::Result<Self> {
 		let engine = EstateEngine::new()?;
@@ -74,6 +78,7 @@ impl App {
 		let (daemon_tx, daemon_rx) = mpsc::channel(100);
 		Ok(Self {
 			context,
+			clock: None,
 			daemon: None,
 			daemon_rx: Some(daemon_rx),
 			daemon_tx,
@@ -91,7 +96,6 @@ impl App {
 			None | Some(Command::Start { .. }) | Some(Command::Tray) => self.run_application(),
 			Some(_) => {
 				let runtime = tokio::runtime::Runtime::new()?;
-
 				runtime.block_on(async {
 					let ctx = cli::context::Context::new();
 					router::execute(cli, ctx, self.engine.clone()).await
@@ -100,11 +104,15 @@ impl App {
 		}
 	}
 	fn run_application(&mut self) -> anyhow::Result<()> {
+		setup_global_shortcuts();
 		let event_loop = EventLoop::<AppEvent>::with_user_event()
 			.with_activation_policy(ActivationPolicy::Accessory)
 			.build()?;
-
 		let proxy = event_loop.create_proxy();
+		let proxy_for_daemon = proxy.clone();
+		std::thread::spawn(move || {
+			start_global_scroll_daemon(proxy_for_daemon);
+		});
 
 		let rx = self
 			.daemon_rx
@@ -112,12 +120,23 @@ impl App {
 			.expect("daemon receiver already consumed");
 
 		let engine = self.engine.clone();
-
-		// Tokio daemon
 		Self::start_daemon(engine, rx);
+		Self::start_signal_handler(proxy.clone());
+		let proxy_ticker = proxy.clone();
+		std::thread::spawn(move || {
+			let mut current_time = 30;
+			loop {
+				let text = format!(" {}s", current_time);
+				let _ = proxy_ticker.send_event(AppEvent::TickClock(text));
 
-		// Ctrl+C → winit
-		Self::start_signal_handler(proxy);
+				if current_time == 0 {
+					current_time = 30;
+				} else {
+					current_time -= 1;
+				}
+				std::thread::sleep(std::time::Duration::from_secs(1));
+			}
+		});
 
 		event_loop.run_app(self)?;
 
@@ -126,7 +145,6 @@ impl App {
 	fn start_daemon(engine: EstateEngine, mut rx: mpsc::Receiver<DaemonCommand>) {
 		std::thread::spawn(move || {
 			let runtime = tokio::runtime::Runtime::new().expect("failed to create Tokio runtime");
-
 			runtime.block_on(async move {
 				let mut daemon = Daemon::new(engine);
 
@@ -140,8 +158,6 @@ impl App {
 					command = rx.recv() => {
 						match command {
 							Some(DaemonCommand::Stop) => {
-								tracing::info!("🛑 daemon stop requested");
-
 								if let Err(error) = daemon.shutdown().await {
 									tracing::error!(
 										%error,
@@ -171,15 +187,13 @@ impl App {
 					);
 					return;
 				}
-
-				tracing::info!("🛑 Ctrl+C received");
-
 				let _ = proxy.send_event(AppEvent::Shutdown);
 			});
 		});
 	}
 	fn bootstrap() -> anyhow::Result<(TrayMenu, TrayIcon)> {
 		let menu = Menu::new();
+		let clock_item = MenuItem::new("Clock: 30s", true, None);
 		let status = MenuItem::new("● Estate Daemon Running", false, None);
 		let dev = MenuItem::new("Open Dashboard", true, None);
 		let telemetry = MenuItem::new("Open Telemetry Inspector", true, None);
@@ -191,17 +205,20 @@ impl App {
 		tasks.append(&list_tasks)?;
 		tasks.append(&clear_tasks)?;
 		let quit = MenuItem::new("Quit", true, None);
+		menu.append(&clock_item)?;
 		menu.append(&status)?;
 		menu.append(&dev)?;
 		menu.append(&telemetry)?;
 		menu.append(&tasks)?;
 		menu.append(&quit)?;
+
 		let tray = TrayIconBuilder::new()
 			.with_icon(Self::tray_icon())
 			.with_menu(Box::new(menu))
 			.with_tooltip("Estate Daemon — Running")
 			.build()
 			.map_err(|e| anyhow::anyhow!("failed to create tray icon: {e}"))?;
+
 		Ok((
 			TrayMenu {
 				clear_tasks,
@@ -217,7 +234,6 @@ impl App {
 		))
 	}
 	fn shutdown(&mut self, event_loop: &ActiveEventLoop) {
-		tracing::info!("🛑 App shutting down");
 		let _ = self.daemon_tx.try_send(DaemonCommand::Stop);
 		event_loop.exit();
 	}
@@ -231,10 +247,8 @@ impl App {
 			let _ = self.daemon_tx.try_send(DaemonCommand::Stop);
 			event_loop.exit();
 		} else if id == menu.dev.id() {
-			tracing::info!("AppWindowType::Dashboard from id == menu.dev.id()");
 			self.open_named_window(event_loop, AppWindowType::Dashboard);
 		} else if id == menu.telemetry.id() {
-			tracing::info!("AppWindowType::TelemetryInspector from id == menu.telemetry.id()");
 			self.open_named_window(event_loop, AppWindowType::TelemetryInspector);
 		} else if id == menu.new_task.id() {
 			self.new_task();
@@ -285,7 +299,38 @@ impl ApplicationHandler<AppEvent> for App {
 			self.handle_menu_event(event, event_loop);
 		}
 	}
+
 	fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+		// Inside your winit Application handler (`resumed`):
+		// if !HOTKEY_INITIALIZED.swap(true, Ordering::Relaxed) {
+		// 	std::thread::spawn(|| {
+		// 		std::thread::sleep(std::time::Duration::from_millis(100));
+
+		// 		if let Ok(manager) = global_hotkey::GlobalHotKeyManager::new() {
+		// 			let hotkey = global_hotkey::hotkey::HotKey::new(
+		// 				Some(global_hotkey::hotkey::Modifiers::SHIFT | global_hotkey::hotkey::Modifiers::ALT),
+		// 				global_hotkey::hotkey::Code::Digit1,
+		// 			);
+		// 			let id = hotkey.id();
+
+		// 			if manager.register(hotkey).is_ok() {
+		// 				println!("✨ Global hotkey successfully bound to live macOS run loop!");
+
+		// 				let receiver = global_hotkey::GlobalHotKeyEvent::receiver();
+		// 				loop {
+		// 					if let Ok(event) = receiver.try_recv() {
+		// 						if event.state == global_hotkey::HotKeyState::Pressed && event.id == id {
+		// 							println!("🔥 Global hotkey intercepted via live loop!");
+		// 							move_cursor_to(ScreenPosition::Left);
+		// 						}
+		// 					}
+		// 					std::thread::sleep(std::time::Duration::from_millis(10));
+		// 				}
+		// 			}
+		// 		}
+		// 	});
+		// }
+
 		if self.window.is_none() {
 			self.open_named_window(event_loop, AppWindowType::TelemetryInspector);
 		}
@@ -403,6 +448,18 @@ impl ApplicationHandler<AppEvent> for App {
 		match event {
 			AppEvent::Shutdown => {
 				self.shutdown(event_loop);
+			}
+			AppEvent::CursorPosition { x, y } => {
+				// <--- Is this match arm present?
+				let text = format!(" X: {:.0} | Y: {:.0}", x, y);
+				if let Some(tray) = &self.tray {
+					let _ = tray.set_title(Some(text));
+				}
+			}
+			AppEvent::TickClock(text) => {
+				if let Some(tray) = &self.tray {
+					let _ = tray.set_title(Some(text));
+				}
 			}
 		}
 	}
@@ -1444,8 +1501,10 @@ struct AppState {
 // 	}
 // }
 #[derive(Debug)]
-enum AppEvent {
+pub enum AppEvent {
 	Shutdown,
+	CursorPosition { x: f64, y: f64 },
+	TickClock(String),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -43,6 +43,8 @@ anyhow.workspace = true
 async-trait.workspace = true
 chrono.workspace = true
 comfy-table.workspace = true
+core-foundation.workspace = true
+core-graphics.workspace = true
 demand.workspace = true
 dirs.workspace = true
 egui-wgpu.workspace = true
@@ -50,9 +52,15 @@ egui-winit.workspace = true
 egui.workspace = true
 egui_plot.workspace = true
 futures.workspace = true
+global-hotkey.workspace = true
 image.workspace = true
 jsonschema.workspace = true
 lazy_static.workspace = true
+macos-accessibility-client.workspace = true
+notify.workspace = true
+objc2-app-kit.workspace = true
+objc2-foundation.workspace = true
+objc2.workspace = true
 pollster.workspace = true
 reqwest.workspace = true
 resvg.workspace = true
@@ -72,14 +80,6 @@ url.workspace = true
 uuid.workspace = true
 wgpu.workspace = true
 winit.workspace = true
-notify.workspace = true
-
-objc2 = "0.6.4"
-objc2-app-kit = "0.3.2"
-objc2-foundation = "0.3.2"
-
-core-foundation = "0.10.1"
-  core-graphics = {version="0.25.0",features = ["highsierra"]}
 
 [build-dependencies]
 resvg.workspace = true

@@ -1,8 +1,10 @@
 use crate::prelude::*;
+
 use egui::Ui;
 use egui_plot::{Line, PlotPoints, Points};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::sync::{Arc, Mutex};
+use winit::event_loop::EventLoopProxy;
 
 use egui::Context;
 use egui_plot::{Bar, BarChart, Plot};
@@ -238,25 +240,6 @@ impl DevSideTab {
 		}
 	}
 }
-
-// #[derive(Clone, Debug)]
-// pub struct Window {
-// 	pub is_visible: bool,
-// 	pub preview: Preview,
-// }
-// impl Default for Window {
-// 	fn default() -> Self {
-// 		Self {
-// 			is_visible: true,
-// 			preview: Preview::default(),
-// 		}
-// 	}
-// }
-// use std::fs;
-// use std::path::Path;
-
-// use anyhow::Result;
-// use serde::Deserialize;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct ChartsFile {
@@ -703,24 +686,6 @@ impl Graphics {
 	// 	});
 	// }
 	fn draw_ui(&mut self, ui: &mut egui::Ui) {
-		// 1. Gather clean trackpad/input data using the helper
-		let trackpad = self.inspect_trackpad(ui);
-
-		// Request repaint if active movement happens
-		if trackpad.direction != ScrollDirection::None {
-			ui.ctx().request_repaint();
-		}
-
-		// 2. Render diagnostic HUD
-		self.draw_trackpad_poc_hud(ui, &trackpad);
-		ui.separator();
-
-		// 3. Example logic layout for future redirection overrides
-		// (e.g., if shift is held and scrolling vertically, redirect to horizontal/custom logic)
-		if trackpad.shift_held {
-			// TODO: Apply your target sub-view override here
-		}
-
 		if let Some(error) = &self.error {
 			self.draw_error(ui, error);
 			return;
@@ -808,116 +773,6 @@ impl Veable for Graphics {
 		});
 	}
 }
-impl Graphics {
-	/// Polls current frame inputs and extracts structured trackpad data.
-	pub fn inspect_trackpad(&self, ui: &egui::Ui) -> TrackpadState {
-		ui.input(|i| {
-			let delta = i.smooth_scroll_delta;
-			let shift_held = i.modifiers.shift;
-			let mouse_pos = i.pointer.hover_pos();
-
-			let direction = if delta.x == 0.0 && delta.y == 0.0 {
-				ScrollDirection::None
-			} else if delta.x.abs() > delta.y.abs() {
-				if delta.x > 0.0 {
-					ScrollDirection::Right
-				} else {
-					ScrollDirection::Left
-				}
-			} else {
-				if delta.y > 0.0 {
-					ScrollDirection::Down
-				} else {
-					ScrollDirection::Up
-				}
-			};
-
-			TrackpadState {
-				delta,
-				direction,
-				shift_held,
-				mouse_pos,
-			}
-		})
-	}
-
-	/// Helper to check if the mouse is hovering inside a specific target rect
-	pub fn is_mouse_over(state: &TrackpadState, target_rect: egui::Rect) -> bool {
-		if let Some(pos) = state.mouse_pos {
-			target_rect.contains(pos)
-		} else {
-			false
-		}
-	}
-
-	/// Optional helper to draw a quick diagnostic heads-up display overlay
-	pub fn draw_trackpad_poc_hud(&self, ui: &mut egui::Ui, state: &TrackpadState) {
-		ui.group(|ui| {
-			ui.heading("Trackpad PoC Diagnostics");
-			ui.horizontal(|ui| {
-				ui.label(format!("Direction: {:?}", state.direction));
-				ui.separator();
-				ui.label(format!("Shift Held: {}", state.shift_held));
-			});
-			ui.label(format!(
-				"Delta X: {:.2} | Delta Y: {:.2}",
-				state.delta.x, state.delta.y
-			));
-			if let Some(pos) = state.mouse_pos {
-				ui.label(format!("Mouse Position: x={:.1}, y={:.1}", pos.x, pos.y));
-			}
-		});
-	}
-	pub fn determine_focus(
-		&self,
-		mouse_pos: Option<egui::Pos2>,
-		main_rect: egui::Rect,
-		side_rect: egui::Rect,
-	) -> FocusedPane {
-		if let Some(pos) = mouse_pos {
-			if main_rect.contains(pos) {
-				FocusedPane::MainEditor
-			} else if side_rect.contains(pos) {
-				FocusedPane::SidePanel
-			} else {
-				FocusedPane::CenterGrid
-			}
-		} else {
-			FocusedPane::Unknown
-		}
-	}
-
-	/// Handles layout resizing or cross-scrolling based on gestures + shift
-	pub fn handle_shift_gestures(&mut self, trackpad: &TrackpadState, focus: FocusedPane) {
-		if !trackpad.shift_held {
-			return;
-		}
-
-		match focus {
-			FocusedPane::MainEditor => {
-				// Goal: Move left/right to expand/shrink side panel
-				if trackpad.delta.x.abs() > 0.0 {
-					// Scale width changes smoothly based on horizontal trackpad delta
-					self.side_panel_width = (self.side_panel_width - trackpad.delta.x).clamp(150.0, 600.0);
-				}
-
-				// Goal: Scroll the *other* column/panel vertically
-				if trackpad.delta.y.abs() > 0.0 {
-					self.secondary_scroll_offset += trackpad.delta.y;
-					// Clamp or handle your cross-scroll target here
-				}
-			}
-			FocusedPane::SidePanel => {
-				// Reverse behavior when your mouse is in the side panel
-				if trackpad.delta.x.abs() > 0.0 {
-					self.side_panel_width = (self.side_panel_width + trackpad.delta.x).clamp(150.0, 600.0);
-				}
-			}
-			_ => {}
-		}
-	}
-}
-
 /// Telemetry
 pub struct Oracle {
 	scroll_x: f32,
@@ -935,7 +790,7 @@ impl Oracle {
 		let path = "/Users/future/kb/project/crates/estate/src/data/chart.json";
 		Self::from_path(path)
 	}
-	pub fn from_path(path: impl Into<PathBuf>) -> Self {
+	fn from_path(path: impl Into<PathBuf>) -> Self {
 		let data_path = path.into();
 		let (tx, rx) = tokio::sync::mpsc::channel::<()>(1);
 		let mut oracle = Self {
@@ -1225,6 +1080,9 @@ impl Veable for Oracle {
 			// Request a continuous repaint so the timer increments live every second
 			ui.ctx()
 				.request_repaint_after(std::time::Duration::from_secs(1));
+			if ui.button("Teleport Cursor to Center").clicked() {
+				move_cursor_to(ScreenPosition::Center);
+			}
 		});
 	}
 }
@@ -1269,36 +1127,58 @@ use core_graphics::{
 use std::sync::atomic::{AtomicBool, Ordering};
 static SHIFT_HELD: AtomicBool = AtomicBool::new(false);
 
-pub fn start_global_scroll_daemon() {
-	tracing::info!("start_global_scroll_daemon");
-	// 1. Create a shared container for our event tap handle
-	let tap_container: Arc<Mutex<Option<Arc<CGEventTap>>>> = Arc::new(Mutex::new(None));
-	let tap_container_clone = Arc::clone(&tap_container);
-	let callback =
-		|_proxy: CGEventTapProxy, event_type: CGEventType, event: &CGEvent| -> CallbackResult {
-			// QUICK DEBUG CHECK
-			eprintln!("Event received: {:?}", event_type);
+pub fn start_global_scroll_daemon(proxy: EventLoopProxy<AppEvent>) {
+	let trusted = macos_accessibility_client::accessibility::application_is_trusted_with_prompt();
+	if !trusted {
+		eprintln!("❌ App is not trusted for accessibility/input monitoring.");
+		return;
+	}
+	println!("✅ App is trusted! Initializing event tap with keyboard/mouse listeners...");
 
+	let callback =
+		move |_proxy_cg: CGEventTapProxy, event_type: CGEventType, event: &CGEvent| -> CallbackResult {
 			match event_type {
+				CGEventType::MouseMoved => {
+					let location = event.location();
+					let _ = proxy.send_event(AppEvent::CursorPosition {
+						x: location.x,
+						y: location.y,
+					});
+					CallbackResult::Keep
+				}
 				CGEventType::FlagsChanged => {
 					let flags = event.get_flags();
 					let shift_is_down = flags.contains(core_graphics::event::CGEventFlags::CGEventFlagShift);
-					println!("Shift held state: {}", shift_is_down);
 					SHIFT_HELD.store(shift_is_down, Ordering::Relaxed);
 					CallbackResult::Keep
 				}
+				// --- 🟢 LISTEN FOR KEY PRESSES (1, 2, 3) ---
+				CGEventType::KeyDown => {
+					let keycode =
+						event.get_integer_value_field(core_graphics::event::EventField::KEYBOARD_EVENT_KEYCODE);
+					match keycode {
+						18 => {
+							println!("Key '1' pressed -> Jumping Left!");
+							move_cursor_to(ScreenPosition::Left);
+						}
+						19 => {
+							println!("Key '2' pressed -> Jumping Center!");
+							move_cursor_to(ScreenPosition::Center);
+						}
+						20 => {
+							println!("Key '3' pressed -> Jumping Right!");
+							move_cursor_to(ScreenPosition::Right);
+						}
+						_ => {}
+					}
+					CallbackResult::Keep
+				}
+				// ---------------------------------------------
 				CGEventType::ScrollWheel => {
-					eprintln!(
-						"Scroll detected! Shift held? {}",
-						SHIFT_HELD.load(Ordering::Relaxed)
-					);
 					if SHIFT_HELD.load(Ordering::Relaxed) {
 						let location = event.location();
-						eprintln!("Cursor X position: {}", location.x);
-
 						if location.x < 960.0 {
 							if let Some(synth) = redirect_scroll(event) {
-								eprintln!("Redirecting scroll event!");
 								synth.post(CGEventTapLocation::HID);
 							}
 							return CallbackResult::Drop;
@@ -1309,50 +1189,46 @@ pub fn start_global_scroll_daemon() {
 				_ => CallbackResult::Keep,
 			}
 		};
-	// Instead of passing a vec of specific event types, pass AllEvents
-	// to avoid the core-graphics bitshift overflow bug:
-	// Construct the mask manually using raw bits to avoid the crate's internal overflow macro
-	let event_mask =
-		(1u64 << (CGEventType::ScrollWheel as u32)) | (1u64 << (CGEventType::FlagsChanged as u32));
-	// Omit TapDisabledByTimeout if it causes an overflow index value,
-	// or include it safely if its discriminant is within 0-63:
-	// | (1u64 << (CGEventType::TapDisabledByTimeout as u32));
 
-	if let Ok(tap) = CGEventTap::new(
+	// Include KeyDown alongside mouse events in the tap mask/vector
+	let tap = CGEventTap::new(
 		CGEventTapLocation::HID,
 		CGEventTapPlacement::HeadInsertEventTap,
 		CGEventTapOptions::Default,
 		vec![
 			CGEventType::ScrollWheel,
 			CGEventType::FlagsChanged,
-			// DO NOT pass CGEventType::TapDisabledByTimeout here,
-			// as its internal enum value triggers the shift overflow panic.
+			CGEventType::MouseMoved,
+			CGEventType::KeyDown,
 		],
 		callback,
-	) {
-		let tap = Arc::new(tap);
+	);
 
-		// Store it so the closure can access it
-		if let Ok(mut guard) = tap_container.lock() {
-			*guard = Some(Arc::clone(&tap));
+	match tap {
+		Ok(t) => {
+			println!("SUCCESS: Global daemon CGEventTap created successfully!");
+			unsafe {
+				let port = t.mach_port();
+				let source = port
+					.create_runloop_source(0)
+					.expect("failed to create run loop source");
+
+				CFRunLoop::get_current().add_source(&source, kCFRunLoopCommonModes);
+				t.enable();
+
+				std::thread::spawn(move || {
+					CFRunLoop::run_current();
+				});
+			}
 		}
-		unsafe {
-			let port = tap.mach_port();
-			let source = port
-				.create_runloop_source(0)
-				.expect("failed to create run loop source");
-
-			CFRunLoop::get_current().add_source(&source, kCFRunLoopCommonModes);
-
-			tap.enable();
-
-			std::thread::spawn(move || {
-				CFRunLoop::run_current();
-			});
+		Err(e) => {
+			eprintln!(
+				"CRITICAL ERROR: CGEventTap creation failed: {:?} (Check Accessibility permissions!)",
+				e
+			);
 		}
 	}
 }
-
 fn redirect_scroll(original: &CGEvent) -> Option<CGEvent> {
 	let source = CGEventSource::new(CGEventSourceStateID::CombinedSessionState).ok()?;
 	let delta_y = original.get_integer_value_field(115);
@@ -1366,4 +1242,81 @@ fn redirect_scroll(original: &CGEvent) -> Option<CGEvent> {
 		0,
 	)
 	.ok()
+}
+use core_graphics::event::CGMouseButton;
+use core_graphics::geometry::CGPoint;
+
+#[derive(Debug, Copy, Clone)]
+pub enum ScreenPosition {
+	Left,
+	Center,
+	Right,
+}
+
+pub fn move_cursor_to(pos: ScreenPosition) {
+	let max_width = 1920.0; // Adjust to your primary display width
+	let center_y = 500.0;
+
+	let (x, y) = match pos {
+		ScreenPosition::Left => (max_width * 0.2, center_y),
+		ScreenPosition::Center => (max_width * 0.5, center_y),
+		ScreenPosition::Right => (max_width * 0.8, center_y),
+	};
+
+	let point = CGPoint { x, y };
+
+	if let Ok(source) = CGEventSource::new(CGEventSourceStateID::CombinedSessionState) {
+		if let Ok(event) =
+			CGEvent::new_mouse_event(source, CGEventType::MouseMoved, point, CGMouseButton::Left)
+		{
+			event.post(CGEventTapLocation::HID);
+			println!("✨ Teleported cursor to position: X={:.1}, Y={:.1}", x, y);
+		}
+	}
+}
+
+use global_hotkey::{
+	GlobalHotKeyEvent, GlobalHotKeyManager,
+	hotkey::{Code, HotKey, Modifiers},
+};
+use std::sync::OnceLock;
+static HOTKEY_MANAGER: OnceLock<GlobalHotKeyManager> = OnceLock::new();
+
+pub fn setup_global_shortcuts() {
+	dbg!("dbg setup_global_shortcuts");
+	eprintln!("eprintln setup_global_shortcuts");
+	println!("println setup_global_shortcuts");
+	let manager = GlobalHotKeyManager::new().expect("Failed to initialize GlobalHotKeyManager");
+
+	// Register Shift + Alt + 1
+	let hotkey_left = HotKey::new(Some(Modifiers::SHIFT | Modifiers::ALT), Code::Digit1);
+	let left_id = hotkey_left.id();
+
+	manager
+		.register(hotkey_left)
+		.expect("Failed to register hotkey");
+	println!("✨ Global hotkey (Shift + Alt + 1) registered and active!");
+
+	let _ = HOTKEY_MANAGER.set(manager);
+
+	std::thread::spawn(move || {
+		let receiver = GlobalHotKeyEvent::receiver();
+		loop {
+			if let Ok(event) = receiver.try_recv() {
+				if event.state == global_hotkey::HotKeyState::Pressed && event.id == left_id {
+					println!("🔥 Global Hotkey Triggered via OS Event!");
+
+					// 1. Trigger your cursor jump
+					move_cursor_to(ScreenPosition::Left);
+
+					// 2. Fire a native macOS notification banner to prove it caught the key combo
+					let _ = std::process::Command::new("osascript")
+						.arg("-e")
+						.arg("display notification \"Shift+Alt+1 intercepted!\" with title \"Estate Daemon\"")
+						.spawn();
+				}
+			}
+			std::thread::sleep(std::time::Duration::from_millis(10));
+		}
+	});
 }

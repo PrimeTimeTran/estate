@@ -14,12 +14,9 @@
 //! ```sh
 //! estate fmt path/to/file.rs
 //! ```
-
-use ::estate::{logger, prelude::*, ve};
+use estate::prelude::{logger, *};
 
 fn main() -> anyhow::Result<()> {
-	println!("Hiiiii main");
-	ve::start_global_scroll_daemon();
 	let cli = cli::context::parse();
 
 	let mut config = LogConfig::load()?;
