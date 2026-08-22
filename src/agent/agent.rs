@@ -3,8 +3,8 @@ use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::agent::{
-	ACTION_PROMPT, AgentEvent, AgentTools, Artifact, DECIDE_PROMPT, JSON_PROMPT, RuntimeEvent, Task,
-	TaskResult, TaskStatus, WorkspaceContext, build_sys_action, build_sys_prompt,
+	ACTION_PROMPT, AgentEvent, AgentTask, AgentTools, Artifact, DECIDE_PROMPT, JSON_PROMPT,
+	RuntimeEvent, TaskResult, TaskStatus, WorkspaceContext, build_sys_action, build_sys_prompt,
 };
 
 #[derive(Debug, Clone)]
@@ -33,7 +33,7 @@ impl Default for Agent {
 impl Agent {
 	pub async fn run_agent_loop(
 		&self,
-		task: Task,
+		task: AgentTask,
 		event_tx: UnboundedSender<RuntimeEvent>,
 	) -> anyhow::Result<TaskResult> {
 		let mut steps = 0;
@@ -166,7 +166,7 @@ pub struct AgentContext {
 	pub history: Vec<AgentObservation>,
 	pub artifacts: Vec<Artifact>,
 	pub logs: Vec<String>,
-	pub spawned_tasks: Vec<Task>,
+	pub spawned_tasks: Vec<AgentTask>,
 }
 
 impl AgentContext {

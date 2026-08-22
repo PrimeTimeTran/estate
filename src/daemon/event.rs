@@ -135,18 +135,55 @@ impl Event {
 
 #[derive(Debug, Clone, Deserialize, Hash, Serialize)]
 pub enum EventKind {
+	// ─────────────────────────────────────────────
+	// Daemon
+	// ─────────────────────────────────────────────
 	DaemonStarted,
 	DaemonStopped,
 	StatusRequested,
-	TaskRequested { task: Task },
-	TaskCompleted { task: Task },
+
+	// ─────────────────────────────────────────────
+	// Tasks
+	// ─────────────────────────────────────────────
+	TaskRequested { request: TaskRequest },
+
+	TaskCreated { task_id: TaskId, name: String },
+
+	TaskStarted { task_id: TaskId },
+
+	TaskCompleted { task_id: TaskId },
+
+	TaskFailed { task_id: TaskId, error: String },
+
+	TaskStopped { task_id: TaskId },
+
+	TaskDeleted { task_id: TaskId },
+
+	TasksCleared,
+
+	// ─────────────────────────────────────────────
+	// Commands
+	// ─────────────────────────────────────────────
 	CommandExecuted { command: String },
-	FileCreated { path: String },
-	FileModified { path: String },
-	FileDeleted { path: String },
-	EstateDiscovered { path: String },
-	EstateRemoved { path: String },
+
+	// ─────────────────────────────────────────────
+	// Files
+	// ─────────────────────────────────────────────
+	FileCreated { inode: Inode, path: String },
+
+	FileModified { inode: Inode, path: String },
+
+	FileDeleted { inode: Inode, path: String },
+
+	// ─────────────────────────────────────────────
+	// Estate / indexing
+	// ─────────────────────────────────────────────
+	EstateDiscovered { inode: Inode, path: String },
+
+	EstateRemoved { inode: Inode, path: String },
+
 	IndexUpdated { files_changed: u64 },
+
 	CacheInvalidated { reason: String },
 }
 
@@ -163,6 +200,7 @@ pub enum EventSource {
 pub struct EstateRuntime {
 	pub events: EventBus,
 	pub state: Arc<RwLock<EstateState>>,
+	pub tasks: Arc<RwLock<TaskManager>>,
 }
 
 impl Default for EstateRuntime {
@@ -176,6 +214,7 @@ impl EstateRuntime {
 		Self {
 			events: EventBus::new(),
 			state: Arc::new(RwLock::new(EstateState::load())),
+			tasks: Arc::new(RwLock::new(TaskManager::default())),
 		}
 	}
 	pub fn emit(&self, event: Event) {
@@ -257,14 +296,17 @@ impl EventDispatcher {
 }
 
 pub struct FileWatcherHandler;
-
 #[async_trait::async_trait]
 impl EventHandler for FileWatcherHandler {
 	async fn handle(&self, event: &Event, runtime: &EstateRuntime) {
-		if let EventKind::FileModified { path } = &event.kind {
-			println!("reindexing {}", path);
+		if let EventKind::FileModified { inode, path } = &event.kind {
+			println!("reindexing {:?} ({:?})", path, inode);
 			runtime.emit(Event::daemon(EventKind::IndexUpdated { files_changed: 1 }));
 		}
+		// if let EventKind::FileModified { inode: Inode, path: String } = &event.kind {
+		// 	println!("reindexing {:?}", path.clone());
+		// 	runtime.emit(Event::daemon(EventKind::IndexUpdated { files_changed: 1 }));
+		// }
 	}
 }
 
@@ -272,30 +314,64 @@ pub struct TaskHandler;
 #[async_trait::async_trait]
 impl EventHandler for TaskHandler {
 	async fn handle(&self, event: &Event, runtime: &EstateRuntime) {
-		let EventKind::TaskRequested { task } = &event.kind else {
+		let EventKind::TaskRequested { request } = &event.kind else {
 			return;
 		};
+		let task_id = match request {
+			TaskRequest::Create(kind) => {
+				let mut tasks = runtime.tasks.write().unwrap();
+				let task = tasks.create(kind.clone());
+				task
+			}
+			TaskRequest::Run(task_id) => *task_id,
+			_ => return,
+		};
 
-		println!("🔥 TaskHandler received: {:?}", task);
+		let task = {
+			let tasks = runtime.tasks.read().unwrap();
 
-		let task = task.clone();
+			let Some(task) = tasks.get(task_id).cloned() else {
+				tracing::warn!(%task_id, "requested task not found");
+				return;
+			};
+
+			task
+		};
+
+		{
+			let mut tasks = runtime.tasks.write().unwrap();
+
+			if let Some(task) = tasks.get_mut(task_id) {
+				task.status = crate::app::TaskStatus::Running;
+			}
+		}
+
+		runtime.emit(Event::daemon(EventKind::TaskStarted { task_id }));
+
 		let runtime = runtime.clone();
 
 		tokio::spawn(async move {
-			println!("🔥 TaskRunner starting: {:?}", task);
-			match TaskRunner::execute(task.clone()).await {
+			tracing::info!(
+				%task_id,
+				task = %task.name,
+				"task starting"
+			);
+
+			match TaskRunner::execute(task).await {
 				Ok(()) => {
-					println!("✅ TaskRunner completed: {:?}", task);
-					runtime.emit(Event::daemon(EventKind::TaskCompleted { task }));
+					runtime.emit(Event::daemon(EventKind::TaskCompleted { task_id }));
 				}
+
 				Err(error) => {
-					eprintln!("❌ TaskRunner failed: {error:?}");
+					runtime.emit(Event::daemon(EventKind::TaskFailed {
+						task_id,
+						error: error.to_string(),
+					}));
 				}
 			}
 		});
 	}
 }
-
 pub struct StateHandler;
 #[async_trait::async_trait]
 impl EventHandler for StateHandler {
@@ -344,27 +420,77 @@ impl EventHandler for CommandHandler {
 		println!("🔥 CommandHandler received: {command}");
 
 		match command.as_str() {
+			"task_create" => {
+				let task_id = {
+					let mut tasks = runtime.tasks.write().unwrap();
+					tasks.create(TaskKind::SyncBookmarks)
+				};
+
+				runtime.emit(Event::daemon(EventKind::TaskCreated {
+					task_id,
+					name: "Smoke Test Task".into(),
+				}));
+			}
+			"task_list" => {
+				let tasks = runtime.tasks.read().unwrap();
+
+				println!("════════════════════════════════════");
+				println!("             ESTATE TASKS");
+				println!("════════════════════════════════════");
+
+				if tasks.count() == 0 {
+					println!("No tasks in memory.");
+				} else {
+					for task in tasks.list() {
+						println!("[{}] {} — {:?}", task.id, task.name, task.status);
+					}
+				}
+
+				drop(tasks);
+
+				let state = EstateState::load();
+
+				println!();
+				println!("──────────── persisted state ────────────");
+				println!("starts:           {}", state.starts);
+				println!("status checks:    {}", state.status_checks);
+				println!("tasks completed:  {}", state.tasks_completed);
+				println!("files indexed:    {}", state.files_indexed);
+				println!("events processed: {}", state.events_processed);
+				println!("longest run:      {}", state.longest_run);
+				println!("started at:       {}", state.started_at);
+
+				runtime.emit(Event::daemon(EventKind::StatusRequested));
+			}
+			"task_clear" => {
+				{
+					let mut tasks = runtime.tasks.write().unwrap();
+					tasks.clear();
+				}
+
+				runtime.emit(Event::daemon(EventKind::TasksCleared));
+			}
 			"dev_info" => {
 				runtime.emit(Event::daemon(EventKind::TaskRequested {
-					task: Task::BuildEstatePrototype,
+					request: TaskRequest::Create(TaskKind::BuildEstatePrototype),
 				}));
 			}
 
 			"rebuild_index" => {
 				runtime.emit(Event::daemon(EventKind::TaskRequested {
-					task: Task::RebuildIndex,
+					request: TaskRequest::Create(TaskKind::RebuildIndex),
 				}));
 			}
 
 			"sync_bookmarks" => {
 				runtime.emit(Event::daemon(EventKind::TaskRequested {
-					task: Task::SyncBookmarks,
+					request: TaskRequest::Create(TaskKind::SyncBookmarks),
 				}));
 			}
 
 			"generate_dashboard" => {
 				runtime.emit(Event::daemon(EventKind::TaskRequested {
-					task: Task::GenerateView("dashboard".into()),
+					request: TaskRequest::Create(TaskKind::GenerateView("dashboard".into())),
 				}));
 			}
 
@@ -376,13 +502,31 @@ impl EventHandler for CommandHandler {
 }
 
 #[derive(Debug, Clone, Deserialize, Hash, Serialize)]
-pub enum Task {
+pub enum TaskKind {
 	RebuildIndex,
 	GenerateView(String),
 	SyncBookmarks,
 	BuildEstatePrototype,
 }
-
+impl TaskKind {
+	pub fn name(&self) -> String {
+		match self {
+			TaskKind::RebuildIndex => "Rebuild Index".into(),
+			TaskKind::GenerateView(name) => {
+				format!("Generate View: {name}")
+			}
+			TaskKind::SyncBookmarks => "Sync Bookmarks".into(),
+			TaskKind::BuildEstatePrototype => "Build Estate Prototype".into(),
+		}
+	}
+}
+#[derive(Debug, Clone, Deserialize, Hash, Serialize)]
+pub enum TaskRequest {
+	Create(TaskKind),
+	Run(TaskId),
+	Stop(TaskId),
+	Delete(TaskId),
+}
 /// "Given this task, actually perform it."
 pub struct TaskRunner;
 
@@ -390,35 +534,32 @@ impl TaskRunner {
 	pub async fn execute(task: Task) -> anyhow::Result<()> {
 		println!("🔥 TaskRunner execute: {:?}", task);
 
-		match task {
-			Task::RebuildIndex => {
+		match task.kind {
+			TaskKind::RebuildIndex => {
 				println!("🔨 rebuilding index");
 
-				// TODO: perform index rebuild
 				tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
 				println!("✅ index rebuild complete");
 			}
 
-			Task::GenerateView(name) => {
+			TaskKind::GenerateView(name) => {
 				println!("👁️ generating view: {name}");
 
-				// TODO: generate the requested view
 				tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
 				println!("✅ view generated: {name}");
 			}
 
-			Task::SyncBookmarks => {
+			TaskKind::SyncBookmarks => {
 				println!("🔖 syncing bookmarks");
 
-				// TODO: synchronize bookmarks
 				tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
 				println!("✅ bookmark sync complete");
 			}
 
-			Task::BuildEstatePrototype => {
+			TaskKind::BuildEstatePrototype => {
 				println!("🚧 starting BuildEstatePrototype");
 
 				for i in 1..=10 {
@@ -443,3 +584,9 @@ fn now() -> u64 {
 }
 
 static EVENT_ID: AtomicU64 = AtomicU64::new(1);
+
+// #[derive(Debug, Clone, Deserialize, Hash, Serialize)]
+// pub enum TaskRequest {
+// 	Id(TaskId),
+// 	Task(Task),
+// }

@@ -55,7 +55,8 @@ pub struct Daemon {
 
 impl Daemon {
 	pub fn new(engine: EstateEngine) -> Self {
-		let runtime = EstateRuntime::new();
+		let runtime = engine.runtime.clone();
+
 		let mut dispatcher = EventDispatcher::new();
 		dispatcher.register(LogHandler);
 		dispatcher.register(StateHandler);
@@ -73,8 +74,11 @@ impl Daemon {
 impl Daemon {
 	pub async fn run_foreground(&mut self) -> anyhow::Result<()> {
 		tracing::info!("daemon running in foreground");
+
 		let mut rx = self.runtime.events.subscribe();
+
 		self.runtime.emit(Event::daemon(EventKind::DaemonStarted));
+
 		loop {
 			tokio::select! {
 				event = rx.recv() => {

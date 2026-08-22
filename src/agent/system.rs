@@ -1,7 +1,8 @@
 use tokio::sync::mpsc::{UnboundedReceiver, unbounded_channel};
 
-use crate::agent::{
-	AgentBus, AgentEvent, AgentRegistry, AgentRuntime, RuntimeEvent, Task, TaskResult,
+use crate::{
+	agent::{AgentBus, AgentEvent, AgentRegistry, AgentRuntime, AgentTask, RuntimeEvent, TaskResult},
+	app::Task,
 };
 
 #[derive(Debug, Clone)]
@@ -9,7 +10,7 @@ pub enum SystemEvent {
 	SpawnAgent { agent_id: String },
 
 	TaskAdd { task_id: String },
-	TaskSpawned { task: Task },
+	TaskSpawned { task: AgentTask },
 	TaskQueued { task_id: String },
 
 	TaskStarted { task_id: String },

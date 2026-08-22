@@ -1,7 +1,7 @@
 use crate::agent::AgentContext;
 
 #[derive(Debug, Clone)]
-pub struct Task {
+pub struct AgentTask {
 	pub id: String,
 	pub prompt: String,
 }
@@ -20,7 +20,7 @@ pub struct TaskResult {
 	pub summary: Option<String>,
 	pub artifacts: Vec<Artifact>,
 	pub logs: Vec<String>,
-	pub spawned_tasks: Vec<Task>,
+	pub spawned_tasks: Vec<AgentTask>,
 	pub chat: Option<String>,
 }
 
@@ -28,7 +28,7 @@ pub struct TaskContext {
 	pub task_id: String,
 	pub artifacts: Vec<Artifact>,
 	pub logs: Vec<String>,
-	pub spawned_tasks: Vec<Task>,
+	pub spawned_tasks: Vec<AgentTask>,
 }
 
 impl TaskResult {

@@ -1,4 +1,4 @@
-use crate::agent::{SystemEvent, Task, TaskResult};
+use crate::agent::{AgentTask, SystemEvent, TaskResult};
 
 #[derive(Clone, Debug)]
 pub enum RuntimeEvent {
@@ -8,11 +8,11 @@ pub enum RuntimeEvent {
 
 #[derive(Debug, Clone)]
 pub enum AgentEvent {
-	NewTask { task: Task },
-	Thinking { task: Task },
-	Working { task: Task, message: String },
+	NewTask { task: AgentTask },
+	Thinking { task: AgentTask },
+	Working { task: AgentTask, message: String },
 	Finished { result: TaskResult },
-	TaskEvent { task: Task, event: TaskEvent },
+	TaskEvent { task: AgentTask, event: TaskEvent },
 }
 
 #[derive(Debug, Clone)]

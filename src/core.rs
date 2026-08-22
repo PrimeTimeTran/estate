@@ -113,7 +113,7 @@ impl Estate {
 pub struct EstateDiscovery {
 	pub store: DiscoveryStore,
 	// pub tasks: DiscoveryStore,
-	pub task_tx: mpsc::Sender<Task>,
+	pub task_tx: mpsc::Sender<DiscoveryTask>,
 }
 impl Default for EstateDiscovery {
 	fn default() -> Self {
@@ -164,8 +164,8 @@ impl EstateDiscovery {
 	//
 	// Multiple producers can clone the sender and enqueue work.
 	// The worker runs concurrently and consumes tasks as they arrive.
-	pub fn prepare() -> mpsc::Sender<Task> {
-		let (tx, rx) = mpsc::channel::<Task>(100);
+	pub fn prepare() -> mpsc::Sender<DiscoveryTask> {
+		let (tx, rx) = mpsc::channel::<DiscoveryTask>(100);
 		tokio::spawn(worker(rx));
 		tx
 	}
@@ -219,7 +219,7 @@ pub struct DiscoveryStore {
 #[derive(Debug)]
 pub enum DiscoveryEvent {
 	Found(RawDiscovery),
-	StartTask(Task),
+	StartTask(DiscoveryTask),
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum EditorKind {
@@ -277,25 +277,25 @@ pub struct Probe {
 pub type ProbeSet = &'static [Probe];
 #[derive(Debug)]
 /// Async tasks triggerable by events
-pub enum Task {
+pub enum DiscoveryTask {
 	Index(PathBuf),
 	GenerateConfig(PathBuf),
 	Scan(PathBuf),
 }
-pub async fn worker(mut rx: mpsc::Receiver<Task>) {
+pub async fn worker(mut rx: mpsc::Receiver<DiscoveryTask>) {
 	while let Some(task) = rx.recv().await {
 		match task {
-			Task::Index(path) => {
+			DiscoveryTask::Index(path) => {
 				// Create an index of something....
 				println!("Indexing {:?}", path);
 				// simulate work
 				tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 				println!("Finished {:?}", path);
 			}
-			Task::GenerateConfig(path) => {
+			DiscoveryTask::GenerateConfig(path) => {
 				println!("Generating config {:?}", path);
 			}
-			Task::Scan(path) => {
+			DiscoveryTask::Scan(path) => {
 				println!("Scanning {:?}", path);
 			}
 		}

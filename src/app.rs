@@ -266,14 +266,6 @@ impl ApplicationHandler<AppEvent> for App {
 		let response = dev_window
 			.egui_state
 			.on_window_event(&dev_window.window, &event);
-
-		// tracing::info!(
-		// 	"EGUI EVENT: {:?}, consumed={}, repaint={}",
-		// 	event,
-		// 	response.consumed,
-		// 	response.repaint
-		// );
-
 		if response.repaint {
 			dev_window.window.request_redraw();
 		}
@@ -334,14 +326,33 @@ impl ApplicationHandler<AppEvent> for App {
 	}
 }
 impl App {
-	fn show_tasks(&self) {
-		println!("Estate Tasks");
+	fn show_tasks(&mut self) {
+		println!("Requesting task/status refresh...");
+
+		self
+			.engine
+			.runtime
+			.emit(Event::app(EventKind::CommandExecuted {
+				command: "task_list".into(),
+			}));
 	}
 	fn new_task(&mut self) {
 		println!("Creating task...");
+		self
+			.engine
+			.runtime
+			.emit(Event::app(EventKind::CommandExecuted {
+				command: "task_create".into(),
+			}));
 	}
 	fn clear_tasks(&mut self) {
 		println!("Clearing tasks...");
+		self
+			.engine
+			.runtime
+			.emit(Event::app(EventKind::CommandExecuted {
+				command: "task_clear".into(),
+			}));
 	}
 	fn tray_icon() -> Icon {
 		let image = image::load_from_memory(constants::TRAY_ICON)
@@ -792,7 +803,6 @@ fn build_egui(event_loop: &ActiveEventLoop) -> (EguiContext, EguiState) {
 	);
 	(egui_ctx, egui_state)
 }
-
 fn build_window(event_loop: &ActiveEventLoop) -> anyhow::Result<Arc<Window>> {
 	let attrs = Window::default_attributes()
 		.with_title("Estate Dev")
@@ -886,16 +896,6 @@ impl Context {
 		})
 	}
 }
-// #[derive(Clone, Debug)]
-// pub enum DaemonCommand {
-// 	Stop,
-// 	// Metrics,
-// 	// Restart,
-// 	// Refresh,
-// 	// Enable,
-// 	// Disable,
-// 	// Status,
-// }
 struct TrayMenu {
 	status: MenuItem,
 	dev: MenuItem,
@@ -905,26 +905,78 @@ struct TrayMenu {
 	clear_tasks: MenuItem,
 	quit: MenuItem,
 }
-#[derive(Clone, Default)]
-pub struct TaskManager {
-	tasks: HashMap<TaskId, Task>,
-}
+
 pub type TaskId = Uuid;
 
 #[derive(Debug, Clone)]
 pub struct Task {
 	pub id: TaskId,
 	pub name: String,
+	pub kind: TaskKind,
 	pub status: TaskStatus,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, Default)]
+pub struct TaskManager {
+	tasks: HashMap<TaskId, Task>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TaskStatus {
 	Pending,
 	Running,
 	Completed,
 	Failed,
 	Stopped,
+}
+
+impl TaskManager {
+	pub fn create(&mut self, kind: TaskKind) -> TaskId {
+		let id = Uuid::now_v7();
+		let task = Task {
+			id,
+			name: kind.name(),
+			kind,
+			status: TaskStatus::Pending,
+		};
+		self.tasks.insert(id, task);
+		id
+	}
+
+	pub fn get(&self, id: TaskId) -> Option<&Task> {
+		self.tasks.get(&id)
+	}
+
+	pub fn get_mut(&mut self, id: TaskId) -> Option<&mut Task> {
+		self.tasks.get_mut(&id)
+	}
+
+	pub fn list(&self) -> impl Iterator<Item = &Task> {
+		self.tasks.values()
+	}
+
+	pub fn set_status(&mut self, id: TaskId, status: TaskStatus) -> anyhow::Result<()> {
+		let task = self
+			.tasks
+			.get_mut(&id)
+			.ok_or_else(|| anyhow::anyhow!("task {id} not found"))?;
+
+		task.status = status;
+
+		Ok(())
+	}
+
+	pub fn delete(&mut self, id: TaskId) -> Option<Task> {
+		self.tasks.remove(&id)
+	}
+
+	pub fn clear(&mut self) {
+		self.tasks.clear();
+	}
+
+	pub fn count(&self) -> usize {
+		self.tasks.len()
+	}
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

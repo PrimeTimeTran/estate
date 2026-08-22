@@ -650,7 +650,7 @@ pub struct RemoteId(u64);
 // 		Self(self.0 + 1)
 // 	}
 // }
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Deserialize, Hash, Serialize)]
 pub struct Inode {
 	pub id: Uuid,
 	pub version: u64,
@@ -707,7 +707,7 @@ impl InodeStore {
 	}
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Deserialize, Serialize)]
 pub enum InodeKind {
 	File,
 	Directory,
