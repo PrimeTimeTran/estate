@@ -1,4 +1,4 @@
-use crate::{prelude::*, router};
+use crate::{prelude::*, router, ve};
 use egui::{Context as EguiContext, PopupAnchor::Position, TexturesDelta, Ui};
 use egui_wgpu::{
 	Renderer, SurfaceConfig,
@@ -47,6 +47,7 @@ pub struct App {
 	daemon: Option<Daemon>,
 	daemon_tx: mpsc::Sender<DaemonCommand>,
 	daemon_rx: Option<mpsc::Receiver<DaemonCommand>>,
+	window: ve::Window,
 }
 impl App {
 	pub fn new() -> anyhow::Result<Self> {
@@ -56,12 +57,13 @@ impl App {
 		Ok(Self {
 			tray: None,
 			menu: None,
-			context,
 			engine,
-			dev_window: None,
-			daemon: None,
+			context,
 			daemon_tx,
+			daemon: None,
+			dev_window: None,
 			daemon_rx: Some(daemon_rx),
+			window: ve::Window::default(),
 		})
 	}
 	pub fn run(&mut self, cli: Cli) -> anyhow::Result<()> {
@@ -217,7 +219,7 @@ impl App {
 			let _ = self.daemon_tx.try_send(DaemonCommand::Stop);
 			event_loop.exit();
 		} else if id == menu.dev.id() {
-			self.show_dev_info(event_loop);
+			self.open_primary_window(event_loop);
 		} else if id == menu.new_task.id() {
 			self.new_task();
 		} else if id == menu.list_tasks.id() {
@@ -233,7 +235,10 @@ impl ApplicationHandler<AppEvent> for App {
 			self.handle_menu_event(event, event_loop);
 		}
 	}
-	fn resumed(&mut self, _event_loop: &ActiveEventLoop) {
+	fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+		if self.window.is_visible {
+			self.open_primary_window(event_loop);
+		}
 		if self.tray.is_some() {
 			return;
 		}
@@ -393,7 +398,7 @@ impl App {
 		Ok(())
 	}
 
-	fn show_dev_info(&mut self, event_loop: &ActiveEventLoop) {
+	fn open_primary_window(&mut self, event_loop: &ActiveEventLoop) {
 		match DevWindow::new(event_loop) {
 			Ok(window) => {
 				tracing::info!(">>> DevWindow created: {:?}", window.window.id());

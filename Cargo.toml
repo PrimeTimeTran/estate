@@ -8,6 +8,10 @@ name = "estate"
 path = "src/bin/main.rs"
 
 [[bin]]
+name = "main"
+path = "src/main.rs"
+
+[[bin]]
 name = "init"
 path = "src/bin/init.rs"
 
@@ -30,33 +34,33 @@ chrono.workspace = true
 comfy-table.workspace = true
 demand.workspace = true
 dirs.workspace = true
-egui.workspace = true
+egui-wgpu.workspace = true
 egui-winit.workspace = true
+egui.workspace = true
+egui_plot.workspace = true
 futures.workspace = true
 image.workspace = true
 jsonschema.workspace = true
 lazy_static.workspace = true
+pollster.workspace = true
 reqwest.workspace = true
 resvg.workspace = true
 rmcp.workspace = true
-serde.workspace = true
 schemars.workspace = true
+serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true
+tokio-util.workspace = true
 tokio.workspace = true
 toml.workspace = true
 tower-lsp.workspace = true
-tracing.workspace = true
 tracing-subscriber.workspace = true
+tracing.workspace = true
 tray-icon.workspace = true
 url.workspace = true
 uuid.workspace = true
+wgpu.workspace = true
 winit.workspace = true
-egui-wgpu = "0.36.1"
-pollster = "1.0.1"
-wgpu = "30.0.0"
-tokio-util = "0.7.19"
-
 
 [build-dependencies]
 resvg.workspace = true

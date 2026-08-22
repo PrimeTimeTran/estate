@@ -1,0 +1,9 @@
+{
+  "title": "Sales",
+  "bars": [
+    { "label": "Jan", "value": 40 },
+    { "label": "Feb", "value": 70 },
+    { "label": "Mar", "value": 55 },
+    { "label": "Apr", "value": 90 }
+  ]
+}

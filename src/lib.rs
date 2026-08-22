@@ -108,6 +108,7 @@ pub mod router;
 pub mod vfs;
 pub mod logger;
 pub mod state;
+pub mod ve;
 
 // #[allow(dead_code)]
 // #[allow(unused_imports)] // Silences unused imports
