@@ -1,11 +1,12 @@
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
-use std::sync::Arc;
-use tokio::sync::mpsc::UnboundedSender;
-
-use crate::agent::{
-	ACTION_PROMPT, AgentEvent, AgentTask, AgentTools, Artifact, DECIDE_PROMPT, JSON_PROMPT,
-	RuntimeEvent, TaskResult, TaskStatus, WorkspaceContext, build_sys_action, build_sys_prompt,
+use crate::{
+	agent::{
+		ACTION_PROMPT, AgentEvent, AgentTools, DECIDE_PROMPT, JSON_PROMPT, RuntimeEvent,
+		WorkspaceContext, build_sys_action, build_sys_prompt,
+	},
+	job::{Artifact, TaskResult, TaskStatus},
+	prelude::*,
 };
+use serde::de::DeserializeOwned;
 
 #[derive(Debug, Clone)]
 pub struct Agent {
@@ -123,7 +124,6 @@ impl Agent {
 			_ => AgentMode::Chat,
 		})
 	}
-
 	async fn decide_next_action(&self, ctx: &AgentContext) -> anyhow::Result<AgentAction> {
 		let prompt = build_prompt(ctx);
 		let raw = build_action(&prompt).await?;
@@ -172,11 +172,11 @@ pub struct AgentContext {
 impl AgentContext {
 	pub fn new(user_prompt: String) -> Self {
 		Self {
-			prompt: user_prompt,
-			logs: vec![],
 			artifacts: vec![],
-			spawned_tasks: vec![],
 			history: vec![],
+			logs: vec![],
+			prompt: user_prompt,
+			spawned_tasks: vec![],
 			workspace: WorkspaceContext::default(),
 		}
 	}

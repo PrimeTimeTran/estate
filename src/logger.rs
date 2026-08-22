@@ -1,5 +1,4 @@
-use crate::prelude::*;
-use crate::{app::RuntimeMode, daemon::engine_data_dir};
+use crate::prelude::{daemon::engine_data_dir, *};
 
 use tracing::{Instrument, debug, error, info, info_span, warn};
 use tracing_subscriber::{
@@ -66,19 +65,15 @@ pub struct LogConfig {
 	pub file: OutputConfig,
 	pub targets: HashMap<String, LogLevel>,
 	// pub fields: LogFields,
-	// pub dev_window: OutputConfig,
+	// pub window: OutputConfig,
 }
 impl LogConfig {
 	pub fn apply_cli(&mut self, cli: &cli::context::Cli) -> anyhow::Result<()> {
 		match &cli.command {
-			cli::context::Command::Start { tail } => {
+			Some(cli::context::Command::Start { tail }) => {
 				if *tail {
 					self.terminal.enabled = true;
 				}
-				// if *tail {
-				// 	self.terminal.enabled = true;
-				// 	self.terminal.level = Some(LogLevel::Info);
-				// }
 			}
 			_ => {}
 		}

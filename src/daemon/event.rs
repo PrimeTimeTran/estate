@@ -1,4 +1,7 @@
-use crate::prelude::{daemon::daemon::*, *};
+use crate::{
+	job,
+	prelude::{daemon::daemon::*, *},
+};
 use std::sync::{Arc, RwLock};
 
 // Events = facts that happened
@@ -342,7 +345,7 @@ impl EventHandler for TaskHandler {
 			let mut tasks = runtime.tasks.write().unwrap();
 
 			if let Some(task) = tasks.get_mut(task_id) {
-				task.status = crate::app::TaskStatus::Running;
+				task.status = job::TaskStatus::Running;
 			}
 		}
 

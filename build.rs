@@ -1,6 +1,5 @@
 use resvg;
 use std::{env, fs, path::PathBuf};
-
 // Generate:
 // $ cargo build
 fn main() {

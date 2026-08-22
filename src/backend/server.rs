@@ -1,10 +1,9 @@
+use crate::{backend::tool::AddVars, prelude::*};
+
 use rmcp::{
 	ErrorData as McpError, handler::server::wrapper::Parameters, model::*, prompt, prompt_router,
 	schemars::JsonSchema, tool, tool_router,
 };
-use serde::{Deserialize, Serialize};
-
-use crate::backend::tool::AddVars;
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
 pub struct CodeReviewArgs {

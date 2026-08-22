@@ -1,0 +1,54 @@
+{
+  "title": "Website Traffic",
+  "type": "line",
+  "points": [
+    {
+      "label": "Jan",
+      "value": 12400
+    },
+    {
+      "label": "Feb",
+      "value": 13800
+    },
+    {
+      "label": "Mar",
+      "value": 15100
+    },
+    {
+      "label": "Apr",
+      "value": 14700
+    },
+    {
+      "label": "May",
+      "value": 17300
+    },
+    {
+      "label": "Jun",
+      "value": 19600
+    },
+    {
+      "label": "Jul",
+      "value": 22100
+    },
+    {
+      "label": "Aug",
+      "value": 24800
+    },
+    {
+      "label": "Sep",
+      "value": 23900
+    },
+    {
+      "label": "Oct",
+      "value": 27600
+    },
+    {
+      "label": "Nov",
+      "value": 31200
+    },
+    {
+      "label": "Dec",
+      "value": 35800
+    }
+  ]
+}

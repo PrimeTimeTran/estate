@@ -1,19 +1,16 @@
-use anyhow::{Error, Result};
-use std::time::SystemTime;
-
-use crate::poc::McpClient;
+use crate::{poc::McpClient, prelude::*};
 
 #[derive(Debug, Default, Clone)]
 pub struct FileInfo {
-	pub inode: String,
 	pub content: String,
-	pub path: String,
-	pub name: String,
 	pub extension: Option<String>,
-	pub size: u64,
-	pub language: Option<String>,
+	pub inode: String,
 	pub is_directory: bool,
+	pub language: Option<String>,
 	pub modified_at: Option<SystemTime>,
+	pub name: String,
+	pub path: String,
+	pub size: u64,
 }
 
 #[derive(Debug, Default, Clone)]

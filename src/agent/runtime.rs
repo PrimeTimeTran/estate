@@ -1,4 +1,8 @@
-use crate::agent::{Agent, AgentEvent, AgentTask, RuntimeEvent, SystemEvent};
+use crate::{
+	agent::{Agent, AgentEvent, RuntimeEvent, SystemEvent},
+	job,
+	prelude::*,
+};
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
 #[derive(Debug, Default)]
@@ -12,7 +16,7 @@ pub struct AgentRuntime {
 }
 
 impl AgentRuntime {
-	pub async fn spawn_agent(&self, task: AgentTask) {
+	pub async fn spawn_agent(&self, task: job::AgentTask) {
 		let event_tx = self.event_tx.clone();
 		tokio::spawn(async move {
 			let agent = Agent::new();

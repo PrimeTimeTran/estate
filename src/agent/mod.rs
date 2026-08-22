@@ -3,7 +3,6 @@ pub mod event;
 pub mod prompt;
 pub mod runtime;
 pub mod system;
-pub mod task;
 pub mod tool;
 pub mod workspace;
 
@@ -12,6 +11,5 @@ pub use event::*;
 pub use prompt::*;
 pub use runtime::*;
 pub use system::*;
-pub use task::*;
 pub use tool::*;
 pub use workspace::*;

@@ -2,6 +2,20 @@
 //! # Description
 use crate::core::{Probe, ProbeKind, ProbeSet};
 
+pub const FILE_EXTENSIONS: &[&str] = &[
+	"rs", "loi", "estate", "html", "htm", "css", "js", "jsx", "ts", "tsx", "json", "jsonc", "md",
+	"mdx", "txt", "toml", "yaml", "yml", "ini", "conf", "sh", "bash", "zsh", "c", "h", "cpp", "hpp",
+	"py", "go", "java", "kt", "png", "jpg", "jpeg", "svg", "webp", "ico", "csv", "xml", "sql",
+];
+pub const FILE_NAMES: &[&str] = &[
+	"Dockerfile",
+	"Makefile",
+	"LICENSE",
+	"README",
+	"README.md",
+	"Cargo.toml",
+	"package.json",
+];
 pub const TEMPLATE_PATH: &str = "/Users/future/KB/project/crates/estate/template";
 pub const SOCKET_PATH: &str = "/tmp/estate-daemon.sock";
 pub const PID_PATH: &str = "/tmp/estate-daemon.pid";

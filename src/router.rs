@@ -1,5 +1,5 @@
+use crate::{app, prelude::daemon::projection::command, prelude::*};
 use cli;
-use crate::{prelude::daemon::projection::command, prelude::*, app};
 /// # Estate Engine CLI
 ///
 /// Build and install the `estate` CLI.
@@ -48,7 +48,8 @@ pub async fn execute(
 	ctx: cli::context::Context,
 	engine: EstateEngine,
 ) -> anyhow::Result<(), anyhow::Error> {
-	match parsed_cli.command {
+	let command = parsed_cli.command.unwrap_or(Command::Start { tail: false });
+	match command {
 		/// [Dev]
 		/// cargo run --bin estate -- start
 		/// cargo run --bin estate -- start --live

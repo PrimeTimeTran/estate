@@ -92,7 +92,6 @@
 #![allow(warnings)]
 
 mod _shared;
-mod _static;
 pub mod agent;
 pub mod app;
 pub mod backend;
@@ -101,14 +100,15 @@ pub mod core;
 pub mod daemon;
 pub mod engine;
 pub mod graph;
+pub mod job;
+pub mod logger;
 pub mod poc;
 pub mod prelude;
 pub mod registry;
 pub mod router;
-pub mod vfs;
-pub mod logger;
 pub mod state;
 pub mod ve;
+pub mod vfs;
 
 // #[allow(dead_code)]
 // #[allow(unused_imports)] // Silences unused imports

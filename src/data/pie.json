@@ -1,0 +1,26 @@
+{
+  "title": "Revenue by Product",
+  "type": "pie",
+  "slices": [
+    {
+      "label": "Enterprise",
+      "value": 420000
+    },
+    {
+      "label": "Professional",
+      "value": 285000
+    },
+    {
+      "label": "Team",
+      "value": 175000
+    },
+    {
+      "label": "Starter",
+      "value": 95000
+    },
+    {
+      "label": "Other",
+      "value": 25000
+    }
+  ]
+}

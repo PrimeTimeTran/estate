@@ -3,21 +3,32 @@ name = "estate"
 version = "0.1.0"
 edition = "2024"
 
+[package.metadata.bundle.bin.estate]
+name = "Estate"
+identifier = "tran.primetimetran.loi"
+version = "0.1.0"
+copyright = "Copyright © 2026"
+category = "Developer Tool"
+short_description = "Estate development environment"
+long_description = "Estate development environment"
+icon = ["assets/icon.icns"]
+
 [[bin]]
 name = "estate"
 path = "src/bin/main.rs"
 
-[[bin]]
-name = "main"
-path = "src/main.rs"
 
-[[bin]]
-name = "init"
-path = "src/bin/init.rs"
+# [[bin]]
+# name = "main"
+# path = "src/main.rs"
 
-[[bin]]
-name = "bootstrap"
-path = "src/bin/bootstrap-1.rs"
+# [[bin]]
+# name = "init"
+# path = "src/bin/init.rs"
+
+# [[bin]]
+# name = "bootstrap"
+# path = "src/bin/bootstrap-1.rs"
 
 [dependencies]
 # Internal
@@ -61,6 +72,14 @@ url.workspace = true
 uuid.workspace = true
 wgpu.workspace = true
 winit.workspace = true
+notify.workspace = true
+
+objc2 = "0.6.4"
+objc2-app-kit = "0.3.2"
+objc2-foundation = "0.3.2"
+
+core-foundation = "0.10.1"
+  core-graphics = {version="0.25.0",features = ["highsierra"]}
 
 [build-dependencies]
 resvg.workspace = true

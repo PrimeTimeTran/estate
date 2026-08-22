@@ -1,4 +1,7 @@
-use crate::agent::{AgentTask, SystemEvent, TaskResult};
+use crate::{
+	agent::SystemEvent,
+	job::{AgentTask, TaskResult},
+};
 
 #[derive(Clone, Debug)]
 pub enum RuntimeEvent {
