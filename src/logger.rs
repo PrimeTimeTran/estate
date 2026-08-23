@@ -39,7 +39,6 @@ pub fn init_logging(config: &LogConfig) -> anyhow::Result<()> {
 		.with(terminal)
 		.with(file)
 		.init();
-
 	Ok(())
 }
 pub fn init() -> anyhow::Result<()> {
@@ -47,7 +46,6 @@ pub fn init() -> anyhow::Result<()> {
 		.with(EnvFilter::from_default_env())
 		.with(tracing_subscriber::fmt::layer())
 		.init();
-
 	Ok(())
 }
 
@@ -97,7 +95,6 @@ impl LogConfig {
 		if let Some(global) = Self::load_global()? {
 			config.merge(global);
 		}
-		// println!("LOADED LOG CONFIG: {config:#?}");
 		Ok(config)
 	}
 	pub fn load_from_cargo() -> anyhow::Result<Option<LogConfig>> {

@@ -64,5 +64,3 @@ impl EstateState {
 	// 	Self::save(&state);
 	// }
 }
-
-// /Users/future/Library/Application Support/estate/state.json

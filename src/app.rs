@@ -104,7 +104,7 @@ impl App {
 		}
 	}
 	fn run_application(&mut self) -> anyhow::Result<()> {
-		setup_global_shortcuts();
+		smoke_test_hotkey();
 		let event_loop = EventLoop::<AppEvent>::with_user_event()
 			.with_activation_policy(ActivationPolicy::Accessory)
 			.build()?;
@@ -223,12 +223,12 @@ impl App {
 			TrayMenu {
 				clear_tasks,
 				dev,
-				telemetry,
 				list_tasks,
 				new_task,
 				quit,
 				status,
 				tasks,
+				telemetry,
 			},
 			tray,
 		))

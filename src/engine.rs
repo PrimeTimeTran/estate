@@ -98,14 +98,7 @@ pub trait Discovery {
 // 	fn update(&mut self, resource: Resource);
 // 	fn remove(&mut self, id: Uuid);
 // }
-/// Graph
-///     "What is A connected to?"
-/// - I created an estate .md file which wikilinks to 5 other estate files. Do I do a full table scan of the registry every time? No, the resolver should take in an estate id and context and give me back what it is I'm looking for. If I've opened the IDE from a repo/workspace then the link will look differently to resolve.
-pub trait Graph {
-	fn children(&self, id: Uuid) -> Vec<Uuid>;
-	fn parents(&self, id: Uuid) -> Vec<Uuid>;
-	fn dependencies(&self, id: Uuid) -> Vec<Uuid>;
-}
+
 /// Abstraction for ranking responses which are not deteminitic.
 /// - "Give me package.json" can produce many results
 /// - "Give me available" commnands can produce different results depending on file .ext, settings.json, UI focus, and state.

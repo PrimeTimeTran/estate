@@ -1279,44 +1279,27 @@ use global_hotkey::{
 	GlobalHotKeyEvent, GlobalHotKeyManager,
 	hotkey::{Code, HotKey, Modifiers},
 };
-use std::sync::OnceLock;
-static HOTKEY_MANAGER: OnceLock<GlobalHotKeyManager> = OnceLock::new();
 
-pub fn setup_global_shortcuts() {
-	dbg!("dbg setup_global_shortcuts");
-	eprintln!("eprintln setup_global_shortcuts");
-	println!("println setup_global_shortcuts");
-	let manager = GlobalHotKeyManager::new().expect("Failed to initialize GlobalHotKeyManager");
-
-	// Register Shift + Alt + 1
-	let hotkey_left = HotKey::new(Some(Modifiers::SHIFT | Modifiers::ALT), Code::Digit1);
-	let left_id = hotkey_left.id();
-
-	manager
-		.register(hotkey_left)
-		.expect("Failed to register hotkey");
-	println!("✨ Global hotkey (Shift + Alt + 1) registered and active!");
-
-	let _ = HOTKEY_MANAGER.set(manager);
-
+pub fn smoke_test_hotkey() {
+	let manager = GlobalHotKeyManager::new().unwrap();
+	let hotkey = HotKey::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyP);
+	let hotkey_id = hotkey.id();
+	manager.register(hotkey).unwrap();
+	println!("🧪 Smoke test active! Press Shift + Alt + P");
 	std::thread::spawn(move || {
 		let receiver = GlobalHotKeyEvent::receiver();
-		loop {
-			if let Ok(event) = receiver.try_recv() {
-				if event.state == global_hotkey::HotKeyState::Pressed && event.id == left_id {
-					println!("🔥 Global Hotkey Triggered via OS Event!");
-
-					// 1. Trigger your cursor jump
-					move_cursor_to(ScreenPosition::Left);
-
-					// 2. Fire a native macOS notification banner to prove it caught the key combo
-					let _ = std::process::Command::new("osascript")
-						.arg("-e")
-						.arg("display notification \"Shift+Alt+1 intercepted!\" with title \"Estate Daemon\"")
-						.spawn();
-				}
+		while let Ok(event) = receiver.recv() {
+			if event.id == hotkey_id && event.state == global_hotkey::HotKeyState::Pressed {
+				println!("🎉 HOTKEY FIRED!");
+				move_cursor_to(ScreenPosition::Left);
+				let _ = std::process::Command::new("osascript")
+					.arg("-e")
+					.arg(r#"display notification "Global Hotkey Works!" with title "Smoke Test""#)
+					.spawn();
 			}
-			std::thread::sleep(std::time::Duration::from_millis(10));
 		}
 	});
+
+	// IMPORTANT: manager must stay alive.
+	std::mem::forget(manager);
 }
