@@ -17,30 +17,31 @@ pub struct Task {
 	pub status: TaskStatus,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Debug)]
 pub struct TaskManager {
-	tasks: HashMap<TaskId, Task>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum TaskStatus {
-	Pending,
-	Running,
-	Completed,
-	Failed(String),
-	Stopped,
-	Interrupted,
+	pub _watcher: notify::RecommendedWatcher,
+	pub dirty: bool,
+	pub error: Option<String>,
+	pub last_loaded: Option<SystemTime>,
+	pub rx: tokio::sync::mpsc::Receiver<()>,
+	pub state: Option<EstateState>,
+	pub state_path: PathBuf,
+	pub tasks: HashMap<TaskId, Task>,
 }
 impl TaskManager {
 	pub fn create(&mut self, kind: TaskKind) -> TaskId {
 		let id = Uuid::now_v7();
+
 		let task = Task {
 			id,
 			name: kind.name(),
 			kind,
 			status: TaskStatus::Pending,
 		};
+
 		self.tasks.insert(id, task);
+		self.dirty = true;
+
 		id
 	}
 
@@ -48,8 +49,12 @@ impl TaskManager {
 		self.tasks.get(&id)
 	}
 
-	pub fn get_mut(&mut self, id: TaskId) -> Option<&mut Task> {
+	fn get_mut(&mut self, id: TaskId) -> Option<&mut Task> {
 		self.tasks.get_mut(&id)
+	}
+
+	pub fn count(&self) -> usize {
+		self.tasks.len()
 	}
 
 	pub fn list(&self) -> impl Iterator<Item = &Task> {
@@ -67,17 +72,38 @@ impl TaskManager {
 		Ok(())
 	}
 
-	pub fn delete(&mut self, id: TaskId) -> Option<Task> {
-		self.tasks.remove(&id)
+	pub fn save(&mut self) -> anyhow::Result<()> {
+		todo!("save")
 	}
 
-	pub fn clear(&mut self) {
+	pub fn clear(&mut self) -> bool {
+		if self.tasks.is_empty() {
+			return false;
+		}
+
 		self.tasks.clear();
+		self.dirty = true;
+		true
 	}
 
-	pub fn count(&self) -> usize {
-		self.tasks.len()
+	pub fn delete(&mut self, id: TaskId) -> Option<Task> {
+		let task = self.tasks.remove(&id);
+
+		if task.is_some() {
+			self.dirty = true;
+		}
+
+		task
 	}
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TaskStatus {
+	Pending,
+	Running,
+	Completed,
+	Failed(String),
+	Stopped,
+	Interrupted,
 }
 
 #[derive(Debug, Clone)]

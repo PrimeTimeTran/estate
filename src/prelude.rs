@@ -39,7 +39,7 @@ pub use std::{
 		atomic::{AtomicU64, Ordering},
 	},
 	thread,
-	time::SystemTime,
+	time::{Instant, SystemTime},
 	*,
 };
 pub use tokio::{

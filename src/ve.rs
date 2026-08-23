@@ -1,36 +1,32 @@
 use crate::prelude::*;
-
+use core_graphics::display::CGDisplay;
+use egui::Context;
 use egui::Ui;
+use egui_plot::{Bar, BarChart, Plot};
 use egui_plot::{Line, PlotBounds, PlotPoints, Points};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use winit::event_loop::EventLoopProxy;
-
-use egui::Context;
-use egui_plot::{Bar, BarChart, Plot};
-
-/// A trait implemented by types which agree to its contract.
+///      A trait implemented by types which agree to its contract.
 ///
-/// Any type which implements this contract must provide `draw`.
-/// Code which depends on `Veable` can therefore rely on that capability
-/// without needing to know how the concrete type implements it.
+///      Any type which implements this contract must provide `draw`.
+///      Code which depends on `Veable` can therefore rely on that capability
+///      without needing to know how the concrete type implements it.
 ///
-/// The implementation details belong to the concrete type; the caller
-/// only depends on the behavior promised by the contract.
+///      The implementation details belong to the concrete type; the caller
+///      only depends on the behavior promised by the contract.
 pub trait Veable {
 	fn draw(&mut self, ui: &mut egui::Ui);
 }
-
-/// A type-erased container for any concrete `Veable`.
+///      A type-erased container for any concrete `Veable`.
 ///
-/// `Box<dyn Veable>` stores the concrete implementation on the heap while
-/// exposing only the `Veable` interface to callers. This allows different
-/// concrete implementations to be substituted without changing the code
-/// which consumes them.
+///      `Box<dyn Veable>` stores the concrete implementation on the heap while
+///      exposing only the `Veable` interface to callers. This allows different
+///      concrete implementations to be substituted without changing the code
+///      which consumes them.
 pub struct Ve {
 	view: Box<dyn Veable>,
 }
-
 impl Ve {
 	/// Rust uses ownership, borrowing, and lifetimes to determine when values
 	/// may be safely destroyed, allowing memory to be reclaimed deterministically
@@ -40,7 +36,6 @@ impl Ve {
 			view: Box::new(view),
 		}
 	}
-
 	/// Forwards the drawing contract to the concrete implementation.
 	///
 	/// `Ve` doesn't know how the view is drawn. It only knows that the
@@ -49,13 +44,13 @@ impl Ve {
 		self.view.draw(ui);
 	}
 }
-///! The first concrete implementation of Veable is here.
-///!
-///! EguiVeable defines it's own state which is specific to its own implementation
-///! and the correponding methods which operate on those properties.
-///!
-///! The draw method is the gateway for this struct to inject behavior thats independent of the
-///! generic base and unique to itself as package or an instance of Veable.
+///       ! The first concrete implementation of Veable is here.
+///       !
+///       ! EguiVeable defines it's own state which is specific to its own implementation
+///       ! and the correponding methods which operate on those properties.
+///       !
+///       ! The draw method is the gateway for this struct to inject behavior thats independent of the
+///       ! generic base and unique to itself as package or an instance of Veable.
 #[derive(Clone, Debug, Default)]
 pub struct EguiVeable {
 	state: EstateState,
@@ -155,7 +150,6 @@ impl EguiVeable {
 			ui.heading("Overview");
 			ui.label(format!("Pointer: {:?}", ui.ctx().pointer_latest_pos()));
 			let response = ui.button("📋 Copy");
-
 			tracing::info!(
 				target: "estate::app",
 				"Copy button: hovered={} clicked={} enabled={}",
@@ -163,21 +157,16 @@ impl EguiVeable {
 				response.clicked(),
 				response.enabled(),
 			);
-
 			if response.clicked() {
 				tracing::info!(target: "estate::app", "CLICKED COPY");
-
 				let json =
 					serde_json::to_string_pretty(&self.state).expect("failed to serialize estate state");
-
 				ui.output_mut(|o| {
 					o.commands.push(egui::OutputCommand::CopyText(json));
 				});
 			}
 		});
-
 		ui.separator();
-
 		let metrics = [
 			("Starts", self.state.starts.to_string()),
 			("Longest run", format!("{}s", self.state.longest_run)),
@@ -188,7 +177,6 @@ impl EguiVeable {
 			("Tasks completed", self.state.tasks_completed.to_string()),
 			("Files indexed", self.state.files_indexed.to_string()),
 		];
-
 		for (name, value) in metrics {
 			ui.horizontal(|ui| {
 				ui.label(name);
@@ -199,7 +187,6 @@ impl EguiVeable {
 }
 pub struct GpuiVeable;
 pub struct TaffyVeable;
-
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum DevTopTab {
 	#[default]
@@ -208,7 +195,6 @@ pub enum DevTopTab {
 	Logs,
 	Config,
 }
-
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum DevSideTab {
 	#[default]
@@ -219,7 +205,6 @@ pub enum DevSideTab {
 	Workspace,
 	Runtime,
 }
-
 impl DevSideTab {
 	const ALL: &[Self] = &[
 		Self::Overview,
@@ -240,7 +225,6 @@ impl DevSideTab {
 		}
 	}
 }
-
 #[derive(Clone, Debug, Deserialize)]
 pub struct ChartsFile {
 	pub charts: Vec<Chart>,
@@ -271,16 +255,13 @@ pub struct BarData {
 impl BarData {
 	pub fn ui(&self, ui: &mut Ui) {
 		ui.heading(&self.title);
-
 		let bars = self
 			.bars
 			.iter()
 			.enumerate()
 			.map(|(index, bar)| Bar::new(index as f64, bar.value))
 			.collect::<Vec<_>>();
-
 		let chart = BarChart::new("bars", bars);
-
 		Plot::new("bar_chart")
 			.height(ui.available_height() - 40.0)
 			.show(ui, |plot_ui| {
@@ -296,15 +277,12 @@ pub struct LineData {
 impl LineData {
 	pub fn ui(&self, ui: &mut Ui) {
 		ui.heading(&self.title);
-
 		let points = self
 			.points
 			.iter()
 			.map(|point| [point.x, point.y])
 			.collect::<Vec<_>>();
-
 		let line = Line::new("line", points);
-
 		Plot::new("line_chart")
 			.height(ui.available_height() - 40.0)
 			.show(ui, |plot_ui| {
@@ -320,29 +298,22 @@ pub struct PieData {
 impl PieData {
 	pub fn ui(&self, ui: &mut Ui) {
 		ui.heading(&self.title);
-
 		let available = ui.available_size();
 		let size = available.x.min(available.y);
 		let radius = size * 0.35;
 		let center = ui.available_rect_before_wrap().center();
-
 		let total: f64 = self.slices.iter().map(|slice| slice.value).sum();
-
 		if total <= 0.0 {
 			ui.label("No data");
 			return;
 		}
-
 		let painter = ui.painter();
 		let mut start_angle = 0.0_f32;
-
 		for (index, slice) in self.slices.iter().enumerate() {
 			let fraction = slice.value / total;
 			let sweep = fraction as f32 * std::f32::consts::TAU;
 			let end_angle = start_angle + sweep;
-
 			let points = Self::pie_slice_points(center, radius, start_angle, end_angle);
-
 			painter.add(egui::Shape::convex_polygon(
 				points,
 				egui::Color32::from_rgb(
@@ -352,24 +323,18 @@ impl PieData {
 				),
 				egui::Stroke::NONE,
 			));
-
 			start_angle = end_angle;
 		}
 	}
-
 	fn pie_slice_points(center: egui::Pos2, radius: f32, start: f32, end: f32) -> Vec<egui::Pos2> {
 		let segments = 32;
 		let mut points = Vec::with_capacity(segments + 2);
-
 		points.push(center);
-
 		for i in 0..=segments {
 			let t = i as f32 / segments as f32;
 			let angle = start + (end - start) * t;
-
 			points.push(center + egui::vec2(angle.cos() * radius, angle.sin() * radius));
 		}
-
 		points
 	}
 }
@@ -381,15 +346,12 @@ pub struct ScatterData {
 impl ScatterData {
 	pub fn ui(&self, ui: &mut Ui) {
 		ui.heading(&self.title);
-
 		let points = self
 			.points
 			.iter()
 			.map(|point| [point.x, point.y])
 			.collect::<Vec<_>>();
-
 		let points = Points::new("scatter", points);
-
 		Plot::new("scatter_chart")
 			.height(ui.available_height() - 40.0)
 			.show(ui, |plot_ui| {
@@ -422,17 +384,14 @@ impl ChartsFile {
 pub struct Graphics {
 	data_path: PathBuf,
 	data: ChartsFile,
-
 	dirty: bool,
 	last_loaded: Option<SystemTime>,
 	error: Option<String>,
-
 	// Expose a receiver if your event loop wants to listen for changes,
 	// or keep it internal if you poll it.
 	// rx: tokio::sync::broadcast::Receiver<()>,
 	rx: tokio::sync::mpsc::Receiver<()>,
 	_watcher: RecommendedWatcher,
-
 	scroll_x: f32,
 	scroll_y: f32,
 	last_direction: String,
@@ -446,7 +405,7 @@ impl Graphics {
 		let path = "/Users/future/kb/project/crates/estate/src/data/chart.json";
 		Self::from_path(path)
 	}
-	pub fn from_path(path: impl Into<PathBuf>) -> Self {
+	fn from_path(path: impl Into<PathBuf>) -> Self {
 		let data_path = path.into();
 		let (tx, rx) = tokio::sync::mpsc::channel::<()>(1);
 		let mut oracle = Self {
@@ -467,28 +426,24 @@ impl Graphics {
 		oracle.reload();
 		oracle
 	}
-	pub fn reload(&mut self) {
+	fn reload(&mut self) {
 		match ChartsFile::load(&self.data_path) {
 			Ok(data) => {
 				self.data = data;
 				self.dirty = false;
 				self.error = None;
-
 				self.last_loaded = fs::metadata(&self.data_path)
 					.and_then(|metadata| metadata.modified())
 					.ok();
-
 				tracing::info!(
 					"Oracle loaded {} charts from {}",
 					self.data.charts.len(),
 					self.data_path.display()
 				);
 			}
-
 			Err(error) => {
 				self.error = Some(error.to_string());
 				self.dirty = true;
-
 				tracing::error!(
 					"Oracle failed to load {}: {error:#}",
 					self.data_path.display()
@@ -497,7 +452,7 @@ impl Graphics {
 		}
 	}
 	/// Call this inside your window event loop / frame tick to check if the file changed.
-	pub fn check_for_changes(&mut self, ctx: &egui::Context) {
+	fn check_for_changes(&mut self, ctx: &egui::Context) {
 		if self.rx.try_recv().is_ok() {
 			tracing::info!("File change detected via watcher, reloading Oracle...");
 			self.reload();
@@ -519,7 +474,6 @@ impl Graphics {
 			},
 			Config::default(),
 		)?;
-
 		if let Some(parent) = path.parent() {
 			watcher.watch(parent, RecursiveMode::NonRecursive)?;
 		} else {
@@ -557,134 +511,14 @@ impl Graphics {
 		} else {
 			watcher.watch(path, RecursiveMode::NonRecursive)?;
 		}
-
 		Ok(watcher)
 	}
 	fn draw_error(&self, ui: &mut egui::Ui, error: &str) {
 		ui.heading("Preview Error");
-
 		ui.colored_label(egui::Color32::RED, error);
-
 		ui.separator();
-
 		ui.label("Preview is showing the last valid state.");
 	}
-	// fn draw_ui(&mut self, ui: &mut egui::Ui) {
-	// 	// 1. Capture clean trackpad and modifier state
-	// 	let trackpad = self.inspect_trackpad(ui);
-
-	// 	// Keep repainting live while interacting to maintain smooth telemetry display
-	// 	if trackpad.direction != ScrollDirection::None
-	// 		|| trackpad.shift_held
-	// 		|| trackpad.delta != egui::Vec2::ZERO
-	// 	{
-	// 		ui.ctx().request_repaint();
-	// 	}
-
-	// 	// 2. Telemetry Header & Status
-	// 	ui.heading("Trackpad & Gesture Telemetry PoC");
-	// 	ui.label(
-	// 		"Goal: Inspect raw multi-axis vectors, modifiers, and spatial state for cross-app redirection.",
-	// 	);
-	// 	ui.separator();
-
-	// 	// 3. Live State Grid
-	// 	ui.columns(2, |columns| {
-	// 		// --- Column A: Raw Input Vectors ---
-	// 		columns[0].group(|ui| {
-	// 			ui.heading("Raw Input Vectors");
-	// 			ui.add_space(4.0);
-
-	// 			ui.label(format!("Scroll Delta X (Horiz): {:.2}", trackpad.delta.x));
-	// 			ui.label(format!("Scroll Delta Y (Vert):  {:.2}", trackpad.delta.y));
-	// 			ui.add_space(8.0);
-
-	// 			let primary_axis = if trackpad.delta.x.abs() > trackpad.delta.y.abs() {
-	// 				"Horizontal (X)"
-	// 			} else if trackpad.delta.y.abs() > trackpad.delta.x.abs() {
-	// 				"Vertical (Y)"
-	// 			} else {
-	// 				"None"
-	// 			};
-	// 			ui.label(format!("Primary Axis: {}", primary_axis));
-	// 			ui.label(format!("Direction State: {:?}", trackpad.direction));
-	// 		});
-
-	// 		// --- Column B: Modifiers & Spatial Focus ---
-	// 		columns[1].group(|ui| {
-	// 			ui.heading("Modifiers & Environment");
-	// 			ui.add_space(4.0);
-
-	// 			// Visual badge for Shift state
-	// 			ui.horizontal(|ui| {
-	// 				ui.label("Shift Key:");
-	// 				if trackpad.shift_held {
-	// 					ui.colored_label(egui::Color32::GREEN, "HELD (Active Modifier)");
-	// 				} else {
-	// 					ui.colored_label(egui::Color32::GRAY, "Released");
-	// 				}
-	// 			});
-
-	// 			// Mouse Position telemetry
-	// 			if let Some(pos) = trackpad.mouse_pos {
-	// 				ui.label(format!("Pointer Coords: x={:.1}, y={:.1}", pos.x, pos.y));
-	// 			} else {
-	// 				ui.label("Pointer Coords: Out of bounds");
-	// 			}
-
-	// 			ui.add_space(8.0);
-	// 			ui.label(format!(
-	// 				"Target Layout Width: {:.1}px",
-	// 				self.side_panel_width
-	// 			));
-	// 		});
-	// 	});
-
-	// 	ui.add_space(12.0);
-	// 	ui.separator();
-
-	// 	// 4. Gesture Trigger Simulation Log / Target Action Preview
-	// 	ui.group(|ui| {
-	// 		ui.heading("Target Action Trigger Preview");
-	// 		ui.add_space(4.0);
-
-	// 		let shift_active = trackpad.shift_held;
-	// 		let is_horizontal = trackpad.delta.x.abs() > trackpad.delta.y.abs();
-	// 		let is_vertical = trackpad.delta.y.abs() > trackpad.delta.x.abs();
-
-	// 		if shift_active && is_horizontal {
-	// 			ui.colored_label(
-	// 				egui::Color32::LIGHT_BLUE,
-	// 				format!(
-	// 					"⚡ TRIGGER MATCH: Resize Panel Vector -> {:.2}px",
-	// 					trackpad.delta.x
-	// 				),
-	// 			);
-	// 		} else if shift_active && is_vertical {
-	// 			ui.colored_label(
-	// 				egui::Color32::LIGHT_GREEN,
-	// 				format!(
-	// 					"⚡ TRIGGER MATCH: Cross-Scroll Secondary Pane -> {:.2} units",
-	// 					trackpad.delta.y
-	// 				),
-	// 			);
-	// 		} else {
-	// 			ui.label("Waiting for trigger combo (Hold Shift + Swipe/Scroll)...");
-	// 		}
-	// 	});
-
-	// 	// 5. Minimal footer instructions
-	// 	ui.add_space(8.0);
-	// 	ui.horizontal(|ui| {
-	// 		if ui.button("Reset Telemetry States").clicked() {
-	// 			self.secondary_scroll_offset = 0.0;
-	// 			self.side_panel_width = 300.0;
-	// 		}
-	// 		ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-	// 			ui.label("PoC V1.0 - Ready for OS Daemon translation");
-	// 		});
-	// 	});
-	// }
 	fn draw_ui(&mut self, ui: &mut egui::Ui) {
 		if let Some(error) = &self.error {
 			self.draw_error(ui, error);
@@ -695,18 +529,14 @@ impl Graphics {
 		let available = ui.available_size();
 		let cell_width = available.x / 2.0;
 		let cell_height = available.y / 2.0;
-
 		for row in 0..2 {
 			ui.horizontal(|ui| {
 				ui.spacing_mut().item_spacing = egui::vec2(8.0, 8.0);
-
 				for column in 0..2 {
 					let index = row * 2 + column;
-
 					ui.allocate_ui(egui::vec2(cell_width - 8.0, cell_height - 8.0), |ui| {
 						ui.group(|ui| {
 							ui.set_min_size(ui.available_size());
-
 							if let Some(chart) = charts.get(index) {
 								chart.ui(ui);
 							} else {
@@ -725,20 +555,15 @@ impl Veable for Graphics {
 	fn draw(&mut self, ui: &mut egui::Ui) {
 		// 1. Poll the channel for file changes on every frame render tick
 		self.check_for_changes(ui.ctx());
-
 		// 2. Split the available space to reserve room for the bottom status bar
 		let available_size = ui.available_size();
 		let status_bar_height = 24.0;
-
 		let main_size = egui::vec2(available_size.x, available_size.y - status_bar_height);
-
 		// Main Content Area
 		ui.allocate_ui(main_size, |ui| {
 			self.draw_ui(ui);
 		});
-
 		ui.separator();
-
 		// Bottom Status Bar
 		ui.horizontal(|ui| {
 			// Left side: Status or error indicator
@@ -749,9 +574,7 @@ impl Veable for Graphics {
 			} else {
 				ui.colored_label(egui::Color32::GREEN, "Status: Connected");
 			}
-
 			ui.separator();
-
 			// Right side: Timer / Last Loaded counter
 			if let Some(last_loaded) = self.last_loaded {
 				if let Ok(elapsed) = last_loaded.elapsed() {
@@ -766,14 +589,13 @@ impl Veable for Graphics {
 			} else {
 				ui.label("Not loaded yet");
 			}
-
 			// Request a continuous repaint so the timer increments live every second
 			ui.ctx()
 				.request_repaint_after(std::time::Duration::from_secs(1));
 		});
 	}
 }
-/// Telemetry
+///      Telemetry
 pub struct Oracle {
 	scroll_x: f32,
 	scroll_y: f32,
@@ -808,12 +630,11 @@ impl Oracle {
 		oracle
 	}
 	/// Polls current frame inputs and extracts structured trackpad data.
-	pub fn inspect_trackpad(&self, ui: &egui::Ui) -> TrackpadState {
+	fn inspect_trackpad(&self, ui: &egui::Ui) -> TrackpadState {
 		ui.input(|i| {
 			let delta = i.smooth_scroll_delta;
 			let shift_held = i.modifiers.shift;
 			let mouse_pos = i.pointer.hover_pos();
-
 			let direction = if delta.x == 0.0 && delta.y == 0.0 {
 				ScrollDirection::None
 			} else if delta.x.abs() > delta.y.abs() {
@@ -829,7 +650,6 @@ impl Oracle {
 					ScrollDirection::Up
 				}
 			};
-
 			TrackpadState {
 				delta,
 				direction,
@@ -838,18 +658,16 @@ impl Oracle {
 			}
 		})
 	}
-
 	/// Helper to check if the mouse is hovering inside a specific target rect
-	pub fn is_mouse_over(state: &TrackpadState, target_rect: egui::Rect) -> bool {
+	fn is_mouse_over(state: &TrackpadState, target_rect: egui::Rect) -> bool {
 		if let Some(pos) = state.mouse_pos {
 			target_rect.contains(pos)
 		} else {
 			false
 		}
 	}
-
 	/// Optional helper to draw a quick diagnostic heads-up display overlay
-	pub fn draw_trackpad_poc_hud(&self, ui: &mut egui::Ui, state: &TrackpadState) {
+	fn draw_trackpad_poc_hud(&self, ui: &mut egui::Ui, state: &TrackpadState) {
 		ui.group(|ui| {
 			ui.heading("Trackpad PoC Diagnostics");
 			ui.horizontal(|ui| {
@@ -866,7 +684,7 @@ impl Oracle {
 			}
 		});
 	}
-	pub fn determine_focus(
+	fn determine_focus(
 		&self,
 		mouse_pos: Option<egui::Pos2>,
 		main_rect: egui::Rect,
@@ -884,13 +702,11 @@ impl Oracle {
 			FocusedPane::Unknown
 		}
 	}
-
 	/// Handles layout resizing or cross-scrolling based on gestures + shift
-	pub fn handle_shift_gestures(&mut self, trackpad: &TrackpadState, focus: FocusedPane) {
+	fn handle_shift_gestures(&mut self, trackpad: &TrackpadState, focus: FocusedPane) {
 		if !trackpad.shift_held {
 			return;
 		}
-
 		match focus {
 			FocusedPane::MainEditor => {
 				// Goal: Move left/right to expand/shrink side panel
@@ -898,7 +714,6 @@ impl Oracle {
 					// Scale width changes smoothly based on horizontal trackpad delta
 					self.side_panel_width = (self.side_panel_width - trackpad.delta.x).clamp(150.0, 600.0);
 				}
-
 				// Goal: Scroll the *other* column/panel vertically
 				if trackpad.delta.y.abs() > 0.0 {
 					self.secondary_scroll_offset += trackpad.delta.y;
@@ -917,7 +732,6 @@ impl Oracle {
 	fn draw_ui(&mut self, ui: &mut egui::Ui) {
 		// 1. Capture clean trackpad and modifier state
 		let trackpad = self.inspect_trackpad(ui);
-
 		// Keep repainting live while interacting to maintain smooth telemetry display
 		if trackpad.direction != ScrollDirection::None
 			|| trackpad.shift_held
@@ -925,25 +739,21 @@ impl Oracle {
 		{
 			ui.ctx().request_repaint();
 		}
-
 		// 2. Telemetry Header & Status
 		ui.heading("Trackpad & Gesture Telemetry PoC");
 		ui.label(
 			"Goal: Inspect raw multi-axis vectors, modifiers, and spatial state for cross-app redirection.",
 		);
 		ui.separator();
-
 		// 3. Live State Grid
 		ui.columns(2, |columns| {
 			// --- Column A: Raw Input Vectors ---
 			columns[0].group(|ui| {
 				ui.heading("Raw Input Vectors");
 				ui.add_space(4.0);
-
 				ui.label(format!("Scroll Delta X (Horiz): {:.2}", trackpad.delta.x));
 				ui.label(format!("Scroll Delta Y (Vert):  {:.2}", trackpad.delta.y));
 				ui.add_space(8.0);
-
 				let primary_axis = if trackpad.delta.x.abs() > trackpad.delta.y.abs() {
 					"Horizontal (X)"
 				} else if trackpad.delta.y.abs() > trackpad.delta.x.abs() {
@@ -954,12 +764,10 @@ impl Oracle {
 				ui.label(format!("Primary Axis: {}", primary_axis));
 				ui.label(format!("Direction State: {:?}", trackpad.direction));
 			});
-
 			// --- Column B: Modifiers & Spatial Focus ---
 			columns[1].group(|ui| {
 				ui.heading("Modifiers & Environment");
 				ui.add_space(4.0);
-
 				// Visual badge for Shift state
 				ui.horizontal(|ui| {
 					ui.label("Shift Key:");
@@ -969,14 +777,12 @@ impl Oracle {
 						ui.colored_label(egui::Color32::GRAY, "Released");
 					}
 				});
-
 				// Mouse Position telemetry
 				if let Some(pos) = trackpad.mouse_pos {
 					ui.label(format!("Pointer Coords: x={:.1}, y={:.1}", pos.x, pos.y));
 				} else {
 					ui.label("Pointer Coords: Out of bounds");
 				}
-
 				ui.add_space(8.0);
 				ui.label(format!(
 					"Target Layout Width: {:.1}px",
@@ -984,19 +790,15 @@ impl Oracle {
 				));
 			});
 		});
-
 		ui.add_space(12.0);
 		ui.separator();
-
 		// 4. Gesture Trigger Simulation Log / Target Action Preview
 		ui.group(|ui| {
 			ui.heading("Target Action Trigger Preview");
 			ui.add_space(4.0);
-
 			let shift_active = trackpad.shift_held;
 			let is_horizontal = trackpad.delta.x.abs() > trackpad.delta.y.abs();
 			let is_vertical = trackpad.delta.y.abs() > trackpad.delta.x.abs();
-
 			if shift_active && is_horizontal {
 				ui.colored_label(
 					egui::Color32::LIGHT_BLUE,
@@ -1017,7 +819,6 @@ impl Oracle {
 				ui.label("Waiting for trigger combo (Hold Shift + Swipe/Scroll)...");
 			}
 		});
-
 		// 5. Minimal footer instructions
 		ui.add_space(8.0);
 		ui.horizontal(|ui| {
@@ -1035,20 +836,15 @@ impl Veable for Oracle {
 	fn draw(&mut self, ui: &mut egui::Ui) {
 		// 1. Poll the channel for file changes on every frame render tick
 		// self.check_for_changes(ui.ctx());
-
 		// 2. Split the available space to reserve room for the bottom status bar
 		let available_size = ui.available_size();
 		let status_bar_height = 24.0;
-
 		let main_size = egui::vec2(available_size.x, available_size.y - status_bar_height);
-
 		// Main Content Area
 		ui.allocate_ui(main_size, |ui| {
 			self.draw_ui(ui);
 		});
-
 		ui.separator();
-
 		// Bottom Status Bar
 		// Left side: Status or error indicator
 		ui.horizontal(|ui| {
@@ -1059,9 +855,7 @@ impl Veable for Oracle {
 			} else {
 				ui.colored_label(egui::Color32::GREEN, "Status: Connected");
 			}
-
 			ui.separator();
-
 			// Right side: Timer / Last Loaded counter
 			if let Some(last_loaded) = self.last_loaded {
 				if let Ok(elapsed) = last_loaded.elapsed() {
@@ -1076,7 +870,6 @@ impl Veable for Oracle {
 			} else {
 				ui.label("Not loaded yet");
 			}
-
 			// Request a continuous repaint so the timer increments live every second
 			ui.ctx()
 				.request_repaint_after(std::time::Duration::from_secs(1));
@@ -1086,7 +879,6 @@ impl Veable for Oracle {
 		});
 	}
 }
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FocusedPane {
 	MainEditor,
@@ -1094,7 +886,6 @@ pub enum FocusedPane {
 	CenterGrid,
 	Unknown,
 }
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScrollDirection {
 	None,
@@ -1103,7 +894,6 @@ pub enum ScrollDirection {
 	Left,
 	Right,
 }
-
 #[derive(Debug, Clone)]
 pub struct TrackpadState {
 	pub delta: egui::Vec2,
@@ -1111,7 +901,6 @@ pub struct TrackpadState {
 	pub shift_held: bool,
 	pub mouse_pos: Option<egui::Pos2>,
 }
-
 use core_foundation::{
 	base::{CFAllocatorRef, TCFType, kCFAllocatorDefault},
 	mach_port::{CFMachPort, CFMachPortRef},
@@ -1126,19 +915,21 @@ use core_graphics::{
 };
 use std::sync::atomic::{AtomicBool, Ordering};
 static SHIFT_HELD: AtomicBool = AtomicBool::new(false);
-
 pub fn start_global_scroll_daemon(proxy: EventLoopProxy<AppEvent>) {
-	let trusted = macos_accessibility_client::accessibility::application_is_trusted_with_prompt();
-	if !trusted {
-		eprintln!("❌ App is not trusted for accessibility/input monitoring.");
-		return;
-	}
-	println!("✅ App is trusted! Initializing event tap with keyboard/mouse listeners...");
-
-	let callback =
-		move |_proxy_cg: CGEventTapProxy, event_type: CGEventType, event: &CGEvent| -> CallbackResult {
+	std::thread::spawn(move || {
+		let trusted = macos_accessibility_client::accessibility::application_is_trusted_with_prompt();
+		if !trusted {
+			return;
+		}
+		let callback = move |_proxy_cg: CGEventTapProxy,
+		                     event_type: CGEventType,
+		                     event: &CGEvent|
+		      -> CallbackResult {
 			match event_type {
 				CGEventType::MouseMoved => {
+					if REDIRECTING_SCROLL.load(Ordering::Relaxed) {
+						return CallbackResult::Keep;
+					}
 					let location = event.location();
 					let _ = proxy.send_event(AppEvent::CursorPosition {
 						x: location.x,
@@ -1148,123 +939,275 @@ pub fn start_global_scroll_daemon(proxy: EventLoopProxy<AppEvent>) {
 				}
 				CGEventType::FlagsChanged => {
 					let flags = event.get_flags();
+
 					let shift_is_down = flags.contains(core_graphics::event::CGEventFlags::CGEventFlagShift);
-					SHIFT_HELD.store(shift_is_down, Ordering::Relaxed);
+
+					let was_down = SHIFT_HELD.swap(shift_is_down, Ordering::Relaxed);
+
+					// -------------------------------------------------------------
+					// Shift pressed
+					// -------------------------------------------------------------
+					if shift_is_down && !was_down {
+						let location = event.location();
+
+						let mut state = scroll_state().lock().unwrap();
+
+						state.active = true;
+						state.redirected = false;
+						state.original_position = location;
+
+						let side = if location.x < 960.0 { "LEFT" } else { "RIGHT" };
+
+						println!(
+							"⬇️ SHIFT DOWN  | cursor=({:.0}, {:.0}) | side={}",
+							location.x, location.y, side
+						);
+					}
+
+					// -------------------------------------------------------------
+					// Shift released
+					// -------------------------------------------------------------
+					if !shift_is_down && was_down {
+						let mut state = scroll_state().lock().unwrap();
+
+						if state.active && state.redirected {
+							println!(
+								"↩️ RESTORE | ({:.0},{:.0}) -> ({:.0},{:.0})",
+								state.target_position.x,
+								state.target_position.y,
+								state.original_position.x,
+								state.original_position.y,
+							);
+
+							if let Ok(source) = CGEventSource::new(CGEventSourceStateID::CombinedSessionState) {
+								if let Ok(event) = CGEvent::new_mouse_event(
+									source,
+									CGEventType::MouseMoved,
+									state.original_position,
+									CGMouseButton::Left,
+								) {
+									event.post(CGEventTapLocation::HID);
+								}
+							}
+						}
+
+						state.active = false;
+						state.redirected = false;
+					}
+
 					CallbackResult::Keep
 				}
-				// --- 🟢 LISTEN FOR KEY PRESSES (1, 2, 3) ---
 				CGEventType::KeyDown => {
 					let keycode =
 						event.get_integer_value_field(core_graphics::event::EventField::KEYBOARD_EVENT_KEYCODE);
 					match keycode {
 						18 => {
-							println!("Key '1' pressed -> Jumping Left!");
+							println!("Key '1' pressed");
 							move_cursor_to(ScreenPosition::Left);
 						}
 						19 => {
-							println!("Key '2' pressed -> Jumping Center!");
+							println!("Key '2' pressed");
 							move_cursor_to(ScreenPosition::Center);
 						}
 						20 => {
-							println!("Key '3' pressed -> Jumping Right!");
+							println!("Key '3' pressed");
 							move_cursor_to(ScreenPosition::Right);
 						}
 						_ => {}
 					}
 					CallbackResult::Keep
 				}
-				// ---------------------------------------------
 				CGEventType::ScrollWheel => {
-					if SHIFT_HELD.load(Ordering::Relaxed) {
-						let location = event.location();
-						if location.x < 960.0 {
-							if let Some(synth) = redirect_scroll(event) {
-								synth.post(CGEventTapLocation::HID);
-							}
-							return CallbackResult::Drop;
-						}
+					if !SHIFT_HELD.load(Ordering::Relaxed) {
+						return CallbackResult::Keep;
 					}
+
+					let mut state = scroll_state().lock().unwrap();
+
+					if !state.active {
+						return CallbackResult::Keep;
+					}
+
+					// Already redirected during this Shift hold.
+					// Let subsequent scroll events pass normally.
+					if state.redirected {
+						return CallbackResult::Keep;
+					}
+
+					let original = state.original_position;
+
+					let target = if original.x < 960.0 {
+						ScreenPosition::Right
+					} else {
+						ScreenPosition::Left
+					};
+
+					let target_point = target_position(original, target);
+
+					println!(
+						"🔀 REDIRECT | from=({:.0},{:.0}) -> ({:.0},{:.0}) | {:?}",
+						original.x, original.y, target_point.x, target_point.y, target,
+					);
+
+					let source = match CGEventSource::new(CGEventSourceStateID::CombinedSessionState) {
+						Ok(source) => source,
+						Err(_) => return CallbackResult::Keep,
+					};
+
+					let move_event = match CGEvent::new_mouse_event(
+						source,
+						CGEventType::MouseMoved,
+						target_point,
+						CGMouseButton::Left,
+					) {
+						Ok(event) => event,
+						Err(_) => return CallbackResult::Keep,
+					};
+
+					move_event.post(CGEventTapLocation::HID);
+
+					state.target_position = target_point;
+					state.redirected = true;
+
+					// Let the ORIGINAL scroll event continue.
 					CallbackResult::Keep
 				}
 				_ => CallbackResult::Keep,
 			}
 		};
-
-	// Include KeyDown alongside mouse events in the tap mask/vector
-	let tap = CGEventTap::new(
-		CGEventTapLocation::HID,
-		CGEventTapPlacement::HeadInsertEventTap,
-		CGEventTapOptions::Default,
-		vec![
-			CGEventType::ScrollWheel,
-			CGEventType::FlagsChanged,
-			CGEventType::MouseMoved,
-			CGEventType::KeyDown,
-		],
-		callback,
-	);
-
-	match tap {
-		Ok(t) => {
-			println!("SUCCESS: Global daemon CGEventTap created successfully!");
-			unsafe {
-				let port = t.mach_port();
-				let source = port
-					.create_runloop_source(0)
-					.expect("failed to create run loop source");
-
-				CFRunLoop::get_current().add_source(&source, kCFRunLoopCommonModes);
-				t.enable();
-
-				std::thread::spawn(move || {
-					CFRunLoop::run_current();
-				});
+		let tap = match CGEventTap::new(
+			CGEventTapLocation::HID,
+			CGEventTapPlacement::HeadInsertEventTap,
+			CGEventTapOptions::Default,
+			vec![
+				CGEventType::ScrollWheel,
+				CGEventType::FlagsChanged,
+				CGEventType::MouseMoved,
+				CGEventType::KeyDown,
+			],
+			callback,
+		) {
+			Ok(tap) => tap,
+			Err(error) => {
+				eprintln!("❌ Failed to create CGEventTap: {:?}", error);
+				return;
 			}
+		};
+		println!("✅ CGEventTap created");
+		unsafe {
+			let port = tap.mach_port();
+			let source = match port.create_runloop_source(0) {
+				Ok(source) => source,
+				Err(_) => {
+					eprintln!("❌ Failed to create CFRunLoopSource");
+					return;
+				}
+			};
+			let run_loop = CFRunLoop::get_current();
+			run_loop.add_source(&source, kCFRunLoopCommonModes);
+			tap.enable();
+			println!("✅ Global input event tap enabled");
+			CFRunLoop::run_current();
 		}
-		Err(e) => {
-			eprintln!(
-				"CRITICAL ERROR: CGEventTap creation failed: {:?} (Check Accessibility permissions!)",
-				e
-			);
-		}
-	}
+	});
 }
-fn redirect_scroll(original: &CGEvent) -> Option<CGEvent> {
-	let source = CGEventSource::new(CGEventSourceStateID::CombinedSessionState).ok()?;
-	let delta_y = original.get_integer_value_field(115);
-	let delta_x = original.get_integer_value_field(116);
-	CGEvent::new_scroll_event(
-		source,
-		ScrollEventUnit::PIXEL,
-		2,
-		delta_y as i32,
-		delta_x as i32,
-		0,
-	)
-	.ok()
+// fn redirect_scroll(original: &CGEvent, target: ScreenPosition) {
+// 	let source = match CGEventSource::new(CGEventSourceStateID::CombinedSessionState) {
+// 		Ok(source) => source,
+// 		Err(_) => return,
+// 	};
+
+// 	let location = original.location();
+// 	let display = CGDisplay::main();
+// 	let bounds = CGDisplay::main().bounds();
+
+// 	let target_x = match target {
+// 		ScreenPosition::Left => bounds.origin.x + bounds.size.width * 0.25,
+// 		ScreenPosition::Right => bounds.origin.x + bounds.size.width * 0.75,
+// 		ScreenPosition::Center => bounds.origin.x + bounds.size.width * 0.50,
+// 	};
+
+// 	let target_point = CGPoint {
+// 		x: target_x,
+// 		y: location.y,
+// 	};
+
+// 	REDIRECTING_SCROLL.store(true, Ordering::Relaxed);
+// 	let Ok(move_event) = CGEvent::new_mouse_event(
+// 		source.clone(),
+// 		CGEventType::MouseMoved,
+// 		target_point,
+// 		CGMouseButton::Left,
+// 	) else {
+// 		REDIRECTING_SCROLL.store(false, Ordering::Relaxed);
+// 		return;
+// 	};
+
+// 	move_event.post(CGEventTapLocation::HID);
+
+// 	// Get original scroll deltas.
+// 	let delta_y = original.get_integer_value_field(EventField::SCROLL_WHEEL_EVENT_POINT_DELTA_AXIS_1);
+
+// 	let delta_x = original.get_integer_value_field(EventField::SCROLL_WHEEL_EVENT_POINT_DELTA_AXIS_2);
+
+// 	// Create scroll event.
+// 	let Ok(scroll) = CGEvent::new_scroll_event(
+// 		source.clone(),
+// 		ScrollEventUnit::PIXEL,
+// 		2,
+// 		delta_y as i32,
+// 		delta_x as i32,
+// 		0,
+// 	) else {
+// 		REDIRECTING_SCROLL.store(false, Ordering::Relaxed);
+// 		return;
+// 	};
+
+// 	// Scroll while cursor is at target.
+// 	scroll.post(CGEventTapLocation::HID);
+
+// 	// Restore cursor.
+// 	let Ok(restore_event) = CGEvent::new_mouse_event(
+// 		source,
+// 		CGEventType::MouseMoved,
+// 		location,
+// 		CGMouseButton::Left,
+// 	) else {
+// 		REDIRECTING_SCROLL.store(false, Ordering::Relaxed);
+// 		return;
+// 	};
+
+// 	restore_event.post(CGEventTapLocation::HID);
+
+// 	REDIRECTING_SCROLL.store(false, Ordering::Relaxed);
+// }
+fn target_position(location: CGPoint, target: ScreenPosition) -> CGPoint {
+	let bounds = CGDisplay::main().bounds();
+	let x = match target {
+		ScreenPosition::Left => bounds.origin.x + bounds.size.width * 0.25,
+		ScreenPosition::Center => bounds.origin.x + bounds.size.width * 0.50,
+		ScreenPosition::Right => bounds.origin.x + bounds.size.width * 0.75,
+	};
+
+	CGPoint { x, y: location.y }
 }
 use core_graphics::event::CGMouseButton;
 use core_graphics::geometry::CGPoint;
-
 #[derive(Debug, Copy, Clone)]
 pub enum ScreenPosition {
 	Left,
 	Center,
 	Right,
 }
-
 pub fn move_cursor_to(pos: ScreenPosition) {
 	let max_width = 1920.0; // Adjust to your primary display width
 	let center_y = 500.0;
-
 	let (x, y) = match pos {
 		ScreenPosition::Left => (max_width * 0.2, center_y),
 		ScreenPosition::Center => (max_width * 0.5, center_y),
 		ScreenPosition::Right => (max_width * 0.8, center_y),
 	};
-
 	let point = CGPoint { x, y };
-
 	if let Ok(source) = CGEventSource::new(CGEventSourceStateID::CombinedSessionState) {
 		if let Ok(event) =
 			CGEvent::new_mouse_event(source, CGEventType::MouseMoved, point, CGMouseButton::Left)
@@ -1274,63 +1217,21 @@ pub fn move_cursor_to(pos: ScreenPosition) {
 		}
 	}
 }
-
 use global_hotkey::{
 	GlobalHotKeyEvent, GlobalHotKeyManager,
 	hotkey::{Code, HotKey, Modifiers},
 };
-
-pub fn smoke_test_hotkey() {
-	let manager = GlobalHotKeyManager::new().unwrap();
-	let hotkey = HotKey::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyP);
-	let hotkey_id = hotkey.id();
-	manager.register(hotkey).unwrap();
-	println!("🧪 Smoke test active! Press Shift + Alt + P");
-	std::thread::spawn(move || {
-		let receiver = GlobalHotKeyEvent::receiver();
-		while let Ok(event) = receiver.recv() {
-			if event.id == hotkey_id && event.state == global_hotkey::HotKeyState::Pressed {
-				println!("🎉 HOTKEY FIRED!");
-				move_cursor_to(ScreenPosition::Left);
-				let _ = std::process::Command::new("osascript")
-					.arg("-e")
-					.arg(r#"display notification "Global Hotkey Works!" with title "Smoke Test""#)
-					.spawn();
-			}
-		}
-	});
-
-	// IMPORTANT: manager must stay alive.
-	std::mem::forget(manager);
-}
-
 use std::time::{Duration, Instant};
-
-pub struct TaskManagerView {
-	state_path: PathBuf,
-	state: Option<EstateState>,
-
-	dirty: bool,
-	last_loaded: Option<SystemTime>,
-	error: Option<String>,
-
-	rx: tokio::sync::mpsc::Receiver<()>,
-	_watcher: notify::RecommendedWatcher,
-}
-
-impl TaskManagerView {
+impl TaskManager {
 	pub fn new() -> Self {
 		Self::from_path("/Users/future/Library/Application Support/estate/state.json")
 	}
-
 	pub fn from_path(path: impl Into<PathBuf>) -> Self {
 		let state_path = path.into();
-
 		let (tx, rx) = tokio::sync::mpsc::channel::<()>(1);
-
 		let watcher = Self::init_watcher(&state_path, tx).expect("Failed to initialize state watcher");
-
 		let mut view = Self {
+			tasks: HashMap::new(),
 			state_path,
 			state: None,
 			dirty: false,
@@ -1339,44 +1240,36 @@ impl TaskManagerView {
 			rx,
 			_watcher: watcher,
 		};
-
 		view.reload();
-
 		view
 	}
-
 	pub fn reload(&mut self) {
 		match EstateState::loadFromPath(&self.state_path) {
 			Ok(state) => {
 				self.state = Some(state);
 				self.dirty = false;
 				self.error = None;
-
 				self.last_loaded = fs::metadata(&self.state_path)
 					.and_then(|metadata| metadata.modified())
 					.ok();
 			}
-
 			Err(error) => {
 				self.error = Some(error.to_string());
 				self.dirty = true;
 			}
 		}
 	}
-
 	pub fn check_for_changes(&mut self, ctx: &egui::Context) {
 		if self.rx.try_recv().is_ok() {
 			self.reload();
 			ctx.request_repaint();
 		}
 	}
-
 	fn init_watcher(
 		path: &Path,
 		tx: tokio::sync::mpsc::Sender<()>,
 	) -> Result<notify::RecommendedWatcher, notify::Error> {
 		use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
-
 		let mut watcher = RecommendedWatcher::new(
 			move |res: Result<Event, notify::Error>| {
 				if let Ok(event) = res {
@@ -1387,33 +1280,23 @@ impl TaskManagerView {
 			},
 			Config::default(),
 		)?;
-
 		if let Some(parent) = path.parent() {
 			watcher.watch(parent, RecursiveMode::NonRecursive)?;
 		}
-
 		Ok(watcher)
 	}
 	fn draw_job(&self, ui: &mut egui::Ui, job: &Job) {
 		egui::Frame::group(ui.style()).show(ui, |ui| {
 			ui.horizontal(|ui| {
-				// Status indicator
 				ui.label(job.status.icon());
-
-				// Job name
 				ui.vertical(|ui| {
 					ui.strong(&job.name);
-
 					ui.small(format!("Job #{}", job.id));
 				});
-
 				ui.add_space(20.0);
-
 				// Status
 				ui.label(job.status.label());
-
 				ui.add_space(20.0);
-
 				// Progress
 				if let Some(progress) = job.progress {
 					ui.add(
@@ -1422,14 +1305,11 @@ impl TaskManagerView {
 							.show_percentage(),
 					);
 				}
-
 				// Runtime
 				if let Some(started_at) = job.started_at {
 					let elapsed = started_at.elapsed();
-
 					ui.label(format_duration(elapsed));
 				}
-
 				ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
 					ui.button("⋮");
 				});
@@ -1437,29 +1317,24 @@ impl TaskManagerView {
 		});
 	}
 }
-
-impl Veable for TaskManagerView {
+impl Veable for TaskManager {
 	fn draw(&mut self, ui: &mut Ui) {
 		self.check_for_changes(ui.ctx());
-
 		if let Some(error) = &self.error {
 			ui.heading("Task Manager");
 			ui.colored_label(palette::DANGER, error);
 			ui.label(self.state_path.display().to_string());
 			return;
 		}
-
 		let Some(state) = &self.state else {
 			ui.centered_and_justified(|ui| {
 				ui.label("Loading task state...");
 			});
 			return;
 		};
-
 		// -------------------------------------------------------------
 		// Header
 		// -------------------------------------------------------------
-
 		ui.vertical(|ui| {
 			ui.label(
 				egui::RichText::new("Task Overview")
@@ -1467,22 +1342,17 @@ impl Veable for TaskManagerView {
 					.strong()
 					.color(palette::TEXT),
 			);
-
 			ui.add_space(2.0);
-
 			ui.label(
 				egui::RichText::new("Estate Runtime")
 					.size(12.0)
 					.color(palette::TEXT_MUTED),
 			);
 		});
-
 		ui.add_space(16.0);
-
 		// -------------------------------------------------------------
 		// Summary metrics
 		// -------------------------------------------------------------
-
 		ui.columns(4, |columns| {
 			metric(
 				&mut columns[0],
@@ -1490,21 +1360,18 @@ impl Veable for TaskManagerView {
 				state.tasks_created,
 				palette::PRIMARY,
 			);
-
 			metric(
 				&mut columns[1],
 				"Tasks Completed",
 				state.tasks_completed,
 				palette::SUCCESS,
 			);
-
 			metric(
 				&mut columns[2],
 				"Events Processed",
 				state.events_processed,
 				palette::WARNING,
 			);
-
 			metric(
 				&mut columns[3],
 				"Status Checks",
@@ -1512,23 +1379,17 @@ impl Veable for TaskManagerView {
 				palette::TEXT_MUTED,
 			);
 		});
-
 		ui.add_space(16.0);
-
 		// -------------------------------------------------------------
 		// Charts
 		// -------------------------------------------------------------
-
 		let available = ui.available_size();
-
 		let gap = 6.0;
 		let card_width = (available.x - gap) / 2.0;
 		let card_height = 280.0;
-
 		// -------------------------------------------------------------
 		// Row 1
 		// -------------------------------------------------------------
-
 		ui.allocate_ui_with_layout(
 			egui::vec2(available.x, card_height),
 			egui::Layout::left_to_right(egui::Align::TOP),
@@ -1542,30 +1403,21 @@ impl Veable for TaskManagerView {
 					// Metrics
 					|ui| {
 						let remaining = state.tasks_created.saturating_sub(state.tasks_completed);
-
 						small_metric(ui, "Created", state.tasks_created, palette::PRIMARY);
-
 						ui.add_space(20.0);
-
 						small_metric(ui, "Completed", state.tasks_completed, palette::SUCCESS);
-
 						ui.add_space(20.0);
-
 						small_metric(ui, "Remaining", remaining, palette::TEXT_MUTED);
 					},
 					// Chart
 					|ui| {
 						let max_value = state.tasks_created.max(1) as f64;
-
 						let bars = vec![
 							Bar::new(0.0, state.tasks_created as f64).fill(palette::PRIMARY),
 							Bar::new(1.0, state.tasks_completed as f64).fill(palette::SUCCESS),
 						];
-
 						let chart = BarChart::new("task_counts", bars);
-
 						let max_y = state.tasks_created.max(1) as f64;
-
 						Plot::new("task_counts_plot")
 							.height(190.0)
 							.show_axes([true, true])
@@ -1580,11 +1432,9 @@ impl Veable for TaskManagerView {
 							});
 					},
 				);
-
 				// ---------------------------------------------------------
 				// Completion
 				// ---------------------------------------------------------
-
 				draw_chart_card(
 					ui,
 					egui::vec2(card_width, card_height),
@@ -1595,21 +1445,15 @@ impl Veable for TaskManagerView {
 						let created = state.tasks_created as f64;
 						let completed = state.tasks_completed as f64;
 						let remaining = (created - completed).max(0.0);
-
 						let percentage = if created > 0.0 {
 							(completed / created) * 100.0
 						} else {
 							0.0
 						};
-
 						small_metric(ui, "Complete", state.tasks_completed, palette::SUCCESS);
-
 						ui.add_space(20.0);
-
 						small_metric(ui, "Remaining", remaining as u64, palette::TEXT_MUTED);
-
 						ui.add_space(20.0);
-
 						ui.label(
 							egui::RichText::new(format!("{percentage:.1}%"))
 								.size(14.0)
@@ -1622,21 +1466,17 @@ impl Veable for TaskManagerView {
 						let created = state.tasks_created as f64;
 						let completed = state.tasks_completed as f64;
 						let remaining = (created - completed).max(0.0);
-
 						let percentage = if created > 0.0 {
 							(completed / created) * 100.0
 						} else {
 							0.0
 						};
-
 						let bars = vec![
 							Bar::new(0.0, completed).fill(palette::SUCCESS),
 							Bar::new(1.0, remaining).fill(palette::SURFACE_HOVER),
 						];
-
 						let chart = BarChart::new("task_completion", bars);
 						let max_value = completed.max(remaining);
-
 						Plot::new("task_completion_plot")
 							.height(190.0)
 							.show_axes([true, true])
@@ -1659,13 +1499,10 @@ impl Veable for TaskManagerView {
 				);
 			},
 		);
-
 		ui.add_space(gap);
-
 		// -------------------------------------------------------------
 		// Row 2
 		// -------------------------------------------------------------
-
 		ui.allocate_ui_with_layout(
 			egui::vec2(available.x, card_height),
 			egui::Layout::left_to_right(egui::Align::TOP),
@@ -1674,7 +1511,6 @@ impl Veable for TaskManagerView {
 				// ---------------------------------------------------------
 				// System Activity
 				// ---------------------------------------------------------
-
 				draw_chart_card(
 					ui,
 					egui::vec2(card_width, card_height),
@@ -1683,17 +1519,11 @@ impl Veable for TaskManagerView {
 					// Metrics
 					|ui| {
 						small_metric(ui, "Starts", state.starts, palette::PRIMARY);
-
 						ui.add_space(16.0);
-
 						small_metric(ui, "Checks", state.status_checks, palette::TEXT_MUTED);
-
 						ui.add_space(16.0);
-
 						small_metric(ui, "Events", state.events_processed, palette::WARNING);
-
 						ui.add_space(16.0);
-
 						small_metric(ui, "Files", state.files_indexed, palette::SUCCESS);
 					},
 					// Chart
@@ -1707,14 +1537,12 @@ impl Veable for TaskManagerView {
 						.into_iter()
 						.max()
 						.unwrap_or(1) as f64;
-
 						let bars = vec![
 							Bar::new(0.0, state.starts as f64).fill(palette::PRIMARY),
 							Bar::new(1.0, state.status_checks as f64).fill(palette::TEXT_MUTED),
 							Bar::new(2.0, state.events_processed as f64).fill(palette::WARNING),
 							Bar::new(3.0, state.files_indexed as f64).fill(palette::SUCCESS),
 						];
-
 						let chart = BarChart::new("system_activity", bars);
 						let max_value = [
 							state.starts,
@@ -1742,11 +1570,9 @@ impl Veable for TaskManagerView {
 							});
 					},
 				);
-
 				// ---------------------------------------------------------
 				// Runtime
 				// ---------------------------------------------------------
-
 				draw_chart_card(
 					ui,
 					egui::vec2(card_width, card_height),
@@ -1755,13 +1581,9 @@ impl Veable for TaskManagerView {
 					// Metrics
 					|ui| {
 						small_metric(ui, "Starts", state.starts, palette::PRIMARY);
-
 						ui.add_space(20.0);
-
 						small_metric(ui, "Longest Run", state.longest_run, palette::WARNING);
-
 						ui.add_space(20.0);
-
 						small_metric(ui, "Events", state.events_processed, palette::TEXT_MUTED);
 					},
 					// Chart
@@ -1770,15 +1592,12 @@ impl Veable for TaskManagerView {
 							.into_iter()
 							.max()
 							.unwrap_or(1) as f64;
-
 						let bars = vec![
 							Bar::new(0.0, state.starts as f64).fill(palette::PRIMARY),
 							Bar::new(1.0, state.events_processed as f64).fill(palette::WARNING),
 							Bar::new(2.0, state.files_indexed as f64).fill(palette::SUCCESS),
 						];
-
 						let chart = BarChart::new("runtime_activity", bars);
-
 						Plot::new("runtime_activity_plot")
 							.height(190.0)
 							.show_axes([true, true])
@@ -1799,18 +1618,15 @@ impl Veable for TaskManagerView {
 		);
 	}
 }
-
 fn metric(ui: &mut Ui, label: &str, value: u64, color: egui::Color32) {
 	ui.group(|ui| {
 		ui.set_min_height(78.0);
-
 		ui.vertical_centered(|ui| {
 			ui.label(
 				egui::RichText::new(label)
 					.small()
 					.color(palette::TEXT_MUTED),
 			);
-
 			ui.label(
 				egui::RichText::new(value.to_string())
 					.size(26.0)
@@ -1827,14 +1643,12 @@ fn chart_stat(ui: &mut Ui, label: &str, value: u64, color: egui::Color32) {
 				.small()
 				.color(palette::TEXT_MUTED),
 		);
-
 		ui.label(egui::RichText::new(value.to_string()).strong().color(color));
 	});
 }
 fn runtime_metric(ui: &mut Ui, label: &str, value: u64) {
 	ui.horizontal(|ui| {
 		ui.label(egui::RichText::new(label).color(palette::TEXT_MUTED));
-
 		ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
 			ui.label(
 				egui::RichText::new(value.to_string())
@@ -1843,7 +1657,6 @@ fn runtime_metric(ui: &mut Ui, label: &str, value: u64) {
 			);
 		});
 	});
-
 	ui.separator();
 }
 fn draw_chart_card(
@@ -1865,36 +1678,28 @@ fn draw_chart_card(
 					// -------------------------------------------------
 					// Header
 					// -------------------------------------------------
-
 					ui.label(
 						egui::RichText::new(title)
 							.size(15.0)
 							.strong()
 							.color(palette::TEXT),
 					);
-
 					ui.label(
 						egui::RichText::new(subtitle)
 							.size(11.0)
 							.color(palette::TEXT_MUTED),
 					);
-
 					ui.add_space(8.0);
-
 					// -------------------------------------------------
 					// Metrics
 					// -------------------------------------------------
-
 					ui.horizontal(|ui| {
 						metrics(ui);
 					});
-
 					ui.add_space(8.0);
-
 					// -------------------------------------------------
 					// Chart
 					// -------------------------------------------------
-
 					ui.vertical(|ui| {
 						chart(ui);
 					});
@@ -1906,10 +1711,8 @@ fn draw_chart_group(ui: &mut Ui, size: egui::Vec2, title: &str, content: impl Fn
 	ui.allocate_ui(size, |ui| {
 		ui.group(|ui| {
 			ui.set_min_size(ui.available_size());
-
 			ui.heading(title);
 			ui.separator();
-
 			content(ui);
 		});
 	});
@@ -1921,7 +1724,6 @@ fn small_metric(ui: &mut Ui, label: &str, value: u64, color: egui::Color32) {
 				.size(11.0)
 				.color(palette::TEXT_MUTED),
 		);
-
 		ui.label(
 			egui::RichText::new(value.to_string())
 				.size(13.0)
@@ -1965,10 +1767,8 @@ impl JobStatus {
 		}
 	}
 }
-
 fn format_duration(duration: Duration) -> String {
 	let secs = duration.as_secs();
-
 	if secs < 60 {
 		format!("{secs}s")
 	} else if secs < 3600 {
@@ -1977,22 +1777,40 @@ fn format_duration(duration: Duration) -> String {
 		format!("{}h {}m", secs / 3600, (secs % 3600) / 60)
 	}
 }
-
 pub mod palette {
 	use egui::Color32;
-
 	pub const BG: Color32 = Color32::from_rgb(18, 20, 24);
 	pub const SURFACE: Color32 = Color32::from_rgb(27, 30, 36);
 	pub const SURFACE_HOVER: Color32 = Color32::from_rgb(34, 38, 46);
 	pub const BORDER: Color32 = Color32::from_rgb(52, 57, 68);
-
 	pub const TEXT: Color32 = Color32::from_rgb(232, 235, 240);
 	pub const TEXT_MUTED: Color32 = Color32::from_rgb(145, 152, 165);
-
 	pub const PRIMARY: Color32 = Color32::from_rgb(100, 160, 255);
 	pub const SUCCESS: Color32 = Color32::from_rgb(82, 190, 125);
 	pub const WARNING: Color32 = Color32::from_rgb(235, 180, 70);
 	pub const DANGER: Color32 = Color32::from_rgb(230, 90, 95);
-
 	pub const GRID: Color32 = Color32::from_rgb(45, 49, 58);
+}
+
+static REDIRECTING_SCROLL: AtomicBool = AtomicBool::new(false);
+
+#[derive(Debug, Clone, Copy)]
+struct ScrollRedirectState {
+	active: bool,
+	redirected: bool,
+	original_position: CGPoint,
+	target_position: CGPoint,
+}
+
+static SCROLL_STATE: OnceLock<Mutex<ScrollRedirectState>> = OnceLock::new();
+
+fn scroll_state() -> &'static Mutex<ScrollRedirectState> {
+	SCROLL_STATE.get_or_init(|| {
+		Mutex::new(ScrollRedirectState {
+			active: false,
+			redirected: false,
+			original_position: CGPoint { x: 0.0, y: 0.0 },
+			target_position: CGPoint { x: 0.0, y: 0.0 },
+		})
+	})
 }

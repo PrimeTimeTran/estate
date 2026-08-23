@@ -6,6 +6,10 @@ use egui_wgpu::{
 	wgpu::{self, hal::InstanceDescriptor},
 };
 use egui_winit::State as EguiState;
+use global_hotkey::{
+	GlobalHotKeyEvent, GlobalHotKeyManager,
+	hotkey::{Code, HotKey, Modifiers},
+};
 use objc2_app_kit::{NSApplication, NSApplicationActivationPolicy};
 use objc2_foundation::MainThreadMarker;
 use tracing::instrument::WithSubscriber;
@@ -53,10 +57,13 @@ pub struct App {
 	/// * **Handoff to an external worker loop/thread:** Use `Option<mpsc::Receiver<T>>` so you can `.take()` it once upon startup.
 	daemon_rx: Option<mpsc::Receiver<DaemonCommand>>,
 	window: Option<Window>,
+	hotkey_manager: Option<GlobalHotKeyManager>,
 	pub windows: Vec<Window>,
 	pub dashboard_window: Option<Window>,
 	pub telemetry_window: Option<Window>,
 	pub clock: Option<Window>,
+	clock_tray: Option<TrayIcon>,
+	scroll_tray: Option<TrayIcon>,
 }
 use std::sync::atomic::{AtomicBool, Ordering};
 static HOTKEY_INITIALIZED: AtomicBool = AtomicBool::new(false);
@@ -65,7 +72,9 @@ impl App {
 		let engine = EstateEngine::new()?;
 		let context = Context::default();
 		let (daemon_tx, daemon_rx) = mpsc::channel(100);
+
 		Ok(Self {
+			hotkey_manager: None,
 			context,
 			clock: None,
 			daemon: None,
@@ -78,11 +87,13 @@ impl App {
 			windows: vec![],
 			dashboard_window: None,
 			telemetry_window: None,
+			clock_tray: None,
+			scroll_tray: None,
 		})
 	}
 	pub fn run(&mut self, cli: Cli) -> anyhow::Result<()> {
 		match cli.command {
-			None | Some(Command::Start { .. }) | Some(Command::Tray) => self.run_application(),
+			None | Some(Command::Start { .. }) | Some(Command::Tray) => self.start_runtime(),
 			Some(_) => {
 				let runtime = tokio::runtime::Runtime::new()?;
 				runtime.block_on(async {
@@ -92,51 +103,32 @@ impl App {
 			}
 		}
 	}
-	fn run_application(&mut self) -> anyhow::Result<()> {
-		smoke_test_hotkey();
+	fn start_runtime(&mut self) -> anyhow::Result<()> {
+		tracing::info!(">>> start_runtime: entering");
+		self.register_global_hotkeys()?;
 		let event_loop = EventLoop::<AppEvent>::with_user_event()
 			.with_activation_policy(ActivationPolicy::Accessory)
 			.build()?;
 		let proxy = event_loop.create_proxy();
-		let proxy_for_daemon = proxy.clone();
-		std::thread::spawn(move || {
-			start_global_scroll_daemon(proxy_for_daemon);
-		});
-
+		start_global_scroll_daemon(proxy.clone());
+		self.spawn_signal_handler(proxy.clone());
+		self.span_clock(proxy);
+		tracing::info!(">>> start_runtime: entering event loop");
+		event_loop.run_app(self)?;
+		tracing::info!(">>> start_runtime: event loop returned");
 		let rx = self
 			.daemon_rx
 			.take()
 			.expect("daemon receiver already consumed");
-
 		let engine = self.engine.clone();
-		Self::start_daemon(engine, rx);
-		Self::start_signal_handler(proxy.clone());
-		let proxy_ticker = proxy.clone();
-		std::thread::spawn(move || {
-			let mut current_time = 30;
-			loop {
-				let text = format!(" {}s", current_time);
-				let _ = proxy_ticker.send_event(AppEvent::TickClock(text));
-
-				if current_time == 0 {
-					current_time = 30;
-				} else {
-					current_time -= 1;
-				}
-				std::thread::sleep(std::time::Duration::from_secs(1));
-			}
-		});
-
-		event_loop.run_app(self)?;
-
+		Self::spawn_daemon(engine, rx);
 		Ok(())
 	}
-	fn start_daemon(engine: EstateEngine, mut rx: mpsc::Receiver<DaemonCommand>) {
+	fn spawn_daemon(engine: EstateEngine, mut rx: mpsc::Receiver<DaemonCommand>) {
 		std::thread::spawn(move || {
 			let runtime = tokio::runtime::Runtime::new().expect("failed to create Tokio runtime");
 			runtime.block_on(async move {
 				let mut daemon = Daemon::new(engine);
-
 				tokio::select! {
 					result = daemon.run_foreground() => {
 						if let Err(error) = result {
@@ -165,24 +157,80 @@ impl App {
 			});
 		});
 	}
-	fn start_signal_handler(proxy: EventLoopProxy<AppEvent>) {
+	fn spawn_signal_handler(&mut self, proxy: EventLoopProxy<AppEvent>) {
 		std::thread::spawn(move || {
+			tracing::info!("Ctrl+C handler started");
 			let runtime = tokio::runtime::Runtime::new().expect("failed to create Tokio runtime");
 			runtime.block_on(async move {
-				if let Err(error) = tokio::signal::ctrl_c().await {
-					tracing::error!(
-						%error,
-						"failed to listen for Ctrl+C"
-					);
-					return;
+				tracing::info!("Waiting for Ctrl+C...");
+
+				match tokio::signal::ctrl_c().await {
+					Ok(()) => {
+						tracing::info!("🛑 Ctrl+C received");
+
+						if let Err(error) = proxy.send_event(AppEvent::Shutdown) {
+							tracing::error!(
+								%error,
+								"failed to send Shutdown event"
+							);
+						}
+					}
+
+					Err(error) => {
+						tracing::error!(
+							%error,
+							"failed to listen for Ctrl+C"
+						);
+					}
 				}
-				let _ = proxy.send_event(AppEvent::Shutdown);
 			});
+
+			tracing::info!("Ctrl+C handler exiting");
 		});
+	}
+	fn span_clock(&mut self, proxy: EventLoopProxy<AppEvent>) {
+		let proxy_ticker = proxy.clone();
+		std::thread::spawn(move || {
+			let mut current_time = 30;
+			loop {
+				let text = format!(" {}s", current_time);
+				let _ = proxy_ticker.send_event(AppEvent::TickClock(text));
+				if current_time == 0 {
+					current_time = 30;
+				} else {
+					current_time -= 1;
+				}
+				std::thread::sleep(std::time::Duration::from_secs(1));
+			}
+		});
+	}
+	fn register_global_hotkeys(&mut self) -> anyhow::Result<()> {
+		let manager = GlobalHotKeyManager::new()?;
+
+		let hotkey = HotKey::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyP);
+
+		let hotkey_id = hotkey.id();
+
+		manager.register(hotkey)?;
+
+		self.hotkey_manager = Some(manager);
+
+		std::thread::spawn(move || {
+			let receiver = GlobalHotKeyEvent::receiver();
+
+			while let Ok(event) = receiver.recv() {
+				if event.id == hotkey_id && event.state == global_hotkey::HotKeyState::Pressed {
+					move_cursor_to(ScreenPosition::Left);
+				}
+			}
+		});
+
+		Ok(())
 	}
 	fn bootstrap() -> anyhow::Result<(TrayMenu, TrayIcon)> {
 		let menu = Menu::new();
 		let clock_item = MenuItem::new("Clock: 30s", true, None);
+		let scroll_item = MenuItem::new("Scroll: Idle", true, None);
 		let status = MenuItem::new("● Estate Daemon Running", false, None);
 		let dev = MenuItem::new("Open Dashboard", true, None);
 		let telemetry = MenuItem::new("Open Telemetry Inspector", true, None);
@@ -196,20 +244,31 @@ impl App {
 		tasks.append(&clear_tasks)?;
 		let quit = MenuItem::new("Quit", true, None);
 		menu.append(&clock_item)?;
+		menu.append(&scroll_item)?;
 		menu.append(&status)?;
 		menu.append(&dev)?;
 		menu.append(&telemetry)?;
 		menu.append(&task_manager)?;
 		menu.append(&tasks)?;
 		menu.append(&quit)?;
-
 		let tray = TrayIconBuilder::new()
 			.with_icon(Self::tray_icon())
 			.with_menu(Box::new(menu))
 			.with_tooltip("Estate Daemon — Running")
 			.build()
 			.map_err(|e| anyhow::anyhow!("failed to create tray icon: {e}"))?;
-
+		let clock_tray = Some(
+			TrayIconBuilder::new()
+				.with_icon(Self::tray_icon())
+				.with_tooltip("Estate Clock")
+				.build()?,
+		);
+		let scroll_tray = Some(
+			TrayIconBuilder::new()
+				.with_icon(Self::tray_icon())
+				.with_tooltip("Scroll Redirect")
+				.build()?,
+		);
 		Ok((
 			TrayMenu {
 				clear_tasks,
@@ -218,6 +277,7 @@ impl App {
 				new_task,
 				quit,
 				status,
+				// scroll_item,
 				tasks,
 				telemetry,
 				task_manager,
@@ -226,8 +286,13 @@ impl App {
 		))
 	}
 	fn shutdown(&mut self, event_loop: &ActiveEventLoop) {
+		tracing::info!("🛑 Shutting down application");
+
 		let _ = self.daemon_tx.try_send(DaemonCommand::Stop);
+
+		tracing::info!("🛑 Calling event_loop.exit()");
 		event_loop.exit();
+		tracing::info!("🛑 event_loop.exit() returned");
 	}
 	fn handle_menu_event(&mut self, event: MenuEvent, event_loop: &ActiveEventLoop) {
 		let Some(menu) = self.menu.as_ref() else {
@@ -235,7 +300,6 @@ impl App {
 		};
 		let id = event.id();
 		if id == menu.quit.id() {
-			tracing::info!("🛑 Quit requested");
 			let _ = self.daemon_tx.try_send(DaemonCommand::Stop);
 			event_loop.exit();
 		} else if id == menu.dev.id() {
@@ -286,7 +350,7 @@ impl App {
 			}
 			AppWindowType::TaskManager => {
 				tracing::info!("AppWindowType::TaskManagerView");
-				let ve = Ve::new(TaskManagerView::new());
+				let ve = Ve::new(TaskManager::new());
 				match Window::new(event_loop, ve) {
 					Ok(mut window) => {
 						window.window.set_title("TaskManagerView");
@@ -298,10 +362,10 @@ impl App {
 		}
 	}
 }
+
 impl App {
 	fn show_tasks(&mut self) {
 		println!("Requesting task/status refresh...");
-
 		self
 			.engine
 			.runtime
@@ -333,6 +397,14 @@ impl App {
 			.into_rgba8();
 		let (width, height) = image.dimensions();
 		Icon::from_rgba(image.into_raw(), width, height).expect("failed to create tray icon")
+	}
+	fn scroll_tray_icon() -> tray_icon::Icon {
+		let image = image::load_from_memory(constants::TRAY_SCROLL_ICON)
+			.expect("failed to load scroll tray icon")
+			.into_rgba8();
+		let (width, height) = image.dimensions();
+		tray_icon::Icon::from_rgba(image.into_raw(), width, height)
+			.expect("failed to create scroll tray icon")
 	}
 	#[tracing::instrument(
 		target = "estate::discovery",
@@ -372,27 +444,43 @@ impl ApplicationHandler<AppEvent> for App {
 			self.handle_menu_event(event, event_loop);
 		}
 	}
-
 	fn resumed(&mut self, event_loop: &ActiveEventLoop) {
 		if self.window.is_none() {
 			self.open_named_window(event_loop, AppWindowType::TaskManager);
 		}
-		if self.tray.is_some() {
-			return;
+
+		// Main Estate tray.
+		if self.tray.is_none() {
+			let (menu, tray) = match Self::bootstrap() {
+				Ok(value) => value,
+				Err(error) => {
+					tracing::error!(%error, "failed to bootstrap tray");
+					return;
+				}
+			};
+
+			self.menu = Some(menu);
+			self.tray = Some(tray);
+
+			tracing::info!("🔥 main tray initialized");
 		}
 
-		let (menu, tray) = match Self::bootstrap() {
-			Ok(value) => value,
-			Err(error) => {
-				tracing::error!(%error, "failed to bootstrap tray");
-				return;
+		// Scroll controller tray.
+		if self.scroll_tray.is_none() {
+			match TrayIconBuilder::new()
+				.with_icon(Self::scroll_tray_icon())
+				.with_tooltip("Estate Scroll Controller")
+				.build()
+			{
+				Ok(tray) => {
+					self.scroll_tray = Some(tray);
+					tracing::info!("🔥 scroll tray initialized");
+				}
+				Err(error) => {
+					tracing::error!(%error, "failed to create scroll tray");
+				}
 			}
-		};
-
-		self.menu = Some(menu);
-		self.tray = Some(tray);
-
-		tracing::info!("🔥 tray initialized");
+		}
 	}
 	fn window_event(
 		&mut self,
@@ -400,7 +488,6 @@ impl ApplicationHandler<AppEvent> for App {
 		window_id: WindowId,
 		event: WindowEvent,
 	) {
-		// 1. Find which of our managed windows matches the incoming window_id
 		let target_window = if let Some(ref mut win) = self.dashboard_window {
 			if win.window.id() == window_id {
 				Some(win)
@@ -421,19 +508,13 @@ impl ApplicationHandler<AppEvent> for App {
 				None
 			}
 		});
-
-		// If the event doesn't belong to any known managed window, bail out
 		let Some(window) = target_window else {
 			return;
 		};
-
-		// 2. Feed event into egui state for the matched window
 		let response = window.egui_state.on_window_event(&window.window, &event);
 		if response.repaint {
 			window.window.request_redraw();
 		}
-
-		// 3. Handle window-specific events
 		match event {
 			WindowEvent::CloseRequested => {
 				tracing::info!("🛑 Window close requested for id: {:?}", window_id);
@@ -490,10 +571,20 @@ impl ApplicationHandler<AppEvent> for App {
 				self.shutdown(event_loop);
 			}
 			AppEvent::CursorPosition { x, y } => {
-				// <--- Is this match arm present?
-				let text = format!(" X: {:.0} | Y: {:.0}", x, y);
-				if let Some(tray) = &self.tray {
-					let _ = tray.set_title(Some(text));
+				let text = format!("↖ {:.0}  {:.0}", x, y);
+				let text = format!("← {:.0}  {:.0}", x, y);
+				let text = format!("→ {:.0}  {:.0}", x, y);
+				let text = format!("↑ {:.0}  {:.0}", x, y);
+				let text = format!("● {:.0}, {:.0}", x, y);
+				let text = format!("◉ {:.0}, {:.0}", x, y);
+				let text = format!("⌖ {:.0}, {:.0}", x, y);
+				let text = format!("🟢 {:.0}, {:.0}", x, y);
+				let text = format!("🔵 {:.0}, {:.0}", x, y);
+				let text = format!("🟡 {:.0}, {:.0}", x, y);
+				let text = format!("🔴 {:.0}, {:.0}", x, y);
+				let region = if x < 960.0 { "← LEFT" } else { "RIGHT →" };
+				if let Some(tray) = &self.scroll_tray {
+					let _ = tray.set_title(Some(region));
 				}
 			}
 			AppEvent::TickClock(text) => {
@@ -508,11 +599,8 @@ impl ApplicationHandler<AppEvent> for App {
 #[derive(Clone, Debug, Default)]
 pub struct Context {
 	pub source: RuntimeMode,
-	/// Where the user is operating
 	pub workspace: PathBuf,
-	/// Global user estate (~/.estate)
 	pub estate_root: PathBuf,
-	/// Engine internals (cache, daemon state, registry)
 	pub engine_root: PathBuf,
 }
 #[derive(Clone, Debug, Default)]
@@ -547,12 +635,61 @@ struct TrayMenu {
 	task_manager: MenuItem,
 	tasks: Submenu,
 	telemetry: MenuItem,
+	// scroll_item: MenuItem,
 }
 
 /// Estate UI Container
 ///
 /// Owns the native window, egui state, wgpu rendering resources, and the
 /// application state required to render and interact with the development UI.
+/// CPU / Rust
+///    │
+///    │ create resources + record commands
+///    ▼
+/// wgpu::Device
+///    │
+///    │ command encoder
+///    ▼
+/// wgpu::Queue
+///    │
+///    │ submit
+///    ▼
+/// ┌─────────────────────────────────────────────┐
+/// │                 GPU PIPELINE                │
+/// │                                             │
+/// │ Vertex Input                                │
+/// │      ↓                                      │
+/// │ Vertex Shader                                │
+/// │      ↓                                      │
+/// │ Primitive Assembly                          │
+/// │      ↓                                      │
+/// │ Rasterization                               │
+/// │      ↓                                      │
+/// │ Fragment Shader                              │
+/// │      ↓                                      │
+/// │ Depth / Stencil / Blending                  │
+/// │      ↓                                      │
+/// │ Render Target                               │
+/// └─────────────────────────────────────────────┘
+///    │
+///    ▼
+/// Surface Texture
+///    │
+///    ▼
+/// Window
+/// Vertex data
+///     ↓
+/// Vertex Shader
+///     ↓
+/// Primitive assembly
+///     ↓
+/// Rasterization
+///     ↓
+/// Fragment Shader
+///     ↓
+/// Depth / Stencil / Blending
+///     ↓
+/// Color attachment
 pub struct Window {
 	pub window: Arc<winit::window::Window>,
 	egui_ctx: egui::Context,
@@ -566,6 +703,15 @@ pub struct Window {
 	pending_textures: TexturesDelta,
 	needs_resize: bool,
 	view: Ve,
+	// 1. input assembler
+	// 2.vertex shader
+	// 3.hull shader
+	//4. tesselator
+	// 5.domain shader
+	// 6.geometry shader
+	// 7.rasterizer
+	// 8.pixel shader
+	// 9.output merger
 }
 
 impl Window {
@@ -606,10 +752,15 @@ impl Window {
 	fn build_ui(&mut self) -> egui::FullOutput {
 		let mut ui = egui::Ui::new(
 			self.egui_ctx.clone(),
-			egui::Id::new("dev_root"),
+			egui::Id::new("window_root"),
 			egui::UiBuilder::new(),
 		);
-		self.view.draw(&mut ui);
+		egui::Frame::NONE
+			.inner_margin(egui::Margin::same(16))
+			.show(&mut ui, |ui| {
+				self.view.draw(ui);
+			});
+
 		self.egui_ctx.end_pass()
 	}
 	fn acquire_surface(&mut self) -> anyhow::Result<Option<wgpu::SurfaceTexture>> {
@@ -779,9 +930,7 @@ fn build_window(event_loop: &ActiveEventLoop) -> anyhow::Result<Arc<winit::windo
 		let image = image::load_from_memory(include_bytes!("../assets/icon.png"))
 			.expect("failed to load icon")
 			.into_rgba8();
-
 		let (width, height) = image.dimensions();
-
 		winit::window::Icon::from_rgba(image.into_raw(), width, height)?
 	};
 	let mut attrs = winit::window::Window::default_attributes()
@@ -1491,3 +1640,26 @@ pub struct NamedWindow {
 	pub window_type: AppWindowType,
 	pub window_handle: Window,
 }
+
+pub struct GlobalHotkeys {
+	manager: GlobalHotKeyManager,
+	shutdown: Arc<AtomicBool>,
+}
+
+impl GlobalHotkeys {
+	pub fn new() -> anyhow::Result<Self> {
+		let manager = GlobalHotKeyManager::new()?;
+
+		let hotkey = HotKey::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyP);
+
+		manager.register(hotkey)?;
+
+		Ok(Self {
+			manager,
+			shutdown: Arc::new(AtomicBool::new(false)),
+		})
+	}
+}
+
+// struct Icon {}
+// impl Icon {}
