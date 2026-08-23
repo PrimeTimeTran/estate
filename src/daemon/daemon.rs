@@ -47,7 +47,7 @@ pub trait EstateDaemon {
 	async fn shutdown(&mut self) -> Result<DaemonResponse>;
 }
 pub struct Daemon {
-	pub runtime: EstateRuntime,
+	pub runtime: Arc<EstateRuntime>,
 	pub dispatcher: EventDispatcher,
 	engine: EstateEngine,
 	shutdown: CancellationToken,
@@ -58,11 +58,11 @@ impl Daemon {
 		let runtime = engine.runtime.clone();
 
 		let mut dispatcher = EventDispatcher::new();
-		dispatcher.register(LogHandler);
-		dispatcher.register(StateHandler);
-		dispatcher.register(CommandHandler);
-		dispatcher.register(TaskHandler);
-		dispatcher.register(FileWatcherHandler);
+		// dispatcher.register(LogHandler);
+		// dispatcher.register(StateHandler);
+		// dispatcher.register(CommandHandler);
+		// dispatcher.register(TaskHandler);
+		// dispatcher.register(FileWatcherHandler);
 		Self {
 			engine,
 			runtime,
@@ -138,13 +138,13 @@ impl Daemon {
 		})
 	}
 }
-impl Daemon {
-	pub fn handle(&self) -> DaemonHandle {
-		DaemonHandle {
-			runtime: self.runtime.clone(),
-		}
-	}
-}
+// impl Daemon {
+// 	pub fn handle(&self) -> DaemonHandle {
+// 		DaemonHandle {
+// 			runtime: self.runtime.clone(),
+// 		}
+// 	}
+// }
 #[async_trait]
 impl EstateDaemon for Daemon {
 	async fn execute(&mut self, action: ActionRequest) -> Result<DaemonResponse> {

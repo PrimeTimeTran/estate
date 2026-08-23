@@ -85,6 +85,7 @@ pub struct Event {
 }
 impl Event {
 	pub fn new(source: EventSource, kind: EventKind) -> Self {
+		println!("Event emmitted of type {:?}", source);
 		Self {
 			id: EVENT_ID.fetch_add(1, Ordering::Relaxed),
 			timestamp: now(),
@@ -166,6 +167,7 @@ impl Default for EstateRuntime {
 }
 impl EstateRuntime {
 	pub fn new() -> Self {
+		println!("TaskHandler handle...");
 		Self {
 			events: EventBus::new(),
 			state: Arc::new(RwLock::new(EstateState::load())),
@@ -174,6 +176,47 @@ impl EstateRuntime {
 	}
 	pub fn emit(&self, event: Event) {
 		self.events.emit(event);
+	}
+	pub fn start_dispatcher(self: &Arc<Self>) {
+		println!("🔥 start_dispatcher()");
+
+		let runtime = Arc::clone(self);
+
+		println!("🔥 subscribing to event bus");
+		let mut receiver = runtime.events.subscribe();
+		println!("🔥 event bus subscribed");
+
+		let mut dispatcher = EventDispatcher::new();
+
+		dispatcher.register(TaskHandler);
+		dispatcher.register(StateHandler);
+		dispatcher.register(CommandHandler);
+		dispatcher.register(FileWatcherHandler);
+
+		println!("🔥 handlers registered");
+
+		tokio::spawn(async move {
+			println!("🔥 EVENT DISPATCHER TASK STARTED");
+
+			loop {
+				match receiver.recv().await {
+					Ok(event) => {
+						println!("🔥 DISPATCHER RECEIVED: {:?}", event.kind);
+
+						dispatcher.dispatch(event, &runtime).await;
+					}
+
+					Err(broadcast::error::RecvError::Lagged(count)) => {
+						tracing::warn!(count, "event dispatcher lagged");
+					}
+
+					Err(broadcast::error::RecvError::Closed) => {
+						println!("🔥 EVENT BUS CLOSED");
+						break;
+					}
+				}
+			}
+		});
 	}
 }
 #[derive(Debug, Clone)]
@@ -196,8 +239,14 @@ impl EventBus {
 		Self { sender }
 	}
 	pub fn emit(&self, event: Event) {
-		// Ignore error if there are no listeners.
-		let _ = self.sender.send(event);
+		match self.sender.send(event.clone()) {
+			Ok(count) => {
+				println!("📡 Event emitted: {:?} → {} receiver(s)", event.kind, count);
+			}
+			Err(_) => {
+				println!("⚠️ Event emitted with NO receivers: {:?}", event.kind);
+			}
+		}
 	}
 	pub fn subscribe(&self) -> broadcast::Receiver<Event> {
 		self.sender.subscribe()
@@ -234,6 +283,11 @@ impl EventDispatcher {
 	{
 		self.handlers.push(Box::new(handler));
 	}
+	pub async fn run(self, mut rx: broadcast::Receiver<Event>, runtime: EstateRuntime) {
+		while let Ok(event) = rx.recv().await {
+			self.dispatch(event, &runtime).await;
+		}
+	}
 	pub async fn dispatch(&self, event: Event, runtime: &EstateRuntime) {
 		for handler in &self.handlers {
 			handler.handle(&event, runtime).await;
@@ -254,17 +308,25 @@ impl EventHandler for FileWatcherHandler {
 		// }
 	}
 }
+
 pub struct TaskHandler;
 #[async_trait::async_trait]
 impl EventHandler for TaskHandler {
 	async fn handle(&self, event: &Event, runtime: &EstateRuntime) {
+		println!("TaskHandler handle...");
 		let EventKind::TaskRequested { request } = &event.kind else {
 			return;
 		};
+
 		let task_id = match request {
 			TaskRequest::Create(kind) => {
+				println!("TaskRequest::Create");
 				let mut tasks = runtime.tasks.write().unwrap();
 				let task = tasks.create(kind.clone());
+				runtime.emit(Event::daemon(EventKind::TaskCreated {
+					task_id: task,
+					name: kind.name(),
+				}));
 				task
 			}
 			TaskRequest::Run(task_id) => *task_id,
@@ -295,6 +357,7 @@ impl EventHandler for TaskHandler {
 			);
 			match TaskRunner::execute(task).await {
 				Ok(()) => {
+					println!("TaskRunner::execute");
 					runtime.emit(Event::daemon(EventKind::TaskCompleted { task_id }));
 				}
 				Err(error) => {
@@ -327,9 +390,15 @@ impl EventHandler for StateHandler {
 			EventKind::TaskCompleted { .. } => {
 				state.tasks_completed += 1;
 			}
-			EventKind::CommandExecuted { .. } => {
+			EventKind::TaskCreated { .. } => {
 				state.tasks_created += 1;
 			}
+			// EventKind::CommandExecuted { .. } => {
+			// 	state.tasks_created += 1;
+			// }
+			// EventKind::CommandExecuted { .. } => {
+			// 	state.tasks_created += 1;
+			// }
 			_ => {}
 		}
 		EstateState::save(&state);
@@ -339,21 +408,28 @@ pub struct CommandHandler;
 #[async_trait::async_trait]
 impl EventHandler for CommandHandler {
 	async fn handle(&self, event: &Event, runtime: &EstateRuntime) {
+		println!("CommandHandler handler {:?}", event);
 		let EventKind::CommandExecuted { command } = &event.kind else {
+			println!("EventKind::CommandExecuted {:?}", event);
 			return;
 		};
 		println!("🔥 CommandHandler received: {command}");
 		match command.as_str() {
 			"task_create" => {
-				let task_id = {
-					let mut tasks = runtime.tasks.write().unwrap();
-					tasks.create(TaskKind::SyncBookmarks)
-				};
-				runtime.emit(Event::daemon(EventKind::TaskCreated {
-					task_id,
-					name: "Smoke Test Task".into(),
+				runtime.emit(Event::app(EventKind::TaskRequested {
+					request: TaskRequest::Create(TaskKind::SyncBookmarks),
 				}));
 			}
+			// "task_create" => {
+			// 	let task_id = {
+			// 		let mut tasks = runtime.tasks.write().unwrap();
+			// 		tasks.create(TaskKind::SyncBookmarks)
+			// 	};
+			// 	runtime.emit(Event::daemon(EventKind::TaskCreated {
+			// 		task_id,
+			// 		name: "Smoke Test Task".into(),
+			// 	}));
+			// }
 			"task_list" => {
 				let tasks = runtime.tasks.read().unwrap();
 				println!("════════════════════════════════════");
@@ -442,7 +518,11 @@ pub enum TaskRequest {
 pub struct TaskRunner;
 impl TaskRunner {
 	pub async fn execute(task: Task) -> anyhow::Result<()> {
+		println!("TaskRunner {:?}", task);
 		match task.kind {
+			TaskKind::RebuildIndex => {
+				todo!("TaskKind::RebuildIndex")
+			}
 			TaskKind::RebuildIndex => {
 				println!("🔨 rebuilding index");
 				tokio::time::sleep(std::time::Duration::from_secs(2)).await;

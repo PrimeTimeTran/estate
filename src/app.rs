@@ -1,5 +1,4 @@
 use crate::{prelude::*, router, ve};
-
 use egui::{Context as EguiContext, PopupAnchor::Position, TexturesDelta, Ui};
 use egui_wgpu::{
 	Renderer, SurfaceConfig,
@@ -56,14 +55,15 @@ pub struct App {
 	/// * **Poll inside `Oracle` methods (like your current setup):** Keep it as a plain `mpsc::Receiver<T>` (no `Option`).
 	/// * **Handoff to an external worker loop/thread:** Use `Option<mpsc::Receiver<T>>` so you can `.take()` it once upon startup.
 	daemon_rx: Option<mpsc::Receiver<DaemonCommand>>,
-	window: Option<Window>,
 	hotkey_manager: Option<GlobalHotKeyManager>,
-	pub windows: Vec<Window>,
-	pub dashboard_window: Option<Window>,
-	pub telemetry_window: Option<Window>,
 	pub clock: Option<Window>,
 	clock_tray: Option<TrayIcon>,
 	scroll_tray: Option<TrayIcon>,
+	window: Option<Window>,
+	// pub windows: Vec<Window>,
+	windows: Vec<AppWindow>,
+	pub dashboard_window: Option<Window>,
+	pub telemetry_window: Option<Window>,
 }
 use std::sync::atomic::{AtomicBool, Ordering};
 static HOTKEY_INITIALIZED: AtomicBool = AtomicBool::new(false);
@@ -72,7 +72,6 @@ impl App {
 		let engine = EstateEngine::new()?;
 		let context = Context::default();
 		let (daemon_tx, daemon_rx) = mpsc::channel(100);
-
 		Ok(Self {
 			hotkey_manager: None,
 			context,
@@ -104,70 +103,77 @@ impl App {
 		}
 	}
 	fn start_runtime(&mut self) -> anyhow::Result<()> {
-		tracing::info!(">>> start_runtime: entering");
 		self.register_global_hotkeys()?;
+
 		let event_loop = EventLoop::<AppEvent>::with_user_event()
 			.with_activation_policy(ActivationPolicy::Accessory)
 			.build()?;
+
 		let proxy = event_loop.create_proxy();
 		start_global_scroll_daemon(proxy.clone());
 		self.spawn_signal_handler(proxy.clone());
-		self.span_clock(proxy);
-		tracing::info!(">>> start_runtime: entering event loop");
+		self.spawn_clock(proxy);
+
+		// START DAEMON BEFORE ENTERING EVENT LOOP
+		self.spawn_daemon();
+
+		tracing::info!(">>> entering event loop");
 		event_loop.run_app(self)?;
-		tracing::info!(">>> start_runtime: event loop returned");
-		let rx = self
+
+		tracing::info!(">>> event loop returned");
+
+		Ok(())
+	}
+	fn spawn_daemon(&mut self) {
+		let mut rx = self
 			.daemon_rx
 			.take()
 			.expect("daemon receiver already consumed");
+
 		let engine = self.engine.clone();
-		Self::spawn_daemon(engine, rx);
-		Ok(())
-	}
-	fn spawn_daemon(engine: EstateEngine, mut rx: mpsc::Receiver<DaemonCommand>) {
+
 		std::thread::spawn(move || {
-			let runtime = tokio::runtime::Runtime::new().expect("failed to create Tokio runtime");
-			runtime.block_on(async move {
+			let tokio_runtime = tokio::runtime::Runtime::new().expect("failed to create Tokio runtime");
+
+			tokio_runtime.block_on(async move {
+				engine.runtime.start_dispatcher();
+
 				let mut daemon = Daemon::new(engine);
+
 				tokio::select! {
-					result = daemon.run_foreground() => {
-						if let Err(error) = result {
-							tracing::error!(%error, "daemon exited");
-						}
-					}
-
-					command = rx.recv() => {
-						match command {
-							Some(DaemonCommand::Stop) => {
-								if let Err(error) = daemon.shutdown().await {
-									tracing::error!(
-										%error,
-										"daemon shutdown failed"
-									);
+						result = daemon.run_foreground() => {
+								if let Err(error) = result {
+										tracing::error!(%error, "daemon exited");
 								}
-							}
-
-							None => {
-								tracing::info!("daemon command channel closed");
-								let _ = daemon.shutdown().await;
-							}
 						}
-					}
+
+						command = rx.recv() => {
+								match command {
+										Some(DaemonCommand::Stop) => {
+												if let Err(error) = daemon.shutdown().await {
+														tracing::error!(
+																%error,
+																"daemon shutdown failed"
+														);
+												}
+										}
+
+										None => {
+												tracing::info!("daemon command channel closed");
+												let _ = daemon.shutdown().await;
+										}
+								}
+						}
 				}
 			});
 		});
 	}
 	fn spawn_signal_handler(&mut self, proxy: EventLoopProxy<AppEvent>) {
 		std::thread::spawn(move || {
-			tracing::info!("Ctrl+C handler started");
 			let runtime = tokio::runtime::Runtime::new().expect("failed to create Tokio runtime");
 			runtime.block_on(async move {
-				tracing::info!("Waiting for Ctrl+C...");
-
 				match tokio::signal::ctrl_c().await {
 					Ok(()) => {
-						tracing::info!("🛑 Ctrl+C received");
-
 						if let Err(error) = proxy.send_event(AppEvent::Shutdown) {
 							tracing::error!(
 								%error,
@@ -175,7 +181,6 @@ impl App {
 							);
 						}
 					}
-
 					Err(error) => {
 						tracing::error!(
 							%error,
@@ -184,11 +189,10 @@ impl App {
 					}
 				}
 			});
-
 			tracing::info!("Ctrl+C handler exiting");
 		});
 	}
-	fn span_clock(&mut self, proxy: EventLoopProxy<AppEvent>) {
+	fn spawn_clock(&mut self, proxy: EventLoopProxy<AppEvent>) {
 		let proxy_ticker = proxy.clone();
 		std::thread::spawn(move || {
 			let mut current_time = 30;
@@ -206,25 +210,18 @@ impl App {
 	}
 	fn register_global_hotkeys(&mut self) -> anyhow::Result<()> {
 		let manager = GlobalHotKeyManager::new()?;
-
 		let hotkey = HotKey::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyP);
-
 		let hotkey_id = hotkey.id();
-
 		manager.register(hotkey)?;
-
 		self.hotkey_manager = Some(manager);
-
 		std::thread::spawn(move || {
 			let receiver = GlobalHotKeyEvent::receiver();
-
 			while let Ok(event) = receiver.recv() {
 				if event.id == hotkey_id && event.state == global_hotkey::HotKeyState::Pressed {
 					move_cursor_to(ScreenPosition::Left);
 				}
 			}
 		});
-
 		Ok(())
 	}
 	fn bootstrap() -> anyhow::Result<(TrayMenu, TrayIcon)> {
@@ -277,7 +274,6 @@ impl App {
 				new_task,
 				quit,
 				status,
-				// scroll_item,
 				tasks,
 				telemetry,
 				task_manager,
@@ -285,16 +281,7 @@ impl App {
 			tray,
 		))
 	}
-	fn shutdown(&mut self, event_loop: &ActiveEventLoop) {
-		tracing::info!("🛑 Shutting down application");
-
-		let _ = self.daemon_tx.try_send(DaemonCommand::Stop);
-
-		tracing::info!("🛑 Calling event_loop.exit()");
-		event_loop.exit();
-		tracing::info!("🛑 event_loop.exit() returned");
-	}
-	fn handle_menu_event(&mut self, event: MenuEvent, event_loop: &ActiveEventLoop) {
+	fn handle_event(&mut self, event: MenuEvent, event_loop: &ActiveEventLoop) {
 		let Some(menu) = self.menu.as_ref() else {
 			return;
 		};
@@ -303,11 +290,11 @@ impl App {
 			let _ = self.daemon_tx.try_send(DaemonCommand::Stop);
 			event_loop.exit();
 		} else if id == menu.dev.id() {
-			self.open_named_window(event_loop, AppWindowType::Dashboard);
+			self.open_window(event_loop, AppWindowType::Dashboard);
 		} else if id == menu.telemetry.id() {
-			self.open_named_window(event_loop, AppWindowType::TelemetryInspector);
+			self.open_window(event_loop, AppWindowType::TelemetryInspector);
 		} else if id == menu.task_manager.id() {
-			self.open_named_window(event_loop, AppWindowType::TaskManager);
+			self.open_window(event_loop, AppWindowType::TaskManager);
 		} else if id == menu.new_task.id() {
 			self.new_task();
 		} else if id == menu.list_tasks.id() {
@@ -316,53 +303,43 @@ impl App {
 			self.clear_tasks();
 		}
 	}
-	fn open_named_window(&mut self, event_loop: &ActiveEventLoop, window_type: AppWindowType) {
-		match window_type {
-			AppWindowType::Dashboard => {
-				tracing::info!("AppWindowType::Dashboard with let ve = Ve::new(Graphics::new());");
-				if self.dashboard_window.is_some() {
-					return;
-				}
-				let ve = Ve::new(Graphics::new());
-				match Window::new(event_loop, ve) {
-					Ok(mut window) => {
-						window.window.set_title("Estate Dashboard");
-						tracing::info!(">>> Dashboard Window created: {:?}", window.window.id());
-						self.dashboard_window = Some(window);
-					}
-					Err(e) => tracing::error!(">>> Dashboard creation failed: {e:#}"),
-				}
+	fn window_by_id(&mut self, id: WindowId) -> Option<&mut AppWindow> {
+		self
+			.windows
+			.iter_mut()
+			.find(|window| window.window.instance.id() == id)
+	}
+	fn window_by_type(&mut self, kind: AppWindowType) -> Option<&mut AppWindow> {
+		self.windows.iter_mut().find(|window| window.kind == kind)
+	}
+	fn open_window(&mut self, event_loop: &ActiveEventLoop, kind: AppWindowType) {
+		if self.window_by_type(kind).is_some() {
+			return;
+		}
+		let (title, view) = match kind {
+			AppWindowType::Dashboard => ("Estate Dashboard", Ve::new(Graphics::new())),
+			AppWindowType::TelemetryInspector => ("Telemetry Inspector", Ve::new(Oracle::new())),
+			AppWindowType::TaskManager => ("Task Manager", Ve::new(TaskManager::new())),
+		};
+		match Window::new(event_loop, view) {
+			Ok(mut window) => {
+				window.instance.set_title(title);
+				self.windows.push(AppWindow { kind, window });
 			}
-			AppWindowType::TelemetryInspector => {
-				tracing::info!("AppWindowType::TelemetryInspector");
-				if self.telemetry_window.is_some() {
-					return;
-				}
-				let ve = Ve::new(Oracle::new());
-				match Window::new(event_loop, ve) {
-					Ok(mut window) => {
-						window.window.set_title("Telemetry Inspector");
-						tracing::info!(">>> Telemetry Window created: {:?}", window.window.id());
-						self.telemetry_window = Some(window);
-					}
-					Err(e) => tracing::error!(">>> Telemetry creation failed: {e:#}"),
-				}
-			}
-			AppWindowType::TaskManager => {
-				tracing::info!("AppWindowType::TaskManagerView");
-				let ve = Ve::new(TaskManager::new());
-				match Window::new(event_loop, ve) {
-					Ok(mut window) => {
-						window.window.set_title("TaskManagerView");
-						self.telemetry_window = Some(window);
-					}
-					Err(e) => tracing::error!(">>> TaskManagerView creation failed: {e:#}"),
-				}
+			Err(error) => {
+				tracing::error!(
+						?kind,
+						%error,
+						"failed to create window"
+				);
 			}
 		}
 	}
+	fn shutdown(&mut self, event_loop: &ActiveEventLoop) {
+		let _ = self.daemon_tx.try_send(DaemonCommand::Stop);
+		event_loop.exit();
+	}
 }
-
 impl App {
 	fn show_tasks(&mut self) {
 		println!("Requesting task/status refresh...");
@@ -378,8 +355,8 @@ impl App {
 		self
 			.engine
 			.runtime
-			.emit(Event::app(EventKind::CommandExecuted {
-				command: "task_create".into(),
+			.emit(Event::app(EventKind::TaskRequested {
+				request: TaskRequest::Create(TaskKind::SyncBookmarks),
 			}));
 	}
 	fn clear_tasks(&mut self) {
@@ -441,15 +418,13 @@ impl App {
 impl ApplicationHandler<AppEvent> for App {
 	fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
 		while let Ok(event) = MenuEvent::receiver().try_recv() {
-			self.handle_menu_event(event, event_loop);
+			self.handle_event(event, event_loop);
 		}
 	}
 	fn resumed(&mut self, event_loop: &ActiveEventLoop) {
 		if self.window.is_none() {
-			self.open_named_window(event_loop, AppWindowType::TaskManager);
+			self.open_window(event_loop, AppWindowType::TaskManager);
 		}
-
-		// Main Estate tray.
 		if self.tray.is_none() {
 			let (menu, tray) = match Self::bootstrap() {
 				Ok(value) => value,
@@ -458,14 +433,10 @@ impl ApplicationHandler<AppEvent> for App {
 					return;
 				}
 			};
-
 			self.menu = Some(menu);
 			self.tray = Some(tray);
-
 			tracing::info!("🔥 main tray initialized");
 		}
-
-		// Scroll controller tray.
 		if self.scroll_tray.is_none() {
 			match TrayIconBuilder::new()
 				.with_icon(Self::scroll_tray_icon())
@@ -488,79 +459,57 @@ impl ApplicationHandler<AppEvent> for App {
 		window_id: WindowId,
 		event: WindowEvent,
 	) {
-		let target_window = if let Some(ref mut win) = self.dashboard_window {
-			if win.window.id() == window_id {
-				Some(win)
-			} else {
-				None
-			}
-		} else {
-			None
-		}
-		.or_else(|| {
-			if let Some(ref mut win) = self.telemetry_window {
-				if win.window.id() == window_id {
-					Some(win)
-				} else {
-					None
-				}
-			} else {
-				None
-			}
-		});
-		let Some(window) = target_window else {
+		let Some(window) = self
+			.windows
+			.iter_mut()
+			.find(|window| window.window.instance.id() == window_id)
+		else {
 			return;
 		};
-		let response = window.egui_state.on_window_event(&window.window, &event);
+		let response = window
+			.window
+			.egui_state
+			.on_window_event(&window.window.instance, &event);
 		if response.repaint {
-			window.window.request_redraw();
+			window.window.instance.request_redraw();
 		}
 		match event {
 			WindowEvent::CloseRequested => {
 				tracing::info!("🛑 Window close requested for id: {:?}", window_id);
-
-				// Clean up the correct slot based on matching ID
-				if let Some(ref win) = self.dashboard_window {
-					if win.window.id() == window_id {
-						self.dashboard_window = None;
-						return;
-					}
-				}
-				if let Some(ref win) = self.telemetry_window {
-					if win.window.id() == window_id {
-						self.telemetry_window = None;
-						return;
-					}
-				}
+				self
+					.windows
+					.retain(|window| window.window.instance.id() != window_id);
+				return;
 			}
 			WindowEvent::RedrawRequested => {
-				if window.occluded {
+				if window.window.occluded {
 					return;
 				}
-
-				if let Err(e) = window.draw() {
+				if let Err(e) = window.window.draw() {
 					tracing::error!("DEV >>> draw failed: {e:#}");
 				}
 			}
 			WindowEvent::Focused(true) => {
-				window.window.request_redraw();
+				window.window.instance.request_redraw();
 			}
 			WindowEvent::Occluded(occluded) => {
-				window.occluded = occluded;
+				window.window.occluded = occluded;
 				if !occluded {
-					window.window.request_redraw();
+					window.window.instance.request_redraw();
 				}
 			}
 			WindowEvent::Resized(size) => {
 				if size.width == 0 || size.height == 0 {
 					return;
 				}
-
-				window.config.width = size.width;
-				window.config.height = size.height;
-				window.surface.configure(&window.device, &window.config);
-				window.needs_resize = false;
-				window.window.request_redraw();
+				window.window.config.width = size.width;
+				window.window.config.height = size.height;
+				window
+					.window
+					.surface
+					.configure(&window.window.device, &window.window.config);
+				window.window.needs_resize = false;
+				window.window.instance.request_redraw();
 			}
 			_ => {}
 		}
@@ -571,17 +520,17 @@ impl ApplicationHandler<AppEvent> for App {
 				self.shutdown(event_loop);
 			}
 			AppEvent::CursorPosition { x, y } => {
-				let text = format!("↖ {:.0}  {:.0}", x, y);
-				let text = format!("← {:.0}  {:.0}", x, y);
-				let text = format!("→ {:.0}  {:.0}", x, y);
-				let text = format!("↑ {:.0}  {:.0}", x, y);
-				let text = format!("● {:.0}, {:.0}", x, y);
-				let text = format!("◉ {:.0}, {:.0}", x, y);
-				let text = format!("⌖ {:.0}, {:.0}", x, y);
-				let text = format!("🟢 {:.0}, {:.0}", x, y);
-				let text = format!("🔵 {:.0}, {:.0}", x, y);
-				let text = format!("🟡 {:.0}, {:.0}", x, y);
-				let text = format!("🔴 {:.0}, {:.0}", x, y);
+				// let text = format!("↖ {:.0}  {:.0}", x, y);
+				// let text = format!("← {:.0}  {:.0}", x, y);
+				// let text = format!("→ {:.0}  {:.0}", x, y);
+				// let text = format!("↑ {:.0}  {:.0}", x, y);
+				// let text = format!("● {:.0}, {:.0}", x, y);
+				// let text = format!("◉ {:.0}, {:.0}", x, y);
+				// let text = format!("⌖ {:.0}, {:.0}", x, y);
+				// let text = format!("🟢 {:.0}, {:.0}", x, y);
+				// let text = format!("🔵 {:.0}, {:.0}", x, y);
+				// let text = format!("🟡 {:.0}, {:.0}", x, y);
+				// let text = format!("🔴 {:.0}, {:.0}", x, y);
 				let region = if x < 960.0 { "← LEFT" } else { "RIGHT →" };
 				if let Some(tray) = &self.scroll_tray {
 					let _ = tray.set_title(Some(region));
@@ -595,7 +544,6 @@ impl ApplicationHandler<AppEvent> for App {
 		}
 	}
 }
-
 #[derive(Clone, Debug, Default)]
 pub struct Context {
 	pub source: RuntimeMode,
@@ -637,7 +585,6 @@ struct TrayMenu {
 	telemetry: MenuItem,
 	// scroll_item: MenuItem,
 }
-
 /// Estate UI Container
 ///
 /// Owns the native window, egui state, wgpu rendering resources, and the
@@ -691,7 +638,7 @@ struct TrayMenu {
 ///     ↓
 /// Color attachment
 pub struct Window {
-	pub window: Arc<winit::window::Window>,
+	pub instance: Arc<winit::window::Window>,
 	egui_ctx: egui::Context,
 	egui_state: EguiState,
 	surface: wgpu::Surface<'static>,
@@ -713,7 +660,6 @@ pub struct Window {
 	// 8.pixel shader
 	// 9.output merger
 }
-
 impl Window {
 	pub fn new(event_loop: &ActiveEventLoop, view: Ve) -> anyhow::Result<Self> {
 		let (egui_ctx, egui_state) = build_egui(event_loop);
@@ -733,7 +679,7 @@ impl Window {
 			renderer,
 			surface,
 			view,
-			window,
+			instance: window,
 		})
 	}
 	pub fn draw(&mut self) -> anyhow::Result<()> {
@@ -746,7 +692,7 @@ impl Window {
 		Ok(())
 	}
 	fn begin_egui(&mut self) {
-		let input = self.egui_state.take_egui_input(&self.window);
+		let input = self.egui_state.take_egui_input(&self.instance);
 		self.egui_ctx.begin_pass(input);
 	}
 	fn build_ui(&mut self) -> egui::FullOutput {
@@ -760,16 +706,12 @@ impl Window {
 			.show(&mut ui, |ui| {
 				self.view.draw(ui);
 			});
-
 		self.egui_ctx.end_pass()
 	}
 	fn acquire_surface(&mut self) -> anyhow::Result<Option<wgpu::SurfaceTexture>> {
 		match self.surface.get_current_texture() {
 			wgpu::CurrentSurfaceTexture::Success(texture)
-			| wgpu::CurrentSurfaceTexture::Suboptimal(texture) => {
-				// tracing::info!("SURFACE ACQUIRED");
-				Ok(Some(texture))
-			}
+			| wgpu::CurrentSurfaceTexture::Suboptimal(texture) => Ok(Some(texture)),
 			wgpu::CurrentSurfaceTexture::Occluded => {
 				tracing::warn!("SURFACE OCCLUDED");
 				Ok(None)
@@ -783,7 +725,7 @@ impl Window {
 		}
 	}
 	fn reconfigure_surface(&mut self) {
-		let size = self.window.inner_size();
+		let size = self.instance.inner_size();
 		if size.width == 0 || size.height == 0 {
 			return;
 		}
@@ -811,8 +753,8 @@ impl Window {
 		let clipped_primitives = self.egui_ctx.tessellate(shapes, pixels_per_point);
 		let screen_descriptor = egui_wgpu::ScreenDescriptor {
 			size_in_pixels: [
-				self.window.inner_size().width,
-				self.window.inner_size().height,
+				self.instance.inner_size().width,
+				self.instance.inner_size().height,
 			],
 			pixels_per_point,
 		};
@@ -938,7 +880,6 @@ fn build_window(event_loop: &ActiveEventLoop) -> anyhow::Result<Arc<winit::windo
 		.with_inner_size(PhysicalSize::new(width, height))
 		.with_window_icon(Some(icon));
 	// .with_window_level(WindowLevel::AlwaysOnTop);
-
 	// Calculate bottom-right screen coordinates if a monitor is available
 	if let Some(monitor) = event_loop
 		.primary_monitor()
@@ -946,14 +887,11 @@ fn build_window(event_loop: &ActiveEventLoop) -> anyhow::Result<Arc<winit::windo
 	{
 		let screen_size = monitor.size();
 		let scale_factor = monitor.scale_factor();
-
 		// Optional: leave a small margin (e.g., 40 pixels) away from the edge/dock
 		let margin_x = (40.0 * scale_factor) as i32;
 		let margin_y = (60.0 * scale_factor) as i32;
-
 		let x = screen_size.width as i32 - width as i32 - margin_x;
 		let y = screen_size.height as i32 - height as i32 - margin_y;
-
 		attrs = attrs.with_position(PhysicalPosition::new(x.max(0), y.max(0)));
 	} else {
 		// Fallback position if no monitor info is found
@@ -1024,142 +962,103 @@ fn build_renderer(
 	let renderer = Renderer::new(device, format, egui_wgpu::RendererOptions::default());
 	Ok((config, renderer))
 }
-
 // 80/20 curriculum. The goal isn't to build every subsystem completely; it's to learn where the boundaries are.
-
 // ### 1. Hot reloading
-
 // * **Goal:** Change a JSON/config file on disk → Estate notices it → reloads state → UI reflects it.
 // * **Stage 1 — File model**
-
 //   * Define the file being watched.
 //   * Define the deserialized config/state type.
 //   * Define defaults and validation.
 // * **Stage 2 — Watcher**
-
 //   * Use a filesystem watcher (`notify` is the obvious Rust choice).
 //   * Boundary: watcher only reports **"this path changed."**
 //   * It should not know anything about egui or Estate business logic.
 // * **Stage 3 — Reload boundary**
-
 //   * `reload_config(path) -> Result<Config>`.
 //   * Read → parse → validate.
 //   * Keep this synchronous/simple initially.
 // * **Stage 4 — Event propagation**
-
 //   * Watcher sends something like `AppEvent::ConfigChanged`.
 //   * App/engine receives it.
 //   * Engine reloads the configuration.
 // * **Stage 5 — UI update**
-
 //   * DevWindow observes the updated state.
 //   * Request redraw.
 // * **Parameters worth learning**
-
 //   * Debouncing.
 //   * Atomic writes/temp files.
 //   * Invalid JSON.
 //   * File deleted/recreated.
 //   * Watcher lifetime.
 // * **Boundary to aim for:**
-
 //   * `filesystem → watcher → application event → state → UI`
 //   * Not `filesystem → egui`.
-
 // ---
-
 // ### 2. Tab state / navigation
-
 // * **Goal:** Top tabs and sidebar tabs actually control what is rendered.
 // * **Stage 1 — State**
-
 //   * `DevTopTab`
 //   * `DevSideTab`
 //   * Store selected values in `DevWindow`.
 // * **Stage 2 — Input**
-
 //   * Render each tab as an egui `selectable_label`, button, etc.
 //   * On click, mutate the enum.
 // * **Stage 3 — Rendering**
-
 //   * `draw_top_bar()`
 //   * `draw_sidebar()`
 //   * `draw_content()`
 // * **Stage 4 — Dispatch**
-
 //   * `draw_content()` matches on `self.side_tab`.
 //   * Each variant delegates to its own renderer.
 // * **Stage 5 — Persistence, optionally**
-
 //   * Remember the last selected tab.
 //   * This is a good tiny exercise in state persistence.
 // * **Parameters**
-
 //   * Enum vs string IDs.
 //   * Selection state.
 //   * `egui::Id`.
 //   * Redraw/invalidation.
 // * **Boundary:**
-
 //   * **State determines UI; UI does not own the state.**
-
 // This one is probably your most important egui exercise.
-
 // ---
-
 // ### 3. OS app switcher / `Cmd+Tab`
-
 // * **Goal:** Estate behaves like a real macOS application/window.
 // * **Stage 1 — Window identity**
-
 //   * Give the window a proper title.
 //   * Set application/window metadata.
 // * **Stage 2 — macOS application identity**
-
 //   * Ensure the `.app` bundle has the correct:
-
 //     * bundle identifier
 //     * executable
 //     * application name
 //     * icon
 // * **Stage 3 — Icon**
-
 //   * Create `.icns`.
 //   * Add it to the application bundle.
 //   * Set the appropriate bundle metadata.
 // * **Stage 4 — Activation**
-
 //   * Verify clicking Estate in `Cmd+Tab` activates the existing window.
 //   * Don't accidentally create a second window.
 // * **Stage 5 — Multi-window behavior**
-
 //   * Understand:
-
 //     * application
 //     * window
 //     * process
 //     * activation
 // * **Parameters**
-
 //   * macOS `Info.plist`
 //   * bundle ID
 //   * application icon
 //   * window activation
 // * **Boundary:**
-
 //   * This is mostly **OS/application packaging**, not egui/wgpu.
-
 // This is a particularly useful thing to learn because it separates *"I can render a window"* from *"I built an actual desktop application."*
-
 // ---
-
 // ### 4. Real Estate Engine metrics
-
 // * **Goal:** Turn your existing engine state into a useful dashboard.
 // * **Stage 1 — Define metrics**
-
 //   * Start with things you already have:
-
 //     * uptime
 //     * starts
 //     * status checks
@@ -1168,150 +1067,109 @@ fn build_renderer(
 //     * nodes
 //     * registry size
 // * **Stage 2 — Metrics model**
-
 //   * Create something like:
-
 //   `EngineMetrics`
-
 //   rather than making the UI inspect random engine internals.
 // * **Stage 3 — Collection**
-
 //   * Engine exposes a snapshot:
-
 //     * `engine.metrics() -> EngineMetrics`
 // * **Stage 4 — UI**
-
 //   * Cards/stat rows:
-
 //     * `Uptime`
 //     * `Resources`
 //     * `Nodes`
 //     * `Status`
 //     * etc.
 // * **Stage 5 — Refresh**
-
 //   * Periodically update metrics.
 //   * Learn egui repaint timing.
 // * **Stage 6 — Historical metrics**
-
 //   * Optional:
-
 //     * requests/sec
 //     * index operations
 //     * average latency
 //     * memory
 // * **Parameters**
-
 //   * Snapshot vs live references.
 //   * Counters vs gauges.
 //   * Refresh frequency.
 //   * Thread safety.
 // * **Boundary:**
-
 //   `Engine → MetricsSnapshot → DevWindow`
-
 //   The UI shouldn't reach deep into the engine.
-
 // ---
-
 // ### 5. Logs UI
-
 // * **Goal:** Make the DevWindow itself useful for debugging Estate.
 // * **Stage 1 — Log capture**
-
 //   * Create an application-owned logging layer.
 //   * Capture tracing events.
 // * **Stage 2 — Log model**
-
 //   * Something like:
-
 //   `LogEntry { timestamp, level, target, message }`
 // * **Stage 3 — Buffer**
-
 //   * Store recent entries in a bounded buffer.
 //   * e.g. last 1,000/5,000 messages.
 // * **Stage 4 — UI**
-
 //   * `ScrollArea::vertical()`
 //   * timestamp
 //   * level
 //   * target
 //   * message
 // * **Stage 5 — Filtering**
-
 //   * `TRACE`
 //   * `DEBUG`
 //   * `INFO`
 //   * `WARN`
 //   * `ERROR`
 // * **Stage 6 — Search**
-
 //   * Filter by text.
 // * **Stage 7 — Auto-scroll**
-
 //   * Follow newest messages unless the user scrolls upward.
 // * **Stage 8 — Clear/export**
-
 //   * Clear buffer.
 //   * Optionally save logs.
 // * **Parameters**
-
 //   * `tracing_subscriber`
 //   * channel/buffer architecture
 //   * bounded memory
 //   * UI repaint on incoming logs
 // * **Boundary:**
-
 //   `tracing event → log collector → LogEntry buffer → egui`
-
 // This one teaches you a **very real desktop-app pattern**: background events feeding a UI.
-
 // ---
-
 // ### 6. Embedded WebViews
-
 // This is the most interesting one because it connects directly to the stuff you've already been experimenting with.
 // * **Goal:** Render HTML/CSS/JS inside your Estate desktop application.
 // * **Stage 1 — WebView**
-
 //   * Embed a native WebView.
 //   * Get a static HTML page rendering.
 // * **Stage 2 — Local content**
-
 //   * Load HTML/CSS/JS from disk or memory.
 // * **Stage 3 — Communication**
-
 //   * Rust → JavaScript
 //   * JavaScript → Rust
 // * **Stage 4 — Estate bridge**
-
 //   * Expose carefully selected operations:
-
 //     * `get_status()`
 //     * `get_resources()`
 //     * `resolve_node()`
 //     * etc.
 // * **Stage 5 — UI integration**
-
 //   * Decide whether WebView is:
-
 //     * a separate window
 //     * a panel
 //     * a tab
 //     * a full application view
 // * **Stage 6 — Asset loading**
-
 //   * CSS
 //   * JS
 //   * images
 //   * fonts
 //   * local resources
 // * **Stage 7 — Security boundary**
-
 //   * Decide exactly what JavaScript is allowed to call.
 //   * Don't expose arbitrary filesystem/process access.
 // * **Parameters**
-
 //   * WebView lifecycle.
 //   * navigation.
 //   * IPC.
@@ -1319,34 +1177,23 @@ fn build_renderer(
 //   * local asset resolution.
 //   * native ↔ JS serialization.
 // * **Boundary:**
-
 //   `egui/native UI ↔ WebView ↔ JS application`
-
 //   with a deliberately tiny:
-
 //   `Rust ↔ JS API`
-
 // ---
-
 // ## The order I'd actually do them
 // I'd slightly reorder your list:
 // 1. **Tab state**
-
 //    * Learn application state → rendering.
 // 2. **Real engine metrics**
-
 //    * Learn backend state → UI state.
 // 3. **Logs**
-
 //    * Learn asynchronous events → UI.
 // 4. **Hot reload**
-
 //    * Learn filesystem events → application state.
 // 5. **Cmd+Tab / app icon**
-
 //    * Learn OS/application packaging.
 // 6. **WebView**
-
 //    * Learn native UI ↔ another rendering runtime.
 // That gives you a pretty nice progression:
 // ```text
@@ -1384,7 +1231,6 @@ impl Window {
 		// │   SIDEBAR    │             MAIN             │
 		// │              │                              │
 		// └──────────────┴──────────────────────────────┘
-
 		egui::containers::Panel::top(ui.id()).show(ui, |ui| {
 			let layout = egui::Layout {
 				main_dir: egui::Direction::LeftToRight,
@@ -1394,15 +1240,12 @@ impl Window {
 				cross_align: egui::Align::Center,
 				cross_justify: false,
 			};
-
 			let mut top = ui.new_child(egui::UiBuilder::new().layout(layout));
-
 			top.label("ESTATE");
 			top.label("STATUS");
 			top.label("REGISTRY");
 			top.label("RUNTIME");
 		});
-
 		egui::containers::Panel::left(ui.id()).show(ui, |ui| {
 			let layout = egui::Layout {
 				main_dir: egui::Direction::TopDown,
@@ -1412,16 +1255,13 @@ impl Window {
 				cross_align: egui::Align::Min,
 				cross_justify: true,
 			};
-
 			let mut sidebar = ui.new_child(egui::UiBuilder::new().layout(layout));
-
 			sidebar.label("Overview");
 			sidebar.label("Registry");
 			sidebar.label("Daemon");
 			sidebar.label("Engine");
 			sidebar.label("Workspace");
 		});
-
 		let layout = egui::Layout {
 			main_dir: egui::Direction::TopDown,
 			main_wrap: false,
@@ -1430,7 +1270,6 @@ impl Window {
 			cross_align: egui::Align::Min,
 			cross_justify: true,
 		};
-
 		let mut main = ui.new_child(egui::UiBuilder::new().layout(layout));
 		main.heading("MAIN");
 		main.label("This area consumes the remaining space.");
@@ -1445,7 +1284,6 @@ impl Window {
 		// ├──────────┴─────────────────────┴────────────┤
 		// │                   FOOTER                    │
 		// └─────────────────────────────────────────────┘
-
 		egui::containers::Panel::top(ui.id()).show(ui, |ui| {
 			let layout = egui::Layout {
 				main_dir: egui::Direction::LeftToRight,
@@ -1455,9 +1293,7 @@ impl Window {
 				cross_align: egui::Align::Center,
 				cross_justify: false,
 			};
-
 			let mut top = ui.new_child(egui::UiBuilder::new().layout(layout));
-
 			top.label("ESTATE");
 			top.label("PROJECT");
 			top.label("COMMANDS");
@@ -1471,9 +1307,7 @@ impl Window {
 				cross_align: egui::Align::Center,
 				cross_justify: false,
 			};
-
 			let mut footer = ui.new_child(egui::UiBuilder::new().layout(layout));
-
 			footer.label("Connected");
 			footer.label("v0.1.0");
 		});
@@ -1486,9 +1320,7 @@ impl Window {
 				cross_align: egui::Align::Min,
 				cross_justify: true,
 			};
-
 			let mut sidebar = ui.new_child(egui::UiBuilder::new().layout(layout));
-
 			sidebar.label("Files");
 			sidebar.label("Registry");
 			sidebar.label("Resources");
@@ -1502,9 +1334,7 @@ impl Window {
 				cross_align: egui::Align::Min,
 				cross_justify: true,
 			};
-
 			let mut aside = ui.new_child(egui::UiBuilder::new().layout(layout));
-
 			aside.label("Inspector");
 			aside.label("Properties");
 			aside.label("Details");
@@ -1536,7 +1366,6 @@ impl Window {
 		// ├─────────────────────────────────────────────┤
 		// │                   FOOTER                    │
 		// └─────────────────────────────────────────────┘
-
 		egui::containers::Panel::top(ui.id()).show(ui, |ui| {
 			let layout = egui::Layout {
 				main_dir: egui::Direction::LeftToRight,
@@ -1546,14 +1375,11 @@ impl Window {
 				cross_align: egui::Align::Center,
 				cross_justify: false,
 			};
-
 			let mut top = ui.new_child(egui::UiBuilder::new().layout(layout));
-
 			top.label("ESTATE");
 			top.label("SEARCH");
 			top.label("FILTER");
 		});
-
 		egui::containers::Panel::bottom(ui.id()).show(ui, |ui| {
 			let layout = egui::Layout {
 				main_dir: egui::Direction::LeftToRight,
@@ -1563,13 +1389,10 @@ impl Window {
 				cross_align: egui::Align::Center,
 				cross_justify: false,
 			};
-
 			let mut footer = ui.new_child(egui::UiBuilder::new().layout(layout));
-
 			footer.label("Status");
 			footer.label("Connected");
 		});
-
 		egui::ScrollArea::vertical()
 			.id_salt("infinite_content")
 			.auto_shrink([false, false])
@@ -1582,9 +1405,7 @@ impl Window {
 					cross_align: egui::Align::Min,
 					cross_justify: true,
 				};
-
 				let mut content = ui.new_child(egui::UiBuilder::new().layout(layout));
-
 				for i in 0..1000 {
 					content.horizontal(|ui| {
 						ui.label(format!("{:04}", i));
@@ -1595,7 +1416,6 @@ impl Window {
 			});
 	}
 }
-
 struct AppState {
 	tray_icon: TrayIcon,
 }
@@ -1605,9 +1425,7 @@ struct AppState {
 // 		if total_width <= 0.0 {
 // 			return;
 // 		}
-
 // 		let ratio = mouse_x / total_width;
-
 // 		let indicator_text = if ratio < 0.25 {
 // 			"[ ◀︎ ]  ·   · " // Left zone
 // 		} else if ratio > 0.75 {
@@ -1615,51 +1433,40 @@ struct AppState {
 // 		} else {
 // 			" ·   [ ▲ ]  · " // Center zone
 // 		};
-
 // 		// If your TrayIcon instance is stored in your app state:
 // 		if let Some(tray) = &self.tray_icon {
 // 			let _ = tray.set_title(Some(indicator_text));
 // 		}
 // 	}
 // }
+struct AppWindow {
+	kind: AppWindowType,
+	window: Window,
+}
 #[derive(Debug)]
 pub enum AppEvent {
 	Shutdown,
 	CursorPosition { x: f64, y: f64 },
 	TickClock(String),
 }
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AppWindowType {
 	Dashboard,
 	TelemetryInspector,
 	TaskManager,
 }
-
-pub struct NamedWindow {
-	pub window_type: AppWindowType,
-	pub window_handle: Window,
-}
-
 pub struct GlobalHotkeys {
 	manager: GlobalHotKeyManager,
 	shutdown: Arc<AtomicBool>,
 }
-
 impl GlobalHotkeys {
 	pub fn new() -> anyhow::Result<Self> {
 		let manager = GlobalHotKeyManager::new()?;
-
 		let hotkey = HotKey::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyP);
-
 		manager.register(hotkey)?;
-
 		Ok(Self {
 			manager,
 			shutdown: Arc::new(AtomicBool::new(false)),
 		})
 	}
 }
-
-// struct Icon {}
-// impl Icon {}

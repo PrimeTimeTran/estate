@@ -7,23 +7,23 @@ use egui_plot::{Line, PlotBounds, PlotPoints, Points};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::sync::{Arc, Mutex, OnceLock};
 use winit::event_loop::EventLoopProxy;
-///      A trait implemented by types which agree to its contract.
+/// A trait implemented by types which agree to its contract.
 ///
-///      Any type which implements this contract must provide `draw`.
-///      Code which depends on `Veable` can therefore rely on that capability
-///      without needing to know how the concrete type implements it.
+/// Any type which implements this contract must provide `draw`.
+/// Code which depends on `Veable` can therefore rely on that capability
+/// without needing to know how the concrete type implements it.
 ///
-///      The implementation details belong to the concrete type; the caller
-///      only depends on the behavior promised by the contract.
+/// The implementation details belong to the concrete type; the caller
+/// only depends on the behavior promised by the contract.
 pub trait Veable {
 	fn draw(&mut self, ui: &mut egui::Ui);
 }
-///      A type-erased container for any concrete `Veable`.
+/// A type-erased container for any concrete `Veable`.
 ///
-///      `Box<dyn Veable>` stores the concrete implementation on the heap while
-///      exposing only the `Veable` interface to callers. This allows different
-///      concrete implementations to be substituted without changing the code
-///      which consumes them.
+/// `Box<dyn Veable>` stores the concrete implementation on the heap while
+/// exposing only the `Veable` interface to callers. This allows different
+/// concrete implementations to be substituted without changing the code
+/// which consumes them.
 pub struct Ve {
 	view: Box<dyn Veable>,
 }
@@ -44,13 +44,13 @@ impl Ve {
 		self.view.draw(ui);
 	}
 }
-///       ! The first concrete implementation of Veable is here.
-///       !
-///       ! EguiVeable defines it's own state which is specific to its own implementation
-///       ! and the correponding methods which operate on those properties.
-///       !
-///       ! The draw method is the gateway for this struct to inject behavior thats independent of the
-///       ! generic base and unique to itself as package or an instance of Veable.
+///! The first concrete implementation of Veable is here.
+///!
+///! EguiVeable defines it's own state which is specific to its own implementation
+///! and the correponding methods which operate on those properties.
+///!
+///! The draw method is the gateway for this struct to inject behavior thats independent of the
+///! generic base and unique to itself as package or an instance of Veable.
 #[derive(Clone, Debug, Default)]
 pub struct EguiVeable {
 	state: EstateState,
@@ -595,7 +595,7 @@ impl Veable for Graphics {
 		});
 	}
 }
-///      Telemetry
+/// Telemetry
 pub struct Oracle {
 	scroll_x: f32,
 	scroll_y: f32,
@@ -939,62 +939,73 @@ pub fn start_global_scroll_daemon(proxy: EventLoopProxy<AppEvent>) {
 				}
 				CGEventType::FlagsChanged => {
 					let flags = event.get_flags();
-
-					let shift_is_down = flags.contains(core_graphics::event::CGEventFlags::CGEventFlagShift);
-
+					let shift_is_down = flags.contains(CGEventFlags::CGEventFlagShift);
 					let was_down = SHIFT_HELD.swap(shift_is_down, Ordering::Relaxed);
-
-					// -------------------------------------------------------------
-					// Shift pressed
-					// -------------------------------------------------------------
+					// ---------------------------------------------------------
+					// SHIFT DOWN
+					// ---------------------------------------------------------
 					if shift_is_down && !was_down {
 						let location = event.location();
-
 						let mut state = scroll_state().lock().unwrap();
-
 						state.active = true;
-						state.redirected = false;
+						state.redirected = true;
 						state.original_position = location;
-
-						let side = if location.x < 960.0 { "LEFT" } else { "RIGHT" };
-
+						let target = if location.x < 960.0 {
+							ScreenPosition::Right
+						} else {
+							ScreenPosition::Left
+						};
+						let bounds = CGDisplay::main().bounds();
+						let target_x = match target {
+							ScreenPosition::Left => bounds.origin.x + bounds.size.width * 0.25,
+							ScreenPosition::Right => bounds.origin.x + bounds.size.width * 0.75,
+							ScreenPosition::Center => bounds.origin.x + bounds.size.width * 0.50,
+						};
+						let target_position = CGPoint {
+							x: target_x,
+							y: location.y,
+						};
+						state.target_position = target_position;
 						println!(
-							"⬇️ SHIFT DOWN  | cursor=({:.0}, {:.0}) | side={}",
-							location.x, location.y, side
+							"⬇️ SHIFT DOWN | ({:.0}, {:.0}) -> {:?} ({:.0}, {:.0})",
+							location.x, location.y, target, target_position.x, target_position.y,
 						);
+						if let Ok(source) = CGEventSource::new(CGEventSourceStateID::CombinedSessionState) {
+							if let Ok(move_event) = CGEvent::new_mouse_event(
+								source,
+								CGEventType::MouseMoved,
+								target_position,
+								CGMouseButton::Left,
+							) {
+								move_event.post(CGEventTapLocation::HID);
+							}
+						}
 					}
-
-					// -------------------------------------------------------------
-					// Shift released
-					// -------------------------------------------------------------
+					// ---------------------------------------------------------
+					// SHIFT UP
+					// ---------------------------------------------------------
 					if !shift_is_down && was_down {
 						let mut state = scroll_state().lock().unwrap();
-
-						if state.active && state.redirected {
-							println!(
-								"↩️ RESTORE | ({:.0},{:.0}) -> ({:.0},{:.0})",
-								state.target_position.x,
-								state.target_position.y,
-								state.original_position.x,
-								state.original_position.y,
-							);
-
+						let original = state.original_position;
+						println!(
+							"⬆️ SHIFT UP | restoring ({:.0}, {:.0})",
+							original.x, original.y
+						);
+						if state.active {
 							if let Ok(source) = CGEventSource::new(CGEventSourceStateID::CombinedSessionState) {
-								if let Ok(event) = CGEvent::new_mouse_event(
+								if let Ok(restore_event) = CGEvent::new_mouse_event(
 									source,
 									CGEventType::MouseMoved,
-									state.original_position,
+									original,
 									CGMouseButton::Left,
 								) {
-									event.post(CGEventTapLocation::HID);
+									restore_event.post(CGEventTapLocation::HID);
 								}
 							}
 						}
-
 						state.active = false;
 						state.redirected = false;
 					}
-
 					CallbackResult::Keep
 				}
 				CGEventType::KeyDown => {
@@ -1021,55 +1032,10 @@ pub fn start_global_scroll_daemon(proxy: EventLoopProxy<AppEvent>) {
 					if !SHIFT_HELD.load(Ordering::Relaxed) {
 						return CallbackResult::Keep;
 					}
-
-					let mut state = scroll_state().lock().unwrap();
-
+					let state = scroll_state().lock().unwrap();
 					if !state.active {
 						return CallbackResult::Keep;
 					}
-
-					// Already redirected during this Shift hold.
-					// Let subsequent scroll events pass normally.
-					if state.redirected {
-						return CallbackResult::Keep;
-					}
-
-					let original = state.original_position;
-
-					let target = if original.x < 960.0 {
-						ScreenPosition::Right
-					} else {
-						ScreenPosition::Left
-					};
-
-					let target_point = target_position(original, target);
-
-					println!(
-						"🔀 REDIRECT | from=({:.0},{:.0}) -> ({:.0},{:.0}) | {:?}",
-						original.x, original.y, target_point.x, target_point.y, target,
-					);
-
-					let source = match CGEventSource::new(CGEventSourceStateID::CombinedSessionState) {
-						Ok(source) => source,
-						Err(_) => return CallbackResult::Keep,
-					};
-
-					let move_event = match CGEvent::new_mouse_event(
-						source,
-						CGEventType::MouseMoved,
-						target_point,
-						CGMouseButton::Left,
-					) {
-						Ok(event) => event,
-						Err(_) => return CallbackResult::Keep,
-					};
-
-					move_event.post(CGEventTapLocation::HID);
-
-					state.target_position = target_point;
-					state.redirected = true;
-
-					// Let the ORIGINAL scroll event continue.
 					CallbackResult::Keep
 				}
 				_ => CallbackResult::Keep,
@@ -1093,7 +1059,6 @@ pub fn start_global_scroll_daemon(proxy: EventLoopProxy<AppEvent>) {
 				return;
 			}
 		};
-		println!("✅ CGEventTap created");
 		unsafe {
 			let port = tap.mach_port();
 			let source = match port.create_runloop_source(0) {
@@ -1111,76 +1076,7 @@ pub fn start_global_scroll_daemon(proxy: EventLoopProxy<AppEvent>) {
 		}
 	});
 }
-// fn redirect_scroll(original: &CGEvent, target: ScreenPosition) {
-// 	let source = match CGEventSource::new(CGEventSourceStateID::CombinedSessionState) {
-// 		Ok(source) => source,
-// 		Err(_) => return,
-// 	};
 
-// 	let location = original.location();
-// 	let display = CGDisplay::main();
-// 	let bounds = CGDisplay::main().bounds();
-
-// 	let target_x = match target {
-// 		ScreenPosition::Left => bounds.origin.x + bounds.size.width * 0.25,
-// 		ScreenPosition::Right => bounds.origin.x + bounds.size.width * 0.75,
-// 		ScreenPosition::Center => bounds.origin.x + bounds.size.width * 0.50,
-// 	};
-
-// 	let target_point = CGPoint {
-// 		x: target_x,
-// 		y: location.y,
-// 	};
-
-// 	REDIRECTING_SCROLL.store(true, Ordering::Relaxed);
-// 	let Ok(move_event) = CGEvent::new_mouse_event(
-// 		source.clone(),
-// 		CGEventType::MouseMoved,
-// 		target_point,
-// 		CGMouseButton::Left,
-// 	) else {
-// 		REDIRECTING_SCROLL.store(false, Ordering::Relaxed);
-// 		return;
-// 	};
-
-// 	move_event.post(CGEventTapLocation::HID);
-
-// 	// Get original scroll deltas.
-// 	let delta_y = original.get_integer_value_field(EventField::SCROLL_WHEEL_EVENT_POINT_DELTA_AXIS_1);
-
-// 	let delta_x = original.get_integer_value_field(EventField::SCROLL_WHEEL_EVENT_POINT_DELTA_AXIS_2);
-
-// 	// Create scroll event.
-// 	let Ok(scroll) = CGEvent::new_scroll_event(
-// 		source.clone(),
-// 		ScrollEventUnit::PIXEL,
-// 		2,
-// 		delta_y as i32,
-// 		delta_x as i32,
-// 		0,
-// 	) else {
-// 		REDIRECTING_SCROLL.store(false, Ordering::Relaxed);
-// 		return;
-// 	};
-
-// 	// Scroll while cursor is at target.
-// 	scroll.post(CGEventTapLocation::HID);
-
-// 	// Restore cursor.
-// 	let Ok(restore_event) = CGEvent::new_mouse_event(
-// 		source,
-// 		CGEventType::MouseMoved,
-// 		location,
-// 		CGMouseButton::Left,
-// 	) else {
-// 		REDIRECTING_SCROLL.store(false, Ordering::Relaxed);
-// 		return;
-// 	};
-
-// 	restore_event.post(CGEventTapLocation::HID);
-
-// 	REDIRECTING_SCROLL.store(false, Ordering::Relaxed);
-// }
 fn target_position(location: CGPoint, target: ScreenPosition) -> CGPoint {
 	let bounds = CGDisplay::main().bounds();
 	let x = match target {
@@ -1188,7 +1084,6 @@ fn target_position(location: CGPoint, target: ScreenPosition) -> CGPoint {
 		ScreenPosition::Center => bounds.origin.x + bounds.size.width * 0.50,
 		ScreenPosition::Right => bounds.origin.x + bounds.size.width * 0.75,
 	};
-
 	CGPoint { x, y: location.y }
 }
 use core_graphics::event::CGMouseButton;
@@ -1791,9 +1686,7 @@ pub mod palette {
 	pub const DANGER: Color32 = Color32::from_rgb(230, 90, 95);
 	pub const GRID: Color32 = Color32::from_rgb(45, 49, 58);
 }
-
 static REDIRECTING_SCROLL: AtomicBool = AtomicBool::new(false);
-
 #[derive(Debug, Clone, Copy)]
 struct ScrollRedirectState {
 	active: bool,
@@ -1801,9 +1694,7 @@ struct ScrollRedirectState {
 	original_position: CGPoint,
 	target_position: CGPoint,
 }
-
 static SCROLL_STATE: OnceLock<Mutex<ScrollRedirectState>> = OnceLock::new();
-
 fn scroll_state() -> &'static Mutex<ScrollRedirectState> {
 	SCROLL_STATE.get_or_init(|| {
 		Mutex::new(ScrollRedirectState {
