@@ -29,37 +29,26 @@ use winit::{
 pub struct App {
 	/// The system tray icon owned by the application.
 	tray: Option<TrayIcon>,
-
 	/// The system tray menu and its associated menu items.
 	menu: Option<TrayMenu>,
-
 	/// Shared application context and runtime state.
 	context: Context,
-
 	/// The Estate engine responsible for the application's core functionality.
 	engine: EstateEngine,
-
 	/// Channel used to send commands to the Estate daemon, when available.
 	// daemon_tx: Option<mpsc::Sender<DaemonCommand>>,
-
 	/// The development window, when it has been opened.
 	// daemon: Option<DaemonHandle>,
 	daemon: Option<Daemon>,
 	daemon_tx: mpsc::Sender<DaemonCommand>,
 	/// Use an `Option` if **another thread or runtime task needs to take permanent ownership** of the receiver to run a loop, and you won't be polling it directly inside `Oracle`'s `draw()` method.
-
 	/// * **How it works:** You create the channel inside `Oracle::new()`, keep the `Sender` inside `Oracle` (or pass it to your file watcher), and **take** the `Receiver` out once via `.take()` to hand it off to a worker thread or your application's main event pump.
 	/// * **Why `Option`?** Because in Rust, you cannot move a field out of a struct by value if the struct itself is behind a mutable reference or doesn't implement `Default`. `.take()` replaces the field with `None` so you can move the `Receiver` out cleanly.
-
 	/// ### 2. When to NOT use `Option` (Direct Polling)
-
 	/// If you are polling the receiver *directly inside* `Oracle`'s own methods (like calling `self.rx.try_recv()` inside your `draw()` frame tick), **you do not need an `Option**`.
-
 	/// * **How it works:** The receiver stays embedded in `Oracle`, and you just access it mutably via `&mut self.rx`.
 	/// * **Why skip `Option`?** It avoids unnecessary `.unwrap()` calls, keeps the struct fields clean, and prevents runtime panics if something tries to access a receiver that has already been taken.
-
 	/// ### Summary Rule of Thumb:
-
 	/// * **Poll inside `Oracle` methods (like your current setup):** Keep it as a plain `mpsc::Receiver<T>` (no `Option`).
 	/// * **Handoff to an external worker loop/thread:** Use `Option<mpsc::Receiver<T>>` so you can `.take()` it once upon startup.
 	daemon_rx: Option<mpsc::Receiver<DaemonCommand>>,
@@ -197,6 +186,7 @@ impl App {
 		let status = MenuItem::new("● Estate Daemon Running", false, None);
 		let dev = MenuItem::new("Open Dashboard", true, None);
 		let telemetry = MenuItem::new("Open Telemetry Inspector", true, None);
+		let task_manager = MenuItem::new("Open Task Manager", true, None);
 		let new_task = MenuItem::new("New Task", true, None);
 		let list_tasks = MenuItem::new("List Tasks", true, None);
 		let clear_tasks = MenuItem::new("Clear Tasks", true, None);
@@ -209,6 +199,7 @@ impl App {
 		menu.append(&status)?;
 		menu.append(&dev)?;
 		menu.append(&telemetry)?;
+		menu.append(&task_manager)?;
 		menu.append(&tasks)?;
 		menu.append(&quit)?;
 
@@ -229,6 +220,7 @@ impl App {
 				status,
 				tasks,
 				telemetry,
+				task_manager,
 			},
 			tray,
 		))
@@ -250,6 +242,8 @@ impl App {
 			self.open_named_window(event_loop, AppWindowType::Dashboard);
 		} else if id == menu.telemetry.id() {
 			self.open_named_window(event_loop, AppWindowType::TelemetryInspector);
+		} else if id == menu.task_manager.id() {
+			self.open_named_window(event_loop, AppWindowType::TaskManager);
 		} else if id == menu.new_task.id() {
 			self.new_task();
 		} else if id == menu.list_tasks.id() {
@@ -290,7 +284,86 @@ impl App {
 					Err(e) => tracing::error!(">>> Telemetry creation failed: {e:#}"),
 				}
 			}
+			AppWindowType::TaskManager => {
+				tracing::info!("AppWindowType::TaskManagerView");
+				let ve = Ve::new(TaskManagerView::new());
+				match Window::new(event_loop, ve) {
+					Ok(mut window) => {
+						window.window.set_title("TaskManagerView");
+						self.telemetry_window = Some(window);
+					}
+					Err(e) => tracing::error!(">>> TaskManagerView creation failed: {e:#}"),
+				}
+			}
 		}
+	}
+}
+impl App {
+	fn show_tasks(&mut self) {
+		println!("Requesting task/status refresh...");
+
+		self
+			.engine
+			.runtime
+			.emit(Event::app(EventKind::CommandExecuted {
+				command: "task_list".into(),
+			}));
+	}
+	fn new_task(&mut self) {
+		println!("Creating task...");
+		self
+			.engine
+			.runtime
+			.emit(Event::app(EventKind::CommandExecuted {
+				command: "task_create".into(),
+			}));
+	}
+	fn clear_tasks(&mut self) {
+		println!("Clearing tasks...");
+		self
+			.engine
+			.runtime
+			.emit(Event::app(EventKind::CommandExecuted {
+				command: "task_clear".into(),
+			}));
+	}
+	fn tray_icon() -> Icon {
+		let image = image::load_from_memory(constants::TRAY_ICON)
+			.expect("failed to load generated tray icon")
+			.into_rgba8();
+		let (width, height) = image.dimensions();
+		Icon::from_rgba(image.into_raw(), width, height).expect("failed to create tray icon")
+	}
+	#[tracing::instrument(
+		target = "estate::discovery",
+		name = "scan_workspace",
+		skip(self),
+		fields(flow_id = %Uuid::now_v7())
+	)]
+	async fn scan_workspace(&mut self, path: &Path) -> anyhow::Result<()> {
+		tracing::info!("starting workspace scan");
+		self.discover(path).await?;
+		tracing::debug!("discovery complete");
+		self.analyze().await?;
+		tracing::debug!("analysis complete");
+		self.build_graph().await?;
+		tracing::info!("workspace scan complete");
+		Ok(())
+	}
+	#[tracing::instrument(target = "estate::discovery", skip(self, path))]
+	async fn discover(&mut self, path: &Path) -> anyhow::Result<()> {
+		tracing::debug!(path = %path.display(), "discovering workspace");
+		Ok(())
+	}
+	#[tracing::instrument(target = "estate::analysis", skip(self))]
+	async fn analyze(&mut self) -> anyhow::Result<()> {
+		tracing::debug!("analyzing workspace");
+		Ok(())
+	}
+	#[tracing::instrument(target = "estate::graph", skip(self))]
+	async fn build_graph(&mut self) -> anyhow::Result<()> {
+		tracing::debug!("building semantic graph");
+		Ok(())
 	}
 }
 impl ApplicationHandler<AppEvent> for App {
@@ -301,42 +374,9 @@ impl ApplicationHandler<AppEvent> for App {
 	}
 
 	fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-		// Inside your winit Application handler (`resumed`):
-		// if !HOTKEY_INITIALIZED.swap(true, Ordering::Relaxed) {
-		// 	std::thread::spawn(|| {
-		// 		std::thread::sleep(std::time::Duration::from_millis(100));
-
-		// 		if let Ok(manager) = global_hotkey::GlobalHotKeyManager::new() {
-		// 			let hotkey = global_hotkey::hotkey::HotKey::new(
-		// 				Some(global_hotkey::hotkey::Modifiers::SHIFT | global_hotkey::hotkey::Modifiers::ALT),
-		// 				global_hotkey::hotkey::Code::Digit1,
-		// 			);
-		// 			let id = hotkey.id();
-
-		// 			if manager.register(hotkey).is_ok() {
-		// 				println!("✨ Global hotkey successfully bound to live macOS run loop!");
-
-		// 				let receiver = global_hotkey::GlobalHotKeyEvent::receiver();
-		// 				loop {
-		// 					if let Ok(event) = receiver.try_recv() {
-		// 						if event.state == global_hotkey::HotKeyState::Pressed && event.id == id {
-		// 							println!("🔥 Global hotkey intercepted via live loop!");
-		// 							move_cursor_to(ScreenPosition::Left);
-		// 						}
-		// 					}
-		// 					std::thread::sleep(std::time::Duration::from_millis(10));
-		// 				}
-		// 			}
-		// 		}
-		// 	});
-		// }
-
 		if self.window.is_none() {
-			self.open_named_window(event_loop, AppWindowType::TelemetryInspector);
+			self.open_named_window(event_loop, AppWindowType::TaskManager);
 		}
-		// if self.window.is_visible {
-		// 	self.open_window(event_loop);
-		// }
 		if self.tray.is_some() {
 			return;
 		}
@@ -464,74 +504,6 @@ impl ApplicationHandler<AppEvent> for App {
 		}
 	}
 }
-impl App {
-	fn show_tasks(&mut self) {
-		println!("Requesting task/status refresh...");
-
-		self
-			.engine
-			.runtime
-			.emit(Event::app(EventKind::CommandExecuted {
-				command: "task_list".into(),
-			}));
-	}
-	fn new_task(&mut self) {
-		println!("Creating task...");
-		self
-			.engine
-			.runtime
-			.emit(Event::app(EventKind::CommandExecuted {
-				command: "task_create".into(),
-			}));
-	}
-	fn clear_tasks(&mut self) {
-		println!("Clearing tasks...");
-		self
-			.engine
-			.runtime
-			.emit(Event::app(EventKind::CommandExecuted {
-				command: "task_clear".into(),
-			}));
-	}
-	fn tray_icon() -> Icon {
-		let image = image::load_from_memory(constants::TRAY_ICON)
-			.expect("failed to load generated tray icon")
-			.into_rgba8();
-		let (width, height) = image.dimensions();
-		Icon::from_rgba(image.into_raw(), width, height).expect("failed to create tray icon")
-	}
-	#[tracing::instrument(
-		target = "estate::discovery",
-		name = "scan_workspace",
-		skip(self),
-		fields(flow_id = %Uuid::now_v7())
-	)]
-	async fn scan_workspace(&mut self, path: &Path) -> anyhow::Result<()> {
-		tracing::info!("starting workspace scan");
-		self.discover(path).await?;
-		tracing::debug!("discovery complete");
-		self.analyze().await?;
-		tracing::debug!("analysis complete");
-		self.build_graph().await?;
-		tracing::info!("workspace scan complete");
-		Ok(())
-	}
-	#[tracing::instrument(target = "estate::discovery", skip(self, path))]
-	async fn discover(&mut self, path: &Path) -> anyhow::Result<()> {
-		tracing::debug!(path = %path.display(), "discovering workspace");
-		Ok(())
-	}
-	#[tracing::instrument(target = "estate::analysis", skip(self))]
-	async fn analyze(&mut self) -> anyhow::Result<()> {
-		tracing::debug!("analyzing workspace");
-		Ok(())
-	}
-	#[tracing::instrument(target = "estate::graph", skip(self))]
-	async fn build_graph(&mut self) -> anyhow::Result<()> {
-		tracing::debug!("building semantic graph");
-		Ok(())
-	}
-}
 
 #[derive(Clone, Debug, Default)]
 pub struct Context {
@@ -572,6 +544,7 @@ struct TrayMenu {
 	new_task: MenuItem,
 	quit: MenuItem,
 	status: MenuItem,
+	task_manager: MenuItem,
 	tasks: Submenu,
 	telemetry: MenuItem,
 }
@@ -1511,6 +1484,7 @@ pub enum AppEvent {
 pub enum AppWindowType {
 	Dashboard,
 	TelemetryInspector,
+	TaskManager,
 }
 
 pub struct NamedWindow {

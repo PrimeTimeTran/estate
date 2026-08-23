@@ -1,3 +1,11 @@
+// | Concept                         | Name           | Meaning                       |
+// | ------------------------------- | -------------- | ----------------------------- |
+// | What needs doing                | `Task`         | Logical unit of work          |
+// | An execution of it              | `Job`          | Concrete background execution |
+// | Oversees them                   | `TaskManager`  | Coordinates tasks/jobs        |
+// | Individual background execution | `Job`          | Has lifecycle/state           |
+// | UI representation               | `Task` / `Job` | Shows pending/running/etc.    |
+
 use crate::{agent::AgentContext, prelude::*, router, ve};
 
 pub type TaskId = Uuid;

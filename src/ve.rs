@@ -1,7 +1,7 @@
 use crate::prelude::*;
 
 use egui::Ui;
-use egui_plot::{Line, PlotPoints, Points};
+use egui_plot::{Line, PlotBounds, PlotPoints, Points};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::sync::{Arc, Mutex};
 use winit::event_loop::EventLoopProxy;
@@ -1302,4 +1302,697 @@ pub fn smoke_test_hotkey() {
 
 	// IMPORTANT: manager must stay alive.
 	std::mem::forget(manager);
+}
+
+use std::time::{Duration, Instant};
+
+pub struct TaskManagerView {
+	state_path: PathBuf,
+	state: Option<EstateState>,
+
+	dirty: bool,
+	last_loaded: Option<SystemTime>,
+	error: Option<String>,
+
+	rx: tokio::sync::mpsc::Receiver<()>,
+	_watcher: notify::RecommendedWatcher,
+}
+
+impl TaskManagerView {
+	pub fn new() -> Self {
+		Self::from_path("/Users/future/Library/Application Support/estate/state.json")
+	}
+
+	pub fn from_path(path: impl Into<PathBuf>) -> Self {
+		let state_path = path.into();
+
+		let (tx, rx) = tokio::sync::mpsc::channel::<()>(1);
+
+		let watcher = Self::init_watcher(&state_path, tx).expect("Failed to initialize state watcher");
+
+		let mut view = Self {
+			state_path,
+			state: None,
+			dirty: false,
+			last_loaded: None,
+			error: None,
+			rx,
+			_watcher: watcher,
+		};
+
+		view.reload();
+
+		view
+	}
+
+	pub fn reload(&mut self) {
+		match EstateState::loadFromPath(&self.state_path) {
+			Ok(state) => {
+				self.state = Some(state);
+				self.dirty = false;
+				self.error = None;
+
+				self.last_loaded = fs::metadata(&self.state_path)
+					.and_then(|metadata| metadata.modified())
+					.ok();
+			}
+
+			Err(error) => {
+				self.error = Some(error.to_string());
+				self.dirty = true;
+			}
+		}
+	}
+
+	pub fn check_for_changes(&mut self, ctx: &egui::Context) {
+		if self.rx.try_recv().is_ok() {
+			self.reload();
+			ctx.request_repaint();
+		}
+	}
+
+	fn init_watcher(
+		path: &Path,
+		tx: tokio::sync::mpsc::Sender<()>,
+	) -> Result<notify::RecommendedWatcher, notify::Error> {
+		use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+
+		let mut watcher = RecommendedWatcher::new(
+			move |res: Result<Event, notify::Error>| {
+				if let Ok(event) = res {
+					if matches!(event.kind, EventKind::Modify(_) | EventKind::Create(_)) {
+						let _ = tx.blocking_send(());
+					}
+				}
+			},
+			Config::default(),
+		)?;
+
+		if let Some(parent) = path.parent() {
+			watcher.watch(parent, RecursiveMode::NonRecursive)?;
+		}
+
+		Ok(watcher)
+	}
+	fn draw_job(&self, ui: &mut egui::Ui, job: &Job) {
+		egui::Frame::group(ui.style()).show(ui, |ui| {
+			ui.horizontal(|ui| {
+				// Status indicator
+				ui.label(job.status.icon());
+
+				// Job name
+				ui.vertical(|ui| {
+					ui.strong(&job.name);
+
+					ui.small(format!("Job #{}", job.id));
+				});
+
+				ui.add_space(20.0);
+
+				// Status
+				ui.label(job.status.label());
+
+				ui.add_space(20.0);
+
+				// Progress
+				if let Some(progress) = job.progress {
+					ui.add(
+						egui::ProgressBar::new(progress)
+							.desired_width(180.0)
+							.show_percentage(),
+					);
+				}
+
+				// Runtime
+				if let Some(started_at) = job.started_at {
+					let elapsed = started_at.elapsed();
+
+					ui.label(format_duration(elapsed));
+				}
+
+				ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+					ui.button("⋮");
+				});
+			});
+		});
+	}
+}
+
+impl Veable for TaskManagerView {
+	fn draw(&mut self, ui: &mut Ui) {
+		self.check_for_changes(ui.ctx());
+
+		if let Some(error) = &self.error {
+			ui.heading("Task Manager");
+			ui.colored_label(palette::DANGER, error);
+			ui.label(self.state_path.display().to_string());
+			return;
+		}
+
+		let Some(state) = &self.state else {
+			ui.centered_and_justified(|ui| {
+				ui.label("Loading task state...");
+			});
+			return;
+		};
+
+		// -------------------------------------------------------------
+		// Header
+		// -------------------------------------------------------------
+
+		ui.vertical(|ui| {
+			ui.label(
+				egui::RichText::new("Task Overview")
+					.size(24.0)
+					.strong()
+					.color(palette::TEXT),
+			);
+
+			ui.add_space(2.0);
+
+			ui.label(
+				egui::RichText::new("Estate Runtime")
+					.size(12.0)
+					.color(palette::TEXT_MUTED),
+			);
+		});
+
+		ui.add_space(16.0);
+
+		// -------------------------------------------------------------
+		// Summary metrics
+		// -------------------------------------------------------------
+
+		ui.columns(4, |columns| {
+			metric(
+				&mut columns[0],
+				"Tasks Created",
+				state.tasks_created,
+				palette::PRIMARY,
+			);
+
+			metric(
+				&mut columns[1],
+				"Tasks Completed",
+				state.tasks_completed,
+				palette::SUCCESS,
+			);
+
+			metric(
+				&mut columns[2],
+				"Events Processed",
+				state.events_processed,
+				palette::WARNING,
+			);
+
+			metric(
+				&mut columns[3],
+				"Status Checks",
+				state.status_checks,
+				palette::TEXT_MUTED,
+			);
+		});
+
+		ui.add_space(16.0);
+
+		// -------------------------------------------------------------
+		// Charts
+		// -------------------------------------------------------------
+
+		let available = ui.available_size();
+
+		let gap = 6.0;
+		let card_width = (available.x - gap) / 2.0;
+		let card_height = 280.0;
+
+		// -------------------------------------------------------------
+		// Row 1
+		// -------------------------------------------------------------
+
+		ui.allocate_ui_with_layout(
+			egui::vec2(available.x, card_height),
+			egui::Layout::left_to_right(egui::Align::TOP),
+			|ui| {
+				ui.spacing_mut().item_spacing.x = gap;
+				draw_chart_card(
+					ui,
+					egui::vec2(card_width, card_height),
+					"Tasks",
+					"Created vs completed",
+					// Metrics
+					|ui| {
+						let remaining = state.tasks_created.saturating_sub(state.tasks_completed);
+
+						small_metric(ui, "Created", state.tasks_created, palette::PRIMARY);
+
+						ui.add_space(20.0);
+
+						small_metric(ui, "Completed", state.tasks_completed, palette::SUCCESS);
+
+						ui.add_space(20.0);
+
+						small_metric(ui, "Remaining", remaining, palette::TEXT_MUTED);
+					},
+					// Chart
+					|ui| {
+						let max_value = state.tasks_created.max(1) as f64;
+
+						let bars = vec![
+							Bar::new(0.0, state.tasks_created as f64).fill(palette::PRIMARY),
+							Bar::new(1.0, state.tasks_completed as f64).fill(palette::SUCCESS),
+						];
+
+						let chart = BarChart::new("task_counts", bars);
+
+						let max_y = state.tasks_created.max(1) as f64;
+
+						Plot::new("task_counts_plot")
+							.height(190.0)
+							.show_axes([true, true])
+							.show_grid([true, true])
+							.allow_zoom(true)
+							.allow_drag(true)
+							.allow_scroll(true)
+							.allow_axis_zoom_drag(true)
+							.allow_boxed_zoom(true)
+							.show(ui, |plot_ui| {
+								plot_ui.bar_chart(chart);
+							});
+					},
+				);
+
+				// ---------------------------------------------------------
+				// Completion
+				// ---------------------------------------------------------
+
+				draw_chart_card(
+					ui,
+					egui::vec2(card_width, card_height),
+					"Completion",
+					"Task completion ratio",
+					// Metrics
+					|ui| {
+						let created = state.tasks_created as f64;
+						let completed = state.tasks_completed as f64;
+						let remaining = (created - completed).max(0.0);
+
+						let percentage = if created > 0.0 {
+							(completed / created) * 100.0
+						} else {
+							0.0
+						};
+
+						small_metric(ui, "Complete", state.tasks_completed, palette::SUCCESS);
+
+						ui.add_space(20.0);
+
+						small_metric(ui, "Remaining", remaining as u64, palette::TEXT_MUTED);
+
+						ui.add_space(20.0);
+
+						ui.label(
+							egui::RichText::new(format!("{percentage:.1}%"))
+								.size(14.0)
+								.strong()
+								.color(palette::SUCCESS),
+						);
+					},
+					// Chart
+					|ui| {
+						let created = state.tasks_created as f64;
+						let completed = state.tasks_completed as f64;
+						let remaining = (created - completed).max(0.0);
+
+						let percentage = if created > 0.0 {
+							(completed / created) * 100.0
+						} else {
+							0.0
+						};
+
+						let bars = vec![
+							Bar::new(0.0, completed).fill(palette::SUCCESS),
+							Bar::new(1.0, remaining).fill(palette::SURFACE_HOVER),
+						];
+
+						let chart = BarChart::new("task_completion", bars);
+						let max_value = completed.max(remaining);
+
+						Plot::new("task_completion_plot")
+							.height(190.0)
+							.show_axes([true, true])
+							.show_grid([true, false])
+							.clamp_grid(true)
+							// Initial/reset viewport:
+							.auto_bounds([false, false])
+							.default_x_bounds(-0.5, 1.5)
+							.default_y_bounds(0.0, (max_value * 1.1).max(1.0))
+							// Interactive:
+							.allow_zoom(true)
+							.allow_drag(true)
+							.allow_scroll(true)
+							.allow_axis_zoom_drag(true)
+							.allow_boxed_zoom(false)
+							.show(ui, |plot_ui| {
+								plot_ui.bar_chart(chart);
+							});
+					},
+				);
+			},
+		);
+
+		ui.add_space(gap);
+
+		// -------------------------------------------------------------
+		// Row 2
+		// -------------------------------------------------------------
+
+		ui.allocate_ui_with_layout(
+			egui::vec2(available.x, card_height),
+			egui::Layout::left_to_right(egui::Align::TOP),
+			|ui| {
+				ui.spacing_mut().item_spacing.x = gap;
+				// ---------------------------------------------------------
+				// System Activity
+				// ---------------------------------------------------------
+
+				draw_chart_card(
+					ui,
+					egui::vec2(card_width, card_height),
+					"System Activity",
+					"Runtime activity",
+					// Metrics
+					|ui| {
+						small_metric(ui, "Starts", state.starts, palette::PRIMARY);
+
+						ui.add_space(16.0);
+
+						small_metric(ui, "Checks", state.status_checks, palette::TEXT_MUTED);
+
+						ui.add_space(16.0);
+
+						small_metric(ui, "Events", state.events_processed, palette::WARNING);
+
+						ui.add_space(16.0);
+
+						small_metric(ui, "Files", state.files_indexed, palette::SUCCESS);
+					},
+					// Chart
+					|ui| {
+						let max_value = [
+							state.starts,
+							state.status_checks,
+							state.events_processed,
+							state.files_indexed,
+						]
+						.into_iter()
+						.max()
+						.unwrap_or(1) as f64;
+
+						let bars = vec![
+							Bar::new(0.0, state.starts as f64).fill(palette::PRIMARY),
+							Bar::new(1.0, state.status_checks as f64).fill(palette::TEXT_MUTED),
+							Bar::new(2.0, state.events_processed as f64).fill(palette::WARNING),
+							Bar::new(3.0, state.files_indexed as f64).fill(palette::SUCCESS),
+						];
+
+						let chart = BarChart::new("system_activity", bars);
+						let max_value = [
+							state.starts,
+							state.status_checks,
+							state.events_processed,
+							state.files_indexed,
+						]
+						.into_iter()
+						.max()
+						.unwrap_or(1) as f64;
+						// .default_y_bounds(0.0, max_value * 1.1)
+						Plot::new("system_activity_plot")
+							.height(190.0)
+							.show_axes([true, true])
+							.show_grid([true, false])
+							.allow_zoom(true)
+							.allow_drag(true)
+							.allow_scroll(true)
+							.allow_axis_zoom_drag(true)
+							.allow_boxed_zoom(false)
+							.default_x_bounds(-0.5, 3.5)
+							.default_y_bounds(0.0, (max_value * 1.1).max(1.0))
+							.show(ui, |plot_ui| {
+								plot_ui.bar_chart(chart);
+							});
+					},
+				);
+
+				// ---------------------------------------------------------
+				// Runtime
+				// ---------------------------------------------------------
+
+				draw_chart_card(
+					ui,
+					egui::vec2(card_width, card_height),
+					"Runtime",
+					"Task manager activity",
+					// Metrics
+					|ui| {
+						small_metric(ui, "Starts", state.starts, palette::PRIMARY);
+
+						ui.add_space(20.0);
+
+						small_metric(ui, "Longest Run", state.longest_run, palette::WARNING);
+
+						ui.add_space(20.0);
+
+						small_metric(ui, "Events", state.events_processed, palette::TEXT_MUTED);
+					},
+					// Chart
+					|ui| {
+						let max_value = [state.starts, state.events_processed, state.files_indexed]
+							.into_iter()
+							.max()
+							.unwrap_or(1) as f64;
+
+						let bars = vec![
+							Bar::new(0.0, state.starts as f64).fill(palette::PRIMARY),
+							Bar::new(1.0, state.events_processed as f64).fill(palette::WARNING),
+							Bar::new(2.0, state.files_indexed as f64).fill(palette::SUCCESS),
+						];
+
+						let chart = BarChart::new("runtime_activity", bars);
+
+						Plot::new("runtime_activity_plot")
+							.height(190.0)
+							.show_axes([true, true])
+							.show_grid([true, false])
+							.allow_zoom(true)
+							.allow_drag(true)
+							.allow_scroll(true)
+							.allow_axis_zoom_drag(true)
+							.allow_boxed_zoom(false)
+							.default_x_bounds(-0.5, 2.5)
+							.default_y_bounds(0.0, (max_value * 1.1).max(1.0))
+							.show(ui, |plot_ui| {
+								plot_ui.bar_chart(chart);
+							});
+					},
+				);
+			},
+		);
+	}
+}
+
+fn metric(ui: &mut Ui, label: &str, value: u64, color: egui::Color32) {
+	ui.group(|ui| {
+		ui.set_min_height(78.0);
+
+		ui.vertical_centered(|ui| {
+			ui.label(
+				egui::RichText::new(label)
+					.small()
+					.color(palette::TEXT_MUTED),
+			);
+
+			ui.label(
+				egui::RichText::new(value.to_string())
+					.size(26.0)
+					.strong()
+					.color(color),
+			);
+		});
+	});
+}
+fn chart_stat(ui: &mut Ui, label: &str, value: u64, color: egui::Color32) {
+	ui.vertical(|ui| {
+		ui.label(
+			egui::RichText::new(label)
+				.small()
+				.color(palette::TEXT_MUTED),
+		);
+
+		ui.label(egui::RichText::new(value.to_string()).strong().color(color));
+	});
+}
+fn runtime_metric(ui: &mut Ui, label: &str, value: u64) {
+	ui.horizontal(|ui| {
+		ui.label(egui::RichText::new(label).color(palette::TEXT_MUTED));
+
+		ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+			ui.label(
+				egui::RichText::new(value.to_string())
+					.strong()
+					.color(palette::TEXT),
+			);
+		});
+	});
+
+	ui.separator();
+}
+fn draw_chart_card(
+	ui: &mut Ui,
+	size: egui::Vec2,
+	title: &str,
+	subtitle: &str,
+	metrics: impl FnOnce(&mut Ui),
+	chart: impl FnOnce(&mut Ui),
+) {
+	ui.allocate_ui(size, |ui| {
+		egui::Frame::group(ui.style())
+			.fill(palette::SURFACE)
+			.stroke(egui::Stroke::new(1.0, palette::BORDER))
+			.inner_margin(egui::Margin::same(12))
+			.show(ui, |ui| {
+				// Force the card's contents into a vertical stack.
+				ui.vertical(|ui| {
+					// -------------------------------------------------
+					// Header
+					// -------------------------------------------------
+
+					ui.label(
+						egui::RichText::new(title)
+							.size(15.0)
+							.strong()
+							.color(palette::TEXT),
+					);
+
+					ui.label(
+						egui::RichText::new(subtitle)
+							.size(11.0)
+							.color(palette::TEXT_MUTED),
+					);
+
+					ui.add_space(8.0);
+
+					// -------------------------------------------------
+					// Metrics
+					// -------------------------------------------------
+
+					ui.horizontal(|ui| {
+						metrics(ui);
+					});
+
+					ui.add_space(8.0);
+
+					// -------------------------------------------------
+					// Chart
+					// -------------------------------------------------
+
+					ui.vertical(|ui| {
+						chart(ui);
+					});
+				});
+			});
+	});
+}
+fn draw_chart_group(ui: &mut Ui, size: egui::Vec2, title: &str, content: impl FnOnce(&mut Ui)) {
+	ui.allocate_ui(size, |ui| {
+		ui.group(|ui| {
+			ui.set_min_size(ui.available_size());
+
+			ui.heading(title);
+			ui.separator();
+
+			content(ui);
+		});
+	});
+}
+fn small_metric(ui: &mut Ui, label: &str, value: u64, color: egui::Color32) {
+	ui.horizontal(|ui| {
+		ui.label(
+			egui::RichText::new(label)
+				.size(11.0)
+				.color(palette::TEXT_MUTED),
+		);
+
+		ui.label(
+			egui::RichText::new(value.to_string())
+				.size(13.0)
+				.strong()
+				.color(color),
+		);
+	});
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum JobStatus {
+	Pending,
+	Running,
+	Completed,
+	Failed,
+	Cancelled,
+}
+struct Job {
+	id: u64,
+	name: String,
+	status: JobStatus,
+	started_at: Option<Instant>,
+	progress: Option<f32>,
+}
+impl JobStatus {
+	fn label(self) -> &'static str {
+		match self {
+			Self::Pending => "Pending",
+			Self::Running => "Running",
+			Self::Completed => "Completed",
+			Self::Failed => "Failed",
+			Self::Cancelled => "Cancelled",
+		}
+	}
+	fn icon(self) -> &'static str {
+		match self {
+			Self::Pending => "○",
+			Self::Running => "●",
+			Self::Completed => "✓",
+			Self::Failed => "✗",
+			Self::Cancelled => "⊘",
+		}
+	}
+}
+
+fn format_duration(duration: Duration) -> String {
+	let secs = duration.as_secs();
+
+	if secs < 60 {
+		format!("{secs}s")
+	} else if secs < 3600 {
+		format!("{}m {}s", secs / 60, secs % 60)
+	} else {
+		format!("{}h {}m", secs / 3600, (secs % 3600) / 60)
+	}
+}
+
+pub mod palette {
+	use egui::Color32;
+
+	pub const BG: Color32 = Color32::from_rgb(18, 20, 24);
+	pub const SURFACE: Color32 = Color32::from_rgb(27, 30, 36);
+	pub const SURFACE_HOVER: Color32 = Color32::from_rgb(34, 38, 46);
+	pub const BORDER: Color32 = Color32::from_rgb(52, 57, 68);
+
+	pub const TEXT: Color32 = Color32::from_rgb(232, 235, 240);
+	pub const TEXT_MUTED: Color32 = Color32::from_rgb(145, 152, 165);
+
+	pub const PRIMARY: Color32 = Color32::from_rgb(100, 160, 255);
+	pub const SUCCESS: Color32 = Color32::from_rgb(82, 190, 125);
+	pub const WARNING: Color32 = Color32::from_rgb(235, 180, 70);
+	pub const DANGER: Color32 = Color32::from_rgb(230, 90, 95);
+
+	pub const GRID: Color32 = Color32::from_rgb(45, 49, 58);
 }

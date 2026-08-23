@@ -39,6 +39,13 @@ impl EstateState {
 	}
 }
 impl EstateState {
+	pub fn loadFromPath(path: impl AsRef<Path>) -> Result<Self> {
+		let contents = fs::read_to_string(path)?;
+		Ok(serde_json::from_str(&contents)?)
+	}
+}
+
+impl EstateState {
 	fn path() -> std::io::Result<PathBuf> {
 		Ok(engine_data_dir()?.join("state.json"))
 	}
