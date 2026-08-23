@@ -52,14 +52,14 @@ impl Estate {
 	/// bindings.
 	pub fn new(name: String, scope: Scope) -> Self {
 		Self {
+			bindings: Vec::new(),
 			id: Uuid::now_v7(),
 			name,
-			parent: None,
-			scope,
 			nodes: Vec::new(),
-			resources: Vec::new(),
+			parent: None,
 			relations: Vec::new(),
-			bindings: Vec::new(),
+			resources: Vec::new(),
+			scope,
 		}
 	}
 }

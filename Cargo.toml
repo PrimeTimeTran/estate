@@ -17,6 +17,10 @@ icon = ["assets/icon.icns"]
 name = "estate"
 path = "src/bin/main.rs"
 
+[[bin]]
+name = "threads"
+path = "src/bin/threads.rs"
+
 
 # [[bin]]
 # name = "main"
