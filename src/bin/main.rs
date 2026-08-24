@@ -18,9 +18,19 @@ use estate::prelude::{logger, *};
 
 fn main() -> anyhow::Result<()> {
 	let cli = cli::context::parse();
+
 	let mut config = LogConfig::load()?;
 	config.apply_cli(&cli)?;
+
 	logger::init_logging(&config)?;
+
+	tracing::info!(">>> main calling App::run");
+
 	let mut app = App::new()?;
-	app.run(cli)
+
+	let result = app.run(cli);
+
+	tracing::info!(">>> main returned from App::run");
+
+	result
 }

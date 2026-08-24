@@ -1,4 +1,13 @@
 use crate::{prelude::*, router, ve};
+use core_foundation::runloop::{CFRunLoop, kCFRunLoopCommonModes, kCFRunLoopDefaultMode};
+use core_graphics::display::{CGDisplay, CGPoint};
+use core_graphics::{
+	event::{
+		self, CGEvent, CGEventField, CGEventTap, CGEventTapLocation, CGEventTapOptions,
+		CGEventTapPlacement, CGEventTapProxy, CGEventType, CallbackResult, ScrollEventUnit, *,
+	},
+	event_source::{CGEventSource, CGEventSourceRef, CGEventSourceStateID},
+};
 use egui::{Context as EguiContext, PopupAnchor::Position, TexturesDelta, Ui};
 use egui_wgpu::{
 	Renderer, SurfaceConfig,
@@ -11,6 +20,9 @@ use global_hotkey::{
 };
 use objc2_app_kit::{NSApplication, NSApplicationActivationPolicy};
 use objc2_foundation::MainThreadMarker;
+use signal_hook::consts::SIGINT;
+use signal_hook::iterator::Signals;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tracing::instrument::WithSubscriber;
 use tray_icon::{
 	Icon, TrayIcon, TrayIconBuilder,
@@ -64,8 +76,11 @@ pub struct App {
 	windows: Vec<AppWindow>,
 	pub dashboard_window: Option<Window>,
 	pub telemetry_window: Option<Window>,
+	clock_running: Arc<AtomicBool>,
+	signal_handle: Option<std::thread::JoinHandle<()>>,
+	// scroll_daemon: Option<ScrollDaemon>,
+	// scroll_daemon: Option<ScrollDaemon>,
 }
-use std::sync::atomic::{AtomicBool, Ordering};
 static HOTKEY_INITIALIZED: AtomicBool = AtomicBool::new(false);
 impl App {
 	pub fn new() -> anyhow::Result<Self> {
@@ -88,19 +103,31 @@ impl App {
 			telemetry_window: None,
 			clock_tray: None,
 			scroll_tray: None,
+			clock_running: Arc::new(AtomicBool::new(true)),
+			signal_handle: None,
+			// scroll_daemon: None,
 		})
 	}
 	pub fn run(&mut self, cli: Cli) -> anyhow::Result<()> {
-		match cli.command {
+		tracing::info!(">>> App::run entered");
+
+		let result = match cli.command {
 			None | Some(Command::Start { .. }) | Some(Command::Tray) => self.start_runtime(),
+
 			Some(_) => {
 				let runtime = tokio::runtime::Runtime::new()?;
+
 				runtime.block_on(async {
 					let ctx = cli::context::Context::new();
+
 					router::execute(cli, ctx, self.engine.clone()).await
 				})
 			}
-		}
+		};
+
+		tracing::info!(">>> App::run returning");
+
+		result
 	}
 	fn start_runtime(&mut self) -> anyhow::Result<()> {
 		self.register_global_hotkeys()?;
@@ -108,21 +135,35 @@ impl App {
 		let event_loop = EventLoop::<AppEvent>::with_user_event()
 			.with_activation_policy(ActivationPolicy::Accessory)
 			.build()?;
-
 		let proxy = event_loop.create_proxy();
-		start_global_scroll_daemon(proxy.clone());
+		self.start_global_scroll_daemon(proxy.clone());
 		self.spawn_signal_handler(proxy.clone());
-		self.spawn_clock(proxy);
-
-		// START DAEMON BEFORE ENTERING EVENT LOOP
+		self.spawn_clock(proxy.clone());
 		self.spawn_daemon();
-
 		tracing::info!(">>> entering event loop");
 		event_loop.run_app(self)?;
-
 		tracing::info!(">>> event loop returned");
-
+		tracing::info!(">>> runtime shutdown complete");
 		Ok(())
+	}
+	fn spawn_signal_handler(&mut self, proxy: EventLoopProxy<AppEvent>) {
+		std::thread::spawn(move || {
+			tracing::info!("SIGNAL: thread started");
+
+			let mut signals = Signals::new([SIGINT]).expect("failed to register SIGINT");
+
+			tracing::info!("SIGNAL: waiting");
+
+			if signals.forever().next().is_some() {
+				tracing::info!("SIGNAL: received");
+
+				let _ = proxy.send_event(AppEvent::Shutdown);
+
+				tracing::info!("SIGNAL: event sent");
+			}
+
+			tracing::info!("SIGNAL: thread exiting");
+		});
 	}
 	fn spawn_daemon(&mut self) {
 		let mut rx = self
@@ -168,46 +209,383 @@ impl App {
 			});
 		});
 	}
-	fn spawn_signal_handler(&mut self, proxy: EventLoopProxy<AppEvent>) {
-		std::thread::spawn(move || {
-			let runtime = tokio::runtime::Runtime::new().expect("failed to create Tokio runtime");
-			runtime.block_on(async move {
-				match tokio::signal::ctrl_c().await {
-					Ok(()) => {
-						if let Err(error) = proxy.send_event(AppEvent::Shutdown) {
-							tracing::error!(
-								%error,
-								"failed to send Shutdown event"
-							);
-						}
-					}
-					Err(error) => {
-						tracing::error!(
-							%error,
-							"failed to listen for Ctrl+C"
-						);
-					}
-				}
-			});
-			tracing::info!("Ctrl+C handler exiting");
-		});
-	}
 	fn spawn_clock(&mut self, proxy: EventLoopProxy<AppEvent>) {
-		let proxy_ticker = proxy.clone();
+		let running = Arc::clone(&self.clock_running);
+
 		std::thread::spawn(move || {
 			let mut current_time = 30;
-			loop {
+
+			while running.load(Ordering::Relaxed) {
 				let text = format!(" {}s", current_time);
-				let _ = proxy_ticker.send_event(AppEvent::TickClock(text));
+
+				let _ = proxy.send_event(AppEvent::TickClock(text));
+
 				if current_time == 0 {
 					current_time = 30;
 				} else {
 					current_time -= 1;
 				}
+
 				std::thread::sleep(std::time::Duration::from_secs(1));
 			}
+
+			tracing::info!("clock thread exiting");
 		});
 	}
+	fn start_global_scroll_daemon(&mut self, proxy: EventLoopProxy<AppEvent>) {
+		// fn start_global_scroll_daemon(&mut self, proxy: EventLoopProxy<AppEvent>) -> ScrollDaemon {
+		let running = Arc::new(AtomicBool::new(true));
+		let thread_running = Arc::clone(&running);
+		let handle = std::thread::spawn(move || {
+			let trusted = macos_accessibility_client::accessibility::application_is_trusted_with_prompt();
+			if !trusted {
+				return;
+			}
+			let callback = move |_proxy_cg: CGEventTapProxy,
+			                     event_type: CGEventType,
+			                     event: &CGEvent|
+			      -> CallbackResult {
+				match event_type {
+					CGEventType::MouseMoved => {
+						if REDIRECTING_SCROLL.load(Ordering::Relaxed) {
+							return CallbackResult::Keep;
+						}
+						let location = event.location();
+						let _ = proxy.send_event(AppEvent::CursorPosition {
+							x: location.x,
+							y: location.y,
+						});
+						CallbackResult::Keep
+					}
+					CGEventType::FlagsChanged => {
+						let flags = event.get_flags();
+						let shift_is_down = flags.contains(CGEventFlags::CGEventFlagShift);
+						let was_down = SHIFT_HELD.swap(shift_is_down, Ordering::Relaxed);
+						// ---------------------------------------------------------
+						// SHIFT DOWN
+						// ---------------------------------------------------------
+						if shift_is_down && !was_down {
+							let location = event.location();
+							let mut state = scroll_state().lock().unwrap();
+							state.active = true;
+							state.redirected = true;
+							state.original_position = location;
+							let target = if location.x < 960.0 {
+								ScreenPosition::Right
+							} else {
+								ScreenPosition::Left
+							};
+							let bounds = CGDisplay::main().bounds();
+							let target_x = match target {
+								ScreenPosition::Left => bounds.origin.x + bounds.size.width * 0.25,
+								ScreenPosition::Right => bounds.origin.x + bounds.size.width * 0.75,
+								ScreenPosition::Center => bounds.origin.x + bounds.size.width * 0.50,
+							};
+							let target_position = CGPoint {
+								x: target_x,
+								y: location.y,
+							};
+							state.target_position = target_position;
+							println!(
+								"⬇️ SHIFT DOWN | ({:.0}, {:.0}) -> {:?} ({:.0}, {:.0})",
+								location.x, location.y, target, target_position.x, target_position.y,
+							);
+							if let Ok(source) = CGEventSource::new(CGEventSourceStateID::CombinedSessionState) {
+								if let Ok(move_event) = CGEvent::new_mouse_event(
+									source,
+									CGEventType::MouseMoved,
+									target_position,
+									CGMouseButton::Left,
+								) {
+									move_event.post(CGEventTapLocation::HID);
+								}
+							}
+						}
+						// ---------------------------------------------------------
+						// SHIFT UP
+						// ---------------------------------------------------------
+						if !shift_is_down && was_down {
+							let mut state = scroll_state().lock().unwrap();
+							let original = state.original_position;
+							println!(
+								"⬆️ SHIFT UP | restoring ({:.0}, {:.0})",
+								original.x, original.y
+							);
+							if state.active {
+								if let Ok(source) = CGEventSource::new(CGEventSourceStateID::CombinedSessionState) {
+									if let Ok(restore_event) = CGEvent::new_mouse_event(
+										source,
+										CGEventType::MouseMoved,
+										original,
+										CGMouseButton::Left,
+									) {
+										restore_event.post(CGEventTapLocation::HID);
+									}
+								}
+							}
+							state.active = false;
+							state.redirected = false;
+						}
+						CallbackResult::Keep
+					}
+					CGEventType::KeyDown => {
+						let keycode = event
+							.get_integer_value_field(core_graphics::event::EventField::KEYBOARD_EVENT_KEYCODE);
+						match keycode {
+							18 => {
+								println!("Key '1' pressed");
+								move_cursor_to(ScreenPosition::Left);
+							}
+							19 => {
+								println!("Key '2' pressed");
+								move_cursor_to(ScreenPosition::Center);
+							}
+							20 => {
+								println!("Key '3' pressed");
+								move_cursor_to(ScreenPosition::Right);
+							}
+							_ => {}
+						}
+						CallbackResult::Keep
+					}
+					CGEventType::ScrollWheel => {
+						if !SHIFT_HELD.load(Ordering::Relaxed) {
+							return CallbackResult::Keep;
+						}
+						let state = scroll_state().lock().unwrap();
+						if !state.active {
+							return CallbackResult::Keep;
+						}
+						CallbackResult::Keep
+					}
+					_ => CallbackResult::Keep,
+				}
+			};
+			let tap = match CGEventTap::new(
+				CGEventTapLocation::HID,
+				CGEventTapPlacement::HeadInsertEventTap,
+				CGEventTapOptions::Default,
+				vec![
+					CGEventType::ScrollWheel,
+					CGEventType::FlagsChanged,
+					CGEventType::MouseMoved,
+					CGEventType::KeyDown,
+				],
+				callback,
+			) {
+				Ok(tap) => tap,
+				Err(error) => {
+					eprintln!("❌ Failed to create CGEventTap: {:?}", error);
+					return;
+				}
+			};
+			unsafe {
+				let port = tap.mach_port();
+				let source = match port.create_runloop_source(0) {
+					Ok(source) => source,
+					Err(_) => {
+						eprintln!("❌ Failed to create CFRunLoopSource");
+						return;
+					}
+				};
+				let run_loop = CFRunLoop::get_current();
+				run_loop.add_source(&source, kCFRunLoopCommonModes);
+				tap.enable();
+				println!("✅ Global input event tap enabled");
+				CFRunLoop::run_current();
+			}
+			// unsafe {
+			// 	let port = tap.mach_port();
+			// 	let source = match port.create_runloop_source(0) {
+			// 		Ok(source) => source,
+			// 		Err(_) => {
+			// 			eprintln!("❌ Failed to create CFRunLoopSource");
+			// 			return;
+			// 		}
+			// 	};
+			// 	let run_loop = CFRunLoop::get_current();
+
+			// 	run_loop.add_source(&source, kCFRunLoopCommonModes);
+
+			// 	tap.enable();
+
+			// 	tracing::info!("scroll daemon started");
+
+			// 	while thread_running.load(Ordering::Relaxed) {
+			// 		CFRunLoop::run_in_mode(
+			// 			kCFRunLoopDefaultMode,
+			// 			std::time::Duration::from_millis(10),
+			// 			false,
+			// 		);
+			// 	}
+
+			// 	tracing::info!("scroll daemon stopping");
+
+			// 	// tap.disable();
+
+			// 	run_loop.remove_source(&source, kCFRunLoopCommonModes);
+
+			// 	tracing::info!("scroll daemon stopped");
+			// }
+		});
+		// ScrollDaemon {
+		// 	running,
+		// 	handle: Some(handle),
+		// }
+	}
+	fn shutdown_runtime(&mut self) {
+		tracing::info!(">>> shutting down runtime");
+
+		self.clock_running.store(false, Ordering::Relaxed);
+
+		// if let Some(scroll_daemon) = self.scroll_daemon.take() {
+		// 	tracing::info!(">>> shutting down scroll daemon");
+		// 	scroll_daemon.shutdown();
+		// }
+
+		if let Some(handle) = self.signal_handle.take() {
+			tracing::info!(">>> joining signal handler");
+			let _ = handle.join();
+		}
+
+		tracing::info!(">>> runtime shutdown complete");
+	}
+}
+impl ApplicationHandler<AppEvent> for App {
+	fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+		while let Ok(event) = MenuEvent::receiver().try_recv() {
+			self.handle_event(event, event_loop);
+		}
+	}
+	fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+		if self.window.is_none() {
+			self.open_window(event_loop, AppWindowType::TaskManager);
+		}
+		if self.tray.is_none() {
+			let (menu, tray) = match Self::bootstrap() {
+				Ok(value) => value,
+				Err(error) => {
+					tracing::error!(%error, "failed to bootstrap tray");
+					return;
+				}
+			};
+			self.menu = Some(menu);
+			self.tray = Some(tray);
+			tracing::info!("🔥 main tray initialized");
+		}
+		if self.scroll_tray.is_none() {
+			match TrayIconBuilder::new()
+				.with_icon(Self::scroll_tray_icon())
+				.with_tooltip("Estate Scroll Controller")
+				.build()
+			{
+				Ok(tray) => {
+					self.scroll_tray = Some(tray);
+					tracing::info!("🔥 scroll tray initialized");
+				}
+				Err(error) => {
+					tracing::error!(%error, "failed to create scroll tray");
+				}
+			}
+		}
+	}
+	fn window_event(
+		&mut self,
+		event_loop: &ActiveEventLoop,
+		window_id: WindowId,
+		event: WindowEvent,
+	) {
+		let Some(window) = self
+			.windows
+			.iter_mut()
+			.find(|window| window.window.instance.id() == window_id)
+		else {
+			return;
+		};
+		let response = window
+			.window
+			.egui_state
+			.on_window_event(&window.window.instance, &event);
+		if response.repaint {
+			window.window.instance.request_redraw();
+		}
+		match event {
+			WindowEvent::CloseRequested => {
+				tracing::info!("🛑 Window close requested for id: {:?}", window_id);
+				self
+					.windows
+					.retain(|window| window.window.instance.id() != window_id);
+				return;
+			}
+			WindowEvent::RedrawRequested => {
+				if window.window.occluded {
+					return;
+				}
+				if let Err(e) = window.window.draw() {
+					tracing::error!("DEV >>> draw failed: {e:#}");
+				}
+			}
+			WindowEvent::Focused(true) => {
+				window.window.instance.request_redraw();
+			}
+			WindowEvent::Occluded(occluded) => {
+				window.window.occluded = occluded;
+				if !occluded {
+					window.window.instance.request_redraw();
+				}
+			}
+			WindowEvent::Resized(size) => {
+				if size.width == 0 || size.height == 0 {
+					return;
+				}
+				window.window.config.width = size.width;
+				window.window.config.height = size.height;
+				window
+					.window
+					.surface
+					.configure(&window.window.device, &window.window.config);
+				window.window.needs_resize = false;
+				window.window.instance.request_redraw();
+			}
+			_ => {}
+		}
+	}
+	fn user_event(&mut self, event_loop: &ActiveEventLoop, event: AppEvent) {
+		match event {
+			AppEvent::Shutdown => {
+				tracing::info!(">>> shutdown event received");
+
+				self.shutdown_runtime();
+
+				tracing::info!(">>> requesting event loop exit");
+				event_loop.exit();
+			}
+			AppEvent::CursorPosition { x, y } => {
+				// let text = format!("↖ {:.0}  {:.0}", x, y);
+				// let text = format!("← {:.0}  {:.0}", x, y);
+				// let text = format!("→ {:.0}  {:.0}", x, y);
+				// let text = format!("↑ {:.0}  {:.0}", x, y);
+				// let text = format!("● {:.0}, {:.0}", x, y);
+				// let text = format!("◉ {:.0}, {:.0}", x, y);
+				// let text = format!("⌖ {:.0}, {:.0}", x, y);
+				// let text = format!("🟢 {:.0}, {:.0}", x, y);
+				// let text = format!("🔵 {:.0}, {:.0}", x, y);
+				// let text = format!("🟡 {:.0}, {:.0}", x, y);
+				// let text = format!("🔴 {:.0}, {:.0}", x, y);
+				let region = if x < 960.0 { "← LEFT" } else { "RIGHT →" };
+				if let Some(tray) = &self.scroll_tray {
+					let _ = tray.set_title(Some(region));
+				}
+			}
+			AppEvent::TickClock(text) => {
+				if let Some(tray) = &self.tray {
+					let _ = tray.set_title(Some(text));
+				}
+			}
+		}
+	}
+}
+impl App {
 	fn register_global_hotkeys(&mut self) -> anyhow::Result<()> {
 		let manager = GlobalHotKeyManager::new()?;
 		let hotkey = HotKey::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyP);
@@ -335,11 +713,8 @@ impl App {
 			}
 		}
 	}
-	fn shutdown(&mut self, event_loop: &ActiveEventLoop) {
-		let _ = self.daemon_tx.try_send(DaemonCommand::Stop);
-		event_loop.exit();
-	}
 }
+
 impl App {
 	fn show_tasks(&mut self) {
 		println!("Requesting task/status refresh...");
@@ -415,135 +790,7 @@ impl App {
 		Ok(())
 	}
 }
-impl ApplicationHandler<AppEvent> for App {
-	fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
-		while let Ok(event) = MenuEvent::receiver().try_recv() {
-			self.handle_event(event, event_loop);
-		}
-	}
-	fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-		if self.window.is_none() {
-			self.open_window(event_loop, AppWindowType::TaskManager);
-		}
-		if self.tray.is_none() {
-			let (menu, tray) = match Self::bootstrap() {
-				Ok(value) => value,
-				Err(error) => {
-					tracing::error!(%error, "failed to bootstrap tray");
-					return;
-				}
-			};
-			self.menu = Some(menu);
-			self.tray = Some(tray);
-			tracing::info!("🔥 main tray initialized");
-		}
-		if self.scroll_tray.is_none() {
-			match TrayIconBuilder::new()
-				.with_icon(Self::scroll_tray_icon())
-				.with_tooltip("Estate Scroll Controller")
-				.build()
-			{
-				Ok(tray) => {
-					self.scroll_tray = Some(tray);
-					tracing::info!("🔥 scroll tray initialized");
-				}
-				Err(error) => {
-					tracing::error!(%error, "failed to create scroll tray");
-				}
-			}
-		}
-	}
-	fn window_event(
-		&mut self,
-		event_loop: &ActiveEventLoop,
-		window_id: WindowId,
-		event: WindowEvent,
-	) {
-		let Some(window) = self
-			.windows
-			.iter_mut()
-			.find(|window| window.window.instance.id() == window_id)
-		else {
-			return;
-		};
-		let response = window
-			.window
-			.egui_state
-			.on_window_event(&window.window.instance, &event);
-		if response.repaint {
-			window.window.instance.request_redraw();
-		}
-		match event {
-			WindowEvent::CloseRequested => {
-				tracing::info!("🛑 Window close requested for id: {:?}", window_id);
-				self
-					.windows
-					.retain(|window| window.window.instance.id() != window_id);
-				return;
-			}
-			WindowEvent::RedrawRequested => {
-				if window.window.occluded {
-					return;
-				}
-				if let Err(e) = window.window.draw() {
-					tracing::error!("DEV >>> draw failed: {e:#}");
-				}
-			}
-			WindowEvent::Focused(true) => {
-				window.window.instance.request_redraw();
-			}
-			WindowEvent::Occluded(occluded) => {
-				window.window.occluded = occluded;
-				if !occluded {
-					window.window.instance.request_redraw();
-				}
-			}
-			WindowEvent::Resized(size) => {
-				if size.width == 0 || size.height == 0 {
-					return;
-				}
-				window.window.config.width = size.width;
-				window.window.config.height = size.height;
-				window
-					.window
-					.surface
-					.configure(&window.window.device, &window.window.config);
-				window.window.needs_resize = false;
-				window.window.instance.request_redraw();
-			}
-			_ => {}
-		}
-	}
-	fn user_event(&mut self, event_loop: &ActiveEventLoop, event: AppEvent) {
-		match event {
-			AppEvent::Shutdown => {
-				self.shutdown(event_loop);
-			}
-			AppEvent::CursorPosition { x, y } => {
-				// let text = format!("↖ {:.0}  {:.0}", x, y);
-				// let text = format!("← {:.0}  {:.0}", x, y);
-				// let text = format!("→ {:.0}  {:.0}", x, y);
-				// let text = format!("↑ {:.0}  {:.0}", x, y);
-				// let text = format!("● {:.0}, {:.0}", x, y);
-				// let text = format!("◉ {:.0}, {:.0}", x, y);
-				// let text = format!("⌖ {:.0}, {:.0}", x, y);
-				// let text = format!("🟢 {:.0}, {:.0}", x, y);
-				// let text = format!("🔵 {:.0}, {:.0}", x, y);
-				// let text = format!("🟡 {:.0}, {:.0}", x, y);
-				// let text = format!("🔴 {:.0}, {:.0}", x, y);
-				let region = if x < 960.0 { "← LEFT" } else { "RIGHT →" };
-				if let Some(tray) = &self.scroll_tray {
-					let _ = tray.set_title(Some(region));
-				}
-			}
-			AppEvent::TickClock(text) => {
-				if let Some(tray) = &self.tray {
-					let _ = tray.set_title(Some(text));
-				}
-			}
-		}
-	}
-}
+
 #[derive(Clone, Debug, Default)]
 pub struct Context {
 	pub source: RuntimeMode,

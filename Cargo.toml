@@ -85,6 +85,7 @@ url.workspace = true
 uuid.workspace = true
 wgpu.workspace = true
 winit.workspace = true
+signal-hook = "0.4.4"
 
 [build-dependencies]
 resvg.workspace = true

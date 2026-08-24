@@ -1,9 +1,14 @@
 use crate::prelude::{daemon::engine_data_dir, *};
 
-use tracing::{Instrument, debug, error, info, info_span, warn};
+use tracing::{Instrument, Span, debug, error, info, info_span, warn};
 use tracing_subscriber::{
 	EnvFilter, Layer, filter::LevelFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt,
 };
+
+// [namespace.flow] 1
+// [namespace.flow] 2
+// [namespace.flow] 3
+// [namespace.flow] 3
 
 pub fn init_logging(config: &LogConfig) -> anyhow::Result<()> {
 	let terminal_filter = config.terminal_filter()?;
@@ -11,7 +16,13 @@ pub fn init_logging(config: &LogConfig) -> anyhow::Result<()> {
 		.with_target(true)
 		.with_thread_ids(false)
 		.with_ansi(true)
+		.with_timer(fmt::time::SystemTime)
 		.with_filter(terminal_filter);
+	// let terminal = fmt::layer()
+	// 	.with_target(true)
+	// 	.with_thread_ids(false)
+	// 	.with_ansi(true)
+	// 	.with_filter(terminal_filter);
 	let file = if config.file.enabled {
 		let path = engine_data_dir()?.join("estate.log");
 		let writer = OpenOptions::new().create(true).append(true).open(path)?;
@@ -225,4 +236,82 @@ struct CargoConfig {
 struct CargoManifest {
 	#[serde(default)]
 	logging: Option<LogConfig>,
+}
+use std::sync::atomic::{AtomicU64, Ordering};
+
+static NEXT_FLOW_ID: AtomicU64 = AtomicU64::new(1);
+
+#[derive(Clone)]
+pub struct Tracer {
+	namespace: String,
+}
+
+impl Tracer {
+	pub fn new(namespace: impl Into<String>) -> Self {
+		Self {
+			namespace: namespace.into(),
+		}
+	}
+	pub fn flow(&self, name: impl Into<String>) -> TraceFlow {
+		let id = NEXT_FLOW_ID.fetch_add(1, Ordering::Relaxed);
+		let name = name.into();
+
+		TraceFlow {
+			span: info_span!(
+					"flow",
+					namespace = %self.namespace,
+					flow = %name,
+					flow_id = id,
+			),
+			name,
+			id,
+		}
+	}
+}
+
+pub struct TraceFlow {
+	span: Span,
+	name: String,
+	id: u64,
+}
+
+impl TraceFlow {
+	fn event(&self, level: LogLevel, message: &str) {
+		let _enter = self.span.enter();
+
+		match level {
+			LogLevel::Debug => {
+				debug!("[{}#{}] {}", self.name, self.id, message)
+			}
+			LogLevel::Info => {
+				info!("[{}#{}] {}", self.name, self.id, message)
+			}
+			LogLevel::Warn => {
+				warn!("[{}#{}] {}", self.name, self.id, message)
+			}
+			LogLevel::Error => {
+				error!("[{}#{}] {}", self.name, self.id, message)
+			}
+			LogLevel::Trace => {
+				tracing::trace!("[{}#{}] {}", self.name, self.id, message)
+			}
+		}
+	}
+	pub fn debug(&self, message: &str) {
+		let _enter = self.span.enter();
+		debug!("{}", message);
+	}
+	pub fn info(&self, message: &str) {
+		let _enter = self.span.enter();
+
+		info!(flow_id = self.id, "{}", message);
+	}
+	pub fn warn(&self, message: &str) {
+		let _enter = self.span.enter();
+		warn!("{}", message);
+	}
+	pub fn error(&self, message: &str) {
+		let _enter = self.span.enter();
+		error!("{}", message);
+	}
 }

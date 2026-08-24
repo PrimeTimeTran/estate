@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use core_foundation::runloop::kCFRunLoopDefaultMode;
 use core_graphics::display::CGDisplay;
 use egui::Context;
 use egui::Ui;
@@ -914,168 +915,6 @@ use core_graphics::{
 	event_source::{CGEventSource, CGEventSourceRef, CGEventSourceStateID},
 };
 use std::sync::atomic::{AtomicBool, Ordering};
-static SHIFT_HELD: AtomicBool = AtomicBool::new(false);
-pub fn start_global_scroll_daemon(proxy: EventLoopProxy<AppEvent>) {
-	std::thread::spawn(move || {
-		let trusted = macos_accessibility_client::accessibility::application_is_trusted_with_prompt();
-		if !trusted {
-			return;
-		}
-		let callback = move |_proxy_cg: CGEventTapProxy,
-		                     event_type: CGEventType,
-		                     event: &CGEvent|
-		      -> CallbackResult {
-			match event_type {
-				CGEventType::MouseMoved => {
-					if REDIRECTING_SCROLL.load(Ordering::Relaxed) {
-						return CallbackResult::Keep;
-					}
-					let location = event.location();
-					let _ = proxy.send_event(AppEvent::CursorPosition {
-						x: location.x,
-						y: location.y,
-					});
-					CallbackResult::Keep
-				}
-				CGEventType::FlagsChanged => {
-					let flags = event.get_flags();
-					let shift_is_down = flags.contains(CGEventFlags::CGEventFlagShift);
-					let was_down = SHIFT_HELD.swap(shift_is_down, Ordering::Relaxed);
-					// ---------------------------------------------------------
-					// SHIFT DOWN
-					// ---------------------------------------------------------
-					if shift_is_down && !was_down {
-						let location = event.location();
-						let mut state = scroll_state().lock().unwrap();
-						state.active = true;
-						state.redirected = true;
-						state.original_position = location;
-						let target = if location.x < 960.0 {
-							ScreenPosition::Right
-						} else {
-							ScreenPosition::Left
-						};
-						let bounds = CGDisplay::main().bounds();
-						let target_x = match target {
-							ScreenPosition::Left => bounds.origin.x + bounds.size.width * 0.25,
-							ScreenPosition::Right => bounds.origin.x + bounds.size.width * 0.75,
-							ScreenPosition::Center => bounds.origin.x + bounds.size.width * 0.50,
-						};
-						let target_position = CGPoint {
-							x: target_x,
-							y: location.y,
-						};
-						state.target_position = target_position;
-						println!(
-							"⬇️ SHIFT DOWN | ({:.0}, {:.0}) -> {:?} ({:.0}, {:.0})",
-							location.x, location.y, target, target_position.x, target_position.y,
-						);
-						if let Ok(source) = CGEventSource::new(CGEventSourceStateID::CombinedSessionState) {
-							if let Ok(move_event) = CGEvent::new_mouse_event(
-								source,
-								CGEventType::MouseMoved,
-								target_position,
-								CGMouseButton::Left,
-							) {
-								move_event.post(CGEventTapLocation::HID);
-							}
-						}
-					}
-					// ---------------------------------------------------------
-					// SHIFT UP
-					// ---------------------------------------------------------
-					if !shift_is_down && was_down {
-						let mut state = scroll_state().lock().unwrap();
-						let original = state.original_position;
-						println!(
-							"⬆️ SHIFT UP | restoring ({:.0}, {:.0})",
-							original.x, original.y
-						);
-						if state.active {
-							if let Ok(source) = CGEventSource::new(CGEventSourceStateID::CombinedSessionState) {
-								if let Ok(restore_event) = CGEvent::new_mouse_event(
-									source,
-									CGEventType::MouseMoved,
-									original,
-									CGMouseButton::Left,
-								) {
-									restore_event.post(CGEventTapLocation::HID);
-								}
-							}
-						}
-						state.active = false;
-						state.redirected = false;
-					}
-					CallbackResult::Keep
-				}
-				CGEventType::KeyDown => {
-					let keycode =
-						event.get_integer_value_field(core_graphics::event::EventField::KEYBOARD_EVENT_KEYCODE);
-					match keycode {
-						18 => {
-							println!("Key '1' pressed");
-							move_cursor_to(ScreenPosition::Left);
-						}
-						19 => {
-							println!("Key '2' pressed");
-							move_cursor_to(ScreenPosition::Center);
-						}
-						20 => {
-							println!("Key '3' pressed");
-							move_cursor_to(ScreenPosition::Right);
-						}
-						_ => {}
-					}
-					CallbackResult::Keep
-				}
-				CGEventType::ScrollWheel => {
-					if !SHIFT_HELD.load(Ordering::Relaxed) {
-						return CallbackResult::Keep;
-					}
-					let state = scroll_state().lock().unwrap();
-					if !state.active {
-						return CallbackResult::Keep;
-					}
-					CallbackResult::Keep
-				}
-				_ => CallbackResult::Keep,
-			}
-		};
-		let tap = match CGEventTap::new(
-			CGEventTapLocation::HID,
-			CGEventTapPlacement::HeadInsertEventTap,
-			CGEventTapOptions::Default,
-			vec![
-				CGEventType::ScrollWheel,
-				CGEventType::FlagsChanged,
-				CGEventType::MouseMoved,
-				CGEventType::KeyDown,
-			],
-			callback,
-		) {
-			Ok(tap) => tap,
-			Err(error) => {
-				eprintln!("❌ Failed to create CGEventTap: {:?}", error);
-				return;
-			}
-		};
-		unsafe {
-			let port = tap.mach_port();
-			let source = match port.create_runloop_source(0) {
-				Ok(source) => source,
-				Err(_) => {
-					eprintln!("❌ Failed to create CFRunLoopSource");
-					return;
-				}
-			};
-			let run_loop = CFRunLoop::get_current();
-			run_loop.add_source(&source, kCFRunLoopCommonModes);
-			tap.enable();
-			println!("✅ Global input event tap enabled");
-			CFRunLoop::run_current();
-		}
-	});
-}
 
 fn target_position(location: CGPoint, target: ScreenPosition) -> CGPoint {
 	let bounds = CGDisplay::main().bounds();
@@ -1686,16 +1525,16 @@ pub mod palette {
 	pub const DANGER: Color32 = Color32::from_rgb(230, 90, 95);
 	pub const GRID: Color32 = Color32::from_rgb(45, 49, 58);
 }
-static REDIRECTING_SCROLL: AtomicBool = AtomicBool::new(false);
+pub static REDIRECTING_SCROLL: AtomicBool = AtomicBool::new(false);
 #[derive(Debug, Clone, Copy)]
-struct ScrollRedirectState {
-	active: bool,
-	redirected: bool,
-	original_position: CGPoint,
-	target_position: CGPoint,
+pub struct ScrollRedirectState {
+	pub active: bool,
+	pub redirected: bool,
+	pub original_position: CGPoint,
+	pub target_position: CGPoint,
 }
-static SCROLL_STATE: OnceLock<Mutex<ScrollRedirectState>> = OnceLock::new();
-fn scroll_state() -> &'static Mutex<ScrollRedirectState> {
+
+pub fn scroll_state() -> &'static Mutex<ScrollRedirectState> {
 	SCROLL_STATE.get_or_init(|| {
 		Mutex::new(ScrollRedirectState {
 			active: false,
@@ -1704,4 +1543,201 @@ fn scroll_state() -> &'static Mutex<ScrollRedirectState> {
 			target_position: CGPoint { x: 0.0, y: 0.0 },
 		})
 	})
+}
+
+pub fn start_global_scroll_daemon(proxy: EventLoopProxy<AppEvent>) -> ScrollDaemon {
+	let running = Arc::new(AtomicBool::new(true));
+	let thread_running = Arc::clone(&running);
+	let handle = std::thread::spawn(move || {
+		let trusted = macos_accessibility_client::accessibility::application_is_trusted_with_prompt();
+		if !trusted {
+			return;
+		}
+		let callback = move |_proxy_cg: CGEventTapProxy,
+		                     event_type: CGEventType,
+		                     event: &CGEvent|
+		      -> CallbackResult {
+			match event_type {
+				CGEventType::MouseMoved => {
+					if REDIRECTING_SCROLL.load(Ordering::Relaxed) {
+						return CallbackResult::Keep;
+					}
+					let location = event.location();
+					let _ = proxy.send_event(AppEvent::CursorPosition {
+						x: location.x,
+						y: location.y,
+					});
+					CallbackResult::Keep
+				}
+				CGEventType::FlagsChanged => {
+					let flags = event.get_flags();
+					let shift_is_down = flags.contains(CGEventFlags::CGEventFlagShift);
+					let was_down = SHIFT_HELD.swap(shift_is_down, Ordering::Relaxed);
+					// ---------------------------------------------------------
+					// SHIFT DOWN
+					// ---------------------------------------------------------
+					if shift_is_down && !was_down {
+						let location = event.location();
+						let mut state = scroll_state().lock().unwrap();
+						state.active = true;
+						state.redirected = true;
+						state.original_position = location;
+						let target = if location.x < 960.0 {
+							ScreenPosition::Right
+						} else {
+							ScreenPosition::Left
+						};
+						let bounds = CGDisplay::main().bounds();
+						let target_x = match target {
+							ScreenPosition::Left => bounds.origin.x + bounds.size.width * 0.25,
+							ScreenPosition::Right => bounds.origin.x + bounds.size.width * 0.75,
+							ScreenPosition::Center => bounds.origin.x + bounds.size.width * 0.50,
+						};
+						let target_position = CGPoint {
+							x: target_x,
+							y: location.y,
+						};
+						state.target_position = target_position;
+						println!(
+							"⬇️ SHIFT DOWN | ({:.0}, {:.0}) -> {:?} ({:.0}, {:.0})",
+							location.x, location.y, target, target_position.x, target_position.y,
+						);
+						if let Ok(source) = CGEventSource::new(CGEventSourceStateID::CombinedSessionState) {
+							if let Ok(move_event) = CGEvent::new_mouse_event(
+								source,
+								CGEventType::MouseMoved,
+								target_position,
+								CGMouseButton::Left,
+							) {
+								move_event.post(CGEventTapLocation::HID);
+							}
+						}
+					}
+					// ---------------------------------------------------------
+					// SHIFT UP
+					// ---------------------------------------------------------
+					if !shift_is_down && was_down {
+						let mut state = scroll_state().lock().unwrap();
+						let original = state.original_position;
+						println!(
+							"⬆️ SHIFT UP | restoring ({:.0}, {:.0})",
+							original.x, original.y
+						);
+						if state.active {
+							if let Ok(source) = CGEventSource::new(CGEventSourceStateID::CombinedSessionState) {
+								if let Ok(restore_event) = CGEvent::new_mouse_event(
+									source,
+									CGEventType::MouseMoved,
+									original,
+									CGMouseButton::Left,
+								) {
+									restore_event.post(CGEventTapLocation::HID);
+								}
+							}
+						}
+						state.active = false;
+						state.redirected = false;
+					}
+					CallbackResult::Keep
+				}
+				CGEventType::KeyDown => {
+					let keycode =
+						event.get_integer_value_field(core_graphics::event::EventField::KEYBOARD_EVENT_KEYCODE);
+					match keycode {
+						18 => {
+							println!("Key '1' pressed");
+							move_cursor_to(ScreenPosition::Left);
+						}
+						19 => {
+							println!("Key '2' pressed");
+							move_cursor_to(ScreenPosition::Center);
+						}
+						20 => {
+							println!("Key '3' pressed");
+							move_cursor_to(ScreenPosition::Right);
+						}
+						_ => {}
+					}
+					CallbackResult::Keep
+				}
+				CGEventType::ScrollWheel => {
+					if !SHIFT_HELD.load(Ordering::Relaxed) {
+						return CallbackResult::Keep;
+					}
+					let state = scroll_state().lock().unwrap();
+					if !state.active {
+						return CallbackResult::Keep;
+					}
+					CallbackResult::Keep
+				}
+				_ => CallbackResult::Keep,
+			}
+		};
+		let tap = match CGEventTap::new(
+			CGEventTapLocation::HID,
+			CGEventTapPlacement::HeadInsertEventTap,
+			CGEventTapOptions::Default,
+			vec![
+				CGEventType::ScrollWheel,
+				CGEventType::FlagsChanged,
+				CGEventType::MouseMoved,
+				CGEventType::KeyDown,
+			],
+			callback,
+		) {
+			Ok(tap) => tap,
+			Err(error) => {
+				eprintln!("❌ Failed to create CGEventTap: {:?}", error);
+				return;
+			}
+		};
+		unsafe {
+			let port = tap.mach_port();
+			let source = match port.create_runloop_source(0) {
+				Ok(source) => source,
+				Err(_) => {
+					eprintln!("❌ Failed to create CFRunLoopSource");
+					return;
+				}
+			};
+			let run_loop = CFRunLoop::get_current();
+
+			run_loop.add_source(&source, kCFRunLoopCommonModes);
+
+			tap.enable();
+
+			tracing::info!("scroll daemon started");
+
+			while thread_running.load(Ordering::Relaxed) {
+				CFRunLoop::run_in_mode(kCFRunLoopDefaultMode, Duration::from_millis(10), false);
+			}
+
+			tracing::info!("scroll daemon stopping");
+
+			// tap.disable();
+
+			run_loop.remove_source(&source, kCFRunLoopCommonModes);
+
+			tracing::info!("scroll daemon stopped");
+		}
+	});
+	ScrollDaemon {
+		running,
+		handle: Some(handle),
+	}
+}
+
+pub struct ScrollDaemon {
+	pub running: Arc<AtomicBool>,
+	pub handle: Option<std::thread::JoinHandle<()>>,
+}
+
+impl ScrollDaemon {
+	pub fn shutdown(self) {
+		self.running.store(false, Ordering::Relaxed);
+
+		if let Some(handle) = self.handle {
+			let _ = handle.join();
+		}
+	}
 }

@@ -197,11 +197,10 @@ impl EstateRuntime {
 
 		tokio::spawn(async move {
 			println!("🔥 EVENT DISPATCHER TASK STARTED");
-
 			loop {
 				match receiver.recv().await {
 					Ok(event) => {
-						println!("🔥 DISPATCHER RECEIVED: {:?}", event.kind);
+						tracing::info!("🔥 DISPATCHER RECEIVED: {:?}", event.kind);
 
 						dispatcher.dispatch(event, &runtime).await;
 					}
@@ -241,10 +240,10 @@ impl EventBus {
 	pub fn emit(&self, event: Event) {
 		match self.sender.send(event.clone()) {
 			Ok(count) => {
-				println!("📡 Event emitted: {:?} → {} receiver(s)", event.kind, count);
+				tracing::info!("📡 Event emitted: {:?} → {} receiver(s)", event.kind, count);
 			}
 			Err(_) => {
-				println!("⚠️ Event emitted with NO receivers: {:?}", event.kind);
+				tracing::error!("⚠️ Event emitted with NO receivers: {:?}", event.kind);
 			}
 		}
 	}
@@ -260,7 +259,7 @@ pub struct LogHandler;
 #[async_trait::async_trait]
 impl EventHandler for LogHandler {
 	async fn handle(&self, event: &Event, _runtime: &EstateRuntime) {
-		println!("📡 received {:?}", event);
+		tracing::info!("📡 received {:?}", event);
 	}
 }
 pub struct EventDispatcher {
@@ -299,7 +298,7 @@ pub struct FileWatcherHandler;
 impl EventHandler for FileWatcherHandler {
 	async fn handle(&self, event: &Event, runtime: &EstateRuntime) {
 		if let EventKind::FileModified { inode, path } = &event.kind {
-			println!("reindexing {:?} ({:?})", path, inode);
+			tracing::info!("📡 FileWatcherHandler handle {:?} ({:?})", event, inode);
 			runtime.emit(Event::daemon(EventKind::IndexUpdated { files_changed: 1 }));
 		}
 		// if let EventKind::FileModified { inode: Inode, path: String } = &event.kind {
@@ -313,7 +312,7 @@ pub struct TaskHandler;
 #[async_trait::async_trait]
 impl EventHandler for TaskHandler {
 	async fn handle(&self, event: &Event, runtime: &EstateRuntime) {
-		println!("TaskHandler handle...");
+		tracing::info!("📡 EventHandler.handle {:?} ({:?})", event, runtime);
 		let EventKind::TaskRequested { request } = &event.kind else {
 			return;
 		};
@@ -358,6 +357,7 @@ impl EventHandler for TaskHandler {
 			match TaskRunner::execute(task).await {
 				Ok(()) => {
 					println!("TaskRunner::execute");
+					// tracing::info!("📡 TaskHandler handle {:?}", event);
 					runtime.emit(Event::daemon(EventKind::TaskCompleted { task_id }));
 				}
 				Err(error) => {

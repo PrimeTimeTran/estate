@@ -1,6 +1,11 @@
 //! Static definitions shared by estate dependencies
 //! # Description
-use crate::core::{Probe, ProbeKind, ProbeSet};
+use std::sync::{Mutex, OnceLock, atomic::AtomicBool};
+
+use crate::{
+	core::{Probe, ProbeKind, ProbeSet},
+	ve::ScrollRedirectState,
+};
 
 pub const FILE_EXTENSIONS: &[&str] = &[
 	"rs", "loi", "estate", "html", "htm", "css", "js", "jsx", "ts", "tsx", "json", "jsonc", "md",
@@ -187,3 +192,6 @@ pub const PROBES: ProbeSet = &[
 		kind: ProbeKind::File,
 	},
 ];
+
+pub static SCROLL_STATE: OnceLock<Mutex<ScrollRedirectState>> = OnceLock::new();
+pub static SHIFT_HELD: AtomicBool = AtomicBool::new(false);
