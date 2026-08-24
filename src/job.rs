@@ -114,13 +114,13 @@ pub struct AgentTask {
 
 #[derive(Debug, Clone)]
 pub struct TaskResult {
-	pub task_id: String,
-	pub status: TaskStatus,
-	pub summary: Option<String>,
 	pub artifacts: Vec<Artifact>,
+	pub chat: Option<String>,
 	pub logs: Vec<String>,
 	pub spawned_tasks: Vec<AgentTask>,
-	pub chat: Option<String>,
+	pub status: TaskStatus,
+	pub summary: Option<String>,
+	pub task_id: String,
 }
 pub struct TaskContext {
 	pub task_id: String,
@@ -131,16 +131,15 @@ pub struct TaskContext {
 impl TaskResult {
 	pub fn completed_chat(task_id: String, ctx: AgentContext, chat: String) -> Self {
 		Self {
-			task_id,
-			status: TaskStatus::Completed,
-			summary: None,
 			artifacts: ctx.artifacts,
+			chat: Some(chat),
 			logs: ctx.logs,
 			spawned_tasks: ctx.spawned_tasks,
-			chat: Some(chat),
+			status: TaskStatus::Completed,
+			summary: None,
+			task_id,
 		}
 	}
-
 	pub fn completed_with_summary(task_id: String, ctx: AgentContext, summary: String) -> Self {
 		Self {
 			task_id,
@@ -152,7 +151,6 @@ impl TaskResult {
 			chat: None,
 		}
 	}
-
 	pub fn failed(
 		task_id: String,
 		ctx: AgentContext,
@@ -190,27 +188,27 @@ pub enum JobStatus {
 pub struct Job {
 	pub id: u64,
 	pub name: String,
-	pub status: JobStatus,
-	pub started_at: Option<Instant>,
 	pub progress: Option<f32>,
+	pub started_at: Option<Instant>,
+	pub status: JobStatus,
 }
 impl JobStatus {
 	pub fn label(self) -> &'static str {
 		match self {
-			Self::Pending => "Pending",
-			Self::Running => "Running",
+			Self::Cancelled => "Cancelled",
 			Self::Completed => "Completed",
 			Self::Failed => "Failed",
-			Self::Cancelled => "Cancelled",
+			Self::Pending => "Pending",
+			Self::Running => "Running",
 		}
 	}
 	pub fn icon(self) -> &'static str {
 		match self {
-			Self::Pending => "○",
-			Self::Running => "●",
+			Self::Cancelled => "⊘",
 			Self::Completed => "✓",
 			Self::Failed => "✗",
-			Self::Cancelled => "⊘",
+			Self::Pending => "○",
+			Self::Running => "●",
 		}
 	}
 }

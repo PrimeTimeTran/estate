@@ -1,33 +1,24 @@
 use crate::prelude::*;
-use global_hotkey::{
-	GlobalHotKeyEvent, GlobalHotKeyManager,
-	hotkey::{Code, HotKey, Modifiers},
-};
-use tray_icon::menu::{MenuItem, Submenu};
-use winit::{
-	dpi::{PhysicalPosition, PhysicalSize},
-	event_loop::ActiveEventLoop,
-};
+
 use egui::{Context as EguiContext, TexturesDelta};
 use egui_wgpu::{
 	Renderer,
 	wgpu::{self},
 };
 use egui_winit::State as EguiState;
+use global_hotkey::{
+	GlobalHotKeyEvent, GlobalHotKeyManager,
+	hotkey::{Code, HotKey, Modifiers},
+};
 use objc2_app_kit::{NSApplication, NSApplicationActivationPolicy};
 use objc2_foundation::MainThreadMarker;
+use tray_icon::menu::{MenuItem, Submenu};
 use wgpu::{Adapter, Device, SurfaceColorSpace};
-pub struct TrayMenu {
-	pub clear_tasks: MenuItem,
-	pub dev: MenuItem,
-	pub list_tasks: MenuItem,
-	pub new_task: MenuItem,
-	pub quit: MenuItem,
-	pub status: MenuItem,
-	pub task_manager: MenuItem,
-	pub tasks: Submenu,
-	pub telemetry: MenuItem,
-}
+use winit::{
+	dpi::{PhysicalPosition, PhysicalSize},
+	event_loop::ActiveEventLoop,
+};
+
 /// Estate UI Container
 ///
 /// Owns the native window, egui state, wgpu rendering resources, and the
@@ -145,7 +136,7 @@ impl Window {
 			egui::UiBuilder::new(),
 		);
 		egui::Frame::NONE
-			.inner_margin(egui::Margin::same(16))
+			// .inner_margin(egui::Margin::same(16))
 			.show(&mut ui, |ui| {
 				self.view.draw(ui);
 			});
@@ -331,10 +322,12 @@ fn build_window(event_loop: &ActiveEventLoop) -> anyhow::Result<Arc<winit::windo
 		let screen_size = monitor.size();
 		let scale_factor = monitor.scale_factor();
 		// Optional: leave a small margin (e.g., 40 pixels) away from the edge/dock
-		let margin_x = (40.0 * scale_factor) as i32;
-		let margin_y = (60.0 * scale_factor) as i32;
-		let x = screen_size.width as i32 - width as i32 - margin_x;
-		let y = screen_size.height as i32 - height as i32 - margin_y;
+		// let margin_x = (40.0 * scale_factor) as i32;
+		// let margin_y = (60.0 * scale_factor) as i32;
+		// let x = screen_size.width as i32 - width as i32 - margin_x;
+		// let y = screen_size.height as i32 - height as i32 - margin_y;
+		let x = screen_size.width as i32 - width as i32;
+		let y = screen_size.height as i32 - height as i32;
 		attrs = attrs.with_position(PhysicalPosition::new(x.max(0), y.max(0)));
 	} else {
 		// Fallback position if no monitor info is found
@@ -734,4 +727,15 @@ impl GlobalHotkeys {
 	pub fn shutdown(&self) {
 		self.shutdown.store(true, Ordering::Relaxed);
 	}
+}
+pub struct TrayMenu {
+	pub clear_tasks: MenuItem,
+	pub dev: MenuItem,
+	pub list_tasks: MenuItem,
+	pub new_task: MenuItem,
+	pub quit: MenuItem,
+	pub status: MenuItem,
+	pub task_manager: MenuItem,
+	pub tasks: Submenu,
+	pub telemetry: MenuItem,
 }

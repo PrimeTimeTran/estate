@@ -1,7 +1,6 @@
 //! Wrapper struct for core components & services used by the Estate Engine
 //!
 //! # Description
-
 //                        ┌─────────────────────┐
 //                        │       Estate        │
 //                        │  semantic engine    │
@@ -175,14 +174,6 @@ pub enum EstateScope {
 	Workspace,
 }
 
-// #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-// pub struct Uuid(u64);
-// static NEXT_ESTATE_ID: AtomicU64 = AtomicU64::new(1);
-// impl Uuid {
-// 	pub fn new() -> Self {
-// 		Self(NEXT_ESTATE_ID.fetch_add(1, Ordering::Relaxed))
-// 	}
-// }
 /// Estate owns the capabilities and domain model; the daemon exposes those capabilities as a long-lived service.
 #[derive(Clone, Debug)]
 pub struct EstateEngine {

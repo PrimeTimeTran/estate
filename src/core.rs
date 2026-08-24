@@ -189,11 +189,13 @@ impl EstateDiscovery {
 		}
 	}
 }
+
 #[derive(Debug)]
 pub struct RawDiscovery {
 	pub probe: &'static Probe,
 	pub path: PathBuf,
 }
+
 #[async_trait]
 impl DiscoverySink for EstateDiscovery {
 	async fn emit(&mut self, event: DiscoveryEvent) {
@@ -209,8 +211,9 @@ impl DiscoverySink for EstateDiscovery {
 		}
 	}
 }
-#[derive(Debug)]
+
 /// Entity representing the MCP tools available
+#[derive(Debug)]
 pub enum Tool {}
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct DiscoveryStore {

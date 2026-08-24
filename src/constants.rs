@@ -7,14 +7,14 @@ use std::sync::{
 
 use crate::{
 	core::{Probe, ProbeKind, ProbeSet},
-	ve::ScrollRedirectState,
+	ve::{PanelConfig, ScrollRedirectState},
 };
 
 pub static EVENT_ID: AtomicU64 = AtomicU64::new(1);
 pub static HOTKEY_INITIALIZED: AtomicBool = AtomicBool::new(false);
+pub static REDIRECTING_SCROLL: AtomicBool = AtomicBool::new(false);
 pub static SCROLL_STATE: OnceLock<Mutex<ScrollRedirectState>> = OnceLock::new();
 pub static SHIFT_HELD: AtomicBool = AtomicBool::new(false);
-pub static REDIRECTING_SCROLL: AtomicBool = AtomicBool::new(false);
 
 pub const FILE_EXTENSIONS: &[&str] = &[
 	"rs", "loi", "estate", "html", "htm", "css", "js", "jsx", "ts", "tsx", "json", "jsonc", "md",
@@ -215,4 +215,29 @@ pub mod palette {
 	pub const WARNING: Color32 = Color32::from_rgb(235, 180, 70);
 	pub const DANGER: Color32 = Color32::from_rgb(230, 90, 95);
 	pub const GRID: Color32 = Color32::from_rgb(45, 49, 58);
+}
+
+pub const DEFAULT_CONFIG: VeConfig = VeConfig {
+	bg: palette::BG,
+	surface: palette::SURFACE,
+	activity_bar: PanelConfig::new(true, 48.0),
+	primary_bar: PanelConfig::new(true, 40.0),
+	secondary_bar: PanelConfig::new(true, 48.0),
+	bottom_panel: PanelConfig::new(true, 240.0),
+	status_bar: PanelConfig::new(true, 24.0),
+	dock_left: PanelConfig::new(true, 280.0),
+	dock_right: PanelConfig::new(true, 320.0),
+};
+
+pub struct VeConfig {
+	pub bg: egui::Color32,
+	pub surface: egui::Color32,
+
+	pub activity_bar: PanelConfig,
+	pub dock_left: PanelConfig,
+	pub primary_bar: PanelConfig,
+	pub secondary_bar: PanelConfig,
+	pub status_bar: PanelConfig,
+	pub dock_right: PanelConfig,
+	pub bottom_panel: PanelConfig,
 }

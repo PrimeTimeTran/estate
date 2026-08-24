@@ -1,5 +1,4 @@
 use crate::prelude::*;
-
 use core_foundation::{
 	base::{CFAllocatorRef, TCFType, kCFAllocatorDefault},
 	mach_port::{CFMachPort, CFMachPortRef},
@@ -9,42 +8,79 @@ use core_graphics::{
 	display::CGDisplay,
 	event::{
 		self, CGEvent, CGEventField, CGEventTap, CGEventTapLocation, CGEventTapOptions,
-		CGEventTapPlacement, CGEventTapProxy, CGEventType, CallbackResult, ScrollEventUnit, *,
+		CGEventTapPlacement, CGEventTapProxy, CGEventType, CGMouseButton, CallbackResult,
+		ScrollEventUnit, *,
 	},
 	event_source::{CGEventSource, CGEventSourceRef, CGEventSourceStateID},
+	geometry::CGPoint,
 };
 use egui::Ui;
 use egui_plot::{Bar, BarChart, Line, Plot, Points};
+use global_hotkey::{
+	GlobalHotKeyEvent, GlobalHotKeyManager,
+	hotkey::{Code, HotKey, Modifiers},
+};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::time::{Duration, Instant};
 use winit::event_loop::EventLoopProxy;
-/// A trait implemented by types which agree to its contract.
+///      A trait implemented by types which agree to its contract.
 ///
-/// Any type which implements this contract must provide `draw`.
-/// Code which depends on `Veable` can therefore rely on that capability
-/// without needing to know how the concrete type implements it.
+///      Any type which implements this contract must provide `draw`.
+///      Code which depends on `Veable` can therefore rely on that capability
+///      without needing to know how the concrete type implements it.
 ///
-/// The implementation details belong to the concrete type; the caller
-/// only depends on the behavior promised by the contract.
+///      The implementation details belong to the concrete type; the caller
+///      only depends on the behavior promised by the contract.
 pub trait Veable {
 	fn draw(&mut self, ui: &mut egui::Ui);
 }
-/// A type-erased container for any concrete `Veable`.
+///      A type-erased container for any concrete `Veable`.
 ///
-/// `Box<dyn Veable>` stores the concrete implementation on the heap while
-/// exposing only the `Veable` interface to callers. This allows different
-/// concrete implementations to be substituted without changing the code
-/// which consumes them.
+///      `Box<dyn Veable>` stores the concrete implementation on the heap while
+///      exposing only the `Veable` interface to callers. This allows different
+///      concrete implementations to be substituted without changing the code
+///      which consumes them.
 pub struct Ve {
-	view: Box<dyn Veable>,
+	// Top left to bottom right ordering for mental model.
+	pub activity_bar: Region,
+	pub dock_left: Panel,
+	pub main: Region,
+	pub primary_bar: Region,
+	pub secondary_bar: Region,
+	pub bottom_panel: Panel,
+	pub status_bar: Region,
+	pub dock_right: Panel,
 }
 impl Ve {
-	/// Rust uses ownership, borrowing, and lifetimes to determine when values
+	///! Rust uses ownership, borrowing, and lifetimes to determine when values
 	/// may be safely destroyed, allowing memory to be reclaimed deterministically
 	/// without a garbage collector.
 	pub fn new(view: impl Veable + 'static) -> Self {
+		let mut config = DEFAULT_CONFIG;
 		Self {
-			view: Box::new(view),
+			activity_bar: Region::fixed(DebugPanel::new("ACTIVITY"), config.activity_bar.size),
+			dock_left: Panel::new(
+				Region::resizable(DebugPanel::new("LEFT"), config.dock_left.size, 0.0, 600.0)
+					.with_fill(config.bg),
+			)
+			.with_open(config.dock_left.active),
+			primary_bar: Region::fixed(DebugPanel::new("TABS"), config.primary_bar.size),
+			secondary_bar: Region::fixed(DebugPanel::new("BREADCRUMBS"), config.activity_bar.size),
+			main: Region::content(view).with_padding(8 as i32),
+			bottom_panel: Panel::new(Region::resizable(
+				DebugPanel::new("BOTTOM"),
+				config.bottom_panel.size,
+				0.0,
+				600.0,
+			)),
+			status_bar: Region::fixed(DebugPanel::new("STATUS BAR"), config.status_bar.size)
+				.with_fill(config.bg)
+				.with_top_border(true),
+			dock_right: Panel::new(
+				Region::resizable(DebugPanel::new("RIGHT"), config.dock_right.size, 0.0, 600.0)
+					.with_fill(config.bg),
+			)
+			.with_open(config.dock_right.active),
 		}
 	}
 	/// Forwards the drawing contract to the concrete implementation.
@@ -52,7 +88,293 @@ impl Ve {
 	/// `Ve` doesn't know how the view is drawn. It only knows that the
 	/// contained implementation satisfies `Veable`.
 	pub fn draw(&mut self, ui: &mut egui::Ui) {
-		self.view.draw(ui);
+		let available = ui.available_rect_before_wrap();
+		ui.painter().rect_filled(available, 0.0, DEFAULT_CONFIG.bg);
+		let (
+			left_rect,
+			right_rect,
+			tabs_rect,
+			breadcrumbs_rect,
+			main_rect,
+			bottom_rect,
+			status_bar_rect,
+		) = self.calculate_region_boundaries(available);
+		if self.dock_left.open {
+			Self::draw_panel(ui, left_rect, &mut self.dock_left);
+			Self::resize_region(
+				ui,
+				"dock_left_resize",
+				left_rect,
+				&mut self.dock_left.region,
+				ResizeEdge::Right,
+				1.0,
+			);
+		}
+		Self::draw_region(ui, tabs_rect, &mut self.primary_bar);
+		Self::draw_region(ui, breadcrumbs_rect, &mut self.secondary_bar);
+		Self::draw_region(ui, main_rect, &mut self.main);
+		if self.bottom_panel.open {
+			Self::draw_panel(ui, bottom_rect, &mut self.bottom_panel);
+			Self::resize_region(
+				ui,
+				"bottom_panel_resize",
+				bottom_rect,
+				&mut self.bottom_panel.region,
+				ResizeEdge::Top,
+				-1.0,
+			);
+		}
+		if self.dock_right.open {
+			Self::draw_panel(ui, right_rect, &mut self.dock_right);
+			Self::resize_region(
+				ui,
+				"dock_right_resize",
+				right_rect,
+				&mut self.dock_right.region,
+				ResizeEdge::Left,
+				-1.0,
+			);
+		}
+		Self::draw_region(ui, status_bar_rect, &mut self.status_bar);
+	}
+	fn calculate_region_boundaries(
+		&mut self,
+		available: egui::Rect,
+	) -> (
+		egui::Rect,
+		egui::Rect,
+		egui::Rect,
+		egui::Rect,
+		egui::Rect,
+		egui::Rect,
+		egui::Rect,
+	) {
+		// =========================================================
+		// Bottom Status Bar
+		// =========================================================
+		let status_bar_height = DEFAULT_CONFIG.status_bar.size;
+		let workspace_rect = egui::Rect::from_min_max(
+			available.min,
+			egui::pos2(available.right(), available.bottom() - status_bar_height),
+		);
+		let status_bar_rect = egui::Rect::from_min_max(
+			egui::pos2(available.left(), workspace_rect.bottom()),
+			available.max,
+		);
+		// =========================================================
+		// Workspace: left / center / right
+		// =========================================================
+		let min_main_width = 100.0;
+		let requested_left = if self.dock_left.open {
+			self.dock_left.region.size
+		} else {
+			0.0
+		};
+		let requested_right = if self.dock_right.open {
+			self.dock_right.region.size
+		} else {
+			0.0
+		};
+		let available_side_width = (workspace_rect.width() - min_main_width).max(0.0);
+		let requested_total = requested_left + requested_right;
+		let scale = if requested_total > available_side_width {
+			available_side_width / requested_total
+		} else {
+			1.0
+		};
+		let left_width = requested_left * scale;
+		let right_width = requested_right * scale;
+		let left_rect = egui::Rect::from_min_max(
+			workspace_rect.min,
+			egui::pos2(workspace_rect.left() + left_width, workspace_rect.bottom()),
+		);
+		let right_rect = egui::Rect::from_min_max(
+			egui::pos2(workspace_rect.right() - right_width, workspace_rect.top()),
+			workspace_rect.max,
+		);
+		let center_rect = egui::Rect::from_min_max(
+			egui::pos2(workspace_rect.left() + left_width, workspace_rect.top()),
+			egui::pos2(
+				workspace_rect.right() - right_width,
+				workspace_rect.bottom(),
+			),
+		);
+		// =========================================================
+		// CENTER: tabs / breadcrumbs / main / bottom
+		// =========================================================
+		let tabs_height = DEFAULT_CONFIG.primary_bar.size;
+		let breadcrumbs_height = DEFAULT_CONFIG.secondary_bar.size;
+		let min_main_height = 100.0;
+		// =========================================================
+		// Tabs
+		// =========================================================
+		let tabs_rect = egui::Rect::from_min_max(
+			center_rect.min,
+			egui::pos2(center_rect.right(), center_rect.top() + tabs_height),
+		);
+		// =========================================================
+		// Breadcrumbs
+		// =========================================================
+		let breadcrumbs_rect = egui::Rect::from_min_max(
+			egui::pos2(center_rect.left(), tabs_rect.bottom()),
+			egui::pos2(center_rect.right(), tabs_rect.bottom() + breadcrumbs_height),
+		);
+		// =========================================================
+		// Center content
+		// =========================================================
+		let content_rect = egui::Rect::from_min_max(
+			egui::pos2(center_rect.left(), breadcrumbs_rect.bottom()),
+			center_rect.max,
+		);
+		// =========================================================
+		// Main / bottom
+		// =========================================================
+		let bottom_height = if self.bottom_panel.open {
+			self
+				.bottom_panel
+				.region
+				.size
+				.min((content_rect.height() - min_main_height).max(0.0))
+		} else {
+			0.0
+		};
+		let main_rect = egui::Rect::from_min_max(
+			content_rect.min,
+			egui::pos2(content_rect.right(), content_rect.bottom() - bottom_height),
+		);
+		let bottom_rect = egui::Rect::from_min_max(
+			egui::pos2(content_rect.left(), content_rect.bottom() - bottom_height),
+			content_rect.max,
+		);
+		(
+			left_rect,
+			right_rect,
+			tabs_rect,
+			breadcrumbs_rect,
+			main_rect,
+			bottom_rect,
+			status_bar_rect,
+		)
+	}
+	fn draw_region(ui: &mut egui::Ui, rect: egui::Rect, region: &mut Region) {
+		let fill = region.fill.unwrap_or(DEFAULT_CONFIG.bg);
+		ui.painter().rect_filled(rect, 0.0, fill);
+		if region.top_border {
+			ui.painter().line_segment(
+				[
+					egui::pos2(rect.left(), rect.top()),
+					egui::pos2(rect.right(), rect.top()),
+				],
+				egui::Stroke::new(1.0, DEFAULT_CONFIG.surface),
+			);
+		}
+		let content_rect = region.content_rect(rect);
+		Self::draw_view(ui, content_rect, &mut *region.content);
+	}
+	fn draw_view(ui: &mut egui::Ui, rect: egui::Rect, view: &mut dyn Veable) {
+		let mut child = ui.new_child(
+			egui::UiBuilder::new()
+				.max_rect(rect)
+				.layout(egui::Layout::top_down(egui::Align::LEFT)),
+		);
+		view.draw(&mut child);
+	}
+	fn draw_panel(ui: &mut egui::Ui, rect: egui::Rect, panel: &mut Panel) {
+		if !panel.open {
+			return;
+		}
+		// Region owns visual styling.
+		if let Some(fill) = panel.region.fill {
+			ui.painter().rect_filled(rect, 0.0, fill);
+		}
+		// Region owns the actual content.
+		Self::draw_view(ui, rect, &mut *panel.region.content);
+	}
+	fn resize_handle(ui: &mut egui::Ui, id: &str, rect: egui::Rect, mut resize: impl FnMut(f32)) {
+		let cursor = if id == "bottom_panel_resize" {
+			egui::CursorIcon::ResizeVertical
+		} else {
+			egui::CursorIcon::ResizeHorizontal
+		};
+		let id = egui::Id::new(id);
+		let response = ui.interact(rect, id, egui::Sense::drag());
+		if response.hovered() || response.dragged() {
+			ui.ctx().set_cursor_icon(cursor);
+		}
+		let hovered = response.hovered();
+		let dragged = response.dragged();
+		let stroke = if hovered || dragged {
+			ui.visuals().widgets.active.bg_stroke
+		} else {
+			ui.visuals().widgets.noninteractive.bg_stroke
+		};
+		ui.painter().rect_filled(rect, 0.0, stroke.color);
+		if dragged {
+			let delta = match cursor {
+				egui::CursorIcon::ResizeVertical => response.drag_motion().y,
+				_ => response.drag_motion().x,
+			};
+			resize(delta);
+		}
+	}
+	fn resize_region(
+		ui: &mut egui::Ui,
+		id: &str,
+		rect: egui::Rect,
+		region: &mut Region,
+		edge: ResizeEdge,
+		direction: f32,
+	) {
+		if !region.resizable {
+			return;
+		}
+		let handle = match edge {
+			ResizeEdge::Left => egui::Rect::from_min_max(
+				egui::pos2(rect.left() - 3.0, rect.top()),
+				egui::pos2(rect.left() + 3.0, rect.bottom()),
+			),
+			ResizeEdge::Right => egui::Rect::from_min_max(
+				egui::pos2(rect.right() - 3.0, rect.top()),
+				egui::pos2(rect.right() + 3.0, rect.bottom()),
+			),
+			ResizeEdge::Top => egui::Rect::from_min_max(
+				egui::pos2(rect.left(), rect.top() - 3.0),
+				egui::pos2(rect.right(), rect.top() + 3.0),
+			),
+			ResizeEdge::Bottom => egui::Rect::from_min_max(
+				egui::pos2(rect.left(), rect.bottom() - 3.0),
+				egui::pos2(rect.right(), rect.bottom() + 3.0),
+			),
+		};
+		Self::resize_handle(ui, id, handle, |delta| {
+			let delta = match edge {
+				ResizeEdge::Left | ResizeEdge::Right => delta,
+				ResizeEdge::Top | ResizeEdge::Bottom => delta,
+			};
+			region.size = (region.size + delta * direction).clamp(region.min_size, region.max_size);
+		});
+	}
+}
+pub struct Size {
+	pub value: f32,
+	pub min: f32,
+	pub max: f32,
+	pub resizable: bool,
+}
+impl Size {
+	pub fn new(value: f32, min: f32, max: f32) -> Self {
+		Self {
+			value: value.clamp(min, max),
+			min,
+			max,
+			resizable: true,
+		}
+	}
+	pub fn set(&mut self, value: f32) {
+		self.value = value.clamp(self.min, self.max);
+	}
+	pub fn resize(&mut self, delta: f32) {
+		self.set(self.value + delta);
 	}
 }
 ///! The first concrete implementation of Veable is here.
@@ -400,7 +722,6 @@ pub struct Graphics {
 	error: Option<String>,
 	// Expose a receiver if your event loop wants to listen for changes,
 	// or keep it internal if you poll it.
-	// rx: tokio::sync::broadcast::Receiver<()>,
 	rx: tokio::sync::mpsc::Receiver<()>,
 	_watcher: RecommendedWatcher,
 	scroll_x: f32,
@@ -568,7 +889,7 @@ impl Veable for Graphics {
 		self.check_for_changes(ui.ctx());
 		// 2. Split the available space to reserve room for the bottom status bar
 		let available_size = ui.available_size();
-		let status_bar_height = 24.0;
+		let status_bar_height = DEFAULT_CONFIG.status_bar.size;
 		let main_size = egui::vec2(available_size.x, available_size.y - status_bar_height);
 		// Main Content Area
 		ui.allocate_ui(main_size, |ui| {
@@ -608,15 +929,15 @@ impl Veable for Graphics {
 }
 /// Telemetry
 pub struct Oracle {
-	scroll_x: f32,
-	scroll_y: f32,
-	last_direction: String,
-	dirty: bool,
-	last_loaded: Option<SystemTime>,
-	error: Option<String>,
-	pub side_panel_width: f32,
 	pub active_focus: FocusedPane,
 	pub secondary_scroll_offset: f32,
+	pub side_panel_width: f32,
+	dirty: bool,
+	error: Option<String>,
+	last_direction: String,
+	last_loaded: Option<SystemTime>,
+	scroll_x: f32,
+	scroll_y: f32,
 }
 impl Oracle {
 	pub fn new() -> Self {
@@ -912,18 +1233,6 @@ pub struct TrackpadState {
 	pub shift_held: bool,
 	pub mouse_pos: Option<egui::Pos2>,
 }
-
-fn target_position(location: CGPoint, target: ScreenPosition) -> CGPoint {
-	let bounds = CGDisplay::main().bounds();
-	let x = match target {
-		ScreenPosition::Left => bounds.origin.x + bounds.size.width * 0.25,
-		ScreenPosition::Center => bounds.origin.x + bounds.size.width * 0.50,
-		ScreenPosition::Right => bounds.origin.x + bounds.size.width * 0.75,
-	};
-	CGPoint { x, y: location.y }
-}
-use core_graphics::event::CGMouseButton;
-use core_graphics::geometry::CGPoint;
 #[derive(Debug, Copy, Clone)]
 pub enum ScreenPosition {
 	Left,
@@ -948,11 +1257,6 @@ pub fn move_cursor_to(pos: ScreenPosition) {
 		}
 	}
 }
-use global_hotkey::{
-	GlobalHotKeyEvent, GlobalHotKeyManager,
-	hotkey::{Code, HotKey, Modifiers},
-};
-
 impl TaskManager {
 	pub fn new() -> Self {
 		Self::from_path("/Users/future/Library/Application Support/estate/state.json")
@@ -1063,9 +1367,9 @@ impl Veable for TaskManager {
 			});
 			return;
 		};
-		// -------------------------------------------------------------
+		// =========================================================
 		// Header
-		// -------------------------------------------------------------
+		// =========================================================
 		ui.vertical(|ui| {
 			ui.label(
 				egui::RichText::new("Task Overview")
@@ -1081,9 +1385,9 @@ impl Veable for TaskManager {
 			);
 		});
 		ui.add_space(16.0);
-		// -------------------------------------------------------------
+		// =========================================================
 		// Summary metrics
-		// -------------------------------------------------------------
+		// =========================================================
 		ui.columns(4, |columns| {
 			metric(
 				&mut columns[0],
@@ -1111,243 +1415,253 @@ impl Veable for TaskManager {
 			);
 		});
 		ui.add_space(16.0);
-		// -------------------------------------------------------------
+		// =========================================================
 		// Charts
-		// -------------------------------------------------------------
+		// =========================================================
 		let available = ui.available_size();
 		let gap = 6.0;
 		let card_width = (available.x - gap) / 2.0;
 		let card_height = 280.0;
-		// -------------------------------------------------------------
-		// Row 1
-		// -------------------------------------------------------------
-		ui.allocate_ui_with_layout(
-			egui::vec2(available.x, card_height),
-			egui::Layout::left_to_right(egui::Align::TOP),
-			|ui| {
-				ui.spacing_mut().item_spacing.x = gap;
-				draw_chart_card(
-					ui,
-					egui::vec2(card_width, card_height),
-					"Tasks",
-					"Created vs completed",
-					// Metrics
-					|ui| {
-						let remaining = state.tasks_created.saturating_sub(state.tasks_completed);
-						small_metric(ui, "Created", state.tasks_created, palette::PRIMARY);
-						ui.add_space(20.0);
-						small_metric(ui, "Completed", state.tasks_completed, palette::SUCCESS);
-						ui.add_space(20.0);
-						small_metric(ui, "Remaining", remaining, palette::TEXT_MUTED);
-					},
-					// Chart
-					|ui| {
-						let max_value = state.tasks_created.max(1) as f64;
-						let bars = vec![
-							Bar::new(0.0, state.tasks_created as f64).fill(palette::PRIMARY),
-							Bar::new(1.0, state.tasks_completed as f64).fill(palette::SUCCESS),
-						];
-						let chart = BarChart::new("task_counts", bars);
-						let max_y = state.tasks_created.max(1) as f64;
-						Plot::new("task_counts_plot")
-							.height(190.0)
-							.show_axes([true, true])
-							.show_grid([true, true])
-							.allow_zoom(true)
-							.allow_drag(true)
-							.allow_scroll(true)
-							.allow_axis_zoom_drag(true)
-							.allow_boxed_zoom(true)
-							.show(ui, |plot_ui| {
-								plot_ui.bar_chart(chart);
-							});
-					},
-				);
-				// ---------------------------------------------------------
-				// Completion
-				// ---------------------------------------------------------
-				draw_chart_card(
-					ui,
-					egui::vec2(card_width, card_height),
-					"Completion",
-					"Task completion ratio",
-					// Metrics
-					|ui| {
-						let created = state.tasks_created as f64;
-						let completed = state.tasks_completed as f64;
-						let remaining = (created - completed).max(0.0);
-						let percentage = if created > 0.0 {
-							(completed / created) * 100.0
-						} else {
-							0.0
-						};
-						small_metric(ui, "Complete", state.tasks_completed, palette::SUCCESS);
-						ui.add_space(20.0);
-						small_metric(ui, "Remaining", remaining as u64, palette::TEXT_MUTED);
-						ui.add_space(20.0);
-						ui.label(
-							egui::RichText::new(format!("{percentage:.1}%"))
-								.size(14.0)
-								.strong()
-								.color(palette::SUCCESS),
-						);
-					},
-					// Chart
-					|ui| {
-						let created = state.tasks_created as f64;
-						let completed = state.tasks_completed as f64;
-						let remaining = (created - completed).max(0.0);
-						let percentage = if created > 0.0 {
-							(completed / created) * 100.0
-						} else {
-							0.0
-						};
-						let bars = vec![
-							Bar::new(0.0, completed).fill(palette::SUCCESS),
-							Bar::new(1.0, remaining).fill(palette::SURFACE_HOVER),
-						];
-						let chart = BarChart::new("task_completion", bars);
-						let max_value = completed.max(remaining);
-						Plot::new("task_completion_plot")
-							.height(190.0)
-							.show_axes([true, true])
-							.show_grid([true, false])
-							.clamp_grid(true)
-							// Initial/reset viewport:
-							.auto_bounds([false, false])
-							.default_x_bounds(-0.5, 1.5)
-							.default_y_bounds(0.0, (max_value * 1.1).max(1.0))
-							// Interactive:
-							.allow_zoom(true)
-							.allow_drag(true)
-							.allow_scroll(true)
-							.allow_axis_zoom_drag(true)
-							.allow_boxed_zoom(false)
-							.show(ui, |plot_ui| {
-								plot_ui.bar_chart(chart);
-							});
-					},
-				);
-			},
-		);
-		ui.add_space(gap);
-		// -------------------------------------------------------------
-		// Row 2
-		// -------------------------------------------------------------
-		ui.allocate_ui_with_layout(
-			egui::vec2(available.x, card_height),
-			egui::Layout::left_to_right(egui::Align::TOP),
-			|ui| {
-				ui.spacing_mut().item_spacing.x = gap;
-				// ---------------------------------------------------------
-				// System Activity
-				// ---------------------------------------------------------
-				draw_chart_card(
-					ui,
-					egui::vec2(card_width, card_height),
-					"System Activity",
-					"Runtime activity",
-					// Metrics
-					|ui| {
-						small_metric(ui, "Starts", state.starts, palette::PRIMARY);
-						ui.add_space(16.0);
-						small_metric(ui, "Checks", state.status_checks, palette::TEXT_MUTED);
-						ui.add_space(16.0);
-						small_metric(ui, "Events", state.events_processed, palette::WARNING);
-						ui.add_space(16.0);
-						small_metric(ui, "Files", state.files_indexed, palette::SUCCESS);
-					},
-					// Chart
-					|ui| {
-						let max_value = [
-							state.starts,
-							state.status_checks,
-							state.events_processed,
-							state.files_indexed,
-						]
-						.into_iter()
-						.max()
-						.unwrap_or(1) as f64;
-						let bars = vec![
-							Bar::new(0.0, state.starts as f64).fill(palette::PRIMARY),
-							Bar::new(1.0, state.status_checks as f64).fill(palette::TEXT_MUTED),
-							Bar::new(2.0, state.events_processed as f64).fill(palette::WARNING),
-							Bar::new(3.0, state.files_indexed as f64).fill(palette::SUCCESS),
-						];
-						let chart = BarChart::new("system_activity", bars);
-						let max_value = [
-							state.starts,
-							state.status_checks,
-							state.events_processed,
-							state.files_indexed,
-						]
-						.into_iter()
-						.max()
-						.unwrap_or(1) as f64;
-						// .default_y_bounds(0.0, max_value * 1.1)
-						Plot::new("system_activity_plot")
-							.height(190.0)
-							.show_axes([true, true])
-							.show_grid([true, false])
-							.allow_zoom(true)
-							.allow_drag(true)
-							.allow_scroll(true)
-							.allow_axis_zoom_drag(true)
-							.allow_boxed_zoom(false)
-							.default_x_bounds(-0.5, 3.5)
-							.default_y_bounds(0.0, (max_value * 1.1).max(1.0))
-							.show(ui, |plot_ui| {
-								plot_ui.bar_chart(chart);
-							});
-					},
-				);
-				// ---------------------------------------------------------
-				// Runtime
-				// ---------------------------------------------------------
-				draw_chart_card(
-					ui,
-					egui::vec2(card_width, card_height),
-					"Runtime",
-					"Task manager activity",
-					// Metrics
-					|ui| {
-						small_metric(ui, "Starts", state.starts, palette::PRIMARY);
-						ui.add_space(20.0);
-						small_metric(ui, "Longest Run", state.longest_run, palette::WARNING);
-						ui.add_space(20.0);
-						small_metric(ui, "Events", state.events_processed, palette::TEXT_MUTED);
-					},
-					// Chart
-					|ui| {
-						let max_value = [state.starts, state.events_processed, state.files_indexed]
-							.into_iter()
-							.max()
-							.unwrap_or(1) as f64;
-						let bars = vec![
-							Bar::new(0.0, state.starts as f64).fill(palette::PRIMARY),
-							Bar::new(1.0, state.events_processed as f64).fill(palette::WARNING),
-							Bar::new(2.0, state.files_indexed as f64).fill(palette::SUCCESS),
-						];
-						let chart = BarChart::new("runtime_activity", bars);
-						Plot::new("runtime_activity_plot")
-							.height(190.0)
-							.show_axes([true, true])
-							.show_grid([true, false])
-							.allow_zoom(true)
-							.allow_drag(true)
-							.allow_scroll(true)
-							.allow_axis_zoom_drag(true)
-							.allow_boxed_zoom(false)
-							.default_x_bounds(-0.5, 2.5)
-							.default_y_bounds(0.0, (max_value * 1.1).max(1.0))
-							.show(ui, |plot_ui| {
-								plot_ui.bar_chart(chart);
-							});
-					},
-				);
-			},
-		);
+		render_graphs(ui, state, available, gap, card_width, card_height);
 	}
+}
+fn render_graphs(
+	ui: &mut Ui,
+	state: &EstateState,
+	available: egui::Vec2,
+	gap: f32,
+	card_width: f32,
+	card_height: f32,
+) {
+	// =========================================================
+	// Row 1
+	// =========================================================
+	ui.allocate_ui_with_layout(
+		egui::vec2(available.x, card_height),
+		egui::Layout::left_to_right(egui::Align::TOP),
+		|ui| {
+			ui.spacing_mut().item_spacing.x = gap;
+			draw_chart_card(
+				ui,
+				egui::vec2(card_width, card_height),
+				"Tasks",
+				"Created vs completed",
+				// Metrics
+				|ui| {
+					let remaining = state.tasks_created.saturating_sub(state.tasks_completed);
+					small_metric(ui, "Created", state.tasks_created, palette::PRIMARY);
+					ui.add_space(20.0);
+					small_metric(ui, "Completed", state.tasks_completed, palette::SUCCESS);
+					ui.add_space(20.0);
+					small_metric(ui, "Remaining", remaining, palette::TEXT_MUTED);
+				},
+				// Chart
+				|ui| {
+					let max_value = state.tasks_created.max(1) as f64;
+					let bars = vec![
+						Bar::new(0.0, state.tasks_created as f64).fill(palette::PRIMARY),
+						Bar::new(1.0, state.tasks_completed as f64).fill(palette::SUCCESS),
+					];
+					let chart = BarChart::new("task_counts", bars);
+					let max_y = state.tasks_created.max(1) as f64;
+					Plot::new("task_counts_plot")
+						.height(190.0)
+						.show_axes([true, true])
+						.show_grid([true, true])
+						.allow_zoom(true)
+						.allow_drag(true)
+						.allow_scroll(true)
+						.allow_axis_zoom_drag(true)
+						.allow_boxed_zoom(true)
+						.show(ui, |plot_ui| {
+							plot_ui.bar_chart(chart);
+						});
+				},
+			);
+			// =========================================================
+			// Completion
+			// =========================================================
+			draw_chart_card(
+				ui,
+				egui::vec2(card_width, card_height),
+				"Completion",
+				"Task completion ratio",
+				// Metrics
+				|ui| {
+					let created = state.tasks_created as f64;
+					let completed = state.tasks_completed as f64;
+					let remaining = (created - completed).max(0.0);
+					let percentage = if created > 0.0 {
+						(completed / created) * 100.0
+					} else {
+						0.0
+					};
+					small_metric(ui, "Complete", state.tasks_completed, palette::SUCCESS);
+					ui.add_space(20.0);
+					small_metric(ui, "Remaining", remaining as u64, palette::TEXT_MUTED);
+					ui.add_space(20.0);
+					ui.label(
+						egui::RichText::new(format!("{percentage:.1}%"))
+							.size(14.0)
+							.strong()
+							.color(palette::SUCCESS),
+					);
+				},
+				// Chart
+				|ui| {
+					let created = state.tasks_created as f64;
+					let completed = state.tasks_completed as f64;
+					let remaining = (created - completed).max(0.0);
+					let percentage = if created > 0.0 {
+						(completed / created) * 100.0
+					} else {
+						0.0
+					};
+					let bars = vec![
+						Bar::new(0.0, completed).fill(palette::SUCCESS),
+						Bar::new(1.0, remaining).fill(palette::SURFACE_HOVER),
+					];
+					let chart = BarChart::new("task_completion", bars);
+					let max_value = completed.max(remaining);
+					Plot::new("task_completion_plot")
+						.height(190.0)
+						.show_axes([true, true])
+						.show_grid([true, false])
+						.clamp_grid(true)
+						// Initial/reset viewport:
+						.auto_bounds([false, false])
+						.default_x_bounds(-0.5, 1.5)
+						.default_y_bounds(0.0, (max_value * 1.1).max(1.0))
+						// Interactive:
+						.allow_zoom(true)
+						.allow_drag(true)
+						.allow_scroll(true)
+						.allow_axis_zoom_drag(true)
+						.allow_boxed_zoom(false)
+						.show(ui, |plot_ui| {
+							plot_ui.bar_chart(chart);
+						});
+				},
+			);
+		},
+	);
+	ui.add_space(gap);
+	// =========================================================
+	// Row 2
+	// =========================================================
+	ui.allocate_ui_with_layout(
+		egui::vec2(available.x, card_height),
+		egui::Layout::left_to_right(egui::Align::TOP),
+		|ui| {
+			ui.spacing_mut().item_spacing.x = gap;
+			// =========================================================
+			// System Activity
+			// =========================================================
+			draw_chart_card(
+				ui,
+				egui::vec2(card_width, card_height),
+				"System Activity",
+				"Runtime activity",
+				// Metrics
+				|ui| {
+					small_metric(ui, "Starts", state.starts, palette::PRIMARY);
+					ui.add_space(16.0);
+					small_metric(ui, "Checks", state.status_checks, palette::TEXT_MUTED);
+					ui.add_space(16.0);
+					small_metric(ui, "Events", state.events_processed, palette::WARNING);
+					ui.add_space(16.0);
+					small_metric(ui, "Files", state.files_indexed, palette::SUCCESS);
+				},
+				// Chart
+				|ui| {
+					let max_value = [
+						state.starts,
+						state.status_checks,
+						state.events_processed,
+						state.files_indexed,
+					]
+					.into_iter()
+					.max()
+					.unwrap_or(1) as f64;
+					let bars = vec![
+						Bar::new(0.0, state.starts as f64).fill(palette::PRIMARY),
+						Bar::new(1.0, state.status_checks as f64).fill(palette::TEXT_MUTED),
+						Bar::new(2.0, state.events_processed as f64).fill(palette::WARNING),
+						Bar::new(3.0, state.files_indexed as f64).fill(palette::SUCCESS),
+					];
+					let chart = BarChart::new("system_activity", bars);
+					let max_value = [
+						state.starts,
+						state.status_checks,
+						state.events_processed,
+						state.files_indexed,
+					]
+					.into_iter()
+					.max()
+					.unwrap_or(1) as f64;
+					// .default_y_bounds(0.0, max_value * 1.1)
+					Plot::new("system_activity_plot")
+						.height(190.0)
+						.show_axes([true, true])
+						.show_grid([true, false])
+						.allow_zoom(true)
+						.allow_drag(true)
+						.allow_scroll(true)
+						.allow_axis_zoom_drag(true)
+						.allow_boxed_zoom(false)
+						.default_x_bounds(-0.5, 3.5)
+						.default_y_bounds(0.0, (max_value * 1.1).max(1.0))
+						.show(ui, |plot_ui| {
+							plot_ui.bar_chart(chart);
+						});
+				},
+			);
+			// =========================================================
+			// Runtime
+			// =========================================================
+			draw_chart_card(
+				ui,
+				egui::vec2(card_width, card_height),
+				"Runtime",
+				"Task manager activity",
+				// Metrics
+				|ui| {
+					small_metric(ui, "Starts", state.starts, palette::PRIMARY);
+					ui.add_space(20.0);
+					small_metric(ui, "Longest Run", state.longest_run, palette::WARNING);
+					ui.add_space(20.0);
+					small_metric(ui, "Events", state.events_processed, palette::TEXT_MUTED);
+				},
+				// Chart
+				|ui| {
+					let max_value = [state.starts, state.events_processed, state.files_indexed]
+						.into_iter()
+						.max()
+						.unwrap_or(1) as f64;
+					let bars = vec![
+						Bar::new(0.0, state.starts as f64).fill(palette::PRIMARY),
+						Bar::new(1.0, state.events_processed as f64).fill(palette::WARNING),
+						Bar::new(2.0, state.files_indexed as f64).fill(palette::SUCCESS),
+					];
+					let chart = BarChart::new("runtime_activity", bars);
+					Plot::new("runtime_activity_plot")
+						.height(190.0)
+						.show_axes([true, true])
+						.show_grid([true, false])
+						.allow_zoom(true)
+						.allow_drag(true)
+						.allow_scroll(true)
+						.allow_axis_zoom_drag(true)
+						.allow_boxed_zoom(false)
+						.default_x_bounds(-0.5, 2.5)
+						.default_y_bounds(0.0, (max_value * 1.1).max(1.0))
+						.show(ui, |plot_ui| {
+							plot_ui.bar_chart(chart);
+						});
+				},
+			);
+		},
+	);
 }
 fn metric(ui: &mut Ui, label: &str, value: u64, color: egui::Color32) {
 	ui.group(|ui| {
@@ -1367,29 +1681,6 @@ fn metric(ui: &mut Ui, label: &str, value: u64, color: egui::Color32) {
 		});
 	});
 }
-fn chart_stat(ui: &mut Ui, label: &str, value: u64, color: egui::Color32) {
-	ui.vertical(|ui| {
-		ui.label(
-			egui::RichText::new(label)
-				.small()
-				.color(palette::TEXT_MUTED),
-		);
-		ui.label(egui::RichText::new(value.to_string()).strong().color(color));
-	});
-}
-fn runtime_metric(ui: &mut Ui, label: &str, value: u64) {
-	ui.horizontal(|ui| {
-		ui.label(egui::RichText::new(label).color(palette::TEXT_MUTED));
-		ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-			ui.label(
-				egui::RichText::new(value.to_string())
-					.strong()
-					.color(palette::TEXT),
-			);
-		});
-	});
-	ui.separator();
-}
 fn draw_chart_card(
 	ui: &mut Ui,
 	size: egui::Vec2,
@@ -1402,7 +1693,7 @@ fn draw_chart_card(
 		egui::Frame::group(ui.style())
 			.fill(palette::SURFACE)
 			.stroke(egui::Stroke::new(1.0, palette::BORDER))
-			.inner_margin(egui::Margin::same(12))
+			// .inner_margin(egui::Margin::same(12))
 			.show(ui, |ui| {
 				// Force the card's contents into a vertical stack.
 				ui.vertical(|ui| {
@@ -1438,16 +1729,6 @@ fn draw_chart_card(
 			});
 	});
 }
-fn draw_chart_group(ui: &mut Ui, size: egui::Vec2, title: &str, content: impl FnOnce(&mut Ui)) {
-	ui.allocate_ui(size, |ui| {
-		ui.group(|ui| {
-			ui.set_min_size(ui.available_size());
-			ui.heading(title);
-			ui.separator();
-			content(ui);
-		});
-	});
-}
 fn small_metric(ui: &mut Ui, label: &str, value: u64, color: egui::Color32) {
 	ui.horizontal(|ui| {
 		ui.label(
@@ -1473,7 +1754,6 @@ fn format_duration(duration: Duration) -> String {
 		format!("{}h {}m", secs / 3600, (secs % 3600) / 60)
 	}
 }
-
 #[derive(Debug, Clone, Copy)]
 pub struct ScrollRedirectState {
 	pub active: bool,
@@ -1517,9 +1797,9 @@ pub fn spawn_global_cursor_daemon(proxy: EventLoopProxy<AppEvent>) {
 					let flags = event.get_flags();
 					let shift_is_down = flags.contains(CGEventFlags::CGEventFlagShift);
 					let was_down = SHIFT_HELD.swap(shift_is_down, Ordering::Relaxed);
-					// ---------------------------------------------------------
+					// =========================================================
 					// SHIFT DOWN
-					// ---------------------------------------------------------
+					// =========================================================
 					if shift_is_down && !was_down {
 						let location = event.location();
 						let mut state = scroll_state().lock().unwrap();
@@ -1557,9 +1837,9 @@ pub fn spawn_global_cursor_daemon(proxy: EventLoopProxy<AppEvent>) {
 							}
 						}
 					}
-					// ---------------------------------------------------------
+					// =========================================================
 					// SHIFT UP
-					// ---------------------------------------------------------
+					// =========================================================
 					if !shift_is_down && was_down {
 						let mut state = scroll_state().lock().unwrap();
 						let original = state.original_position;
@@ -1650,4 +1930,196 @@ pub fn spawn_global_cursor_daemon(proxy: EventLoopProxy<AppEvent>) {
 			CFRunLoop::run_current();
 		}
 	});
+}
+struct DebugPanel {
+	title: String,
+}
+impl DebugPanel {
+	fn new(title: impl Into<String>) -> Self {
+		Self {
+			title: title.into(),
+		}
+	}
+}
+impl Veable for DebugPanel {
+	fn draw(&mut self, ui: &mut egui::Ui) {
+		ui.vertical_centered(|ui| {
+			ui.heading(&self.title);
+			ui.separator();
+			ui.label(format!(
+				"{} × {}",
+				ui.available_width(),
+				ui.available_height()
+			));
+		});
+	}
+}
+// pub struct Size {
+// 	pub value: f32,
+// 	pub min: f32,
+// 	pub max: f32,
+// 	pub resizable: bool,
+// }
+// A layout area within the view.
+// Regions define where content lives, how much space it occupies,
+// and how that space is visually presented.
+// A region may contain arbitrary UI content, potentially composed
+// from smaller slots.
+pub struct Region {
+	pub content: Box<dyn Veable>,
+	// Layout
+	pub size: f32,
+	pub min_size: f32,
+	pub max_size: f32,
+	pub resizable: bool,
+	// Presentation
+	pub padding: egui::Margin,
+	pub fill: Option<egui::Color32>,
+	pub is_docked: bool,
+	pub top_border: bool,
+}
+impl Region {
+	pub fn new(view: impl Veable + 'static, size: f32) -> Self {
+		Self {
+			content: Box::new(view),
+			fill: None,
+			is_docked: false,
+			max_size: size,
+			min_size: size,
+			padding: egui::Margin::ZERO,
+			resizable: false,
+			size,
+			top_border: false,
+		}
+	}
+	pub fn fixed(view: impl Veable + 'static, size: f32) -> Self {
+		Self::new(view, size)
+	}
+	pub fn resizable(view: impl Veable + 'static, size: f32, min_size: f32, max_size: f32) -> Self {
+		let mut region = Self::new(view, size);
+		region.size = size.clamp(min_size, max_size);
+		region.min_size = min_size;
+		region.max_size = max_size;
+		region.resizable = true;
+		region.fill = Some(palette::SURFACE);
+		region.is_docked = true;
+		region
+	}
+	pub fn content(view: impl Veable + 'static) -> Self {
+		Self {
+			content: Box::new(view),
+			size: 0.0,
+			min_size: 0.0,
+			max_size: f32::MAX,
+			fill: None,
+			padding: egui::Margin::ZERO,
+			resizable: false,
+			is_docked: false,
+			top_border: false,
+		}
+	}
+	pub fn with_fill(mut self, fill: egui::Color32) -> Self {
+		self.fill = Some(fill);
+		self
+	}
+	pub fn set_size(&mut self, size: f32) {
+		self.size = size.clamp(self.min_size, self.max_size);
+	}
+	pub fn resize(&mut self, delta: f32) {
+		self.set_size(self.size + delta);
+	}
+	pub fn with_padding(mut self, padding: i32) -> Self {
+		self.padding = egui::Margin::same(padding as i8);
+		self
+	}
+	pub fn with_top_border(mut self, enabled: bool) -> Self {
+		self.top_border = enabled;
+		self
+	}
+	pub fn content_rect(&self, rect: egui::Rect) -> egui::Rect {
+		egui::Rect::from_min_max(
+			egui::pos2(
+				rect.left() + self.padding.left as f32,
+				rect.top() + self.padding.top as f32,
+			),
+			egui::pos2(
+				rect.right() - self.padding.right as f32,
+				rect.bottom() - self.padding.bottom as f32,
+			),
+		)
+	}
+}
+/// A named, interactive view that occupies a region.
+///
+/// Panels add interaction and lifecycle behavior to a Region.
+/// They may be opened, closed, overlaid, auto-hidden, moved,
+/// or potentially detached from their parent layout.
+pub struct Panel {
+	pub region: Region,
+	pub open: bool,
+	pub overlay: bool,
+	pub auto_hide: bool,
+}
+impl Panel {
+	pub fn new(region: Region) -> Self {
+		Self {
+			region,
+			open: true,
+			overlay: false,
+			auto_hide: false,
+		}
+	}
+	pub fn with_open(mut self, open: bool) -> Self {
+		self.open = open;
+		self
+	}
+	pub fn with_overlay(mut self, overlay: bool) -> Self {
+		self.overlay = overlay;
+		self
+	}
+	pub fn with_auto_hide(mut self, auto_hide: bool) -> Self {
+		self.auto_hide = auto_hide;
+		self
+	}
+	pub fn open(&mut self) {
+		self.open = true;
+	}
+	pub fn close(&mut self) {
+		self.open = false;
+	}
+	pub fn toggle(&mut self) {
+		self.open = !self.open;
+	}
+}
+pub struct PanelConfig {
+	// It's region is visible & this panel is the focused one
+	pub active: bool,
+	pub size: f32,
+	pub resizable: bool,
+	pub docked: bool,
+}
+impl PanelConfig {
+	pub const fn new(active: bool, size: f32) -> Self {
+		Self {
+			active,
+			size,
+			resizable: true,
+			docked: true,
+		}
+	}
+	fn with_active() -> Self {
+		Self {
+			active: true,
+			docked: true,
+			resizable: true,
+			size: 280.0,
+		}
+	}
+}
+#[derive(Clone, Copy)]
+enum ResizeEdge {
+	Left,
+	Right,
+	Top,
+	Bottom,
 }

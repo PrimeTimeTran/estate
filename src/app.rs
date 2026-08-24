@@ -1,4 +1,5 @@
 use crate::prelude::*;
+
 use crate::state::EstateEngine;
 use signal_hook::{consts::SIGINT, iterator::Signals};
 use tray_icon::{TrayIcon, TrayIconBuilder, menu::MenuEvent};
@@ -9,10 +10,10 @@ use winit::{
 	platform::macos::{ActivationPolicy, EventLoopBuilderExtMacOS},
 	window::WindowId,
 };
-///      Top-level application state.
+/// Top-level application state.
 ///
-///      Owns the system tray integration, application context, Estate engine,
-///      daemon communication channel, and optional development window.
+/// Owns the system tray integration, application context, Estate engine,
+/// daemon communication channel, and optional development window.
 pub struct App {
 	/// The system tray icon owned by the application.
 	tray: Option<TrayIcon>,
@@ -38,7 +39,8 @@ pub struct App {
 	/// ### Summary Rule of Thumb:
 	/// * **Poll inside `Oracle` methods (like your current setup):** Keep it as a plain `mpsc::Receiver<T>` (no `Option`).
 	/// * **Handoff to an external worker loop/thread:** Use `Option<mpsc::Receiver<T>>` so you can `.take()` it once upon startup.
-	daemon_rx: Option<mpsc::Receiver<DaemonCommand>>,
+	// daemon_rx: Option<mpsc::Receiver<DaemonCommand>>,
+	// daemon_rx: mpsc::Receiver<DaemonCommand>,
 	hotkey_manager: GlobalHotkeys,
 	scroll_tray: Option<TrayIcon>,
 	pub windows: Vec<AppWindow>,
@@ -47,12 +49,12 @@ pub struct App {
 impl App {
 	pub fn new() -> anyhow::Result<Self> {
 		let (daemon_tx, daemon_rx) = mpsc::channel(100);
+		let engine = EstateEngine::new()?;
+		Self::spawn_daemon(daemon_rx, engine.clone());
 		Ok(Self {
 			clock_running: Arc::new(AtomicBool::new(true)),
-			// daemon: None,
-			daemon_rx: Some(daemon_rx),
 			daemon_tx,
-			engine: EstateEngine::new()?,
+			engine,
 			hotkey_manager: GlobalHotkeys::new().unwrap(),
 			menu: None,
 			scroll_tray: None,
@@ -85,7 +87,6 @@ impl App {
 		self.spawn_clock(proxy.clone());
 		self.spawn_cursor_daemon(proxy.clone());
 		self.spawn_signal_handler(proxy.clone());
-		self.spawn_daemon();
 		event_loop.run_app(self)?;
 		tracing::info!(">>> App::start_runtime returning");
 		Ok(())
@@ -114,12 +115,7 @@ impl App {
 		self.hotkey_manager.start();
 		Ok(())
 	}
-	fn spawn_daemon(&mut self) {
-		let mut rx = self
-			.daemon_rx
-			.take()
-			.expect("daemon receiver already consumed");
-		let engine = self.engine.clone();
+	fn spawn_daemon(mut rx: mpsc::Receiver<DaemonCommand>, engine: EstateEngine) {
 		std::thread::spawn(move || {
 			let tokio_runtime = tokio::runtime::Runtime::new().expect("failed to create Tokio runtime");
 			tokio_runtime.block_on(async move {
@@ -170,7 +166,6 @@ impl App {
 			tracing::info!("SIGNAL: thread exiting");
 		});
 	}
-
 	fn shutdown_runtime(&mut self) {
 		tracing::info!(">>> shutting down runtime");
 		self.clock_running.store(false, Ordering::Relaxed);
@@ -352,8 +347,8 @@ impl App {
 		}
 		let (title, view) = match kind {
 			AppWindowType::Dashboard => ("Estate Dashboard", Ve::new(Graphics::new())),
-			AppWindowType::TelemetryInspector => ("Telemetry Inspector", Ve::new(Oracle::new())),
 			AppWindowType::TaskManager => ("Task Manager", Ve::new(TaskManager::new())),
+			AppWindowType::TelemetryInspector => ("Telemetry Inspector", Ve::new(Oracle::new())),
 		};
 		match Window::new(event_loop, view) {
 			Ok(window) => {
