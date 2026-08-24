@@ -1,28 +1,26 @@
 use crate::prelude::{daemon::engine_data_dir, *};
-
-use tracing::{Instrument, Span, debug, error, info, info_span, warn};
+use tracing::{Instrument, Span, debug, error, info, info_span, trace, warn};
 use tracing_subscriber::{
 	EnvFilter, Layer, filter::LevelFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt,
 };
 
-// [namespace.flow] 1
-// [namespace.flow] 2
-// [namespace.flow] 3
-// [namespace.flow] 3
-
 pub fn init_logging(config: &LogConfig) -> anyhow::Result<()> {
 	let terminal_filter = config.terminal_filter()?;
 	let terminal = fmt::layer()
+		.without_time()
 		.with_target(true)
 		.with_thread_ids(false)
 		.with_ansi(true)
-		.with_timer(fmt::time::SystemTime)
+		// .with_timer(fmt::time::SystemTime)
 		.with_filter(terminal_filter);
 	// let terminal = fmt::layer()
 	// 	.with_target(true)
 	// 	.with_thread_ids(false)
 	// 	.with_ansi(true)
 	// 	.with_filter(terminal_filter);
+	// let terminal = fmt::layer()
+	// 	.with_target(true)
+	// 	.with_thread_ids(false)
 	let file = if config.file.enabled {
 		let path = engine_data_dir()?.join("estate.log");
 		let writer = OpenOptions::new().create(true).append(true).open(path)?;
@@ -62,17 +60,11 @@ pub fn init() -> anyhow::Result<()> {
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(default)]
-pub struct Config {
-	pub logging: LogConfig,
-}
-
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-#[serde(default)]
 pub struct LogConfig {
-	pub level: LogLevel,
-	pub terminal: OutputConfig,
 	pub file: OutputConfig,
+	pub level: LogLevel,
 	pub targets: HashMap<String, LogLevel>,
+	pub terminal: OutputConfig,
 	// pub fields: LogFields,
 	// pub window: OutputConfig,
 }
@@ -86,19 +78,23 @@ impl LogConfig {
 			}
 			_ => {}
 		}
-
 		Ok(())
 	}
-	pub fn terminal_filter(&self) -> anyhow::Result<EnvFilter> {
+	fn terminal_filter(&self) -> anyhow::Result<EnvFilter> {
+		// let mut filter = EnvFilter::new("off");
+		// for (target, level) in &self.targets {
+		// 	let directive = format!("{target}={level}");
+		// 	filter = filter.add_directive(directive.parse()?);
+		// }
+		// Ok(filter)
+		// Enables targeting one or more namespaces
 		let mut filter = EnvFilter::new(self.level.to_string());
 		for (target, level) in &self.targets {
 			let directive = format!("{target}={level}")
 				.parse()
 				.map_err(|e| anyhow::anyhow!("invalid log target `{target}`: {e}"))?;
-
 			filter = filter.add_directive(directive);
 		}
-
 		Ok(filter)
 	}
 	pub fn load() -> anyhow::Result<Self> {
@@ -108,14 +104,13 @@ impl LogConfig {
 		}
 		Ok(config)
 	}
-	pub fn load_from_cargo() -> anyhow::Result<Option<LogConfig>> {
+	fn load_from_cargo() -> anyhow::Result<Option<LogConfig>> {
 		let path = Path::new(env!("CARGO_MANIFEST_DIR"))
 			.ancestors()
 			.find_map(|dir| {
 				let path = dir.join("Cargo.toml");
 				path.exists().then_some(path)
 			});
-
 		let Some(path) = path else {
 			return Ok(None);
 		};
@@ -132,10 +127,8 @@ impl LogConfig {
 			.and_then(Path::parent)
 			.ok_or_else(|| anyhow::anyhow!("could not find workspace root"))?
 			.join("Cargo.toml");
-
 		let raw = fs::read_to_string(path)?;
 		let cargo = toml::from_str::<CargoConfig>(&raw)?;
-
 		Ok(Some(cargo.logging))
 	}
 	fn merge(&mut self, other: Self) {
@@ -185,6 +178,81 @@ impl std::fmt::Display for LogLevel {
 		f.write_str(self.as_str())
 	}
 }
+
+static FLOW_ID: AtomicU64 = AtomicU64::new(0);
+#[derive(Clone)]
+pub struct Tracer {
+	namespace: String,
+}
+impl Tracer {
+	pub fn new(namespace: impl Into<String>) -> Self {
+		Self {
+			namespace: namespace.into(),
+		}
+	}
+	pub fn flow(&self, name: impl Into<String>) -> TraceFlow {
+		TraceFlow {
+			namespace: self.namespace.clone(),
+			name: name.into(),
+		}
+	}
+	pub fn next_flow_id() -> u64 {
+		FLOW_ID.fetch_add(1, Ordering::Relaxed) + 1
+	}
+}
+pub struct TraceFlow {
+	namespace: String,
+	name: String,
+}
+impl TraceFlow {
+	fn event(&self, level: LogLevel, message: &str) {
+		let id = Tracer::next_flow_id();
+		let span = info_span!(
+		"flow",
+		flow = %format_args!("{}#{}.{}", self.namespace, id, self.name),
+		);
+		let _enter = span.enter();
+		match level {
+			LogLevel::Trace => trace!("{}", message),
+			LogLevel::Debug => debug!("{}", message),
+			LogLevel::Info => info!("{}", message),
+			LogLevel::Warn => warn!("{}", message),
+			LogLevel::Error => error!("{}", message),
+		}
+	}
+	pub fn trace(&mut self, message: &str) {
+		self.event(LogLevel::Trace, message);
+	}
+	pub fn debug(&mut self, message: &str) {
+		self.event(LogLevel::Debug, message);
+	}
+	pub fn info(&mut self, message: &str) {
+		self.event(LogLevel::Info, message);
+	}
+	pub fn warn(&mut self, message: &str) {
+		self.event(LogLevel::Warn, message);
+	}
+	pub fn error(&mut self, message: &str) {
+		self.event(LogLevel::Error, message);
+	}
+}
+
+#[derive(Debug, Deserialize)]
+struct CargoConfig {
+	#[serde(default)]
+	logging: LogConfig,
+}
+/// Minimal representation of a Cargo.toml manifest used by Estate.
+/// This intentionally models only the fields Estate needs rather than
+///
+/// depending on Cargo's complete manifest schema.
+#[derive(Debug, Deserialize)]
+struct CargoManifest {
+	#[serde(default)]
+	logging: Option<LogConfig>,
+}
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct OutputOptions {}
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct LogFieldConfig {
 	pub enabled: bool,
@@ -218,100 +286,4 @@ pub struct LogOptions {
 	pub level: Option<LogLevel>,
 	pub targets: Option<HashMap<String, LogLevel>>,
 	pub terminal: Option<OutputOptions>,
-}
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct OutputOptions {}
-
-#[derive(Debug, Deserialize)]
-struct CargoConfig {
-	#[serde(default)]
-	logging: LogConfig,
-}
-
-/// Minimal representation of a Cargo.toml manifest used by Estate.
-///
-/// This intentionally models only the fields Estate needs rather than
-/// depending on Cargo's complete manifest schema.
-#[derive(Debug, Deserialize)]
-struct CargoManifest {
-	#[serde(default)]
-	logging: Option<LogConfig>,
-}
-use std::sync::atomic::{AtomicU64, Ordering};
-
-static NEXT_FLOW_ID: AtomicU64 = AtomicU64::new(1);
-
-#[derive(Clone)]
-pub struct Tracer {
-	namespace: String,
-}
-
-impl Tracer {
-	pub fn new(namespace: impl Into<String>) -> Self {
-		Self {
-			namespace: namespace.into(),
-		}
-	}
-	pub fn flow(&self, name: impl Into<String>) -> TraceFlow {
-		let id = NEXT_FLOW_ID.fetch_add(1, Ordering::Relaxed);
-		let name = name.into();
-
-		TraceFlow {
-			span: info_span!(
-					"flow",
-					namespace = %self.namespace,
-					flow = %name,
-					flow_id = id,
-			),
-			name,
-			id,
-		}
-	}
-}
-
-pub struct TraceFlow {
-	span: Span,
-	name: String,
-	id: u64,
-}
-
-impl TraceFlow {
-	fn event(&self, level: LogLevel, message: &str) {
-		let _enter = self.span.enter();
-
-		match level {
-			LogLevel::Debug => {
-				debug!("[{}#{}] {}", self.name, self.id, message)
-			}
-			LogLevel::Info => {
-				info!("[{}#{}] {}", self.name, self.id, message)
-			}
-			LogLevel::Warn => {
-				warn!("[{}#{}] {}", self.name, self.id, message)
-			}
-			LogLevel::Error => {
-				error!("[{}#{}] {}", self.name, self.id, message)
-			}
-			LogLevel::Trace => {
-				tracing::trace!("[{}#{}] {}", self.name, self.id, message)
-			}
-		}
-	}
-	pub fn debug(&self, message: &str) {
-		let _enter = self.span.enter();
-		debug!("{}", message);
-	}
-	pub fn info(&self, message: &str) {
-		let _enter = self.span.enter();
-
-		info!(flow_id = self.id, "{}", message);
-	}
-	pub fn warn(&self, message: &str) {
-		let _enter = self.span.enter();
-		warn!("{}", message);
-	}
-	pub fn error(&self, message: &str) {
-		let _enter = self.span.enter();
-		error!("{}", message);
-	}
 }

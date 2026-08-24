@@ -286,10 +286,10 @@ impl App {
 								y: location.y,
 							};
 							state.target_position = target_position;
-							println!(
-								"⬇️ SHIFT DOWN | ({:.0}, {:.0}) -> {:?} ({:.0}, {:.0})",
-								location.x, location.y, target, target_position.x, target_position.y,
-							);
+							// println!(
+							// 	"⬇️ SHIFT DOWN | ({:.0}, {:.0}) -> {:?} ({:.0}, {:.0})",
+							// 	location.x, location.y, target, target_position.x, target_position.y,
+							// );
 							if let Ok(source) = CGEventSource::new(CGEventSourceStateID::CombinedSessionState) {
 								if let Ok(move_event) = CGEvent::new_mouse_event(
 									source,
@@ -307,10 +307,10 @@ impl App {
 						if !shift_is_down && was_down {
 							let mut state = scroll_state().lock().unwrap();
 							let original = state.original_position;
-							println!(
-								"⬆️ SHIFT UP | restoring ({:.0}, {:.0})",
-								original.x, original.y
-							);
+							// println!(
+							// 	"⬆️ SHIFT UP | restoring ({:.0}, {:.0})",
+							// 	original.x, original.y
+							// );
 							if state.active {
 								if let Ok(source) = CGEventSource::new(CGEventSourceStateID::CombinedSessionState) {
 									if let Ok(restore_event) = CGEvent::new_mouse_event(
@@ -391,58 +391,14 @@ impl App {
 				let run_loop = CFRunLoop::get_current();
 				run_loop.add_source(&source, kCFRunLoopCommonModes);
 				tap.enable();
-				println!("✅ Global input event tap enabled");
+				// println!("✅ Global input event tap enabled");
 				CFRunLoop::run_current();
 			}
-			// unsafe {
-			// 	let port = tap.mach_port();
-			// 	let source = match port.create_runloop_source(0) {
-			// 		Ok(source) => source,
-			// 		Err(_) => {
-			// 			eprintln!("❌ Failed to create CFRunLoopSource");
-			// 			return;
-			// 		}
-			// 	};
-			// 	let run_loop = CFRunLoop::get_current();
-
-			// 	run_loop.add_source(&source, kCFRunLoopCommonModes);
-
-			// 	tap.enable();
-
-			// 	tracing::info!("scroll daemon started");
-
-			// 	while thread_running.load(Ordering::Relaxed) {
-			// 		CFRunLoop::run_in_mode(
-			// 			kCFRunLoopDefaultMode,
-			// 			std::time::Duration::from_millis(10),
-			// 			false,
-			// 		);
-			// 	}
-
-			// 	tracing::info!("scroll daemon stopping");
-
-			// 	// tap.disable();
-
-			// 	run_loop.remove_source(&source, kCFRunLoopCommonModes);
-
-			// 	tracing::info!("scroll daemon stopped");
-			// }
 		});
-		// ScrollDaemon {
-		// 	running,
-		// 	handle: Some(handle),
-		// }
 	}
 	fn shutdown_runtime(&mut self) {
 		tracing::info!(">>> shutting down runtime");
-
 		self.clock_running.store(false, Ordering::Relaxed);
-
-		// if let Some(scroll_daemon) = self.scroll_daemon.take() {
-		// 	tracing::info!(">>> shutting down scroll daemon");
-		// 	scroll_daemon.shutdown();
-		// }
-
 		if let Some(handle) = self.signal_handle.take() {
 			tracing::info!(">>> joining signal handler");
 			let _ = handle.join();
@@ -717,7 +673,7 @@ impl App {
 
 impl App {
 	fn show_tasks(&mut self) {
-		println!("Requesting task/status refresh...");
+		// println!("Requesting task/status refresh...");
 		self
 			.engine
 			.runtime
@@ -726,7 +682,7 @@ impl App {
 			}));
 	}
 	fn new_task(&mut self) {
-		println!("Creating task...");
+		// println!("Creating task...");
 		self
 			.engine
 			.runtime
@@ -735,7 +691,7 @@ impl App {
 			}));
 	}
 	fn clear_tasks(&mut self) {
-		println!("Clearing tasks...");
+		// println!("Clearing tasks...");
 		self
 			.engine
 			.runtime

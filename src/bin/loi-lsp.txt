@@ -405,7 +405,7 @@ impl LoiLanguageServer {
 			.show_message(MessageType::ERROR, message.into())
 			.await;
 	}
-	// async fn logg(&self, msg: &str) {
+	// async fn estate::logger:logg(&self, msg: &str) {
 	// }
 	// async fn log(&self, message: impl Into<String>) {
 	// }

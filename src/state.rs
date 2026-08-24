@@ -56,12 +56,19 @@ impl EstateState {
 		}
 		tracing::info!("EstateState load path={:?}", path);
 		let raw = fs::read_to_string(path).expect("failed reading daemon state");
-		tracing::info!("EstateState raw={:?}", &raw);
+		let pretty: serde_json::Value = match serde_json::from_str(&raw) {
+			Ok(value) => value,
+			Err(error) => {
+				tracing::error!(%error, "failed to parse EstateState JSON");
+				return Self::default();
+			}
+		};
+		tracing::info!("EstateState:\n{pretty:#}");
 		serde_json::from_str(&raw).expect("failed parsing daemon state")
 	}
 	pub fn save(state: &Self) {
 		let path = Self::path().expect("could not resolve daemon state path");
-		eprintln!("pathpath {:?}", path);
+		tracing::info!("💾 EstateState received: {:?}", path);
 		let json = serde_json::to_string_pretty(state).expect("failed serializing daemon state");
 		fs::write(path, json).expect("failed writing daemon state");
 	}
