@@ -1,7 +1,4 @@
-use crate::{
-	job,
-	prelude::{daemon::daemon::*, *},
-};
+use crate::prelude::{daemon::daemon::*, *};
 use std::sync::{Arc, RwLock};
 // Events = facts that happened
 // Handlers = reactions to facts
@@ -502,9 +499,9 @@ impl TaskRunner {
 	pub async fn execute(task: Task) -> anyhow::Result<()> {
 		tracing::info!("TaskRunner execute {:?}", task);
 		match task.kind {
-			TaskKind::RebuildIndex => {
-				todo!("TaskKind::RebuildIndex")
-			}
+			// TaskKind::RebuildIndex => {
+			// 	todo!("TaskKind::RebuildIndex")
+			// }
 			TaskKind::RebuildIndex => {
 				println!("🔨 rebuilding index");
 				tokio::time::sleep(std::time::Duration::from_secs(2)).await;

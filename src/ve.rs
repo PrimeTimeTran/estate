@@ -1,12 +1,11 @@
 use crate::prelude::*;
-use core_foundation::runloop::kCFRunLoopDefaultMode;
+
 use core_graphics::display::CGDisplay;
-use egui::Context;
 use egui::Ui;
 use egui_plot::{Bar, BarChart, Plot};
-use egui_plot::{Line, PlotBounds, PlotPoints, Points};
+use egui_plot::{Line, Points};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex};
 use winit::event_loop::EventLoopProxy;
 /// A trait implemented by types which agree to its contract.
 ///
@@ -1545,10 +1544,8 @@ pub fn scroll_state() -> &'static Mutex<ScrollRedirectState> {
 	})
 }
 
-pub fn start_global_scroll_daemon(proxy: EventLoopProxy<AppEvent>) -> ScrollDaemon {
-	let running = Arc::new(AtomicBool::new(true));
-	let thread_running = Arc::clone(&running);
-	let handle = std::thread::spawn(move || {
+pub fn spawn_global_cursor_daemon(proxy: EventLoopProxy<AppEvent>) {
+	std::thread::spawn(move || {
 		let trusted = macos_accessibility_client::accessibility::application_is_trusted_with_prompt();
 		if !trusted {
 			return;
@@ -1598,10 +1595,10 @@ pub fn start_global_scroll_daemon(proxy: EventLoopProxy<AppEvent>) -> ScrollDaem
 							y: location.y,
 						};
 						state.target_position = target_position;
-						println!(
-							"⬇️ SHIFT DOWN | ({:.0}, {:.0}) -> {:?} ({:.0}, {:.0})",
-							location.x, location.y, target, target_position.x, target_position.y,
-						);
+						// println!(
+						// 	"⬇️ SHIFT DOWN | ({:.0}, {:.0}) -> {:?} ({:.0}, {:.0})",
+						// 	location.x, location.y, target, target_position.x, target_position.y,
+						// );
 						if let Ok(source) = CGEventSource::new(CGEventSourceStateID::CombinedSessionState) {
 							if let Ok(move_event) = CGEvent::new_mouse_event(
 								source,
@@ -1619,10 +1616,10 @@ pub fn start_global_scroll_daemon(proxy: EventLoopProxy<AppEvent>) -> ScrollDaem
 					if !shift_is_down && was_down {
 						let mut state = scroll_state().lock().unwrap();
 						let original = state.original_position;
-						println!(
-							"⬆️ SHIFT UP | restoring ({:.0}, {:.0})",
-							original.x, original.y
-						);
+						// println!(
+						// 	"⬆️ SHIFT UP | restoring ({:.0}, {:.0})",
+						// 	original.x, original.y
+						// );
 						if state.active {
 							if let Ok(source) = CGEventSource::new(CGEventSourceStateID::CombinedSessionState) {
 								if let Ok(restore_event) = CGEvent::new_mouse_event(
@@ -1701,30 +1698,11 @@ pub fn start_global_scroll_daemon(proxy: EventLoopProxy<AppEvent>) -> ScrollDaem
 				}
 			};
 			let run_loop = CFRunLoop::get_current();
-
 			run_loop.add_source(&source, kCFRunLoopCommonModes);
-
 			tap.enable();
-
-			tracing::info!("scroll daemon started");
-
-			while thread_running.load(Ordering::Relaxed) {
-				CFRunLoop::run_in_mode(kCFRunLoopDefaultMode, Duration::from_millis(10), false);
-			}
-
-			tracing::info!("scroll daemon stopping");
-
-			// tap.disable();
-
-			run_loop.remove_source(&source, kCFRunLoopCommonModes);
-
-			tracing::info!("scroll daemon stopped");
+			CFRunLoop::run_current();
 		}
 	});
-	ScrollDaemon {
-		running,
-		handle: Some(handle),
-	}
 }
 
 pub struct ScrollDaemon {

@@ -195,3 +195,4 @@ pub const PROBES: ProbeSet = &[
 
 pub static SCROLL_STATE: OnceLock<Mutex<ScrollRedirectState>> = OnceLock::new();
 pub static SHIFT_HELD: AtomicBool = AtomicBool::new(false);
+pub static HOTKEY_INITIALIZED: AtomicBool = AtomicBool::new(false);

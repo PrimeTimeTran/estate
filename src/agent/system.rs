@@ -1,8 +1,8 @@
+use crate::prelude::*;
 use crate::{
 	agent::{AgentBus, AgentEvent, AgentRegistry, AgentRuntime, RuntimeEvent},
-	job::{AgentTask, Task, TaskResult},
+	job::{AgentTask, TaskResult},
 };
-use crate::{job, prelude::*};
 use tokio::sync::mpsc::{UnboundedReceiver, unbounded_channel};
 
 #[derive(Debug, Clone)]

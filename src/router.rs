@@ -1,4 +1,4 @@
-use crate::{app, prelude::daemon::projection::command, prelude::*};
+use crate::{prelude::daemon::projection::command, prelude::*};
 use cli;
 /// # Estate Engine CLI
 ///
@@ -50,13 +50,6 @@ pub async fn execute(
 ) -> anyhow::Result<(), anyhow::Error> {
 	let command = parsed_cli.command.unwrap_or(Command::Start { tail: false });
 	match command {
-		/// [Dev]
-		/// cargo run --bin estate -- start
-		/// cargo run --bin estate -- start --live
-		///
-		/// [Release]
-		/// estate start
-		/// estate start --live
 		Command::Start { tail: false } => {
 			// app::App::spawn_tray_process();
 		}
@@ -68,8 +61,6 @@ pub async fn execute(
 		}
 		Command::Metrics(args) => {
 			let workspace = AnalyzeDaemon.run(&ctx, &args).await?;
-			/// "/Users/future/KB/project/crates/estate-engine/src/main.rs"
-			/// cargo run metrics "/Users/future/KB/project/crates/estate-engine/src/main.rs"
 			AnalyzeLoop::run_cli(workspace).await;
 		}
 		//                        ┌──────────────────┐
@@ -125,14 +116,6 @@ pub async fn execute(
 				}
 			}
 		}
-		// Server
-		// Command::Start => {
-		// 	start::daemon().await;
-		// }
-		// Background process/app
-		// Command::Process(args) => {
-		//     start::BackgroundDaemon::run(&ctx, &args).await;
-		// }
 		Command::DaemonServer => {
 			daemon::DaemonServer::run().await;
 		}
@@ -158,11 +141,8 @@ pub async fn execute(
 		Command::Foo(_args) => {
 			let _ = EstateDiscovery::init();
 		}
-		// --info
-		// --doctor
 		_ => {
 			todo!("Command not found");
-			// router::execute(parsed_cli, ctx, engine).await?;
 		}
 	}
 	Ok(())
