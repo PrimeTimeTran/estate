@@ -14,18 +14,35 @@ short_description = "Estate development environment"
 long_description = "Estate development environment"
 icon = ["assets/icon.icns"]
 
+[build]
+target = "wasm32-unknown-unknown"
+
+[[bin]]
+name = "main"
+path = "src/main.rs"
+
 [[bin]]
 name = "estate"
-path = "src/bin/main.rs"
+path = "src/bin/web.rs"
+required-features = ["wasm"]
+
+# cargo build \
+#   --target wasm32-unknown-unknown \
+#   --manifest-path crates/estate/Cargo.toml \
+#   --bin web \
+#   --no-default-features \
+#   --features wasm
+# trunk serve --features=wasm
+
+
+[[bin]]
+name = "native"
+path = "src/bin/native.rs"
+required-features = ["native"]
 
 [[bin]]
 name = "threads"
 path = "src/bin/threads.rs"
-
-
-# [[bin]]
-# name = "main"
-# path = "src/main.rs"
 
 # [[bin]]
 # name = "init"
@@ -37,7 +54,6 @@ path = "src/bin/threads.rs"
 
 [dependencies]
 # Internal
-cli.workspace = true
 foo.workspace = true
 macros-decl.workspace = true
 macros-proc.workspace = true
@@ -47,45 +63,87 @@ revelation.workspace = true
 anyhow.workspace = true
 async-trait.workspace = true
 chrono.workspace = true
-comfy-table.workspace = true
-core-foundation.workspace = true
-core-graphics.workspace = true
-demand.workspace = true
+
 dirs.workspace = true
 egui-wgpu.workspace = true
-egui-winit.workspace = true
+
 egui.workspace = true
 egui_plot.workspace = true
 futures.workspace = true
 global-hotkey.workspace = true
 image.workspace = true
-jsonschema.workspace = true
+
 lazy_static.workspace = true
-macos-accessibility-client.workspace = true
-notify.workspace = true
-objc2-app-kit.workspace = true
-objc2-foundation.workspace = true
-objc2.workspace = true
+
 pollster.workspace = true
 reqwest.workspace = true
 resvg.workspace = true
-rmcp.workspace = true
 schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true
-tokio-util.workspace = true
-tokio.workspace = true
+serde-wasm-bindgen.workspace = true
 toml.workspace = true
-tower-lsp.workspace = true
 tracing-subscriber.workspace = true
 tracing.workspace = true
-tray-icon.workspace = true
-url.workspace = true
-uuid.workspace = true
-wgpu.workspace = true
-winit.workspace = true
-signal-hook = "0.4.4"
 
+url.workspace = true
+
+wgpu.workspace = true
+wasm-bridge.workspace = true
+wasm-bindgen.workspace = true
+web-sys.workspace = true
+winit.workspace = true
+uuid = { version = "1.24", features = ["v4", "js", "serde"] }
+
+# Make all these optional so they can be toggled by the native feature
+notify = { workspace = true, optional = true }
+cli = { workspace = true, optional = true }
+demand = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true, features = ["rt", "macros"] } # Make sure features don't force 'net' on WASM if compiled
+rmcp = { workspace = true, optional = true }
+tower-lsp = { workspace = true, optional = true }
+tokio-util = { workspace = true, optional = true }
+objc2-app-kit = { workspace = true, optional = true }
+objc2-foundation = { workspace = true, optional = true }
+objc2 = { workspace = true, optional = true }
+core-foundation = { workspace = true, optional = true }
+core-graphics = { workspace = true, optional = true }
+signal-hook = { version = "0.4.4", optional = true }
+comfy-table = { workspace = true, optional = true }
+jsonschema = { workspace = true, optional = true }
+tray-icon = { workspace = true, optional = true }
+egui-winit = { workspace = true, optional = true }
+macos-accessibility-client = { workspace = true, optional = true }
+
+[features]
+# This overwrites IDE speficification causing diagnostics to be wrong given the targetted platform.
+#
+# To get IDE diagnostics functioning correctly remove the hardcoded default when troubleshooting another build target.
+#
+# default = ["native"]
+default = []
+wasm = []
+mobile = []
+native = [
+    "dep:notify",
+    "dep:cli",
+    "dep:demand",
+    "dep:tokio",
+    "dep:rmcp",
+    "dep:tower-lsp",
+    "dep:tokio-util",
+    "dep:objc2-app-kit",
+    "dep:objc2-foundation",
+    "dep:objc2",
+    "dep:core-foundation",
+    "dep:core-graphics",
+    "dep:signal-hook",
+    "dep:comfy-table",
+    "dep:jsonschema",
+    "dep:tray-icon",
+    "dep:egui-winit",
+    "dep:macos-accessibility-client"
+]
 [build-dependencies]
 resvg.workspace = true

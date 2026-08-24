@@ -88,7 +88,12 @@
 //!   replaceable without changing the domain model.
 //! - **Frontend independence** — the CLI, daemon, LSP, and IDE integrations
 //!   should operate on the same underlying engine and domain abstractions.
+
 #![allow(warnings)]
+
+pub mod prelude;
+pub mod shared;
+pub mod utils;
 
 #[cfg(feature = "native")]
 pub mod native;
@@ -98,9 +103,3 @@ pub mod wasm;
 
 #[cfg(feature = "mobile")]
 pub mod mobile;
-
-// Build Targert Wasm & Native cause conflicts here.
-// These
-pub mod prelude;
-pub mod shared;
-// pub mod utils;

@@ -1,4 +1,4 @@
-mod wasm;
+use estate::wasm;
 
 fn main() {
 	todo!("hi ")
