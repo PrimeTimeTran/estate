@@ -1,6 +1,6 @@
-use crate::prelude::*;
+use crate::{native::*, prelude::*};
 
-use crate::shared::state::EstateEngine;
+use crate::native::state::EstateEngine;
 
 use signal_hook::{consts::SIGINT, iterator::Signals};
 use tray_icon::{TrayIcon, TrayIconBuilder, menu::MenuEvent};
@@ -11,18 +11,18 @@ use winit::{
 	platform::macos::{ActivationPolicy, EventLoopBuilderExtMacOS},
 	window::WindowId,
 };
-/// Top-level application state.
+/// Top-level NativeApplication state.
 ///
-/// Owns the system tray integration, application context, Estate engine,
+/// Owns the system tray integration, NativeApplication context, Estate engine,
 /// daemon communication channel, and optional development window.
-pub struct App {
-	/// The system tray icon owned by the application.
+pub struct NativeApp {
+	/// The system tray icon owned by the NativeApplication.
 	tray: Option<TrayIcon>,
 	/// The system tray menu and its associated menu items.
 	menu: Option<TrayMenu>,
-	/// Shared application context and runtime state.
+	/// Shared NativeApplication context and runtime state.
 	// context: Context,
-	/// The Estate engine responsible for the application's core functionality.
+	/// The Estate engine responsible for the NativeApplication's core functionality.
 	engine: EstateEngine,
 	/// Channel used to send commands to the Estate daemon, when available.
 	// daemon_tx: Option<mpsc::Sender<DaemonCommand>>,
@@ -31,7 +31,7 @@ pub struct App {
 	// daemon: Option<Daemon>,
 	daemon_tx: mpsc::Sender<DaemonCommand>,
 	/// Use an `Option` if **another thread or runtime task needs to take permanent ownership** of the receiver to run a loop, and you won't be polling it directly inside `Oracle`'s `draw()` method.
-	/// * **How it works:** You create the channel inside `Oracle::new()`, keep the `Sender` inside `Oracle` (or pass it to your file watcher), and **take** the `Receiver` out once via `.take()` to hand it off to a worker thread or your application's main event pump.
+	/// * **How it works:** You create the channel inside `Oracle::new()`, keep the `Sender` inside `Oracle` (or pass it to your file watcher), and **take** the `Receiver` out once via `.take()` to hand it off to a worker thread or your NativeApplication's main event pump.
 	/// * **Why `Option`?** Because in Rust, you cannot move a field out of a struct by value if the struct itself is behind a mutable reference or doesn't implement `Default`. `.take()` replaces the field with `None` so you can move the `Receiver` out cleanly.
 	/// ### 2. When to NOT use `Option` (Direct Polling)
 	/// If you are polling the receiver *directly inside* `Oracle`'s own methods (like calling `self.rx.try_recv()` inside your `draw()` frame tick), **you do not need an `Option**`.
@@ -47,7 +47,7 @@ pub struct App {
 	pub windows: Vec<AppWindow>,
 	clock_running: Arc<AtomicBool>,
 }
-impl App {
+impl NativeApp {
 	pub fn new() -> anyhow::Result<Self> {
 		let (daemon_tx, daemon_rx) = mpsc::channel(100);
 		let engine = EstateEngine::new()?;
@@ -64,7 +64,7 @@ impl App {
 		})
 	}
 	pub fn run(&mut self, cli: Cli) -> anyhow::Result<()> {
-		tracing::info!(">>> App::run entered");
+		tracing::info!(">>> NativeApp::run entered");
 		let result = match cli.command {
 			None | Some(Command::Start { .. }) | Some(Command::Tray) => self.start_runtime(),
 			Some(_) => {
@@ -75,11 +75,11 @@ impl App {
 				})
 			}
 		};
-		tracing::info!(">>> App::run returning");
+		tracing::info!(">>> NativeApp::run returning");
 		result
 	}
 	fn start_runtime(&mut self) -> anyhow::Result<()> {
-		tracing::info!(">>> App::start_runtime start");
+		tracing::info!(">>> NativeApp::start_runtime start");
 		self.spawn_global_hotkey_daemon()?;
 		let event_loop = EventLoop::<AppEvent>::with_user_event()
 			.with_activation_policy(ActivationPolicy::Accessory)
@@ -89,7 +89,7 @@ impl App {
 		self.spawn_cursor_daemon(proxy.clone());
 		self.spawn_signal_handler(proxy.clone());
 		event_loop.run_app(self)?;
-		tracing::info!(">>> App::start_runtime returning");
+		tracing::info!(">>> NativeApp::start_runtime returning");
 		Ok(())
 	}
 	fn spawn_clock(&mut self, proxy: EventLoopProxy<AppEvent>) {
@@ -178,7 +178,7 @@ impl App {
 		tracing::info!(">>> runtime shutdown complete");
 	}
 }
-impl ApplicationHandler<AppEvent> for App {
+impl ApplicationHandler<AppEvent> for NativeApp {
 	fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
 		while let Ok(event) = MenuEvent::receiver().try_recv() {
 			self.handle_event(event, event_loop);
@@ -311,7 +311,7 @@ impl ApplicationHandler<AppEvent> for App {
 		}
 	}
 }
-impl App {
+impl NativeApp {
 	fn handle_event(&mut self, event: MenuEvent, event_loop: &ActiveEventLoop) {
 		let Some(menu) = self.menu.as_ref() else {
 			return;
@@ -366,7 +366,7 @@ impl App {
 		}
 	}
 }
-impl App {
+impl NativeApp {
 	fn new_task(&mut self) {
 		self
 			.engine
@@ -395,7 +395,7 @@ impl App {
 		target = "estate::discovery",
 		name = "scan_workspace",
 		skip(self),
-		fields(flow_id = %Uuid::now_v7())
+		fields(flow_id = %Uuid::new_v4())
 	)]
 	async fn _scan_workspace(&mut self, path: &Path) -> anyhow::Result<()> {
 		tracing::info!("starting workspace scan");
@@ -443,7 +443,7 @@ impl App {
 // #[derive(Clone, Debug, Default)]
 // pub enum RuntimeMode {
 // 	#[default]
-// 	App,
+// 	NativeApp,
 // 	Cli,
 // 	Daemon,
 // 	Lsp,

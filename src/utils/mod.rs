@@ -4,6 +4,6 @@ pub struct Uid(Uuid);
 
 impl Uid {
 	pub fn new() -> Self {
-		Self(Uuid::now_v7())
+		Self(Uuid::new_v4())
 	}
 }

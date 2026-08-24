@@ -1,4 +1,4 @@
-use crate::{prelude::*, shared::poc::McpClient};
+use crate::{native::poc::McpClient, prelude::*};
 use anyhow::Error;
 
 #[derive(Debug, Default, Clone)]

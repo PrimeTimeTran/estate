@@ -29,7 +29,7 @@ fn main() -> anyhow::Result<()> {
 
 	flow.info("App::new");
 
-	let mut app = App::new()?;
+	let mut app = NativeApp::new()?;
 
 	flow.info(">>> BEFORE app.run()");
 

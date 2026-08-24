@@ -45,9 +45,9 @@ impl EstateState {
 }
 
 impl EstateState {
-	// fn path() -> std::io::Result<PathBuf> {
-	// 	Ok(engine_data_dir()?.join("state.json"))
-	// }
+	fn path() -> std::io::Result<PathBuf> {
+		Ok(engine_data_dir()?.join("state.json"))
+	}
 	pub fn load() -> Self {
 		let path = Self::path().expect("could not resolve daemon state path");
 		if !path.exists() {

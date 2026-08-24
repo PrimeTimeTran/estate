@@ -1,4 +1,4 @@
-use crate::{prelude::*, shared::daemon::daemon_config::derive_runtime_context};
+use crate::{native::daemon::daemon_config::derive_runtime_context, prelude::*};
 use anyhow::Error;
 
 fn manifest_path() -> Result<PathBuf, Error> {

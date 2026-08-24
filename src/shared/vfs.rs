@@ -617,7 +617,7 @@ pub struct Runtime {
 // 		}
 // 	}
 // 	pub fn new() -> Self {
-// 		let uid = Uuid::now_v7();
+// 		let uid = Uuid::new_v4();
 // 		let root = Inode {
 // 			version: 1,
 // 			id: uid,
@@ -629,7 +629,7 @@ pub struct Runtime {
 // 		Self {
 // 			inodes,
 // 			root: root.id,
-// 			next_inode_id: Uuid::now_v7(),
+// 			next_inode_id: Uuid::new_v4(),
 // 		}
 // 	}
 // }
@@ -674,7 +674,7 @@ impl InodeStore {
 	pub fn new() -> Self {
 		Self {
 			inodes: HashMap::new(),
-			next_id: Uuid::now_v7(),
+			next_id: Uuid::new_v4(),
 		}
 	}
 
@@ -685,7 +685,7 @@ impl InodeStore {
 	// }
 
 	pub fn create(&mut self, kind: InodeKind) -> Uuid {
-		let id = Uuid::now_v7();
+		let id = Uuid::new_v4();
 
 		let inode = Inode {
 			id,

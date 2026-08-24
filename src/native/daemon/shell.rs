@@ -1,6 +1,5 @@
 pub use crate::prelude::*;
-
-// pub use comfy_table::{Cell, Table, presets::UTF8_FULL};
+pub use comfy_table::{Cell, Table, presets::UTF8_FULL};
 
 ///--------------------------------------------------------------------------------
 /// CLI Tools

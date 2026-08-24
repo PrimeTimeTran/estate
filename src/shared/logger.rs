@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use crate::shared::*;
-// use crate::shared::daemon::engine_data_dir;
+// use crate::native::daemon::engine_data_dir;
 
 use tracing::{debug, error, info, info_span, trace, warn};
 use tracing_subscriber::{
@@ -72,17 +72,17 @@ pub struct LogConfig {
 	// pub window: OutputConfig,
 }
 impl LogConfig {
-	// pub fn apply_cli(&mut self, cli: &cli::context::Cli) -> anyhow::Result<()> {
-	// 	match &cli.command {
-	// 		Some(cli::context::Command::Start { tail }) => {
-	// 			if *tail {
-	// 				self.terminal.enabled = true;
-	// 			}
-	// 		}
-	// 		_ => {}
-	// 	}
-	// 	Ok(())
-	// }
+	pub fn apply_cli(&mut self, cli: &cli::context::Cli) -> anyhow::Result<()> {
+		match &cli.command {
+			Some(cli::context::Command::Start { tail }) => {
+				if *tail {
+					self.terminal.enabled = true;
+				}
+			}
+			_ => {}
+		}
+		Ok(())
+	}
 	fn terminal_filter(&self) -> anyhow::Result<EnvFilter> {
 		// let mut filter = EnvFilter::new("off");
 		// for (target, level) in &self.targets {

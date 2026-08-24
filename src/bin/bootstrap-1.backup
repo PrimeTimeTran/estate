@@ -327,7 +327,7 @@ pub fn build_estate(document: EstateDocument) -> Estate {
 			// Node
 			// ---------------------------------------------------------
 
-			let node_id = Uuid::now_v7();
+			let node_id = Uuid::new_v4();
 
 			let node = Node {
 				id: node_id,
@@ -352,7 +352,7 @@ pub fn build_estate(document: EstateDocument) -> Estate {
 			// constructor/default mechanism the shared type provides.
 			//
 			// For now, if ResourceId is a u64 type alias, this works:
-			let resource_id = Uuid::now_v7();
+			let resource_id = Uuid::new_v4();
 
 			let resource = Resource {
 				id: resource_id,

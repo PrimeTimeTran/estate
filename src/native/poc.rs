@@ -4,7 +4,7 @@ use rmcp::{
 	model::{PromptMessage, PromptMessageContent},
 };
 
-use crate::shared::backend::server::{CodeReviewArgs, MyServer};
+use crate::native::backend::server::{CodeReviewArgs, MyServer};
 
 #[derive(Default, Debug, Clone)]
 pub struct McpClient {

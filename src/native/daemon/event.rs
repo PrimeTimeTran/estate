@@ -1,4 +1,5 @@
-use crate::prelude::*;
+use crate::{prelude::*, shared::vfs::*};
+
 // Events = facts that happened
 // Handlers = reactions to facts
 // Tasks = units of work
@@ -299,62 +300,62 @@ impl EventHandler for FileWatcherHandler {
 pub struct TaskHandler;
 #[async_trait::async_trait]
 impl EventHandler for TaskHandler {
-	// async fn handle(&self, event: &Event, runtime: &EstateRuntime) {
-	// 	tracing::info!("📡 EventHandler.handle {:?}", event);
-	// 	let EventKind::TaskRequested { request } = &event.kind else {
-	// 		return;
-	// 	};
-	// 	let task_id = match request {
-	// 		TaskRequest::Create(kind) => {
-	// 			tracing::info!("TaskRequest::Create {:?}", kind);
-	// 			let mut tasks = runtime.tasks.write().unwrap();
-	// 			let task = tasks.create(kind.clone());
-	// 			runtime.emit(Event::daemon(EventKind::TaskCreated {
-	// 				task_id: task,
-	// 				name: kind.name(),
-	// 			}));
-	// 			task
-	// 		}
-	// 		TaskRequest::Run(task_id) => *task_id,
-	// 		_ => return,
-	// 	};
-	// 	let task = {
-	// 		let tasks = runtime.tasks.read().unwrap();
-	// 		let Some(task) = tasks.get(task_id).cloned() else {
-	// 			tracing::warn!(%task_id, "requested task not found");
-	// 			return;
-	// 		};
-	// 		task
-	// 	};
-	// 	{
-	// 		let mut tasks = runtime.tasks.write().unwrap();
-	// 		if let Err(error) = tasks.set_status(task_id, TaskStatus::Running) {
-	// 			tracing::warn!(%task_id, %error, "failed to set task running");
-	// 			return;
-	// 		}
-	// 	}
-	// 	runtime.emit(Event::daemon(EventKind::TaskStarted { task_id }));
-	// 	let runtime = runtime.clone();
-	// 	tokio::spawn(async move {
-	// 		tracing::info!(
-	// 			%task_id,
-	// 			task = %task.name,
-	// 			"task starting"
-	// 		);
-	// 		match TaskRunner::execute(task.clone()).await {
-	// 			Ok(()) => {
-	// 				tracing::info!("TaskHandler match TaskRunner::execute {:?}", task);
-	// 				runtime.emit(Event::daemon(EventKind::TaskCompleted { task_id }));
-	// 			}
-	// 			Err(error) => {
-	// 				runtime.emit(Event::daemon(EventKind::TaskFailed {
-	// 					task_id,
-	// 					error: error.to_string(),
-	// 				}));
-	// 			}
-	// 		}
-	// 	});
-	// }
+	async fn handle(&self, event: &Event, runtime: &EstateRuntime) {
+		tracing::info!("📡 EventHandler.handle {:?}", event);
+		let EventKind::TaskRequested { request } = &event.kind else {
+			return;
+		};
+		let task_id = match request {
+			TaskRequest::Create(kind) => {
+				tracing::info!("TaskRequest::Create {:?}", kind);
+				let mut tasks = runtime.tasks.write().unwrap();
+				let task = tasks.create(kind.clone());
+				runtime.emit(Event::daemon(EventKind::TaskCreated {
+					task_id: task,
+					name: kind.name(),
+				}));
+				task
+			}
+			TaskRequest::Run(task_id) => *task_id,
+			_ => return,
+		};
+		let task = {
+			let tasks = runtime.tasks.read().unwrap();
+			let Some(task) = tasks.get(task_id).cloned() else {
+				tracing::warn!(%task_id, "requested task not found");
+				return;
+			};
+			task
+		};
+		{
+			let mut tasks = runtime.tasks.write().unwrap();
+			if let Err(error) = tasks.set_status(task_id, TaskStatus::Running) {
+				tracing::warn!(%task_id, %error, "failed to set task running");
+				return;
+			}
+		}
+		runtime.emit(Event::daemon(EventKind::TaskStarted { task_id }));
+		let runtime = runtime.clone();
+		tokio::spawn(async move {
+			tracing::info!(
+				%task_id,
+				task = %task.name,
+				"task starting"
+			);
+			match TaskRunner::execute(task.clone()).await {
+				Ok(()) => {
+					tracing::info!("TaskHandler match TaskRunner::execute {:?}", task);
+					runtime.emit(Event::daemon(EventKind::TaskCompleted { task_id }));
+				}
+				Err(error) => {
+					runtime.emit(Event::daemon(EventKind::TaskFailed {
+						task_id,
+						error: error.to_string(),
+					}));
+				}
+			}
+		});
+	}
 }
 pub struct StateHandler;
 #[async_trait::async_trait]
@@ -464,68 +465,45 @@ impl EventHandler for CommandHandler {
 		}
 	}
 }
-#[derive(Debug, Clone, Deserialize, Hash, Serialize)]
-pub enum TaskKind {
-	BuildEstatePrototype,
-	GenerateView(String),
-	RebuildIndex,
-	SyncBookmarks,
-}
-impl TaskKind {
-	pub fn name(&self) -> String {
-		match self {
-			TaskKind::RebuildIndex => "Rebuild Index".into(),
-			TaskKind::GenerateView(name) => {
-				format!("Generate View: {name}")
-			}
-			TaskKind::SyncBookmarks => "Sync Bookmarks".into(),
-			TaskKind::BuildEstatePrototype => "Build Estate Prototype".into(),
-		}
-	}
-}
-#[derive(Debug, Clone, Deserialize, Hash, Serialize)]
-pub enum TaskRequest {
-	Create(TaskKind),
-	Run(TaskId),
-	Stop(TaskId),
-	Delete(TaskId),
-}
+
 /// "Given this task, actually perform it."
 pub struct TaskRunner;
-// impl TaskRunner {
-// 	pub async fn execute(task: Task) -> anyhow::Result<()> {
-// 		tracing::info!("TaskRunner execute {:?}", task);
-// 		match task.kind {
-// 			TaskKind::RebuildIndex => {
-// 				println!("🔨 rebuilding index");
-// 				tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-// 				println!("✅ index rebuild complete");
-// 			}
-// 			TaskKind::GenerateView(name) => {
-// 				println!("👁️ generating view: {name}");
-// 				tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-// 				println!("✅ view generated: {name}");
-// 			}
-// 			TaskKind::SyncBookmarks => {
-// 				tracing::info!("🔖 TaskKind::SyncBookmarks {:?}", task);
-// 				tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-// 				tracing::info!("✅ bookmark sync complete {:?}", task.id);
-// 			}
-// 			TaskKind::BuildEstatePrototype => {
-// 				println!("🚧 starting BuildEstatePrototype");
-// 				for i in 1..=10 {
-// 					tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-// 					println!("🚧 prototype task: {i}/10");
-// 				}
-// 				println!("✅ BuildEstatePrototype complete");
-// 			}
-// 		}
-// 		Ok(())
-// 	}
-// }
+impl TaskRunner {
+	pub async fn execute(task: Task) -> anyhow::Result<()> {
+		tracing::info!("TaskRunner execute {:?}", task);
+		match task.kind {
+			TaskKind::RebuildIndex => {
+				println!("🔨 rebuilding index");
+				tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+				println!("✅ index rebuild complete");
+			}
+			TaskKind::GenerateView(name) => {
+				println!("👁️ generating view: {name}");
+				tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+				println!("✅ view generated: {name}");
+			}
+			TaskKind::SyncBookmarks => {
+				tracing::info!("🔖 TaskKind::SyncBookmarks {:?}", task);
+				tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+				tracing::info!("✅ bookmark sync complete {:?}", task.id);
+			}
+			TaskKind::BuildEstatePrototype => {
+				println!("🚧 starting BuildEstatePrototype");
+				for i in 1..=10 {
+					tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+					println!("🚧 prototype task: {i}/10");
+				}
+				println!("✅ BuildEstatePrototype complete");
+			}
+		}
+		Ok(())
+	}
+}
 fn now() -> u64 {
 	std::time::SystemTime::now()
 		.duration_since(std::time::UNIX_EPOCH)
 		.unwrap()
 		.as_secs()
 }
+
+// struct Inode;

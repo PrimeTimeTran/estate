@@ -1,4 +1,7 @@
-use crate::{shared::agent::SystemEvent, shared::prelude::*};
+use crate::{
+	native::{agent::SystemEvent, job::*, *},
+	shared::prelude::*,
+};
 
 #[derive(Clone, Debug)]
 pub enum RuntimeEvent {

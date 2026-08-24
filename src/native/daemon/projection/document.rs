@@ -1,6 +1,6 @@
 use crate::{
+	native::{daemon::daemon::*, prelude::*, *},
 	prelude::*,
-	shared::{daemon::daemon::*, prelude::*, *},
 };
 
 use std::{

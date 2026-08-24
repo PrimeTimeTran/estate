@@ -177,11 +177,11 @@ pub enum EstateScope {
 /// Estate owns the capabilities and domain model; the daemon exposes those capabilities as a long-lived service.
 #[derive(Clone, Debug)]
 pub struct EstateEngine {
-	pub estate: Estate, // domain model
-	// pub runtime: Arc<EstateRuntime>, // capability
-	pub vfs: EstateVfs,       // infrastructure
-	pub index: EstateIndex,   // infrastructure
-	pub workspace: Workspace, // domain/context
+	pub estate: Estate,              // domain model
+	pub runtime: Arc<EstateRuntime>, // capability
+	pub vfs: EstateVfs,              // infrastructure
+	pub index: EstateIndex,          // infrastructure
+	pub workspace: Workspace,        // domain/context
 
 	// pub index: OnceCell<EstateIndex>,
 	// pub search: OnceCell<SearchService>,
@@ -196,10 +196,10 @@ pub struct EstateEngine {
 }
 impl EstateEngine {
 	pub fn new() -> anyhow::Result<Self> {
-		// let runtime = Arc::new(EstateRuntime::new());
+		let runtime = Arc::new(EstateRuntime::new());
 
 		Ok(Self {
-			// runtime,
+			runtime,
 			estate: Estate::default(),
 			workspace: Workspace::new(),
 			registry: EstateRegistry::default(),
@@ -213,10 +213,10 @@ impl EstateEngine {
 			analysis: AnalysisService::default(),
 		})
 	}
-	// pub async fn format(self, args: &FormatArgs) -> anyhow::Result<String, anyhow::Error> {
-	// 	LintDaemon.run(&args).await;
-	// 	Ok("Success".to_string())
-	// }
+	pub async fn format(self, args: &FormatArgs) -> anyhow::Result<String, anyhow::Error> {
+		LintDaemon.run(&args).await;
+		Ok("Success".to_string())
+	}
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]

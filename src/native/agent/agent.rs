@@ -1,9 +1,9 @@
 use crate::{
-	prelude::*,
-	shared::agent::{
+	native::agent::{
 		ACTION_PROMPT, AgentEvent, AgentTools, DECIDE_PROMPT, JSON_PROMPT, RuntimeEvent,
 		WorkspaceContext, build_sys_action, build_sys_prompt,
 	},
+	prelude::*,
 };
 
 #[derive(Debug, Clone)]
@@ -16,7 +16,7 @@ pub struct Agent {
 impl Agent {
 	pub fn new() -> Self {
 		Self {
-			id: uuid::Uuid::now_v7().to_string(),
+			id: uuid::Uuid::new_v4().to_string(),
 			tools: AgentTools::default(),
 			workspace: Arc::new(WorkspaceContext::default()),
 		}

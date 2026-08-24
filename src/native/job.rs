@@ -6,31 +6,31 @@
 // | Individual background execution | `Job`          | Has lifecycle/state           |
 // | UI representation               | `Task` / `Job` | Shows pending/running/etc.    |
 
-use crate::{prelude::*, shared::*};
+use crate::{native::agent::AgentContext, prelude::*, shared::*};
 
 pub type TaskId = Uuid;
 #[derive(Debug, Clone)]
 pub struct Task {
 	pub id: TaskId,
 	pub name: String,
-	// pub kind: TaskKind,
+	pub kind: TaskKind,
 	pub status: TaskStatus,
 }
 
 #[derive(Debug)]
 pub struct TaskManager {
-	// pub _watcher: notify::RecommendedWatcher,
+	pub _watcher: notify::RecommendedWatcher,
 	pub dirty: bool,
 	pub error: Option<String>,
 	pub last_loaded: Option<SystemTime>,
-	// pub rx: tokio::sync::mpsc::Receiver<()>,
+	pub rx: tokio::sync::mpsc::Receiver<()>,
 	pub state: Option<EstateState>,
 	pub state_path: PathBuf,
 	pub tasks: HashMap<TaskId, Task>,
 }
 impl TaskManager {
 	pub fn create(&mut self, kind: TaskKind) -> TaskId {
-		let id = Uuid::now_v7();
+		let id = Uuid::new_v4();
 
 		let task = Task {
 			id,
@@ -129,44 +129,44 @@ pub struct TaskContext {
 	pub spawned_tasks: Vec<AgentTask>,
 }
 impl TaskResult {
-	// 	pub fn completed_chat(task_id: String, ctx: AgentContext, chat: String) -> Self {
-	// 		Self {
-	// 			artifacts: ctx.artifacts,
-	// 			chat: Some(chat),
-	// 			logs: ctx.logs,
-	// 			spawned_tasks: ctx.spawned_tasks,
-	// 			status: TaskStatus::Completed,
-	// 			summary: None,
-	// 			task_id,
-	// 		}
-	// 	}
-	// 	pub fn completed_with_summary(task_id: String, ctx: AgentContext, summary: String) -> Self {
-	// 		Self {
-	// 			task_id,
-	// 			status: TaskStatus::Completed,
-	// 			summary: Some(summary),
-	// 			artifacts: ctx.artifacts,
-	// 			logs: ctx.logs,
-	// 			spawned_tasks: ctx.spawned_tasks,
-	// 			chat: None,
-	// 		}
-	// 	}
-	// 	pub fn failed(
-	// 		task_id: String,
-	// 		// ctx: AgentContext,
-	// 		reason: impl Into<String>,
-	// 		summary: Option<String>,
-	// 	) -> Self {
-	// 		Self {
-	// 			task_id,
-	// 			status: TaskStatus::Failed(reason.into()),
-	// 			summary,
-	// 			artifacts: ctx.artifacts,
-	// 			logs: ctx.logs,
-	// 			spawned_tasks: ctx.spawned_tasks,
-	// 			chat: None,
-	// 		}
-	// 	}
+	pub fn completed_chat(task_id: String, ctx: AgentContext, chat: String) -> Self {
+		Self {
+			artifacts: ctx.artifacts,
+			chat: Some(chat),
+			logs: ctx.logs,
+			spawned_tasks: ctx.spawned_tasks,
+			status: TaskStatus::Completed,
+			summary: None,
+			task_id,
+		}
+	}
+	pub fn completed_with_summary(task_id: String, ctx: AgentContext, summary: String) -> Self {
+		Self {
+			task_id,
+			status: TaskStatus::Completed,
+			summary: Some(summary),
+			artifacts: ctx.artifacts,
+			logs: ctx.logs,
+			spawned_tasks: ctx.spawned_tasks,
+			chat: None,
+		}
+	}
+	pub fn failed(
+		task_id: String,
+		ctx: AgentContext,
+		reason: impl Into<String>,
+		summary: Option<String>,
+	) -> Self {
+		Self {
+			task_id,
+			status: TaskStatus::Failed(reason.into()),
+			summary,
+			artifacts: ctx.artifacts,
+			logs: ctx.logs,
+			spawned_tasks: ctx.spawned_tasks,
+			chat: None,
+		}
+	}
 }
 
 #[derive(Debug, Clone)]
@@ -211,4 +211,31 @@ impl JobStatus {
 			Self::Running => "●",
 		}
 	}
+}
+
+#[derive(Debug, Clone, Deserialize, Hash, Serialize)]
+pub enum TaskKind {
+	BuildEstatePrototype,
+	GenerateView(String),
+	RebuildIndex,
+	SyncBookmarks,
+}
+impl TaskKind {
+	pub fn name(&self) -> String {
+		match self {
+			TaskKind::RebuildIndex => "Rebuild Index".into(),
+			TaskKind::GenerateView(name) => {
+				format!("Generate View: {name}")
+			}
+			TaskKind::SyncBookmarks => "Sync Bookmarks".into(),
+			TaskKind::BuildEstatePrototype => "Build Estate Prototype".into(),
+		}
+	}
+}
+#[derive(Debug, Clone, Deserialize, Hash, Serialize)]
+pub enum TaskRequest {
+	Create(TaskKind),
+	Run(TaskId),
+	Stop(TaskId),
+	Delete(TaskId),
 }

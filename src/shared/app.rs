@@ -345,7 +345,7 @@ pub struct App {
 // 		target = "estate::discovery",
 // 		name = "scan_workspace",
 // 		skip(self),
-// 		fields(flow_id = %Uuid::now_v7())
+// 		fields(flow_id = %Uuid::new_v4())
 // 	)]
 // 	async fn _scan_workspace(&mut self, path: &Path) -> anyhow::Result<()> {
 // 		tracing::info!("starting workspace scan");

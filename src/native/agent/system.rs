@@ -1,6 +1,6 @@
 use crate::{
+	native::agent::{AgentBus, AgentEvent, AgentRegistry, AgentRuntime, RuntimeEvent},
 	prelude::*,
-	shared::agent::{AgentBus, AgentEvent, AgentRegistry, AgentRuntime, RuntimeEvent},
 };
 use tokio::sync::mpsc::{UnboundedReceiver, unbounded_channel};
 

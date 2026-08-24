@@ -1,4 +1,4 @@
-use crate::{prelude::*, shared::daemon::projection::command};
+use crate::{native::daemon::projection::command, prelude::*};
 use cli;
 /// # Estate Engine CLI
 ///
@@ -131,7 +131,6 @@ pub async fn execute(
 		Command::Status => StatusDaemon.run(&ctx).await,
 		Command::Bookmark => command::ViewList.run(&ctx).await,
 		Command::Bookmarks => command::ViewList.run(&ctx).await,
-		Command::Reload => reload::ReloadDaemon.run(&ctx).await,
 		Command::Explain => command::Explain.run(&ctx).await,
 		Command::ExplainDoc => command::ExplainDoc.run(&ctx).await,
 		Command::View { name } => (command::View { name }).run(&ctx).await,

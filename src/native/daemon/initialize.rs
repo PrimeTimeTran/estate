@@ -1,6 +1,6 @@
 use std::{fs, io::Result};
 
-use crate::{prelude::*, shared::daemon::resolver::engine_data_dir};
+use crate::{native::daemon::resolver::engine_data_dir, prelude::*};
 
 pub fn init() -> Result<()> {
 	let root = engine_data_dir()?;

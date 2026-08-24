@@ -1,4 +1,4 @@
-use crate::shared::agent::FileInfo;
+use crate::native::agent::FileInfo;
 
 #[derive(Debug, Default, Clone)]
 pub struct WorkspaceContext {

@@ -363,7 +363,7 @@ pub struct Node {
 // 		let now = Utc::now();
 
 // 		Self {
-// 			id: Uuid::now_v7(),
+// 			id: Uuid::new_v4(),
 // 			kind,
 // 			name,
 // 			description,

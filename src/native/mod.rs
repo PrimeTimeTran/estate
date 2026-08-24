@@ -1,19 +1,27 @@
 #[cfg(target_os = "linux")]
-mod linux;
+pub mod linux;
 
 #[cfg(target_os = "windows")]
-mod windows;
+pub mod windows;
 
 #[cfg(target_os = "macos")]
-mod macos;
+pub mod macos;
 
+pub mod agent;
 pub mod app;
+pub mod backend;
 pub mod constants;
+pub mod daemon;
+pub mod job;
+pub mod linux;
+pub mod poc;
 pub mod prelude;
 pub mod router;
+pub mod state;
 pub mod ui;
 pub mod ve;
 pub mod window;
+pub mod windows;
 
 pub use tokio::{
 	io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},

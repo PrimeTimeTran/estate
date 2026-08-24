@@ -84,15 +84,18 @@
 //! API where possible.
 // pub mod bootstrap;
 // pub mod daemon;
+pub mod daemon;
 pub mod daemon_config;
-// pub mod event;
+pub mod event;
 pub mod initialize;
 pub mod lint;
+pub mod projection;
 pub mod resolver;
-// pub mod shell;
+pub mod shell;
 
-// pub use daemon::*;
-// pub use event::*;
+pub use daemon::*;
+pub use event::*;
 pub use lint::*;
+pub use projection::*;
 pub use resolver::*;
-// pub use shell::*;
+pub use shell::*;
