@@ -38,7 +38,7 @@ pub use std::{
 	iter::Map,
 	path::*,
 	sync::{
-		Arc, Mutex,
+		Arc, Mutex, RwLock,
 		atomic::{AtomicBool, AtomicU64, Ordering},
 	},
 	thread,

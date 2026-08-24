@@ -1,11 +1,22 @@
 use crate::prelude::*;
 
-use core_graphics::display::CGDisplay;
+use core_foundation::{
+	base::{CFAllocatorRef, TCFType, kCFAllocatorDefault},
+	mach_port::{CFMachPort, CFMachPortRef},
+	runloop::{CFRunLoop, CFRunLoopSource, CFRunLoopSourceRef, kCFRunLoopCommonModes},
+};
+use core_graphics::{
+	display::CGDisplay,
+	event::{
+		self, CGEvent, CGEventField, CGEventTap, CGEventTapLocation, CGEventTapOptions,
+		CGEventTapPlacement, CGEventTapProxy, CGEventType, CallbackResult, ScrollEventUnit, *,
+	},
+	event_source::{CGEventSource, CGEventSourceRef, CGEventSourceStateID},
+};
 use egui::Ui;
-use egui_plot::{Bar, BarChart, Plot};
-use egui_plot::{Line, Points};
+use egui_plot::{Bar, BarChart, Line, Plot, Points};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
-use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 use winit::event_loop::EventLoopProxy;
 /// A trait implemented by types which agree to its contract.
 ///
@@ -901,19 +912,6 @@ pub struct TrackpadState {
 	pub shift_held: bool,
 	pub mouse_pos: Option<egui::Pos2>,
 }
-use core_foundation::{
-	base::{CFAllocatorRef, TCFType, kCFAllocatorDefault},
-	mach_port::{CFMachPort, CFMachPortRef},
-	runloop::{CFRunLoop, CFRunLoopSource, CFRunLoopSourceRef, kCFRunLoopCommonModes},
-};
-use core_graphics::{
-	event::{
-		self, CGEvent, CGEventField, CGEventTap, CGEventTapLocation, CGEventTapOptions,
-		CGEventTapPlacement, CGEventTapProxy, CGEventType, CallbackResult, ScrollEventUnit, *,
-	},
-	event_source::{CGEventSource, CGEventSourceRef, CGEventSourceStateID},
-};
-use std::sync::atomic::{AtomicBool, Ordering};
 
 fn target_position(location: CGPoint, target: ScreenPosition) -> CGPoint {
 	let bounds = CGDisplay::main().bounds();
@@ -954,7 +952,7 @@ use global_hotkey::{
 	GlobalHotKeyEvent, GlobalHotKeyManager,
 	hotkey::{Code, HotKey, Modifiers},
 };
-use std::time::{Duration, Instant};
+
 impl TaskManager {
 	pub fn new() -> Self {
 		Self::from_path("/Users/future/Library/Application Support/estate/state.json")
@@ -1465,41 +1463,6 @@ fn small_metric(ui: &mut Ui, label: &str, value: u64, color: egui::Color32) {
 		);
 	});
 }
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum JobStatus {
-	Pending,
-	Running,
-	Completed,
-	Failed,
-	Cancelled,
-}
-struct Job {
-	id: u64,
-	name: String,
-	status: JobStatus,
-	started_at: Option<Instant>,
-	progress: Option<f32>,
-}
-impl JobStatus {
-	fn label(self) -> &'static str {
-		match self {
-			Self::Pending => "Pending",
-			Self::Running => "Running",
-			Self::Completed => "Completed",
-			Self::Failed => "Failed",
-			Self::Cancelled => "Cancelled",
-		}
-	}
-	fn icon(self) -> &'static str {
-		match self {
-			Self::Pending => "○",
-			Self::Running => "●",
-			Self::Completed => "✓",
-			Self::Failed => "✗",
-			Self::Cancelled => "⊘",
-		}
-	}
-}
 fn format_duration(duration: Duration) -> String {
 	let secs = duration.as_secs();
 	if secs < 60 {
@@ -1510,21 +1473,7 @@ fn format_duration(duration: Duration) -> String {
 		format!("{}h {}m", secs / 3600, (secs % 3600) / 60)
 	}
 }
-pub mod palette {
-	use egui::Color32;
-	pub const BG: Color32 = Color32::from_rgb(18, 20, 24);
-	pub const SURFACE: Color32 = Color32::from_rgb(27, 30, 36);
-	pub const SURFACE_HOVER: Color32 = Color32::from_rgb(34, 38, 46);
-	pub const BORDER: Color32 = Color32::from_rgb(52, 57, 68);
-	pub const TEXT: Color32 = Color32::from_rgb(232, 235, 240);
-	pub const TEXT_MUTED: Color32 = Color32::from_rgb(145, 152, 165);
-	pub const PRIMARY: Color32 = Color32::from_rgb(100, 160, 255);
-	pub const SUCCESS: Color32 = Color32::from_rgb(82, 190, 125);
-	pub const WARNING: Color32 = Color32::from_rgb(235, 180, 70);
-	pub const DANGER: Color32 = Color32::from_rgb(230, 90, 95);
-	pub const GRID: Color32 = Color32::from_rgb(45, 49, 58);
-}
-pub static REDIRECTING_SCROLL: AtomicBool = AtomicBool::new(false);
+
 #[derive(Debug, Clone, Copy)]
 pub struct ScrollRedirectState {
 	pub active: bool,
@@ -1532,7 +1481,6 @@ pub struct ScrollRedirectState {
 	pub original_position: CGPoint,
 	pub target_position: CGPoint,
 }
-
 pub fn scroll_state() -> &'static Mutex<ScrollRedirectState> {
 	SCROLL_STATE.get_or_init(|| {
 		Mutex::new(ScrollRedirectState {
@@ -1543,7 +1491,6 @@ pub fn scroll_state() -> &'static Mutex<ScrollRedirectState> {
 		})
 	})
 }
-
 pub fn spawn_global_cursor_daemon(proxy: EventLoopProxy<AppEvent>) {
 	std::thread::spawn(move || {
 		let trusted = macos_accessibility_client::accessibility::application_is_trusted_with_prompt();
@@ -1703,19 +1650,4 @@ pub fn spawn_global_cursor_daemon(proxy: EventLoopProxy<AppEvent>) {
 			CFRunLoop::run_current();
 		}
 	});
-}
-
-pub struct ScrollDaemon {
-	pub running: Arc<AtomicBool>,
-	pub handle: Option<std::thread::JoinHandle<()>>,
-}
-
-impl ScrollDaemon {
-	pub fn shutdown(self) {
-		self.running.store(false, Ordering::Relaxed);
-
-		if let Some(handle) = self.handle {
-			let _ = handle.join();
-		}
-	}
 }

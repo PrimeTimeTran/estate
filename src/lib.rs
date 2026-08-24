@@ -89,7 +89,7 @@
 //! - **Frontend independence** — the CLI, daemon, LSP, and IDE integrations
 //!   should operate on the same underlying engine and domain abstractions.
 
-// #![allow(warnings)]
+#![allow(warnings)]
 
 mod _shared;
 pub mod agent;

@@ -1,5 +1,4 @@
 use crate::prelude::{daemon::daemon::*, *};
-use std::sync::{Arc, RwLock};
 // Events = facts that happened
 // Handlers = reactions to facts
 // Tasks = units of work
@@ -85,9 +84,9 @@ impl Event {
 		tracing::info!("new Event {:?}", source);
 		Self {
 			id: EVENT_ID.fetch_add(1, Ordering::Relaxed),
-			timestamp: now(),
-			source,
 			kind,
+			source,
+			timestamp: now(),
 		}
 	}
 	pub fn daemon(kind: EventKind) -> Self {
@@ -295,10 +294,6 @@ impl EventHandler for FileWatcherHandler {
 			tracing::info!("📡 FileWatcherHandler handle {:?} ({:?})", event, inode);
 			runtime.emit(Event::daemon(EventKind::IndexUpdated { files_changed: 1 }));
 		}
-		// if let EventKind::FileModified { inode: Inode, path: String } = &event.kind {
-		// 	println!("reindexing {:?}", path.clone());
-		// 	runtime.emit(Event::daemon(EventKind::IndexUpdated { files_changed: 1 }));
-		// }
 	}
 }
 pub struct TaskHandler;
@@ -306,7 +301,6 @@ pub struct TaskHandler;
 impl EventHandler for TaskHandler {
 	async fn handle(&self, event: &Event, runtime: &EstateRuntime) {
 		tracing::info!("📡 EventHandler.handle {:?}", event);
-		// tracing::info!("📡 EventHandler.handle {:?} ({:?})", event, runtime);
 		let EventKind::TaskRequested { request } = &event.kind else {
 			return;
 		};
@@ -350,7 +344,6 @@ impl EventHandler for TaskHandler {
 			match TaskRunner::execute(task.clone()).await {
 				Ok(()) => {
 					tracing::info!("TaskHandler match TaskRunner::execute {:?}", task);
-					// tracing::info!("📡 TaskHandler handle {:?}", event);
 					runtime.emit(Event::daemon(EventKind::TaskCompleted { task_id }));
 				}
 				Err(error) => {
@@ -404,7 +397,6 @@ impl EventHandler for CommandHandler {
 		tracing::info!("CommandHandler handler {:?}", event);
 		let EventKind::CommandExecuted { command } = &event.kind else {
 			tracing::info!("CommandHandler handle {:?}", event);
-			// println!("EventKind::CommandExecuted {:?}", event);
 			return;
 		};
 		match command.as_str() {
@@ -504,9 +496,6 @@ impl TaskRunner {
 	pub async fn execute(task: Task) -> anyhow::Result<()> {
 		tracing::info!("TaskRunner execute {:?}", task);
 		match task.kind {
-			// TaskKind::RebuildIndex => {
-			// 	todo!("TaskKind::RebuildIndex")
-			// }
 			TaskKind::RebuildIndex => {
 				println!("🔨 rebuilding index");
 				tokio::time::sleep(std::time::Duration::from_secs(2)).await;
@@ -540,4 +529,3 @@ fn now() -> u64 {
 		.unwrap()
 		.as_secs()
 }
-static EVENT_ID: AtomicU64 = AtomicU64::new(1);

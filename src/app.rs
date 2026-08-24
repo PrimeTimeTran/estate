@@ -90,18 +90,29 @@ impl App {
 		tracing::info!(">>> App::start_runtime returning");
 		Ok(())
 	}
-	fn spawn_signal_handler(&mut self, proxy: EventLoopProxy<AppEvent>) {
+	fn spawn_clock(&mut self, proxy: EventLoopProxy<AppEvent>) {
+		let running = Arc::clone(&self.clock_running);
 		std::thread::spawn(move || {
-			tracing::info!("SIGNAL: thread started");
-			let mut signals = Signals::new([SIGINT]).expect("failed to register SIGINT");
-			tracing::info!("SIGNAL: waiting");
-			if signals.forever().next().is_some() {
-				tracing::info!("SIGNAL: received");
-				let _ = proxy.send_event(AppEvent::Shutdown);
-				tracing::info!("SIGNAL: event sent");
+			let mut current_time = 30;
+			while running.load(Ordering::Relaxed) {
+				let text = format!(" {}s", current_time);
+				let _ = proxy.send_event(AppEvent::TickClock(text));
+				if current_time == 0 {
+					current_time = 30;
+				} else {
+					current_time -= 1;
+				}
+				std::thread::sleep(std::time::Duration::from_secs(1));
 			}
-			tracing::info!("SIGNAL: thread exiting");
+			tracing::info!("clock thread exiting");
 		});
+	}
+	fn spawn_cursor_daemon(&mut self, proxy: EventLoopProxy<AppEvent>) {
+		spawn_global_cursor_daemon(proxy)
+	}
+	fn spawn_global_hotkey_daemon(&mut self) -> anyhow::Result<()> {
+		self.hotkey_manager.start();
+		Ok(())
 	}
 	fn spawn_daemon(&mut self) {
 		let mut rx = self
@@ -146,30 +157,20 @@ impl App {
 			});
 		});
 	}
-	fn spawn_clock(&mut self, proxy: EventLoopProxy<AppEvent>) {
-		let running = Arc::clone(&self.clock_running);
+	fn spawn_signal_handler(&mut self, proxy: EventLoopProxy<AppEvent>) {
 		std::thread::spawn(move || {
-			let mut current_time = 30;
-			while running.load(Ordering::Relaxed) {
-				let text = format!(" {}s", current_time);
-				let _ = proxy.send_event(AppEvent::TickClock(text));
-				if current_time == 0 {
-					current_time = 30;
-				} else {
-					current_time -= 1;
-				}
-				std::thread::sleep(std::time::Duration::from_secs(1));
+			tracing::info!("SIGNAL: thread started");
+			let mut signals = Signals::new([SIGINT]).expect("failed to register SIGINT");
+			tracing::info!("SIGNAL: waiting");
+			if signals.forever().next().is_some() {
+				tracing::info!("SIGNAL: received");
+				let _ = proxy.send_event(AppEvent::Shutdown);
+				tracing::info!("SIGNAL: event sent");
 			}
-			tracing::info!("clock thread exiting");
+			tracing::info!("SIGNAL: thread exiting");
 		});
 	}
-	fn spawn_global_hotkey_daemon(&mut self) -> anyhow::Result<()> {
-		self.hotkey_manager.start();
-		Ok(())
-	}
-	fn spawn_cursor_daemon(&mut self, proxy: EventLoopProxy<AppEvent>) {
-		spawn_global_cursor_daemon(proxy)
-	}
+
 	fn shutdown_runtime(&mut self) {
 		tracing::info!(">>> shutting down runtime");
 		self.clock_running.store(false, Ordering::Relaxed);

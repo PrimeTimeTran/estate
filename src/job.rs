@@ -178,3 +178,39 @@ pub enum Artifact {
 	Observation(String),
 	ToolOutput(String),
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum JobStatus {
+	Pending,
+	Running,
+	Completed,
+	Failed,
+	Cancelled,
+}
+pub struct Job {
+	pub id: u64,
+	pub name: String,
+	pub status: JobStatus,
+	pub started_at: Option<Instant>,
+	pub progress: Option<f32>,
+}
+impl JobStatus {
+	pub fn label(self) -> &'static str {
+		match self {
+			Self::Pending => "Pending",
+			Self::Running => "Running",
+			Self::Completed => "Completed",
+			Self::Failed => "Failed",
+			Self::Cancelled => "Cancelled",
+		}
+	}
+	pub fn icon(self) -> &'static str {
+		match self {
+			Self::Pending => "○",
+			Self::Running => "●",
+			Self::Completed => "✓",
+			Self::Failed => "✗",
+			Self::Cancelled => "⊘",
+		}
+	}
+}
