@@ -82,7 +82,6 @@ pub struct Event {
 }
 impl Event {
 	pub fn new(source: EventSource, kind: EventKind) -> Self {
-		// println!("new Event {:?}", source);
 		tracing::info!("new Event {:?}", source);
 		Self {
 			id: EVENT_ID.fetch_add(1, Ordering::Relaxed),
@@ -175,6 +174,11 @@ impl EstateRuntime {
 	pub fn emit(&self, event: Event) {
 		self.events.emit(event);
 	}
+	pub fn event_processed(&self) {
+		let mut state = self.state.write().unwrap();
+		state.events_processed += 1;
+	}
+	// pub fn increment_events_processed() {}
 	pub fn start_dispatcher(self: &Arc<Self>) {
 		// println!("🔥 start_dispatcher()");
 		let runtime = Arc::clone(self);
@@ -280,6 +284,7 @@ impl EventDispatcher {
 		for handler in &self.handlers {
 			handler.handle(&event, runtime).await;
 		}
+		runtime.event_processed();
 	}
 }
 pub struct FileWatcherHandler;
@@ -367,6 +372,7 @@ impl EventHandler for StateHandler {
 		match &event.kind {
 			EventKind::DaemonStarted => {
 				state.starts += 1;
+				state.status_checks += 1;
 				state.started_at = event.timestamp;
 			}
 			EventKind::StatusRequested => {
@@ -381,14 +387,13 @@ impl EventHandler for StateHandler {
 			EventKind::TaskCreated { .. } => {
 				state.tasks_created += 1;
 			}
-			// EventKind::CommandExecuted { .. } => {
-			// 	state.tasks_created += 1;
-			// }
-			// EventKind::CommandExecuted { .. } => {
-			// 	state.tasks_created += 1;
-			// }
+			EventKind::DaemonStopped => {
+				let run_duration = event.timestamp.saturating_sub(state.started_at);
+				state.longest_run = state.longest_run.max(run_duration);
+			}
 			_ => {}
 		}
+		state.events_processed += 1;
 		EstateState::save(&state);
 	}
 }

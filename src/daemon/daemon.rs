@@ -48,7 +48,7 @@ pub trait EstateDaemon {
 pub struct Daemon {
 	runtime: Arc<EstateRuntime>,
 	pub dispatcher: EventDispatcher,
-	shutdown: CancellationToken,
+	pub shutdown_token: CancellationToken,
 }
 impl Daemon {
 	pub fn new(engine: EstateEngine) -> Self {
@@ -57,43 +57,11 @@ impl Daemon {
 		Self {
 			runtime,
 			dispatcher,
-			shutdown: CancellationToken::new(),
+			shutdown_token: CancellationToken::new(),
 		}
 	}
 }
 impl Daemon {
-	pub async fn run_foreground(&mut self) -> anyhow::Result<()> {
-		tracing::info!("daemon running in foreground");
-		let mut rx = self.runtime.events.subscribe();
-		self.runtime.emit(Event::daemon(EventKind::DaemonStarted));
-		loop {
-			tokio::select! {
-				event = rx.recv() => {
-					match event {
-						Ok(event) => {
-							self.dispatcher
-								.dispatch(event, &self.runtime)
-								.await;
-						}
-						Err(broadcast::error::RecvError::Closed) => {
-							break;
-						}
-						Err(broadcast::error::RecvError::Lagged(count)) => {
-							tracing::warn!(
-								count,
-								"event dispatcher lagged behind"
-							);
-						}
-					}
-				}
-				_ = self.shutdown.cancelled() => {
-					break;
-				}
-			}
-		}
-		tracing::info!("daemon stopped");
-		Ok(())
-	}
 	///--------------------------------------------------------------------------------
 	/// Long lived runner ready todo something
 	/// cargo run daemon
@@ -116,6 +84,19 @@ impl Daemon {
 			message: Some(format!("Daemon started with PID {}", pid)),
 			..Default::default()
 		})
+	}
+	pub async fn run_foreground(&mut self) -> anyhow::Result<()> {
+		tracing::info!("daemon running in foreground");
+
+		self.runtime.emit(Event::daemon(EventKind::DaemonStarted));
+
+		self.shutdown_token.cancelled().await;
+
+		tracing::info!("daemon stopped");
+
+		self.runtime.emit(Event::daemon(EventKind::DaemonStopped));
+
+		Ok(())
 	}
 }
 
@@ -143,12 +124,8 @@ impl EstateDaemon for Daemon {
 		Ok(DaemonResponse::default())
 	}
 	async fn shutdown(&mut self) -> Result<DaemonResponse> {
-		tracing::info!(
-			target: "estate::daemon",
-			"shutdown requested"
-		);
-		self.runtime.emit(Event::daemon(EventKind::DaemonStopped));
-		self.shutdown.cancel();
+		tracing::info!("shutdown requested");
+		self.shutdown_token.cancel();
 		Ok(DaemonResponse::default())
 	}
 }
@@ -327,17 +304,7 @@ struct IncomingRequest {
 	column: Option<u32>,
 	mode: Option<String>,
 }
-// #[derive(Debug, serde::Deserialize)]
-// pub struct SocketPayload {
-// 	pub path: PathBuf,
-// 	pub subject: Option<AnalyzeSubjectDto>,
-// }
-// #[derive(Debug, serde::Deserialize)]
-// pub struct AnalyzeSubjectDto {
-// 	pub offset: usize,
-// 	pub identifier: Option<String>,
-// }
-// pub struct DaemonError {}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub enum ActionRequest {
 	Analyze {

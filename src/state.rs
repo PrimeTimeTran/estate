@@ -1,5 +1,4 @@
 pub use crate::prelude::*;
-use cli::prelude::{CliCommand, Context as CliContext, FormatArgs};
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(default)]

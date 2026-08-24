@@ -1,8 +1,5 @@
 use crate::prelude::*;
-use global_hotkey::{
-	GlobalHotKeyEvent, GlobalHotKeyManager,
-	hotkey::{Code, HotKey, Modifiers},
-};
+use crate::state::EstateEngine;
 use signal_hook::{consts::SIGINT, iterator::Signals};
 use tray_icon::{TrayIcon, TrayIconBuilder, menu::MenuEvent};
 use winit::{
@@ -12,12 +9,10 @@ use winit::{
 	platform::macos::{ActivationPolicy, EventLoopBuilderExtMacOS},
 	window::WindowId,
 };
-
-use crate::state::EstateEngine;
-/// Top-level application state.
+///      Top-level application state.
 ///
-/// Owns the system tray integration, application context, Estate engine,
-/// daemon communication channel, and optional development window.
+///      Owns the system tray integration, application context, Estate engine,
+///      daemon communication channel, and optional development window.
 pub struct App {
 	/// The system tray icon owned by the application.
 	tray: Option<TrayIcon>,
@@ -87,12 +82,11 @@ impl App {
 			.with_activation_policy(ActivationPolicy::Accessory)
 			.build()?;
 		let proxy = event_loop.create_proxy();
+		self.spawn_clock(proxy.clone());
 		self.spawn_cursor_daemon(proxy.clone());
 		self.spawn_signal_handler(proxy.clone());
-		self.spawn_clock(proxy.clone());
 		self.spawn_daemon();
 		event_loop.run_app(self)?;
-		tracing::info!(">>> run_app() RETURNED");
 		tracing::info!(">>> App::start_runtime returning");
 		Ok(())
 	}
@@ -119,31 +113,35 @@ impl App {
 			let tokio_runtime = tokio::runtime::Runtime::new().expect("failed to create Tokio runtime");
 			tokio_runtime.block_on(async move {
 				engine.runtime.start_dispatcher();
-				let mut daemon = Daemon::new(engine);
-				tokio::select! {
-						result = daemon.run_foreground() => {
-								if let Err(error) = result {
-										tracing::error!(%error, "daemon exited");
-								}
+				let daemon = Daemon::new(engine);
+				let shutdown_token = daemon.shutdown_token.clone();
+				let daemon_task = tokio::spawn(async move {
+					let mut daemon = daemon;
+					daemon.run_foreground().await
+				});
+				match rx.recv().await {
+					Some(DaemonCommand::Stop) => {
+						tracing::info!("daemon stop requested");
+						shutdown_token.cancel();
+						// Wait for run_foreground() to observe the
+						// cancellation and emit DaemonStopped.
+						match daemon_task.await {
+							Ok(Ok(())) => {
+								tracing::info!("daemon stopped cleanly");
+							}
+							Ok(Err(error)) => {
+								tracing::error!(%error, "daemon exited with error");
+							}
+							Err(error) => {
+								tracing::error!(%error, "daemon task panicked");
+							}
 						}
-						command = rx.recv() => {
-								match command {
-								Some(DaemonCommand::Stop) => {
-									tracing::info!(">>> daemon received Stop command");
-
-									if let Err(error) = daemon.shutdown().await {
-											tracing::error!(
-													%error,
-													"daemon shutdown failed"
-											);
-									}
-								}
-										None => {
-												tracing::info!("daemon command channel closed");
-												let _ = daemon.shutdown().await;
-										}
-								}
-						}
+					}
+					None => {
+						tracing::info!("daemon command channel closed");
+						shutdown_token.cancel();
+						let _ = daemon_task.await;
+					}
 				}
 			});
 		});
@@ -174,15 +172,12 @@ impl App {
 	}
 	fn shutdown_runtime(&mut self) {
 		tracing::info!(">>> shutting down runtime");
-
 		self.clock_running.store(false, Ordering::Relaxed);
 		self.hotkey_manager.shutdown();
-
 		match self.daemon_tx.try_send(DaemonCommand::Stop) {
 			Ok(()) => tracing::info!(">>> daemon stop sent"),
 			Err(error) => tracing::error!(%error, ">>> daemon stop failed"),
 		}
-
 		tracing::info!(">>> runtime shutdown complete");
 	}
 }
