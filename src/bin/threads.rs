@@ -2,26 +2,24 @@
 // https://www.youtube.com/watch?v=rNhfQimiwEs
 // https://www.youtube.com/watch?v=8gNKE5jVqYY
 #![allow(warnings)]
-// 1. Race Conditions
-// Deadlocks
-// Invalid Memory Access
 use std::{
 	sync::{
-		Arc, Barrier, Mutex,
+		Arc, Barrier, Mutex, RwLock,
 		atomic::{AtomicUsize, Ordering},
 	},
 	thread,
 	time::Duration,
 };
 fn main() {
-	// threads_are_async();
-	// demo_loop();
-	// threads_outlive_functions();
-	// move_transfers_ownership();
-	// arc_handles_ownership();
-	// cross_thread_data_needs_mutex();
-	mutex_race_depends_on_scheduling();
-	mutex_race_is_deterministically_reproduced();
+	threads_are_async();
+	demo_loop();
+	threads_have_non_deterministic_lifetimes();
+	move_transfers_ownership();
+	arc_handles_ownership();
+	arc_shares_ownership_across_threads();
+	arc_mutex_allows_shared_mutation();
+	mutex_does_not_make_separate_operations_atomic();
+	rw_lock_serializes_mutable_access();
 	println!("{:?} Main Thread done", thread::current().id());
 }
 fn threads_are_async() {
@@ -52,7 +50,7 @@ fn demo_loop() {
 	t3.join().unwrap();
 	println!("{:?} Spawned thread '3' done", thread::current().id());
 }
-fn threads_outlive_functions() {
+fn threads_have_non_deterministic_lifetimes() {
 	// "Closure may outlive the current function"
 	// The solution is to transfer ownership of any data it takes with the move
 	let s = "hello";
@@ -138,7 +136,7 @@ fn arc_handles_ownership() {
 	t5.join().unwrap();
 	t6.join().unwrap();
 }
-fn cross_thread_data_needs_mutex() {
+fn arc_shares_ownership_across_threads() {
 	// Arc gives multiple threads shared ownership of the same data,
 	// but Arc alone does NOT allow us to mutate the wrapped value.
 	//
@@ -163,86 +161,116 @@ fn cross_thread_data_needs_mutex() {
 	let c2 = Arc::clone(&counter);
 	let t1 = thread::spawn(move || {
 		println!("thread 1: {}", c1);
-		// c1 += 1; // ❌
+		// cannot assign to data in an `Arc`
+		// trait `DerefMut` is required to modify through a dereference, but it is not implemented for `Arc<i32>`
+		// *c1 += 1;
+		// binary assignment operation += cannot be applied to type Arc<{integer}> (rustc E0368)
+		// c1 += 1;
 	});
 	let t2 = thread::spawn(move || {
 		println!("thread 2: {}", c2);
-		// c2 += 100; // ❌
+		// cannot assign to data in an `Arc`
+		// trait `DerefMut` is required to modify through a dereference, but it is not implemented for `Arc<i32>`
+		// *c1 += 100;
+		// binary assignment operation += cannot be applied to type Arc<{integer}> (rustc E0368)
+		// c1 += 100;
 	});
 	t1.join().unwrap();
 	t2.join().unwrap();
 }
-fn mutex_race_depends_on_scheduling() {
-	// Arc<T>
-	//     ↓
-	// "I want multiple threads to own/read the same T"
-	// let counter = Arc::new(0);
-	// Arc<Mutex<T>>
-	//     ↓
-	// "I want multiple threads to safely mutate the same T"
+fn arc_mutex_allows_shared_mutation() {
 	let counter = Arc::new(Mutex::new(0));
-	//             Arc
-	//              │
-	//              ▼
-	//        ┌─────────────┐
-	//        │ Mutex<i32>  │
-	//        │      0      │
-	//        └─────────────┘
-	//          ▲         ▲
-	//          │         │
-	//         c1         c2
-	//       thread 1   thread 2
+
 	let c1 = Arc::clone(&counter);
 	let c2 = Arc::clone(&counter);
+
 	let t1 = thread::spawn(move || {
-		// The Mutex protects each individual read/write,
-		// but NOT the entire read → modify → write operation.
-		let current = *c1.lock().unwrap(); // LOCK → READ → UNLOCK
-		// Give the other thread a chance to run after we've
-		// read the value but before we've written it.
-		thread::sleep(Duration::from_millis(10));
-		*c1.lock().unwrap() = current + 1; // LOCK → WRITE → UNLOCK
+		*c1.lock().unwrap() += 1;
 	});
+
 	let t2 = thread::spawn(move || {
-		let current = *c2.lock().unwrap(); // LOCK → READ → UNLOCK
-		thread::sleep(Duration::from_millis(10));
-		*c2.lock().unwrap() = current + 100; // LOCK → WRITE → UNLOCK
+		*c2.lock().unwrap() += 100;
 	});
+
 	t1.join().unwrap();
 	t2.join().unwrap();
-	println!("mutex_race_depends_on_scheduling");
+
+	println!("arc_mutex_allows_shared_mutation");
 	println!("counter = {}", *counter.lock().unwrap());
 }
-
-fn mutex_race_is_deterministically_reproduced() {
+fn mutex_does_not_make_separate_operations_atomic() {
+	// The Mutex protects each individual access,
+	// but the read → modify → write sequence is split
+	// across two separate lock acquisitions.
 	let counter = Arc::new(Mutex::new(0));
-	// Force both threads to finish their READ before either
-	// thread is allowed to perform its WRITE.
+	// Force both threads to complete their reads before
+	// either thread is allowed to perform its write.
 	//
-	// This makes the race deterministic instead of relying
-	// on the OS scheduler to happen to interleave the threads.
-	let barrier = Arc::new(Barrier::new(2));
+	// This guarantees both threads operate on the same
+	// stale value, making the lost update deterministic.
+	let barrier = Arc::new(Barrier::new(3)); // Create a barrier that requires 3 threads to arrive before either one is allowed to continue.
 	let c1 = Arc::clone(&counter);
 	let c2 = Arc::clone(&counter);
+	let c3 = Arc::clone(&counter);
 	let b1 = Arc::clone(&barrier);
 	let b2 = Arc::clone(&barrier);
+	let b3 = Arc::clone(&barrier);
 
 	let t1 = thread::spawn(move || {
 		let current = *c1.lock().unwrap(); // LOCK → READ → UNLOCK
-		// Wait until thread 2 has also read the counter.
-		b1.wait();
+		b1.wait(); // "Don't let either thread continue until both threads have finished this phase."
 		// Both threads now have the same stale value.
-		*c1.lock().unwrap() = current + 1; // LOCK → WRITE → UNLOCK
+		*c1.lock().unwrap() = current + 1
 	});
 	let t2 = thread::spawn(move || {
 		let current = *c2.lock().unwrap(); // LOCK → READ → UNLOCK
-		// Wait until thread 1 has also read the counter.
 		b2.wait(); // "Don't let either thread continue until both threads have finished this phase."
 		// Both threads now have the same stale value.
-		*c2.lock().unwrap() = current + 100; // LOCK → WRITE → UNLOCK
+		*c2.lock().unwrap() = current + 100
+	});
+	let t3 = thread::spawn(move || {
+		let current = *c3.lock().unwrap(); // LOCK → READ → UNLOCK
+		b3.wait(); // "Don't let either thread continue until both threads have finished this phase."
+		// Both threads now have the same stale value.
+		*c3.lock().unwrap() = current + 1000
 	});
 	t1.join().unwrap();
 	t2.join().unwrap();
-	println!("mutex_race_is_deterministically_reproduced");
+	t3.join().unwrap();
+	println!("mutex_does_not_make_separate_operations_atomic");
 	println!("counter = {}", *counter.lock().unwrap());
+	// Arc<Mutex<i32>>
+	//      │
+	//      └── coordinates ACCESS TO DATA
+	// Arc<Barrier>
+	//      │
+	//      └── coordinates PROGRESS OF THREADS
+}
+
+fn rw_lock_serializes_mutable_access() {
+	// RwLock makes the entire mutable access through a write guard exclusive, so concurrent writers cannot operate on stale copies of the protected value.
+	let counter = Arc::new(RwLock::new(0));
+	let c1 = Arc::clone(&counter);
+	let c2 = Arc::clone(&counter);
+	let c3 = Arc::clone(&counter);
+	let t1 = thread::spawn(move || {
+		let mut num = c1.write().unwrap();
+		thread::sleep(Duration::from_millis(10));
+		*num += 1;
+	});
+	let t2 = thread::spawn(move || {
+		let mut num = c2.write().unwrap();
+		thread::sleep(Duration::from_millis(10));
+		*num += 100;
+	});
+	let t3 = thread::spawn(move || {
+		let mut num = c3.write().unwrap();
+		thread::sleep(Duration::from_millis(100));
+		*num += 1000;
+	});
+	t1.join().unwrap();
+	t2.join().unwrap();
+	t3.join().unwrap();
+	println!("rw_lock_serializes_mutable_access");
+	println!("counter = {}", *counter.read().unwrap());
 }

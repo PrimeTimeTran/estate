@@ -2,6 +2,7 @@
 name = "estate"
 version = "0.1.0"
 edition = "2024"
+description="Estate"
 
 [package.metadata.bundle.bin.estate]
 name = "Estate"
