@@ -1,25 +1,48 @@
 use crate::prelude::*;
 use crate::shared::{prelude::*, *};
 
-// use signal_hook::{consts::SIGINT, iterator::Signals};
-// use tray_icon::{TrayIcon, TrayIconBuilder, menu::MenuEvent};
 use winit::{
 	application::ApplicationHandler,
 	event::WindowEvent,
 	event_loop::{ActiveEventLoop, EventLoop, EventLoopProxy},
-	// platform::macos::{ActivationPolicy, EventLoopBuilderExtMacOS},
 	window::WindowId,
 };
 
-pub struct App {
+pub trait Runtime {
+	// event/message operations, etc.
+}
+
+pub struct NativeRuntime {
+	// tokio runtime, channels, daemon communication, etc.
+}
+
+impl Runtime for NativeRuntime {
+	// ...
+}
+
+pub struct WebRuntime {
+	// browser/client-side event system later
+}
+
+impl Runtime for WebRuntime {
+	// ...
+}
+
+pub struct App<R> {
+	engine: EstateEngine<R>,
 	// tray: Option<TrayIcon>,
 	// menu: Option<TrayMenu>,
-	engine: EstateEngine,
+
 	// daemon_tx: mpsc::Sender<DaemonCommand>,
 	// hotkey_manager: GlobalHotkeys,
 	// scroll_tray: Option<TrayIcon>,
 	// pub windows: Vec<AppWindow>,
-	clock_running: Arc<AtomicBool>,
+	// clock_running: Arc<AtomicBool>,
+}
+impl<R> App<R> {
+	pub fn new(engine: EstateEngine<R>) -> Self {
+		Self { engine }
+	}
 }
 // impl App {
 // 	pub fn new() -> anyhow::Result<Self> {

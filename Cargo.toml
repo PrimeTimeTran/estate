@@ -23,14 +23,14 @@ path = "src/main.rs"
 # required-features = ["native"]
 
 [[bin]]
-name = "estate"
-path = "src/bin/web.rs"
+name = "wasm"
+path = "src/bin/wasm.rs"
 required-features = ["wasm"]
 
 # cargo build \
 #   --target wasm32-unknown-unknown \
 #   --manifest-path crates/estate/Cargo.toml \
-#   --bin web \
+#   --bin wasm \
 #   --no-default-features \
 #   --features wasm
 # trunk serve --features=wasm
@@ -121,8 +121,8 @@ macos-accessibility-client = { workspace = true, optional = true }
 #
 # To get IDE diagnostics functioning correctly remove the hardcoded default when troubleshooting another build target.
 #
-default = ["native"]
-# default = []
+# default = ["native"]
+default = []
 wasm = []
 mobile = []
 native = [

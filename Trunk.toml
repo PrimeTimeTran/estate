@@ -1,4 +1,3 @@
-
 [build]
+bin = "wasm"
 target = "index.html"
-bin = "web"

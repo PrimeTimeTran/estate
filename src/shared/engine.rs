@@ -176,13 +176,13 @@ pub enum EstateScope {
 
 /// Estate owns the capabilities and domain model; the daemon exposes those capabilities as a long-lived service.
 #[derive(Clone, Debug)]
-pub struct EstateEngine {
-	pub estate: Estate,              // domain model
-	pub runtime: Arc<EstateRuntime>, // capability
-	pub vfs: EstateVfs,              // infrastructure
-	pub index: EstateIndex,          // infrastructure
-	pub workspace: Workspace,        // domain/context
+pub struct EstateEngine<R> {
+	pub estate: Estate, // domain model
+	pub runtime: R,
 
+	pub vfs: EstateVfs,       // infrastructure
+	pub index: EstateIndex,   // infrastructure
+	pub workspace: Workspace, // domain/context
 	// pub index: OnceCell<EstateIndex>,
 	// pub search: OnceCell<SearchService>,
 	// pub analysis: OnceCell<AnalysisService>,
@@ -194,10 +194,8 @@ pub struct EstateEngine {
 	pub search: SearchService,      // capability
 	pub analysis: AnalysisService,  // capability
 }
-impl EstateEngine {
-	pub fn new() -> anyhow::Result<Self> {
-		let runtime = Arc::new(EstateRuntime::new());
-
+impl<R> EstateEngine<R> {
+	pub fn new(runtime: R) -> anyhow::Result<Self> {
 		Ok(Self {
 			runtime,
 			estate: Estate::default(),
@@ -212,10 +210,6 @@ impl EstateEngine {
 			search: SearchService::default(),
 			analysis: AnalysisService::default(),
 		})
-	}
-	pub async fn format(self, args: &FormatArgs) -> anyhow::Result<String, anyhow::Error> {
-		LintDaemon.run(&args).await;
-		Ok("Success".to_string())
 	}
 }
 

@@ -72,6 +72,7 @@ pub struct LogConfig {
 	// pub window: OutputConfig,
 }
 impl LogConfig {
+	#[cfg(feature = "native")]
 	pub fn apply_cli(&mut self, cli: &cli::context::Cli) -> anyhow::Result<()> {
 		match &cli.command {
 			Some(cli::context::Command::Start { tail }) => {
