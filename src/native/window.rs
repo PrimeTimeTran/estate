@@ -1,23 +1,14 @@
 use crate::prelude::*;
 
-use egui::{Context as EguiContext, TexturesDelta};
-use egui_wgpu::{
-	Renderer,
-	wgpu::{self},
-};
+use egui::{ Context as EguiContext, TexturesDelta };
+use egui_wgpu::{ Renderer, wgpu::{ self } };
 use egui_winit::State as EguiState;
-use global_hotkey::{
-	GlobalHotKeyEvent, GlobalHotKeyManager,
-	hotkey::{Code, HotKey, Modifiers},
-};
-use objc2_app_kit::{NSApplication, NSApplicationActivationPolicy};
+use global_hotkey::{ GlobalHotKeyEvent, GlobalHotKeyManager, hotkey::{ Code, HotKey, Modifiers } };
+use objc2_app_kit::{ NSApplication, NSApplicationActivationPolicy };
 use objc2_foundation::MainThreadMarker;
-use tray_icon::menu::{MenuItem, Submenu};
-use wgpu::{Adapter, Device, SurfaceColorSpace};
-use winit::{
-	dpi::{PhysicalPosition, PhysicalSize},
-	event_loop::ActiveEventLoop,
-};
+use tray_icon::menu::{ MenuItem, Submenu };
+use wgpu::{ Adapter, Device, SurfaceColorSpace };
+use winit::{ dpi::{ PhysicalPosition, PhysicalSize }, event_loop::ActiveEventLoop };
 
 /// Estate UI Container
 ///
@@ -133,7 +124,7 @@ impl Window {
 		let mut ui = egui::Ui::new(
 			self.egui_ctx.clone(),
 			egui::Id::new("window_root"),
-			egui::UiBuilder::new(),
+			egui::UiBuilder::new()
 		);
 		egui::Frame::NONE
 			// .inner_margin(egui::Margin::same(16))
@@ -144,7 +135,7 @@ impl Window {
 	}
 	fn acquire_surface(&mut self) -> anyhow::Result<Option<wgpu::SurfaceTexture>> {
 		match self.surface.get_current_texture() {
-			wgpu::CurrentSurfaceTexture::Success(texture)
+			| wgpu::CurrentSurfaceTexture::Success(texture)
 			| wgpu::CurrentSurfaceTexture::Suboptimal(texture) => Ok(Some(texture)),
 			wgpu::CurrentSurfaceTexture::Occluded => {
 				tracing::warn!("SURFACE OCCLUDED");
@@ -170,7 +161,7 @@ impl Window {
 	fn render_egui(
 		&mut self,
 		surface_texture: wgpu::SurfaceTexture,
-		output: egui::FullOutput,
+		output: egui::FullOutput
 	) -> anyhow::Result<()> {
 		let egui::FullOutput {
 			pixels_per_point,
@@ -181,29 +172,24 @@ impl Window {
 			..
 		} = output;
 		self.pending_textures.append(textures_delta);
-		let view = surface_texture
-			.texture
-			.create_view(&wgpu::TextureViewDescriptor::default());
+		let view = surface_texture.texture.create_view(&wgpu::TextureViewDescriptor::default());
 		let clipped_primitives = self.egui_ctx.tessellate(shapes, pixels_per_point);
 		let screen_descriptor = egui_wgpu::ScreenDescriptor {
-			size_in_pixels: [
-				self.instance.inner_size().width,
-				self.instance.inner_size().height,
-			],
+			size_in_pixels: [self.instance.inner_size().width, self.instance.inner_size().height],
 			pixels_per_point,
 		};
 		self.upload_textures();
-		let mut encoder = self
-			.device
-			.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+		let mut encoder = self.device.create_command_encoder(
+			&(wgpu::CommandEncoderDescriptor {
 				label: Some("egui-render"),
-			});
+			})
+		);
 		self.renderer.update_buffers(
 			&self.device,
 			&self.queue,
 			&mut encoder,
 			&clipped_primitives,
-			&screen_descriptor,
+			&screen_descriptor
 		);
 		self.render_pass(&mut encoder, &view, &clipped_primitives, &screen_descriptor);
 		self.queue.submit(Some(encoder.finish()));
@@ -213,9 +199,7 @@ impl Window {
 	fn upload_textures(&mut self) {
 		for (id, image_deltas) in &self.pending_textures.set {
 			for image_delta in image_deltas {
-				self
-					.renderer
-					.update_texture(&self.device, &self.queue, *id, image_delta);
+				self.renderer.update_texture(&self.device, &self.queue, *id, image_delta);
 			}
 		}
 		self.pending_textures.clear();
@@ -225,63 +209,70 @@ impl Window {
 		encoder: &mut wgpu::CommandEncoder,
 		view: &wgpu::TextureView,
 		primitives: &[egui::ClippedPrimitive],
-		screen_descriptor: &egui_wgpu::ScreenDescriptor,
+		screen_descriptor: &egui_wgpu::ScreenDescriptor
 	) {
-		let render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-			label: Some("egui-render-pass"),
-			color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-				view,
-				depth_slice: None,
-				resolve_target: None,
-				ops: wgpu::Operations {
-					load: wgpu::LoadOp::Clear(wgpu::Color {
-						r: 0.08,
-						g: 0.08,
-						b: 0.08,
-						a: 1.0,
+		let render_pass = encoder.begin_render_pass(
+			&(wgpu::RenderPassDescriptor {
+				label: Some("egui-render-pass"),
+				color_attachments: &[
+					Some(wgpu::RenderPassColorAttachment {
+						view,
+						depth_slice: None,
+						resolve_target: None,
+						ops: wgpu::Operations {
+							load: wgpu::LoadOp::Clear(wgpu::Color {
+								r: 0.08,
+								g: 0.08,
+								b: 0.08,
+								a: 1.0,
+							}),
+							store: wgpu::StoreOp::Store,
+						},
 					}),
-					store: wgpu::StoreOp::Store,
-				},
-			})],
-			depth_stencil_attachment: None,
-			timestamp_writes: None,
-			occlusion_query_set: None,
-			multiview_mask: None,
-		});
+				],
+				depth_stencil_attachment: None,
+				timestamp_writes: None,
+				occlusion_query_set: None,
+				multiview_mask: None,
+			})
+		);
 		let mut render_pass = render_pass.forget_lifetime();
-		self
-			.renderer
-			.render(&mut render_pass, primitives, screen_descriptor);
+		self.renderer.render(&mut render_pass, primitives, screen_descriptor);
 	}
 }
 fn initialize_gpu(
 	instance: &wgpu::Instance,
-	surface: &wgpu::Surface<'_>,
+	surface: &wgpu::Surface<'_>
 ) -> anyhow::Result<(Adapter, Device, wgpu::Queue)> {
-	let adapter = pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
-		apply_limit_buckets: true,
-		power_preference: wgpu::PowerPreference::HighPerformance,
-		compatible_surface: Some(&surface),
-		force_fallback_adapter: false,
-	}))
-	.map_err(|e| anyhow::anyhow!("failed to find suitable GPU adapter: {e}"))?;
-	let (device, queue) = pollster::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
-		experimental_features: wgpu::ExperimentalFeatures::disabled(),
-		label: Some("estate-dev-device"),
-		required_features: wgpu::Features::empty(),
-		required_limits: wgpu::Limits::default(),
-		memory_hints: wgpu::MemoryHints::Performance,
-		trace: wgpu::Trace::Off,
-	}))?;
+	let adapter = pollster
+		::block_on(
+			instance.request_adapter(
+				&(wgpu::RequestAdapterOptions {
+					apply_limit_buckets: true,
+					power_preference: wgpu::PowerPreference::HighPerformance,
+					compatible_surface: Some(&surface),
+					force_fallback_adapter: false,
+				})
+			)
+		)
+		.map_err(|e| anyhow::anyhow!("failed to find suitable GPU adapter: {e}"))?;
+	let (device, queue) = pollster::block_on(
+		adapter.request_device(
+			&(wgpu::DeviceDescriptor {
+				experimental_features: wgpu::ExperimentalFeatures::disabled(),
+				label: Some("estate-dev-device"),
+				required_features: wgpu::Features::empty(),
+				required_limits: wgpu::Limits::default(),
+				memory_hints: wgpu::MemoryHints::Performance,
+				trace: wgpu::Trace::Off,
+			})
+		)
+	)?;
 	Ok((adapter, device, queue))
 }
 fn create_gpu_surface(
-	event_loop: &ActiveEventLoop,
-) -> anyhow::Result<(
-	Arc<winit::window::Window>,
-	wgpu::Instance,
-	wgpu::Surface<'static>,
-)> {
+	event_loop: &ActiveEventLoop
+) -> anyhow::Result<(Arc<winit::window::Window>, wgpu::Instance, wgpu::Surface<'static>)> {
 	let window = build_window(event_loop)?;
 	let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle());
 	let surface = { instance.create_surface(window.clone())? };
@@ -295,7 +286,7 @@ fn build_egui(event_loop: &ActiveEventLoop) -> (EguiContext, EguiState) {
 		event_loop,
 		None,
 		None,
-		None,
+		None
 	);
 	(egui_ctx, egui_state)
 }
@@ -304,21 +295,21 @@ fn build_window(event_loop: &ActiveEventLoop) -> anyhow::Result<Arc<winit::windo
 	let height = 1280;
 	let icon_file = include_bytes!("../../assets/icon.png");
 	let icon = {
-		let image = image::load_from_memory(icon_file)
-			.expect("failed to load icon")
-			.into_rgba8();
+		let image = image::load_from_memory(icon_file).expect("failed to load icon").into_rgba8();
 		let (width, height) = image.dimensions();
 		winit::window::Icon::from_rgba(image.into_raw(), width, height)?
 	};
-	let mut attrs = winit::window::Window::default_attributes()
+	let mut attrs = winit::window::Window
+		::default_attributes()
 		.with_title("Estate Dev")
 		.with_inner_size(PhysicalSize::new(width, height))
 		.with_window_icon(Some(icon));
 	// .with_window_level(WindowLevel::AlwaysOnTop);
 	// Calculate bottom-right screen coordinates if a monitor is available
-	if let Some(monitor) = event_loop
-		.primary_monitor()
-		.or_else(|| event_loop.available_monitors().next())
+	if
+		let Some(monitor) = event_loop
+			.primary_monitor()
+			.or_else(|| event_loop.available_monitors().next())
 	{
 		let screen_size = monitor.size();
 		let scale_factor = monitor.scale_factor();
@@ -327,14 +318,13 @@ fn build_window(event_loop: &ActiveEventLoop) -> anyhow::Result<Arc<winit::windo
 		// let margin_y = (60.0 * scale_factor) as i32;
 		// let x = screen_size.width as i32 - width as i32 - margin_x;
 		// let y = screen_size.height as i32 - height as i32 - margin_y;
-		let x = screen_size.width as i32 - width as i32;
-		let y = screen_size.height as i32 - height as i32;
+		let x = (screen_size.width as i32) - (width as i32);
+		let y = (screen_size.height as i32) - (height as i32);
 		attrs = attrs.with_position(PhysicalPosition::new(x.max(0), y.max(0)));
 	} else {
 		// Fallback position if no monitor info is found
 		attrs = attrs.with_position(PhysicalPosition::new(100, 100));
 	}
-	// use eframe::egui;
 	let window = event_loop.create_window(attrs)?;
 	// Force macOS to show a Dock icon and participate in Cmd + Tab
 	#[cfg(target_os = "macos")]
@@ -352,35 +342,23 @@ fn build_renderer(
 	surface: &wgpu::Surface<'_>,
 	adapter: wgpu::Adapter,
 	device: &wgpu::Device,
-	size: PhysicalSize<u32>,
-) -> Result<
-	(
-		wgpu::wgt::SurfaceConfiguration<Vec<wgpu::TextureFormat>>,
-		Renderer,
-	),
-	Error,
-> {
+	size: PhysicalSize<u32>
+) -> Result<(wgpu::wgt::SurfaceConfiguration<Vec<wgpu::TextureFormat>>, Renderer), Error> {
 	let caps = surface.get_capabilities(&adapter);
-	let format = caps
-		.formats
+	let format = caps.formats
 		.iter()
 		.copied()
 		.find(|format| {
-			matches!(
-				format,
-				wgpu::TextureFormat::Bgra8Unorm | wgpu::TextureFormat::Rgba8Unorm
-			)
+			matches!(format, wgpu::TextureFormat::Bgra8Unorm | wgpu::TextureFormat::Rgba8Unorm)
 		})
 		.or_else(|| caps.formats.first().copied())
 		.ok_or_else(|| anyhow::anyhow!("GPU surface has no supported formats"))?;
-	let present_mode = caps
-		.present_modes
+	let present_mode = caps.present_modes
 		.iter()
 		.copied()
 		.find(|mode| *mode == wgpu::PresentMode::Fifo)
 		.unwrap_or(wgpu::PresentMode::Fifo);
-	let alpha_mode = caps
-		.alpha_modes
+	let alpha_mode = caps.alpha_modes
 		.first()
 		.copied()
 		.ok_or_else(|| anyhow::anyhow!("GPU surface has no alpha modes"))?;
@@ -655,7 +633,8 @@ impl Window {
 			footer.label("Status");
 			footer.label("Connected");
 		});
-		egui::ScrollArea::vertical()
+		egui::ScrollArea
+			::vertical()
 			.id_salt("infinite_content")
 			.auto_shrink([false, false])
 			.show(ui, |ui| {
@@ -685,7 +664,10 @@ pub struct AppWindow {
 #[derive(Debug)]
 pub enum AppEvent {
 	Shutdown,
-	CursorPosition { x: f64, y: f64 },
+	CursorPosition {
+		x: f64,
+		y: f64,
+	},
 	TickClock(String),
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

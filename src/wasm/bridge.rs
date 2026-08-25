@@ -130,24 +130,24 @@ extern "C" {
 	fn js_test(payload: JsValue);
 }
 
-#[wasm_bindgen]
-pub fn run_test(callback: js_sys::Function) -> Result<(), JsValue> {
-	log("RUST RUNNING");
+// #[wasm_bindgen]
+// pub fn run_test(callback: js_sys::Function) -> Result<(), JsValue> {
+// 	log("RUST RUNNING");
 
-	let payload = create_payload()?;
+// 	let payload = create_payload()?;
 
-	callback.call1(&JsValue::NULL, &payload)?;
+// 	callback.call1(&JsValue::NULL, &payload)?;
 
-	Ok(())
-}
+// 	Ok(())
+// }
 
-#[wasm_bindgen(start)]
-pub fn start() -> Result<(), JsValue> {
-	log("RUST STARTED");
+// #[wasm_bindgen(start)]
+// pub fn start() -> Result<(), JsValue> {
+// 	log("RUST STARTED");
 
-	let payload = create_payload()?;
+// 	let payload = create_payload()?;
 
-	js_test(payload);
+// 	js_test(payload);
 
-	Ok(())
-}
+// 	Ok(())
+// }

@@ -23,6 +23,7 @@ path = "src/main.rs"
 # required-features = ["native"]
 
 
+# $ cargo build --bin wasm --target wasm32-unknown-unknown
 [[bin]]
 name = "wasm"
 path = "src/bin/wasm.rs"
@@ -67,36 +68,32 @@ revelation.workspace = true
 anyhow.workspace = true
 async-trait.workspace = true
 chrono.workspace = true
-
 dirs.workspace = true
 egui-wgpu.workspace = true
-
 egui.workspace = true
 egui_plot.workspace = true
+eframe.workspace = true
 futures.workspace = true
 global-hotkey.workspace = true
 image.workspace = true
-
 lazy_static.workspace = true
-
 pollster.workspace = true
 reqwest.workspace = true
 resvg.workspace = true
 schemars.workspace = true
+serde-wasm-bindgen.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true
-serde-wasm-bindgen.workspace = true
 toml.workspace = true
 tracing-subscriber.workspace = true
 tracing.workspace = true
-
 url.workspace = true
-
-wgpu.workspace = true
-wasm-bridge.workspace = true
+wasm-bindgen-futures.workspace = true
 wasm-bindgen.workspace = true
+wasm-bridge.workspace = true
 web-sys.workspace = true
+wgpu.workspace = true
 winit.workspace = true
 uuid = { version = "1.24", features = ["v4", "js", "serde"] }
 
@@ -123,13 +120,15 @@ tray-icon = { workspace = true, optional = true }
 egui-winit = { workspace = true, optional = true }
 macos-accessibility-client = { workspace = true, optional = true }
 
+
 [features]
 # This overwrites IDE speficification causing diagnostics to be wrong given the targetted platform.
 #
 # To get IDE diagnostics functioning correctly remove the hardcoded default when troubleshooting another build target.
 #
+# default = []
 # default = ["native"]
-default = []
+default = ["wasm"]
 wasm = []
 mobile = []
 native = [

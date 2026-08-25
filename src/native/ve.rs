@@ -1,18 +1,26 @@
 use crate::prelude::*;
 
-use core_foundation::runloop::{CFRunLoop, kCFRunLoopCommonModes};
+use core_foundation::runloop::{ CFRunLoop, kCFRunLoopCommonModes };
 use core_graphics::{
 	display::CGDisplay,
 	event::{
-		CGEvent, CGEventTap, CGEventTapLocation, CGEventTapOptions, CGEventTapPlacement,
-		CGEventTapProxy, CGEventType, CGMouseButton, CallbackResult, *,
+		CGEvent,
+		CGEventTap,
+		CGEventTapLocation,
+		CGEventTapOptions,
+		CGEventTapPlacement,
+		CGEventTapProxy,
+		CGEventType,
+		CGMouseButton,
+		CallbackResult,
+		*,
 	},
-	event_source::{CGEventSource, CGEventSourceStateID},
+	event_source::{ CGEventSource, CGEventSourceStateID },
 	geometry::CGPoint,
 };
 use egui::Ui;
-use egui_plot::{Bar, BarChart, Line, Plot, Points};
-use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use egui_plot::{ Bar, BarChart, Line, Plot, Points };
+use notify::{ Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher };
 use std::time::Duration;
 use winit::event_loop::EventLoopProxy;
 ///      A trait implemented by types which agree to its contract.
@@ -52,27 +60,24 @@ impl Ve {
 		Self {
 			activity_bar: Region::fixed(DebugPanel::new("ACTIVITY"), config.activity_bar.size),
 			dock_left: Panel::new(
-				Region::resizable(DebugPanel::new("LEFT"), config.dock_left.size, 0.0, 600.0)
-					.with_fill(config.bg),
-			)
-			.with_open(config.dock_left.active),
+				Region::resizable(DebugPanel::new("LEFT"), config.dock_left.size, 0.0, 600.0).with_fill(
+					config.bg
+				)
+			).with_open(config.dock_left.active),
 			primary_bar: Region::fixed(DebugPanel::new("TABS"), config.primary_bar.size),
 			secondary_bar: Region::fixed(DebugPanel::new("BREADCRUMBS"), config.activity_bar.size),
 			main: Region::content(view).with_padding(8 as i32),
-			bottom_panel: Panel::new(Region::resizable(
-				DebugPanel::new("BOTTOM"),
-				config.bottom_panel.size,
-				0.0,
-				600.0,
-			)),
+			bottom_panel: Panel::new(
+				Region::resizable(DebugPanel::new("BOTTOM"), config.bottom_panel.size, 0.0, 600.0)
+			),
 			status_bar: Region::fixed(DebugPanel::new("STATUS BAR"), config.status_bar.size)
 				.with_fill(config.bg)
 				.with_top_border(true),
 			dock_right: Panel::new(
-				Region::resizable(DebugPanel::new("RIGHT"), config.dock_right.size, 0.0, 600.0)
-					.with_fill(config.bg),
-			)
-			.with_open(config.dock_right.active),
+				Region::resizable(DebugPanel::new("RIGHT"), config.dock_right.size, 0.0, 600.0).with_fill(
+					config.bg
+				)
+			).with_open(config.dock_right.active),
 		}
 	}
 	/// Forwards the drawing contract to the concrete implementation.
@@ -99,7 +104,7 @@ impl Ve {
 				left_rect,
 				&mut self.dock_left.region,
 				ResizeEdge::Right,
-				1.0,
+				1.0
 			);
 		}
 		Self::draw_region(ui, tabs_rect, &mut self.primary_bar);
@@ -113,7 +118,7 @@ impl Ve {
 				bottom_rect,
 				&mut self.bottom_panel.region,
 				ResizeEdge::Top,
-				-1.0,
+				-1.0
 			);
 		}
 		if self.dock_right.open {
@@ -124,49 +129,33 @@ impl Ve {
 				right_rect,
 				&mut self.dock_right.region,
 				ResizeEdge::Left,
-				-1.0,
+				-1.0
 			);
 		}
 		Self::draw_region(ui, status_bar_rect, &mut self.status_bar);
 	}
 	fn calculate_region_boundaries(
 		&mut self,
-		available: egui::Rect,
-	) -> (
-		egui::Rect,
-		egui::Rect,
-		egui::Rect,
-		egui::Rect,
-		egui::Rect,
-		egui::Rect,
-		egui::Rect,
-	) {
+		available: egui::Rect
+	) -> (egui::Rect, egui::Rect, egui::Rect, egui::Rect, egui::Rect, egui::Rect, egui::Rect) {
 		// =========================================================
 		// Bottom Status Bar
 		// =========================================================
 		let status_bar_height = DEFAULT_CONFIG.status_bar.size;
 		let workspace_rect = egui::Rect::from_min_max(
 			available.min,
-			egui::pos2(available.right(), available.bottom() - status_bar_height),
+			egui::pos2(available.right(), available.bottom() - status_bar_height)
 		);
 		let status_bar_rect = egui::Rect::from_min_max(
 			egui::pos2(available.left(), workspace_rect.bottom()),
-			available.max,
+			available.max
 		);
 		// =========================================================
 		// Workspace: left / center / right
 		// =========================================================
 		let min_main_width = 100.0;
-		let requested_left = if self.dock_left.open {
-			self.dock_left.region.size
-		} else {
-			0.0
-		};
-		let requested_right = if self.dock_right.open {
-			self.dock_right.region.size
-		} else {
-			0.0
-		};
+		let requested_left = if self.dock_left.open { self.dock_left.region.size } else { 0.0 };
+		let requested_right = if self.dock_right.open { self.dock_right.region.size } else { 0.0 };
 		let available_side_width = (workspace_rect.width() - min_main_width).max(0.0);
 		let requested_total = requested_left + requested_right;
 		let scale = if requested_total > available_side_width {
@@ -178,18 +167,15 @@ impl Ve {
 		let right_width = requested_right * scale;
 		let left_rect = egui::Rect::from_min_max(
 			workspace_rect.min,
-			egui::pos2(workspace_rect.left() + left_width, workspace_rect.bottom()),
+			egui::pos2(workspace_rect.left() + left_width, workspace_rect.bottom())
 		);
 		let right_rect = egui::Rect::from_min_max(
 			egui::pos2(workspace_rect.right() - right_width, workspace_rect.top()),
-			workspace_rect.max,
+			workspace_rect.max
 		);
 		let center_rect = egui::Rect::from_min_max(
 			egui::pos2(workspace_rect.left() + left_width, workspace_rect.top()),
-			egui::pos2(
-				workspace_rect.right() - right_width,
-				workspace_rect.bottom(),
-			),
+			egui::pos2(workspace_rect.right() - right_width, workspace_rect.bottom())
 		);
 		// =========================================================
 		// CENTER: tabs / breadcrumbs / main / bottom
@@ -202,62 +188,47 @@ impl Ve {
 		// =========================================================
 		let tabs_rect = egui::Rect::from_min_max(
 			center_rect.min,
-			egui::pos2(center_rect.right(), center_rect.top() + tabs_height),
+			egui::pos2(center_rect.right(), center_rect.top() + tabs_height)
 		);
 		// =========================================================
 		// Breadcrumbs
 		// =========================================================
 		let breadcrumbs_rect = egui::Rect::from_min_max(
 			egui::pos2(center_rect.left(), tabs_rect.bottom()),
-			egui::pos2(center_rect.right(), tabs_rect.bottom() + breadcrumbs_height),
+			egui::pos2(center_rect.right(), tabs_rect.bottom() + breadcrumbs_height)
 		);
 		// =========================================================
 		// Center content
 		// =========================================================
 		let content_rect = egui::Rect::from_min_max(
 			egui::pos2(center_rect.left(), breadcrumbs_rect.bottom()),
-			center_rect.max,
+			center_rect.max
 		);
 		// =========================================================
 		// Main / bottom
 		// =========================================================
 		let bottom_height = if self.bottom_panel.open {
-			self
-				.bottom_panel
-				.region
-				.size
-				.min((content_rect.height() - min_main_height).max(0.0))
+			self.bottom_panel.region.size.min((content_rect.height() - min_main_height).max(0.0))
 		} else {
 			0.0
 		};
 		let main_rect = egui::Rect::from_min_max(
 			content_rect.min,
-			egui::pos2(content_rect.right(), content_rect.bottom() - bottom_height),
+			egui::pos2(content_rect.right(), content_rect.bottom() - bottom_height)
 		);
 		let bottom_rect = egui::Rect::from_min_max(
 			egui::pos2(content_rect.left(), content_rect.bottom() - bottom_height),
-			content_rect.max,
+			content_rect.max
 		);
-		(
-			left_rect,
-			right_rect,
-			tabs_rect,
-			breadcrumbs_rect,
-			main_rect,
-			bottom_rect,
-			status_bar_rect,
-		)
+		(left_rect, right_rect, tabs_rect, breadcrumbs_rect, main_rect, bottom_rect, status_bar_rect)
 	}
 	fn draw_region(ui: &mut egui::Ui, rect: egui::Rect, region: &mut Region) {
 		let fill = region.fill.unwrap_or(DEFAULT_CONFIG.bg);
 		ui.painter().rect_filled(rect, 0.0, fill);
 		if region.top_border {
 			ui.painter().line_segment(
-				[
-					egui::pos2(rect.left(), rect.top()),
-					egui::pos2(rect.right(), rect.top()),
-				],
-				egui::Stroke::new(1.0, DEFAULT_CONFIG.surface),
+				[egui::pos2(rect.left(), rect.top()), egui::pos2(rect.right(), rect.top())],
+				egui::Stroke::new(1.0, DEFAULT_CONFIG.surface)
 			);
 		}
 		let content_rect = region.content_rect(rect);
@@ -265,9 +236,7 @@ impl Ve {
 	}
 	fn draw_view(ui: &mut egui::Ui, rect: egui::Rect, view: &mut dyn Veable) {
 		let mut child = ui.new_child(
-			egui::UiBuilder::new()
-				.max_rect(rect)
-				.layout(egui::Layout::top_down(egui::Align::LEFT)),
+			egui::UiBuilder::new().max_rect(rect).layout(egui::Layout::top_down(egui::Align::LEFT))
 		);
 		view.draw(&mut child);
 	}
@@ -315,28 +284,32 @@ impl Ve {
 		rect: egui::Rect,
 		region: &mut Region,
 		edge: ResizeEdge,
-		direction: f32,
+		direction: f32
 	) {
 		if !region.resizable {
 			return;
 		}
 		let handle = match edge {
-			ResizeEdge::Left => egui::Rect::from_min_max(
-				egui::pos2(rect.left() - 3.0, rect.top()),
-				egui::pos2(rect.left() + 3.0, rect.bottom()),
-			),
-			ResizeEdge::Right => egui::Rect::from_min_max(
-				egui::pos2(rect.right() - 3.0, rect.top()),
-				egui::pos2(rect.right() + 3.0, rect.bottom()),
-			),
-			ResizeEdge::Top => egui::Rect::from_min_max(
-				egui::pos2(rect.left(), rect.top() - 3.0),
-				egui::pos2(rect.right(), rect.top() + 3.0),
-			),
-			ResizeEdge::Bottom => egui::Rect::from_min_max(
-				egui::pos2(rect.left(), rect.bottom() - 3.0),
-				egui::pos2(rect.right(), rect.bottom() + 3.0),
-			),
+			ResizeEdge::Left =>
+				egui::Rect::from_min_max(
+					egui::pos2(rect.left() - 3.0, rect.top()),
+					egui::pos2(rect.left() + 3.0, rect.bottom())
+				),
+			ResizeEdge::Right =>
+				egui::Rect::from_min_max(
+					egui::pos2(rect.right() - 3.0, rect.top()),
+					egui::pos2(rect.right() + 3.0, rect.bottom())
+				),
+			ResizeEdge::Top =>
+				egui::Rect::from_min_max(
+					egui::pos2(rect.left(), rect.top() - 3.0),
+					egui::pos2(rect.right(), rect.top() + 3.0)
+				),
+			ResizeEdge::Bottom =>
+				egui::Rect::from_min_max(
+					egui::pos2(rect.left(), rect.bottom() - 3.0),
+					egui::pos2(rect.right(), rect.bottom() + 3.0)
+				),
 		};
 		Self::resize_handle(ui, id, handle, |delta| {
 			let delta = match edge {
@@ -484,8 +457,9 @@ impl EguiVeable {
 			);
 			if response.clicked() {
 				tracing::info!(target: "estate::app", "CLICKED COPY");
-				let json =
-					serde_json::to_string_pretty(&self.state).expect("failed to serialize estate state");
+				let json = serde_json
+					::to_string_pretty(&self.state)
+					.expect("failed to serialize estate state");
 				ui.output_mut(|o| {
 					o.commands.push(egui::OutputCommand::CopyText(json));
 				});
@@ -581,8 +555,7 @@ pub struct BarData {
 impl BarData {
 	pub fn ui(&self, ui: &mut Ui) {
 		ui.heading(&self.title);
-		let bars = self
-			.bars
+		let bars = self.bars
 			.iter()
 			.enumerate()
 			.map(|(index, bar)| Bar::new(index as f64, bar.value))
@@ -603,8 +576,7 @@ pub struct LineData {
 impl LineData {
 	pub fn ui(&self, ui: &mut Ui) {
 		ui.heading(&self.title);
-		let points = self
-			.points
+		let points = self.points
 			.iter()
 			.map(|point| [point.x, point.y])
 			.collect::<Vec<_>>();
@@ -628,7 +600,10 @@ impl PieData {
 		let size = available.x.min(available.y);
 		let radius = size * 0.35;
 		let center = ui.available_rect_before_wrap().center();
-		let total: f64 = self.slices.iter().map(|slice| slice.value).sum();
+		let total: f64 = self.slices
+			.iter()
+			.map(|slice| slice.value)
+			.sum();
 		if total <= 0.0 {
 			ui.label("No data");
 			return;
@@ -637,18 +612,20 @@ impl PieData {
 		let mut start_angle = 0.0_f32;
 		for (index, slice) in self.slices.iter().enumerate() {
 			let fraction = slice.value / total;
-			let sweep = fraction as f32 * std::f32::consts::TAU;
+			let sweep = (fraction as f32) * std::f32::consts::TAU;
 			let end_angle = start_angle + sweep;
 			let points = Self::pie_slice_points(center, radius, start_angle, end_angle);
-			painter.add(egui::Shape::convex_polygon(
-				points,
-				egui::Color32::from_rgb(
-					((50 + index * 35) % 255) as u8,
-					((100 + index * 45) % 255) as u8,
-					((180 + index * 20) % 255) as u8,
-				),
-				egui::Stroke::NONE,
-			));
+			painter.add(
+				egui::Shape::convex_polygon(
+					points,
+					egui::Color32::from_rgb(
+						((50 + index * 35) % 255) as u8,
+						((100 + index * 45) % 255) as u8,
+						((180 + index * 20) % 255) as u8
+					),
+					egui::Stroke::NONE
+				)
+			);
 			start_angle = end_angle;
 		}
 	}
@@ -657,7 +634,7 @@ impl PieData {
 		let mut points = Vec::with_capacity(segments + 2);
 		points.push(center);
 		for i in 0..=segments {
-			let t = i as f32 / segments as f32;
+			let t = (i as f32) / (segments as f32);
 			let angle = start + (end - start) * t;
 			points.push(center + egui::vec2(angle.cos() * radius, angle.sin() * radius));
 		}
@@ -672,8 +649,7 @@ pub struct ScatterData {
 impl ScatterData {
 	pub fn ui(&self, ui: &mut Ui) {
 		ui.heading(&self.title);
-		let points = self
-			.points
+		let points = self.points
 			.iter()
 			.map(|point| [point.x, point.y])
 			.collect::<Vec<_>>();
@@ -708,14 +684,15 @@ impl ChartsFile {
 }
 #[derive(Debug)]
 pub struct Graphics {
+	#[cfg(not(target_arch = "wasm32"))]
 	data_path: PathBuf,
 	data: ChartsFile,
 	dirty: bool,
 	last_loaded: Option<SystemTime>,
 	error: Option<String>,
-	// Expose a receiver if your event loop wants to listen for changes,
-	// or keep it internal if you poll it.
+	#[cfg(not(target_arch = "wasm32"))]
 	rx: tokio::sync::mpsc::Receiver<()>,
+	#[cfg(not(target_arch = "wasm32"))]
 	_watcher: RecommendedWatcher,
 	scroll_x: f32,
 	scroll_y: f32,
@@ -726,10 +703,10 @@ pub struct Graphics {
 	pub secondary_scroll_offset: f32, // For testing cross-scrolling the "other" column
 }
 impl Graphics {
-	pub fn new() -> Self {
-		let path = "/Users/future/kb/project/crates/estate/src/data/chart.json";
-		Self::from_path(path)
-	}
+	// pub fn new() -> Self {
+	// 	let path = "/Users/future/kb/project/crates/estate/src/data/chart.json";
+	// 	Self::from_path(path)
+	// }
 	fn from_path(path: impl Into<PathBuf>) -> Self {
 		let data_path = path.into();
 		let (tx, rx) = tokio::sync::mpsc::channel::<()>(1);
@@ -757,7 +734,8 @@ impl Graphics {
 				self.data = data;
 				self.dirty = false;
 				self.error = None;
-				self.last_loaded = fs::metadata(&self.data_path)
+				self.last_loaded = fs
+					::metadata(&self.data_path)
 					.and_then(|metadata| metadata.modified())
 					.ok();
 				tracing::info!(
@@ -769,10 +747,7 @@ impl Graphics {
 			Err(error) => {
 				self.error = Some(error.to_string());
 				self.dirty = true;
-				tracing::error!(
-					"Oracle failed to load {}: {error:#}",
-					self.data_path.display()
-				);
+				tracing::error!("Oracle failed to load {}: {error:#}", self.data_path.display());
 			}
 		}
 	}
@@ -786,19 +761,16 @@ impl Graphics {
 	}
 	fn init_watcher(
 		path: &Path,
-		tx: tokio::sync::mpsc::Sender<()>,
+		tx: tokio::sync::mpsc::Sender<()>
 	) -> Result<RecommendedWatcher, notify::Error> {
-		let mut watcher = RecommendedWatcher::new(
-			move |res: Result<Event, notify::Error>| {
-				if let Ok(event) = res {
-					if matches!(event.kind, EventKind::Modify(_) | EventKind::Create(_)) {
-						// Use blocking_send since the notify callback is synchronous
-						let _ = tx.blocking_send(());
-					}
+		let mut watcher = RecommendedWatcher::new(move |res: Result<Event, notify::Error>| {
+			if let Ok(event) = res {
+				if matches!(event.kind, EventKind::Modify(_) | EventKind::Create(_)) {
+					// Use blocking_send since the notify callback is synchronous
+					let _ = tx.blocking_send(());
 				}
-			},
-			Config::default(),
-		)?;
+			}
+		}, Config::default())?;
 		if let Some(parent) = path.parent() {
 			watcher.watch(parent, RecursiveMode::NonRecursive)?;
 		} else {
@@ -808,26 +780,23 @@ impl Graphics {
 	}
 	fn setup_watcher(
 		oracle: Arc<Mutex<Oracle>>,
-		path: &Path,
+		path: &Path
 	) -> Result<RecommendedWatcher, notify::Error> {
 		// Watcher closure/event handler
-		let mut watcher = RecommendedWatcher::new(
-			move |res: Result<Event, notify::Error>| {
-				match res {
-					Ok(event) => {
-						// Check if the event is a modification or creation event
-						if matches!(event.kind, EventKind::Modify(_) | EventKind::Create(_)) {
-							tracing::info!("Detected change on chart file, reloading...");
-							if let Ok(mut locked) = oracle.lock() {
-								// locked.reload();
-							}
+		let mut watcher = RecommendedWatcher::new(move |res: Result<Event, notify::Error>| {
+			match res {
+				Ok(event) => {
+					// Check if the event is a modification or creation event
+					if matches!(event.kind, EventKind::Modify(_) | EventKind::Create(_)) {
+						tracing::info!("Detected change on chart file, reloading...");
+						if let Ok(mut locked) = oracle.lock() {
+							// locked.reload();
 						}
 					}
-					Err(e) => tracing::error!("Watch error: {e:?}"),
 				}
-			},
-			Config::default(),
-		)?;
+				Err(e) => tracing::error!("Watch error: {e:?}"),
+			}
+		}, Config::default())?;
 		// Note: It's often safest to watch the *parent directory* because many editors
 		// write files via atomic replacement (saving to a temp file and renaming over the original),
 		// which can break direct file watches on some operating systems.
@@ -915,9 +884,35 @@ impl Veable for Graphics {
 				ui.label("Not loaded yet");
 			}
 			// Request a continuous repaint so the timer increments live every second
-			ui.ctx()
-				.request_repaint_after(std::time::Duration::from_secs(1));
+			ui.ctx().request_repaint_after(std::time::Duration::from_secs(1));
 		});
+	}
+}
+impl Graphics {
+	#[cfg(target_arch = "wasm32")]
+	pub fn new() -> Self {
+		let data: ChartsFile = serde_json
+			::from_str(include_str!("../data/chart.json"))
+			.expect("failed to parse chart.json");
+
+		Self {
+			data,
+			dirty: false,
+			last_loaded: Some(SystemTime::now()),
+			error: None,
+			scroll_x: 0.0,
+			scroll_y: 0.0,
+			last_direction: String::new(),
+			side_panel_width: 0.0,
+			active_focus: FocusedPane::MainEditor,
+			secondary_scroll_offset: 0.0,
+		}
+	}
+
+	#[cfg(not(target_arch = "wasm32"))]
+	pub fn new() -> Self {
+		let path = "...";
+		Self::from_path(path)
 	}
 }
 /// Telemetry
@@ -963,17 +958,9 @@ impl Oracle {
 			let direction = if delta.x == 0.0 && delta.y == 0.0 {
 				ScrollDirection::None
 			} else if delta.x.abs() > delta.y.abs() {
-				if delta.x > 0.0 {
-					ScrollDirection::Right
-				} else {
-					ScrollDirection::Left
-				}
+				if delta.x > 0.0 { ScrollDirection::Right } else { ScrollDirection::Left }
 			} else {
-				if delta.y > 0.0 {
-					ScrollDirection::Down
-				} else {
-					ScrollDirection::Up
-				}
+				if delta.y > 0.0 { ScrollDirection::Down } else { ScrollDirection::Up }
 			};
 			TrackpadState {
 				delta,
@@ -985,11 +972,7 @@ impl Oracle {
 	}
 	/// Helper to check if the mouse is hovering inside a specific target rect
 	fn is_mouse_over(state: &TrackpadState, target_rect: egui::Rect) -> bool {
-		if let Some(pos) = state.mouse_pos {
-			target_rect.contains(pos)
-		} else {
-			false
-		}
+		if let Some(pos) = state.mouse_pos { target_rect.contains(pos) } else { false }
 	}
 	/// Optional helper to draw a quick diagnostic heads-up display overlay
 	fn draw_trackpad_poc_hud(&self, ui: &mut egui::Ui, state: &TrackpadState) {
@@ -1000,10 +983,7 @@ impl Oracle {
 				ui.separator();
 				ui.label(format!("Shift Held: {}", state.shift_held));
 			});
-			ui.label(format!(
-				"Delta X: {:.2} | Delta Y: {:.2}",
-				state.delta.x, state.delta.y
-			));
+			ui.label(format!("Delta X: {:.2} | Delta Y: {:.2}", state.delta.x, state.delta.y));
 			if let Some(pos) = state.mouse_pos {
 				ui.label(format!("Mouse Position: x={:.1}, y={:.1}", pos.x, pos.y));
 			}
@@ -1013,7 +993,7 @@ impl Oracle {
 		&self,
 		mouse_pos: Option<egui::Pos2>,
 		main_rect: egui::Rect,
-		side_rect: egui::Rect,
+		side_rect: egui::Rect
 	) -> FocusedPane {
 		if let Some(pos) = mouse_pos {
 			if main_rect.contains(pos) {
@@ -1058,16 +1038,17 @@ impl Oracle {
 		// 1. Capture clean trackpad and modifier state
 		let trackpad = self.inspect_trackpad(ui);
 		// Keep repainting live while interacting to maintain smooth telemetry display
-		if trackpad.direction != ScrollDirection::None
-			|| trackpad.shift_held
-			|| trackpad.delta != egui::Vec2::ZERO
+		if
+			trackpad.direction != ScrollDirection::None ||
+			trackpad.shift_held ||
+			trackpad.delta != egui::Vec2::ZERO
 		{
 			ui.ctx().request_repaint();
 		}
 		// 2. Telemetry Header & Status
 		ui.heading("Trackpad & Gesture Telemetry PoC");
 		ui.label(
-			"Goal: Inspect raw multi-axis vectors, modifiers, and spatial state for cross-app redirection.",
+			"Goal: Inspect raw multi-axis vectors, modifiers, and spatial state for cross-app redirection."
 		);
 		ui.separator();
 		// 3. Live State Grid
@@ -1109,10 +1090,7 @@ impl Oracle {
 					ui.label("Pointer Coords: Out of bounds");
 				}
 				ui.add_space(8.0);
-				ui.label(format!(
-					"Target Layout Width: {:.1}px",
-					self.side_panel_width
-				));
+				ui.label(format!("Target Layout Width: {:.1}px", self.side_panel_width));
 			});
 		});
 		ui.add_space(12.0);
@@ -1127,18 +1105,12 @@ impl Oracle {
 			if shift_active && is_horizontal {
 				ui.colored_label(
 					egui::Color32::LIGHT_BLUE,
-					format!(
-						"⚡ TRIGGER MATCH: Resize Panel Vector -> {:.2}px",
-						trackpad.delta.x
-					),
+					format!("⚡ TRIGGER MATCH: Resize Panel Vector -> {:.2}px", trackpad.delta.x)
 				);
 			} else if shift_active && is_vertical {
 				ui.colored_label(
 					egui::Color32::LIGHT_GREEN,
-					format!(
-						"⚡ TRIGGER MATCH: Cross-Scroll Secondary Pane -> {:.2} units",
-						trackpad.delta.y
-					),
+					format!("⚡ TRIGGER MATCH: Cross-Scroll Secondary Pane -> {:.2} units", trackpad.delta.y)
 				);
 			} else {
 				ui.label("Waiting for trigger combo (Hold Shift + Swipe/Scroll)...");
@@ -1196,8 +1168,7 @@ impl Veable for Oracle {
 				ui.label("Not loaded yet");
 			}
 			// Request a continuous repaint so the timer increments live every second
-			ui.ctx()
-				.request_repaint_after(std::time::Duration::from_secs(1));
+			ui.ctx().request_repaint_after(std::time::Duration::from_secs(1));
 			if ui.button("Teleport Cursor to Center").clicked() {
 				move_cursor_to(ScreenPosition::Center);
 			}
@@ -1242,8 +1213,13 @@ pub fn move_cursor_to(pos: ScreenPosition) {
 	};
 	let point = CGPoint { x, y };
 	if let Ok(source) = CGEventSource::new(CGEventSourceStateID::CombinedSessionState) {
-		if let Ok(event) =
-			CGEvent::new_mouse_event(source, CGEventType::MouseMoved, point, CGMouseButton::Left)
+		if
+			let Ok(event) = CGEvent::new_mouse_event(
+				source,
+				CGEventType::MouseMoved,
+				point,
+				CGMouseButton::Left
+			)
 		{
 			event.post(CGEventTapLocation::HID);
 			println!("✨ Teleported cursor to position: X={:.1}, Y={:.1}", x, y);
@@ -1277,7 +1253,8 @@ impl TaskManager {
 				self.state = Some(state);
 				self.dirty = false;
 				self.error = None;
-				self.last_loaded = fs::metadata(&self.state_path)
+				self.last_loaded = fs
+					::metadata(&self.state_path)
 					.and_then(|metadata| metadata.modified())
 					.ok();
 			}
@@ -1288,26 +1265,26 @@ impl TaskManager {
 		}
 	}
 	pub fn check_for_changes(&mut self, ctx: &egui::Context) {
-		if self.rx.try_recv().is_ok() {
-			self.reload();
-			ctx.request_repaint();
+		#[cfg(not(target_arch = "wasm32"))]
+		{
+			if self.rx.try_recv().is_ok() {
+				self.reload();
+				ctx.request_repaint();
+			}
 		}
 	}
 	fn init_watcher(
 		path: &Path,
-		tx: tokio::sync::mpsc::Sender<()>,
+		tx: tokio::sync::mpsc::Sender<()>
 	) -> Result<notify::RecommendedWatcher, notify::Error> {
-		use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
-		let mut watcher = RecommendedWatcher::new(
-			move |res: Result<Event, notify::Error>| {
-				if let Ok(event) = res {
-					if matches!(event.kind, EventKind::Modify(_) | EventKind::Create(_)) {
-						let _ = tx.blocking_send(());
-					}
+		use notify::{ Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher };
+		let mut watcher = RecommendedWatcher::new(move |res: Result<Event, notify::Error>| {
+			if let Ok(event) = res {
+				if matches!(event.kind, EventKind::Modify(_) | EventKind::Create(_)) {
+					let _ = tx.blocking_send(());
 				}
-			},
-			Config::default(),
-		)?;
+			}
+		}, Config::default())?;
 		if let Some(parent) = path.parent() {
 			watcher.watch(parent, RecursiveMode::NonRecursive)?;
 		}
@@ -1327,11 +1304,7 @@ impl TaskManager {
 				ui.add_space(20.0);
 				// Progress
 				if let Some(progress) = job.progress {
-					ui.add(
-						egui::ProgressBar::new(progress)
-							.desired_width(180.0)
-							.show_percentage(),
-					);
+					ui.add(egui::ProgressBar::new(progress).desired_width(180.0).show_percentage());
 				}
 				// Runtime
 				if let Some(started_at) = job.started_at {
@@ -1364,48 +1337,19 @@ impl Veable for TaskManager {
 		// Header
 		// =========================================================
 		ui.vertical(|ui| {
-			ui.label(
-				egui::RichText::new("Task Overview")
-					.size(24.0)
-					.strong()
-					.color(palette::TEXT),
-			);
+			ui.label(egui::RichText::new("Task Overview").size(24.0).strong().color(palette::TEXT));
 			ui.add_space(2.0);
-			ui.label(
-				egui::RichText::new("Estate Runtime")
-					.size(12.0)
-					.color(palette::TEXT_MUTED),
-			);
+			ui.label(egui::RichText::new("Estate Runtime").size(12.0).color(palette::TEXT_MUTED));
 		});
 		ui.add_space(16.0);
 		// =========================================================
 		// Summary metrics
 		// =========================================================
 		ui.columns(4, |columns| {
-			metric(
-				&mut columns[0],
-				"Tasks Created",
-				state.tasks_created,
-				palette::PRIMARY,
-			);
-			metric(
-				&mut columns[1],
-				"Tasks Completed",
-				state.tasks_completed,
-				palette::SUCCESS,
-			);
-			metric(
-				&mut columns[2],
-				"Events Processed",
-				state.events_processed,
-				palette::WARNING,
-			);
-			metric(
-				&mut columns[3],
-				"Status Checks",
-				state.status_checks,
-				palette::TEXT_MUTED,
-			);
+			metric(&mut columns[0], "Tasks Created", state.tasks_created, palette::PRIMARY);
+			metric(&mut columns[1], "Tasks Completed", state.tasks_completed, palette::SUCCESS);
+			metric(&mut columns[2], "Events Processed", state.events_processed, palette::WARNING);
+			metric(&mut columns[3], "Status Checks", state.status_checks, palette::TEXT_MUTED);
 		});
 		ui.add_space(16.0);
 		// =========================================================
@@ -1424,7 +1368,7 @@ fn render_graphs(
 	available: egui::Vec2,
 	gap: f32,
 	card_width: f32,
-	card_height: f32,
+	card_height: f32
 ) {
 	ui.allocate_ui_with_layout(
 		egui::vec2(available.x, card_height),
@@ -1450,7 +1394,7 @@ fn render_graphs(
 					let max_value = state.tasks_created.max(1) as f64;
 					let bars = vec![
 						Bar::new(0.0, state.tasks_created as f64).fill(palette::PRIMARY),
-						Bar::new(1.0, state.tasks_completed as f64).fill(palette::SUCCESS),
+						Bar::new(1.0, state.tasks_completed as f64).fill(palette::SUCCESS)
 					];
 					let chart = BarChart::new("task_counts", bars);
 					let max_y = state.tasks_created.max(1) as f64;
@@ -1466,7 +1410,7 @@ fn render_graphs(
 						.show(ui, |plot_ui| {
 							plot_ui.bar_chart(chart);
 						});
-				},
+				}
 			);
 			// =========================================================
 			// Completion
@@ -1481,20 +1425,17 @@ fn render_graphs(
 					let created = state.tasks_created as f64;
 					let completed = state.tasks_completed as f64;
 					let remaining = (created - completed).max(0.0);
-					let percentage = if created > 0.0 {
-						(completed / created) * 100.0
-					} else {
-						0.0
-					};
+					let percentage = if created > 0.0 { (completed / created) * 100.0 } else { 0.0 };
 					small_metric(ui, "Complete", state.tasks_completed, palette::SUCCESS);
 					ui.add_space(20.0);
 					small_metric(ui, "Remaining", remaining as u64, palette::TEXT_MUTED);
 					ui.add_space(20.0);
 					ui.label(
-						egui::RichText::new(format!("{percentage:.1}%"))
+						egui::RichText
+							::new(format!("{percentage:.1}%"))
 							.size(14.0)
 							.strong()
-							.color(palette::SUCCESS),
+							.color(palette::SUCCESS)
 					);
 				},
 				// Chart
@@ -1502,14 +1443,10 @@ fn render_graphs(
 					let created = state.tasks_created as f64;
 					let completed = state.tasks_completed as f64;
 					let remaining = (created - completed).max(0.0);
-					let percentage = if created > 0.0 {
-						(completed / created) * 100.0
-					} else {
-						0.0
-					};
+					let percentage = if created > 0.0 { (completed / created) * 100.0 } else { 0.0 };
 					let bars = vec![
 						Bar::new(0.0, completed).fill(palette::SUCCESS),
-						Bar::new(1.0, remaining).fill(palette::SURFACE_HOVER),
+						Bar::new(1.0, remaining).fill(palette::SURFACE_HOVER)
 					];
 					let chart = BarChart::new("task_completion", bars);
 					let max_value = completed.max(remaining);
@@ -1531,9 +1468,9 @@ fn render_graphs(
 						.show(ui, |plot_ui| {
 							plot_ui.bar_chart(chart);
 						});
-				},
+				}
 			);
-		},
+		}
 	);
 	ui.add_space(gap);
 	ui.allocate_ui_with_layout(
@@ -1567,14 +1504,14 @@ fn render_graphs(
 						state.events_processed,
 						state.files_indexed,
 					]
-					.into_iter()
-					.max()
-					.unwrap_or(1) as f64;
+						.into_iter()
+						.max()
+						.unwrap_or(1) as f64;
 					let bars = vec![
 						Bar::new(0.0, state.starts as f64).fill(palette::PRIMARY),
 						Bar::new(1.0, state.status_checks as f64).fill(palette::TEXT_MUTED),
 						Bar::new(2.0, state.events_processed as f64).fill(palette::WARNING),
-						Bar::new(3.0, state.files_indexed as f64).fill(palette::SUCCESS),
+						Bar::new(3.0, state.files_indexed as f64).fill(palette::SUCCESS)
 					];
 					let chart = BarChart::new("system_activity", bars);
 					let max_value = [
@@ -1583,9 +1520,9 @@ fn render_graphs(
 						state.events_processed,
 						state.files_indexed,
 					]
-					.into_iter()
-					.max()
-					.unwrap_or(1) as f64;
+						.into_iter()
+						.max()
+						.unwrap_or(1) as f64;
 					// .default_y_bounds(0.0, max_value * 1.1)
 					Plot::new("system_activity_plot")
 						.height(190.0)
@@ -1601,7 +1538,7 @@ fn render_graphs(
 						.show(ui, |plot_ui| {
 							plot_ui.bar_chart(chart);
 						});
-				},
+				}
 			);
 			// =========================================================
 			// Runtime
@@ -1628,7 +1565,7 @@ fn render_graphs(
 					let bars = vec![
 						Bar::new(0.0, state.starts as f64).fill(palette::PRIMARY),
 						Bar::new(1.0, state.events_processed as f64).fill(palette::WARNING),
-						Bar::new(2.0, state.files_indexed as f64).fill(palette::SUCCESS),
+						Bar::new(2.0, state.files_indexed as f64).fill(palette::SUCCESS)
 					];
 					let chart = BarChart::new("runtime_activity", bars);
 					Plot::new("runtime_activity_plot")
@@ -1645,26 +1582,17 @@ fn render_graphs(
 						.show(ui, |plot_ui| {
 							plot_ui.bar_chart(chart);
 						});
-				},
+				}
 			);
-		},
+		}
 	);
 }
 fn metric(ui: &mut Ui, label: &str, value: u64, color: egui::Color32) {
 	ui.group(|ui| {
 		ui.set_min_height(78.0);
 		ui.vertical_centered(|ui| {
-			ui.label(
-				egui::RichText::new(label)
-					.small()
-					.color(palette::TEXT_MUTED),
-			);
-			ui.label(
-				egui::RichText::new(value.to_string())
-					.size(26.0)
-					.strong()
-					.color(color),
-			);
+			ui.label(egui::RichText::new(label).small().color(palette::TEXT_MUTED));
+			ui.label(egui::RichText::new(value.to_string()).size(26.0).strong().color(color));
 		});
 	});
 }
@@ -1674,10 +1602,11 @@ fn draw_chart_card(
 	title: &str,
 	subtitle: &str,
 	metrics: impl FnOnce(&mut Ui),
-	chart: impl FnOnce(&mut Ui),
+	chart: impl FnOnce(&mut Ui)
 ) {
 	ui.allocate_ui(size, |ui| {
-		egui::Frame::group(ui.style())
+		egui::Frame
+			::group(ui.style())
 			.fill(palette::SURFACE)
 			.stroke(egui::Stroke::new(1.0, palette::BORDER))
 			// .inner_margin(egui::Margin::same(12))
@@ -1687,17 +1616,8 @@ fn draw_chart_card(
 					// -------------------------------------------------
 					// Header
 					// -------------------------------------------------
-					ui.label(
-						egui::RichText::new(title)
-							.size(15.0)
-							.strong()
-							.color(palette::TEXT),
-					);
-					ui.label(
-						egui::RichText::new(subtitle)
-							.size(11.0)
-							.color(palette::TEXT_MUTED),
-					);
+					ui.label(egui::RichText::new(title).size(15.0).strong().color(palette::TEXT));
+					ui.label(egui::RichText::new(subtitle).size(11.0).color(palette::TEXT_MUTED));
 					ui.add_space(8.0);
 					// -------------------------------------------------
 					// Metrics
@@ -1718,17 +1638,8 @@ fn draw_chart_card(
 }
 fn small_metric(ui: &mut Ui, label: &str, value: u64, color: egui::Color32) {
 	ui.horizontal(|ui| {
-		ui.label(
-			egui::RichText::new(label)
-				.size(11.0)
-				.color(palette::TEXT_MUTED),
-		);
-		ui.label(
-			egui::RichText::new(value.to_string())
-				.size(13.0)
-				.strong()
-				.color(color),
-		);
+		ui.label(egui::RichText::new(label).size(11.0).color(palette::TEXT_MUTED));
+		ui.label(egui::RichText::new(value.to_string()).size(13.0).strong().color(color));
 	});
 }
 fn format_duration(duration: Duration) -> String {
@@ -1764,10 +1675,11 @@ pub fn spawn_global_cursor_daemon(proxy: EventLoopProxy<AppEvent>) {
 		if !trusted {
 			return;
 		}
-		let callback = move |_proxy_cg: CGEventTapProxy,
-		                     event_type: CGEventType,
-		                     event: &CGEvent|
-		      -> CallbackResult {
+		let callback = move |
+			_proxy_cg: CGEventTapProxy,
+			event_type: CGEventType,
+			event: &CGEvent
+		| -> CallbackResult {
 			match event_type {
 				CGEventType::MouseMoved => {
 					if REDIRECTING_SCROLL.load(Ordering::Relaxed) {
@@ -1802,7 +1714,7 @@ pub fn spawn_global_cursor_daemon(proxy: EventLoopProxy<AppEvent>) {
 						let target_x = match target {
 							ScreenPosition::Left => bounds.origin.x + bounds.size.width * 0.25,
 							ScreenPosition::Right => bounds.origin.x + bounds.size.width * 0.75,
-							ScreenPosition::Center => bounds.origin.x + bounds.size.width * 0.50,
+							ScreenPosition::Center => bounds.origin.x + bounds.size.width * 0.5,
 						};
 						let target_position = CGPoint {
 							x: target_x,
@@ -1814,12 +1726,14 @@ pub fn spawn_global_cursor_daemon(proxy: EventLoopProxy<AppEvent>) {
 						// 	location.x, location.y, target, target_position.x, target_position.y,
 						// );
 						if let Ok(source) = CGEventSource::new(CGEventSourceStateID::CombinedSessionState) {
-							if let Ok(move_event) = CGEvent::new_mouse_event(
-								source,
-								CGEventType::MouseMoved,
-								target_position,
-								CGMouseButton::Left,
-							) {
+							if
+								let Ok(move_event) = CGEvent::new_mouse_event(
+									source,
+									CGEventType::MouseMoved,
+									target_position,
+									CGMouseButton::Left
+								)
+							{
 								move_event.post(CGEventTapLocation::HID);
 							}
 						}
@@ -1836,12 +1750,14 @@ pub fn spawn_global_cursor_daemon(proxy: EventLoopProxy<AppEvent>) {
 						// );
 						if state.active {
 							if let Ok(source) = CGEventSource::new(CGEventSourceStateID::CombinedSessionState) {
-								if let Ok(restore_event) = CGEvent::new_mouse_event(
-									source,
-									CGEventType::MouseMoved,
-									original,
-									CGMouseButton::Left,
-								) {
+								if
+									let Ok(restore_event) = CGEvent::new_mouse_event(
+										source,
+										CGEventType::MouseMoved,
+										original,
+										CGMouseButton::Left
+									)
+								{
 									restore_event.post(CGEventTapLocation::HID);
 								}
 							}
@@ -1852,8 +1768,9 @@ pub fn spawn_global_cursor_daemon(proxy: EventLoopProxy<AppEvent>) {
 					CallbackResult::Keep
 				}
 				CGEventType::KeyDown => {
-					let keycode =
-						event.get_integer_value_field(core_graphics::event::EventField::KEYBOARD_EVENT_KEYCODE);
+					let keycode = event.get_integer_value_field(
+						core_graphics::event::EventField::KEYBOARD_EVENT_KEYCODE
+					);
 					match keycode {
 						18 => {
 							println!("Key '1' pressed");
@@ -1884,18 +1801,20 @@ pub fn spawn_global_cursor_daemon(proxy: EventLoopProxy<AppEvent>) {
 				_ => CallbackResult::Keep,
 			}
 		};
-		let tap = match CGEventTap::new(
-			CGEventTapLocation::HID,
-			CGEventTapPlacement::HeadInsertEventTap,
-			CGEventTapOptions::Default,
-			vec![
-				CGEventType::ScrollWheel,
-				CGEventType::FlagsChanged,
-				CGEventType::MouseMoved,
-				CGEventType::KeyDown,
-			],
-			callback,
-		) {
+		let tap = match
+			CGEventTap::new(
+				CGEventTapLocation::HID,
+				CGEventTapPlacement::HeadInsertEventTap,
+				CGEventTapOptions::Default,
+				vec![
+					CGEventType::ScrollWheel,
+					CGEventType::FlagsChanged,
+					CGEventType::MouseMoved,
+					CGEventType::KeyDown
+				],
+				callback
+			)
+		{
 			Ok(tap) => tap,
 			Err(error) => {
 				eprintln!("❌ Failed to create CGEventTap: {:?}", error);
@@ -1933,11 +1852,7 @@ impl Veable for DebugPanel {
 		ui.vertical_centered(|ui| {
 			ui.heading(&self.title);
 			ui.separator();
-			ui.label(format!(
-				"{} × {}",
-				ui.available_width(),
-				ui.available_height()
-			));
+			ui.label(format!("{} × {}", ui.available_width(), ui.available_height()));
 		});
 	}
 }
@@ -2025,14 +1940,11 @@ impl Region {
 	}
 	pub fn content_rect(&self, rect: egui::Rect) -> egui::Rect {
 		egui::Rect::from_min_max(
+			egui::pos2(rect.left() + (self.padding.left as f32), rect.top() + (self.padding.top as f32)),
 			egui::pos2(
-				rect.left() + self.padding.left as f32,
-				rect.top() + self.padding.top as f32,
-			),
-			egui::pos2(
-				rect.right() - self.padding.right as f32,
-				rect.bottom() - self.padding.bottom as f32,
-			),
+				rect.right() - (self.padding.right as f32),
+				rect.bottom() - (self.padding.bottom as f32)
+			)
 		)
 	}
 }

@@ -1,6 +1,12 @@
-use std::sync::{ Mutex, OnceLock, atomic::{ AtomicBool, AtomicU64 } };
+use std::sync::{
+	Mutex, OnceLock,
+	atomic::{AtomicBool, AtomicU64},
+};
 
-use crate::{ native::prelude::{ PanelConfig, ScrollRedirectState, * }, share::prelude::* };
+use crate::{
+	native::prelude::{PanelConfig, ScrollRedirectState, *},
+	share::prelude::*,
+};
 
 pub const TRAY_ICON: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/estate-tray.png"));
 pub const TRAY_SCROLL_ICON: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/estate-tray.png"));
