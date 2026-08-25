@@ -27,7 +27,8 @@
 //                        ┌──────────┼──────────┐
 //                        ▼          ▼          ▼
 //                      Zed       VS Code      CLI
-use crate::prelude::*;
+
+use crate::{ share::r#trait::Runtime, prelude::* };
 use revelation::analyzer::Workspace;
 
 pub trait Engine {
@@ -176,28 +177,40 @@ pub enum EstateScope {
 
 /// Estate owns the capabilities and domain model; the daemon exposes those capabilities as a long-lived service.
 #[derive(Clone, Debug)]
-pub struct EstateEngine<R> {
-	pub estate: Estate, // domain model
-	pub runtime: R,
+pub struct EstateEngine<R: Runtime> {
+	// Meaning of EstateEngine is "an engine with a Runtime" then
+	// pub struct EstateEngine<R: Runtime>
+	// Is reasonable.
 
-	pub vfs: EstateVfs,       // infrastructure
-	pub index: EstateIndex,   // infrastructure
-	pub workspace: Workspace, // domain/context
+	// Domain
+	pub estate: Estate,
+	pub runtime: Arc<R>,
+	// Infrastructure
+	pub vfs: EstateVfs,
+	pub index: EstateIndex,
+	pub workspace: Workspace,
+
 	// pub index: OnceCell<EstateIndex>,
 	// pub search: OnceCell<SearchService>,
 	// pub analysis: OnceCell<AnalysisService>,
-	pub graph: EstateGraph,         // domain representation
-	pub registry: EstateRegistry,   // persistence/coordination
-	pub resolver: EstateResolver,   // capability
-	pub discovery: EstateDiscovery, // capability
-	pub anchors: AnchorService,     // capability
-	pub search: SearchService,      // capability
-	pub analysis: AnalysisService,  // capability
+
+	// domain representation
+	pub graph: EstateGraph,
+
+	// persistence/coordination
+	pub registry: EstateRegistry,
+
+	/// Capabilities
+	pub resolver: EstateResolver,
+	pub discovery: EstateDiscovery,
+	pub anchors: AnchorService,
+	pub search: SearchService,
+	pub analysis: AnalysisService,
 }
-impl<R> EstateEngine<R> {
+impl<R: Runtime> EstateEngine<R> {
 	pub fn new(runtime: R) -> anyhow::Result<Self> {
 		Ok(Self {
-			runtime,
+			runtime: Arc::new(runtime),
 			estate: Estate::default(),
 			workspace: Workspace::new(),
 			registry: EstateRegistry::default(),
@@ -218,7 +231,10 @@ pub enum Change {
 	Created(Uuid),
 	Modified(Uuid),
 	Deleted(Uuid),
-	Renamed { from: Uuid, to: Uuid },
+	Renamed {
+		from: Uuid,
+		to: Uuid,
+	},
 	ConfigChanged,
 	WorkspaceChanged,
 }

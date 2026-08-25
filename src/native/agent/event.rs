@@ -1,7 +1,4 @@
-use crate::{
-	native::{agent::SystemEvent, job::*, *},
-	shared::prelude::*,
-};
+use crate::{ native::{ agent::SystemEvent, job::*, * }, share::prelude::* };
 
 #[derive(Clone, Debug)]
 pub enum RuntimeEvent {
@@ -11,11 +8,23 @@ pub enum RuntimeEvent {
 
 #[derive(Debug, Clone)]
 pub enum AgentEvent {
-	NewTask { task: AgentTask },
-	Thinking { task: AgentTask },
-	Working { task: AgentTask, message: String },
-	Finished { result: TaskResult },
-	TaskEvent { task: AgentTask, event: TaskEvent },
+	NewTask {
+		task: AgentTask,
+	},
+	Thinking {
+		task: AgentTask,
+	},
+	Working {
+		task: AgentTask,
+		message: String,
+	},
+	Finished {
+		result: TaskResult,
+	},
+	TaskEvent {
+		task: AgentTask,
+		event: TaskEvent,
+	},
 }
 
 #[derive(Debug, Clone)]

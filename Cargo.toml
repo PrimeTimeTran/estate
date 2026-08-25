@@ -2,7 +2,7 @@
 name = "estate"
 version = "0.1.0"
 edition = "2024"
-description="Estate"
+description = "Estate"
 
 [package.metadata.bundle.bin.estate]
 name = "Estate"
@@ -22,23 +22,27 @@ name = "main"
 path = "src/main.rs"
 # required-features = ["native"]
 
+
 [[bin]]
 name = "wasm"
 path = "src/bin/wasm.rs"
 required-features = ["wasm"]
-
+# 1.
 # cargo build \
 #   --target wasm32-unknown-unknown \
 #   --manifest-path crates/estate/Cargo.toml \
 #   --bin wasm \
 #   --no-default-features \
 #   --features wasm
+# 2. Serve
 # trunk serve --features=wasm
 
 [[bin]]
 name = "native"
 path = "src/bin/native.rs"
 required-features = ["native"]
+# 1. Run as native
+# cargo run --bin native --features=native
 
 [[bin]]
 name = "threads"
@@ -100,7 +104,10 @@ uuid = { version = "1.24", features = ["v4", "js", "serde"] }
 notify = { workspace = true, optional = true }
 cli = { workspace = true, optional = true }
 demand = { workspace = true, optional = true }
-tokio = { workspace = true, optional = true, features = ["rt", "macros"] } # Make sure features don't force 'net' on WASM if compiled
+tokio = { workspace = true, optional = true, features = [
+  "rt",
+  "macros",
+] } # Make sure features don't force 'net' on WASM if compiled
 rmcp = { workspace = true, optional = true }
 tower-lsp = { workspace = true, optional = true }
 tokio-util = { workspace = true, optional = true }
@@ -126,24 +133,24 @@ default = []
 wasm = []
 mobile = []
 native = [
-    "dep:notify",
-    "dep:cli",
-    "dep:demand",
-    "dep:tokio",
-    "dep:rmcp",
-    "dep:tower-lsp",
-    "dep:tokio-util",
-    "dep:objc2-app-kit",
-    "dep:objc2-foundation",
-    "dep:objc2",
-    "dep:core-foundation",
-    "dep:core-graphics",
-    "dep:signal-hook",
-    "dep:comfy-table",
-    "dep:jsonschema",
-    "dep:tray-icon",
-    "dep:egui-winit",
-    "dep:macos-accessibility-client"
+  "dep:notify",
+  "dep:cli",
+  "dep:demand",
+  "dep:tokio",
+  "dep:rmcp",
+  "dep:tower-lsp",
+  "dep:tokio-util",
+  "dep:objc2-app-kit",
+  "dep:objc2-foundation",
+  "dep:objc2",
+  "dep:core-foundation",
+  "dep:core-graphics",
+  "dep:signal-hook",
+  "dep:comfy-table",
+  "dep:jsonschema",
+  "dep:tray-icon",
+  "dep:egui-winit",
+  "dep:macos-accessibility-client",
 ]
 [build-dependencies]
 resvg.workspace = true

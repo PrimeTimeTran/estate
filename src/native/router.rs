@@ -1,4 +1,4 @@
-use crate::{native::daemon::projection::command, prelude::*};
+use crate::{ native::daemon::projection::command, prelude::* };
 use cli;
 /// # Estate Engine CLI
 ///
@@ -43,10 +43,13 @@ use cli;
 /// estate fmt path/to/file.rs
 /// estate format path/to/file.rs
 /// ```
-pub async fn execute(
+
+use crate::share::r#trait::Runtime;
+
+pub async fn execute<R: Runtime>(
 	parsed_cli: Cli,
 	ctx: cli::context::Context,
-	engine: EstateEngine,
+	engine: EstateEngine<R>
 ) -> anyhow::Result<(), anyhow::Error> {
 	let command = parsed_cli.command.unwrap_or(Command::Start { tail: false });
 	match command {
@@ -84,15 +87,14 @@ pub async fn execute(
 			let mut stream = match UnixStream::connect(SOCKET_PATH).await {
 				Ok(s) => s,
 				Err(e) => {
-					return Err(anyhow::anyhow!(
-						"Daemon is not running. Start it first: {e}"
-					));
+					return Err(anyhow::anyhow!("Daemon is not running. Start it first: {e}"));
 				}
 			};
 			for path in &args.paths {
 				let clean_path = path.canonicalize().unwrap_or_else(|_| path.clone());
 				// Just pass the file path and line/offset directly as raw fields
-				let request = serde_json::json!({
+				let request =
+					serde_json::json!({
 						"path": clean_path,
 						"line": args.line,
 						"column": &args.column,
@@ -119,15 +121,16 @@ pub async fn execute(
 		Command::DaemonServer => {
 			daemon::DaemonServer::run().await;
 		}
-		Command::Capabilities(args) => match AnalyzeDaemon.run(&ctx, &args).await {
-			Ok(result) => {
-				MetricsRenderer::render(&result);
+		Command::Capabilities(args) =>
+			match AnalyzeDaemon.run(&ctx, &args).await {
+				Ok(result) => {
+					MetricsRenderer::render(&result);
+				}
+				Err(err) => {
+					eprintln!("Analyze failed: {err}");
+					std::process::exit(1);
+				}
 			}
-			Err(err) => {
-				eprintln!("Analyze failed: {err}");
-				std::process::exit(1);
-			}
-		},
 		Command::Status => StatusDaemon.run(&ctx).await,
 		Command::Bookmark => command::ViewList.run(&ctx).await,
 		Command::Bookmarks => command::ViewList.run(&ctx).await,

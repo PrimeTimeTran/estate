@@ -1,61 +1,40 @@
-use crate::{native::*, prelude::*};
+use crate::{ native::*, native::state::EstateEngine, prelude::*, share::r#trait::Runtime };
 
-use crate::native::state::EstateEngine;
-
-use signal_hook::{consts::SIGINT, iterator::Signals};
-use tray_icon::{TrayIcon, TrayIconBuilder, menu::MenuEvent};
+use signal_hook::{ consts::SIGINT, iterator::Signals };
+use tray_icon::{ TrayIcon, TrayIconBuilder, menu::MenuEvent };
 use winit::{
 	application::ApplicationHandler,
 	event::WindowEvent,
-	event_loop::{ActiveEventLoop, EventLoop, EventLoopProxy},
-	platform::macos::{ActivationPolicy, EventLoopBuilderExtMacOS},
+	event_loop::{ ActiveEventLoop, EventLoop, EventLoopProxy },
+	platform::macos::{ ActivationPolicy, EventLoopBuilderExtMacOS },
 	window::WindowId,
 };
-/// Top-level NativeApplication state.
-///
-/// Owns the system tray integration, NativeApplication context, Estate engine,
-/// daemon communication channel, and optional development window.
+
 pub struct NativeApp {
-	/// The system tray icon owned by the NativeApplication.
+	app: App<NativeRuntime>,
 	tray: Option<TrayIcon>,
-	/// The system tray menu and its associated menu items.
 	menu: Option<TrayMenu>,
-	/// Shared NativeApplication context and runtime state.
-	// context: Context,
-	/// The Estate engine responsible for the NativeApplication's core functionality.
-	engine: EstateEngine,
-	/// Channel used to send commands to the Estate daemon, when available.
-	// daemon_tx: Option<mpsc::Sender<DaemonCommand>>,
-	/// The development window, when it has been opened.
-	// daemon: Option<DaemonHandle>,
-	// daemon: Option<Daemon>,
 	daemon_tx: mpsc::Sender<DaemonCommand>,
-	/// Use an `Option` if **another thread or runtime task needs to take permanent ownership** of the receiver to run a loop, and you won't be polling it directly inside `Oracle`'s `draw()` method.
-	/// * **How it works:** You create the channel inside `Oracle::new()`, keep the `Sender` inside `Oracle` (or pass it to your file watcher), and **take** the `Receiver` out once via `.take()` to hand it off to a worker thread or your NativeApplication's main event pump.
-	/// * **Why `Option`?** Because in Rust, you cannot move a field out of a struct by value if the struct itself is behind a mutable reference or doesn't implement `Default`. `.take()` replaces the field with `None` so you can move the `Receiver` out cleanly.
-	/// ### 2. When to NOT use `Option` (Direct Polling)
-	/// If you are polling the receiver *directly inside* `Oracle`'s own methods (like calling `self.rx.try_recv()` inside your `draw()` frame tick), **you do not need an `Option**`.
-	/// * **How it works:** The receiver stays embedded in `Oracle`, and you just access it mutably via `&mut self.rx`.
-	/// * **Why skip `Option`?** It avoids unnecessary `.unwrap()` calls, keeps the struct fields clean, and prevents runtime panics if something tries to access a receiver that has already been taken.
-	/// ### Summary Rule of Thumb:
-	/// * **Poll inside `Oracle` methods (like your current setup):** Keep it as a plain `mpsc::Receiver<T>` (no `Option`).
-	/// * **Handoff to an external worker loop/thread:** Use `Option<mpsc::Receiver<T>>` so you can `.take()` it once upon startup.
-	// daemon_rx: Option<mpsc::Receiver<DaemonCommand>>,
-	// daemon_rx: mpsc::Receiver<DaemonCommand>,
 	hotkey_manager: GlobalHotkeys,
 	scroll_tray: Option<TrayIcon>,
 	pub windows: Vec<AppWindow>,
 	clock_running: Arc<AtomicBool>,
+	// daemon: Option<DaemonHandle>,
+	// daemon: Option<Daemon>,
+	// daemon_rx: Option<mpsc::Receiver<DaemonCommand>>,
+	// daemon_rx: mpsc::Receiver<DaemonCommand>,
 }
 impl NativeApp {
 	pub fn new() -> anyhow::Result<Self> {
 		let (daemon_tx, daemon_rx) = mpsc::channel(100);
-		let engine = EstateEngine::new()?;
-		Self::spawn_daemon(daemon_rx, engine.clone());
+		let runtime = NativeRuntime::new();
+		let engine = EstateEngine::new(runtime)?;
+		let app = App::new(engine);
+		Self::spawn_daemon(daemon_rx, Arc::clone(&app.engine.runtime));
 		Ok(Self {
+			app,
 			clock_running: Arc::new(AtomicBool::new(true)),
 			daemon_tx,
-			engine,
 			hotkey_manager: GlobalHotkeys::new().unwrap(),
 			menu: None,
 			scroll_tray: None,
@@ -71,7 +50,7 @@ impl NativeApp {
 				let runtime = tokio::runtime::Runtime::new()?;
 				runtime.block_on(async {
 					let ctx = cli::context::Context::new();
-					router::execute(cli, ctx, self.engine.clone()).await
+					router::execute(cli, ctx, self.app.engine.clone()).await
 				})
 			}
 		};
@@ -81,7 +60,8 @@ impl NativeApp {
 	fn start_runtime(&mut self) -> anyhow::Result<()> {
 		tracing::info!(">>> NativeApp::start_runtime start");
 		self.spawn_global_hotkey_daemon()?;
-		let event_loop = EventLoop::<AppEvent>::with_user_event()
+		let event_loop = EventLoop::<AppEvent>
+			::with_user_event()
 			.with_activation_policy(ActivationPolicy::Accessory)
 			.build()?;
 		let proxy = event_loop.create_proxy();
@@ -116,12 +96,12 @@ impl NativeApp {
 		self.hotkey_manager.start();
 		Ok(())
 	}
-	fn spawn_daemon(mut rx: mpsc::Receiver<DaemonCommand>, engine: EstateEngine) {
+	fn spawn_daemon(mut rx: mpsc::Receiver<DaemonCommand>, runtime: Arc<NativeRuntime>) {
 		std::thread::spawn(move || {
 			let tokio_runtime = tokio::runtime::Runtime::new().expect("failed to create Tokio runtime");
 			tokio_runtime.block_on(async move {
-				engine.runtime.start_dispatcher();
-				let daemon = Daemon::new(engine);
+				runtime.start_dispatcher();
+				let daemon: Daemon<NativeRuntime> = Daemon::new(runtime.clone());
 				let shutdown_token = daemon.shutdown_token.clone();
 				let daemon_task = tokio::spawn(async move {
 					let mut daemon = daemon;
@@ -201,10 +181,11 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 			tracing::info!("🔥 main tray initialized");
 		}
 		if self.scroll_tray.is_none() {
-			match TrayIconBuilder::new()
-				.with_icon(scroll_tray_icon())
-				.with_tooltip("Estate Scroll Controller")
-				.build()
+			match
+				TrayIconBuilder::new()
+					.with_icon(scroll_tray_icon())
+					.with_tooltip("Estate Scroll Controller")
+					.build()
 			{
 				Ok(tray) => {
 					self.scroll_tray = Some(tray);
@@ -220,28 +201,21 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 		&mut self,
 		event_loop: &ActiveEventLoop,
 		window_id: WindowId,
-		event: WindowEvent,
+		event: WindowEvent
 	) {
-		let Some(window) = self
-			.windows
+		let Some(window) = self.windows
 			.iter_mut()
-			.find(|window| window.window.instance.id() == window_id)
-		else {
+			.find(|window| window.window.instance.id() == window_id) else {
 			return;
 		};
-		let response = window
-			.window
-			.egui_state
-			.on_window_event(&window.window.instance, &event);
+		let response = window.window.egui_state.on_window_event(&window.window.instance, &event);
 		if response.repaint {
 			window.window.instance.request_redraw();
 		}
 		match event {
 			WindowEvent::CloseRequested => {
 				tracing::info!("🛑 Window close requested for id: {:?}", window_id);
-				self
-					.windows
-					.retain(|window| window.window.instance.id() != window_id);
+				self.windows.retain(|window| window.window.instance.id() != window_id);
 				return;
 			}
 			WindowEvent::RedrawRequested => {
@@ -267,10 +241,7 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 				}
 				window.window.config.width = size.width;
 				window.window.config.height = size.height;
-				window
-					.window
-					.surface
-					.configure(&window.window.device, &window.window.config);
+				window.window.surface.configure(&window.window.device, &window.window.config);
 				window.window.needs_resize = false;
 				window.window.instance.request_redraw();
 			}
@@ -368,28 +339,25 @@ impl NativeApp {
 }
 impl NativeApp {
 	fn new_task(&mut self) {
-		self
-			.engine
-			.runtime
-			.emit(Event::app(EventKind::TaskRequested {
+		self.app.engine.runtime.emit(
+			Event::app(EventKind::TaskRequested {
 				request: TaskRequest::Create(TaskKind::SyncBookmarks),
-			}));
+			})
+		);
 	}
 	fn show_tasks(&mut self) {
-		self
-			.engine
-			.runtime
-			.emit(Event::app(EventKind::CommandExecuted {
+		self.app.engine.runtime.emit(
+			Event::app(EventKind::CommandExecuted {
 				command: "task_list".into(),
-			}));
+			})
+		);
 	}
 	fn clear_tasks(&mut self) {
-		self
-			.engine
-			.runtime
-			.emit(Event::app(EventKind::CommandExecuted {
+		self.app.engine.runtime.emit(
+			Event::app(EventKind::CommandExecuted {
 				command: "task_clear".into(),
-			}));
+			})
+		);
 	}
 	#[tracing::instrument(
 		target = "estate::discovery",

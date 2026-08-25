@@ -1,10 +1,7 @@
 use anyhow::Ok;
-use rmcp::{
-	handler::server::wrapper::Parameters,
-	model::{PromptMessage, PromptMessageContent},
-};
+use rmcp::{ handler::server::wrapper::Parameters, model::{ PromptMessage, PromptMessageContent } };
 
-use crate::native::backend::server::{CodeReviewArgs, MyServer};
+use crate::native::backend::server::{ CodeReviewArgs, MyServer };
 
 #[derive(Default, Debug, Clone)]
 pub struct McpClient {
@@ -30,9 +27,11 @@ impl McpClient {
 fn format_prompt_messages(msgs: Vec<rmcp::model::PromptMessage>) -> String {
 	msgs
 		.into_iter()
-		.map(|m| match m.content {
-			PromptMessageContent::Text { text } => text,
-			other => format!("{other:?}"),
+		.map(|m| {
+			match m.content {
+				PromptMessageContent::Text { text } => text,
+				other => format!("{other:?}"),
+			}
 		})
 		.collect::<Vec<_>>()
 		.join("\n")

@@ -1,12 +1,6 @@
-use std::sync::{
-	Mutex, OnceLock,
-	atomic::{AtomicBool, AtomicU64},
-};
+use std::sync::{ Mutex, OnceLock, atomic::{ AtomicBool, AtomicU64 } };
 
-use crate::{
-	native::prelude::{PanelConfig, ScrollRedirectState},
-	shared::prelude::*,
-};
+use crate::{ native::prelude::{ PanelConfig, ScrollRedirectState, * }, share::prelude::* };
 
 pub const TRAY_ICON: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/estate-tray.png"));
 pub const TRAY_SCROLL_ICON: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/estate-tray.png"));
@@ -54,6 +48,7 @@ pub struct VeConfig {
 	pub dock_right: PanelConfig,
 	pub bottom_panel: PanelConfig,
 }
+
 pub const PROBES_MINIMAL: ProbeSet = &[
 	Probe {
 		id: "git",

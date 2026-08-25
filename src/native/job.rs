@@ -6,9 +6,8 @@
 // | Individual background execution | `Job`          | Has lifecycle/state           |
 // | UI representation               | `Task` / `Job` | Shows pending/running/etc.    |
 
-use crate::{native::agent::AgentContext, prelude::*, shared::*};
+use crate::{ native::agent::AgentContext, prelude::*, share::* };
 
-pub type TaskId = Uuid;
 #[derive(Debug, Clone)]
 pub struct Task {
 	pub id: TaskId,
@@ -62,10 +61,7 @@ impl TaskManager {
 	}
 
 	pub fn set_status(&mut self, id: TaskId, status: TaskStatus) -> anyhow::Result<()> {
-		let task = self
-			.tasks
-			.get_mut(&id)
-			.ok_or_else(|| anyhow::anyhow!("task {id} not found"))?;
+		let task = self.tasks.get_mut(&id).ok_or_else(|| anyhow::anyhow!("task {id} not found"))?;
 
 		task.status = status;
 
@@ -155,7 +151,7 @@ impl TaskResult {
 		task_id: String,
 		ctx: AgentContext,
 		reason: impl Into<String>,
-		summary: Option<String>,
+		summary: Option<String>
 	) -> Self {
 		Self {
 			task_id,
@@ -171,8 +167,13 @@ impl TaskResult {
 
 #[derive(Debug, Clone)]
 pub enum Artifact {
-	FileRead { path: String, content: String },
-	FileWrite { path: String },
+	FileRead {
+		path: String,
+		content: String,
+	},
+	FileWrite {
+		path: String,
+	},
 	Observation(String),
 	ToolOutput(String),
 }
@@ -211,31 +212,4 @@ impl JobStatus {
 			Self::Running => "●",
 		}
 	}
-}
-
-#[derive(Debug, Clone, Deserialize, Hash, Serialize)]
-pub enum TaskKind {
-	BuildEstatePrototype,
-	GenerateView(String),
-	RebuildIndex,
-	SyncBookmarks,
-}
-impl TaskKind {
-	pub fn name(&self) -> String {
-		match self {
-			TaskKind::RebuildIndex => "Rebuild Index".into(),
-			TaskKind::GenerateView(name) => {
-				format!("Generate View: {name}")
-			}
-			TaskKind::SyncBookmarks => "Sync Bookmarks".into(),
-			TaskKind::BuildEstatePrototype => "Build Estate Prototype".into(),
-		}
-	}
-}
-#[derive(Debug, Clone, Deserialize, Hash, Serialize)]
-pub enum TaskRequest {
-	Create(TaskKind),
-	Run(TaskId),
-	Stop(TaskId),
-	Delete(TaskId),
 }

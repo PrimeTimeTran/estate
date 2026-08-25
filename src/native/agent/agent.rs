@@ -1,7 +1,14 @@
 use crate::{
 	native::agent::{
-		ACTION_PROMPT, AgentEvent, AgentTools, DECIDE_PROMPT, JSON_PROMPT, RuntimeEvent,
-		WorkspaceContext, build_sys_action, build_sys_prompt,
+		ACTION_PROMPT,
+		AgentEvent,
+		AgentTools,
+		DECIDE_PROMPT,
+		JSON_PROMPT,
+		RuntimeEvent,
+		WorkspaceContext,
+		build_sys_action,
+		build_sys_prompt,
 	},
 	prelude::*,
 };
@@ -33,33 +40,39 @@ impl Agent {
 	pub async fn run_agent_loop(
 		&self,
 		task: AgentTask,
-		event_tx: UnboundedSender<RuntimeEvent>,
+		event_tx: UnboundedSender<RuntimeEvent>
 	) -> anyhow::Result<TaskResult> {
 		let mut steps = 0;
 		let max_steps = 10;
 		let mut ctx = AgentContext::new(task.prompt.clone());
-		let _ = event_tx.send(RuntimeEvent::Agent(AgentEvent::Thinking {
-			task: task.clone(),
-		}));
+		let _ = event_tx.send(
+			RuntimeEvent::Agent(AgentEvent::Thinking {
+				task: task.clone(),
+			})
+		);
 		let mode: AgentMode = self.decide_mode(&ctx).await?;
 		if matches!(mode, AgentMode::Chat) {
 			let response = prompt_chat(&ctx).await?;
 			let result = TaskResult::completed_chat(task.id, ctx, response);
-			let _ = event_tx.send(RuntimeEvent::Agent(AgentEvent::Finished {
-				result: result.clone(),
-			}));
+			let _ = event_tx.send(
+				RuntimeEvent::Agent(AgentEvent::Finished {
+					result: result.clone(),
+				})
+			);
 			return Ok(result);
 		}
 		loop {
 			steps += 1;
 
 			if steps > max_steps {
-				return Ok(TaskResult::failed(
-					task.id,
-					ctx,
-					"Infinite loop",
-					Some("Agent exceeded maximum reasoning steps".into()),
-				));
+				return Ok(
+					TaskResult::failed(
+						task.id,
+						ctx,
+						"Infinite loop",
+						Some("Agent exceeded maximum reasoning steps".into())
+					)
+				);
 			}
 			let action = self.decide_next_action(&ctx).await?;
 
@@ -68,30 +81,32 @@ impl Agent {
 					let now = chrono::Local::now().format("%Y-%m-%d").to_string();
 
 					let response = format!("Context update: The current date is {}. {}", now, message);
-					let _ = event_tx.send(RuntimeEvent::Agent(AgentEvent::Working {
-						task: task.clone(),
-						message: response.clone(),
-					}));
-					ctx
-						.history
-						.push(AgentObservation::Current { message: response });
+					let _ = event_tx.send(
+						RuntimeEvent::Agent(AgentEvent::Working {
+							task: task.clone(),
+							message: response.clone(),
+						})
+					);
+					ctx.history.push(AgentObservation::Current { message: response });
 				}
 				AgentAction::ReadFile { path } => {
-					let _ = event_tx.send(RuntimeEvent::Agent(AgentEvent::Working {
-						task: task.clone(),
-						message: format!("Reading {path}"),
-					}));
+					let _ = event_tx.send(
+						RuntimeEvent::Agent(AgentEvent::Working {
+							task: task.clone(),
+							message: format!("Reading {path}"),
+						})
+					);
 					let content = self.tools.fs.read(&path)?;
-					ctx
-						.history
-						.push(AgentObservation::ReadFile { path, content });
+					ctx.history.push(AgentObservation::ReadFile { path, content });
 				}
 
 				AgentAction::WriteFile { path, content } => {
-					let _ = event_tx.send(RuntimeEvent::Agent(AgentEvent::Working {
-						task: task.clone(),
-						message: format!("Writing {path}"),
-					}));
+					let _ = event_tx.send(
+						RuntimeEvent::Agent(AgentEvent::Working {
+							task: task.clone(),
+							message: format!("Writing {path}"),
+						})
+					);
 
 					self.tools.fs.write(&path, &content)?;
 
@@ -103,9 +118,11 @@ impl Agent {
 				AgentAction::Finish { message } => {
 					let result = TaskResult::completed_with_summary(task.id, ctx, message);
 
-					let _ = event_tx.send(RuntimeEvent::Agent(AgentEvent::Finished {
-						result: result.clone(),
-					}));
+					let _ = event_tx.send(
+						RuntimeEvent::Agent(AgentEvent::Finished {
+							result: result.clone(),
+						})
+					);
 
 					return Ok(result);
 				}
@@ -182,9 +199,17 @@ impl AgentContext {
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum AgentObservation {
-	ReadFile { path: String, content: String },
-	WriteFile { path: String, success: bool },
-	Current { message: String },
+	ReadFile {
+		path: String,
+		content: String,
+	},
+	WriteFile {
+		path: String,
+		success: bool,
+	},
+	Current {
+		message: String,
+	},
 }
 
 #[derive(Clone, Debug)]
@@ -196,17 +221,22 @@ pub struct AgentBus {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "action")]
 pub enum AgentAction {
-	#[serde(rename = "read_file")]
-	ReadFile { path: String },
+	#[serde(rename = "read_file")] ReadFile {
+		path: String,
+	},
 
-	#[serde(rename = "write_file")]
-	WriteFile { path: String, content: String },
+	#[serde(rename = "write_file")] WriteFile {
+		path: String,
+		content: String,
+	},
 
-	#[serde(rename = "finish")]
-	Finish { message: String },
+	#[serde(rename = "finish")] Finish {
+		message: String,
+	},
 
-	#[serde(rename = "current")]
-	Current { message: String },
+	#[serde(rename = "current")] Current {
+		message: String,
+	},
 }
 
 impl TryFrom<LlmAction> for AgentAction {
@@ -214,24 +244,26 @@ impl TryFrom<LlmAction> for AgentAction {
 
 	fn try_from(v: LlmAction) -> Result<Self, Self::Error> {
 		match v.action.as_str() {
-			"read_file" => Ok(Self::ReadFile {
-				path: v.path.ok_or_else(|| anyhow::anyhow!("missing path"))?,
-			}),
+			"read_file" =>
+				Ok(Self::ReadFile {
+					path: v.path.ok_or_else(|| anyhow::anyhow!("missing path"))?,
+				}),
 
-			"write_file" => Ok(Self::WriteFile {
-				path: v.path.ok_or_else(|| anyhow::anyhow!("missing path"))?,
-				content: v
-					.content
-					.ok_or_else(|| anyhow::anyhow!("missing content"))?,
-			}),
+			"write_file" =>
+				Ok(Self::WriteFile {
+					path: v.path.ok_or_else(|| anyhow::anyhow!("missing path"))?,
+					content: v.content.ok_or_else(|| anyhow::anyhow!("missing content"))?,
+				}),
 
-			"current" => Ok(Self::Current {
-				message: v.message.unwrap_or_default(),
-			}),
+			"current" =>
+				Ok(Self::Current {
+					message: v.message.unwrap_or_default(),
+				}),
 
-			"finish" => Ok(Self::Finish {
-				message: v.message.unwrap_or_default(),
-			}),
+			"finish" =>
+				Ok(Self::Finish {
+					message: v.message.unwrap_or_default(),
+				}),
 
 			other => Err(anyhow::anyhow!("unknown action: {}", other)),
 		}
@@ -241,11 +273,7 @@ impl TryFrom<LlmAction> for AgentAction {
 fn build_prompt(ctx: &AgentContext) -> String {
 	return build_sys_action(
 		ACTION_PROMPT,
-		&[
-			&ctx.prompt,
-			&format_workspace(&ctx.workspace),
-			&format_history(&ctx.history),
-		],
+		&[&ctx.prompt, &format_workspace(&ctx.workspace), &format_history(&ctx.history)]
 	);
 }
 
@@ -254,7 +282,8 @@ async fn build_action(prompt: &str) -> anyhow::Result<LlmAction> {
 
 	let system_prompt: &str = JSON_PROMPT;
 
-	let payload = serde_json::json!({
+	let payload =
+		serde_json::json!({
 			"model": "qwen3:8b",
 			"system": system_prompt,
 			"prompt": prompt,
@@ -265,10 +294,8 @@ async fn build_action(prompt: &str) -> anyhow::Result<LlmAction> {
 	let res = client
 		.post("http://localhost:11434/api/generate")
 		.json(&payload)
-		.send()
-		.await?
-		.json::<serde_json::Value>()
-		.await?;
+		.send().await?
+		.json::<serde_json::Value>().await?;
 
 	let response_text = res["response"].as_str().unwrap_or("{}");
 
@@ -308,10 +335,7 @@ pub async fn prompt_chat(ctx: &AgentContext) -> anyhow::Result<String> {
 	Ok(result)
 }
 
-pub async fn prompt_ollama_json<T>(prompt: &str) -> anyhow::Result<T>
-where
-	T: DeserializeOwned,
-{
+pub async fn prompt_ollama_json<T>(prompt: &str) -> anyhow::Result<T> where T: DeserializeOwned {
 	let result = ollama_generate(prompt, Some("You are a helpful assistant"), true).await?;
 	Ok(serde_json::from_str(&result)?)
 }
@@ -319,7 +343,7 @@ where
 pub async fn ollama_generate(
 	prompt: &str,
 	system: Option<&str>,
-	json: bool,
+	json: bool
 ) -> anyhow::Result<String> {
 	let client = reqwest::Client::new();
 	let mut payload = serde_json::json!({
@@ -333,11 +357,7 @@ pub async fn ollama_generate(
 	if json {
 		payload["format"] = serde_json::json!("json");
 	}
-	let response = client
-		.post("http://localhost:11434/api/generate")
-		.json(&payload)
-		.send()
-		.await?;
+	let response = client.post("http://localhost:11434/api/generate").json(&payload).send().await?;
 	let res: serde_json::Value = response.json().await?;
 	res["response"]
 		.as_str()

@@ -1,4 +1,4 @@
-use crate::{native::poc::McpClient, prelude::*};
+use crate::{ native::poc::McpClient, prelude::* };
 use anyhow::Error;
 
 #[derive(Debug, Default, Clone)]
@@ -45,10 +45,7 @@ impl Vfs {
 	pub fn read_file(&self, path: &str) -> Result<String, Error> {
 		dbg!("Read file contents from VFS");
 
-		Ok(format!(
-			"// Placeholder content for {}\n\nfn main() {{}}\n",
-			path
-		))
+		Ok(format!("// Placeholder content for {}\n\nfn main() {{}}\n", path))
 	}
 
 	pub fn write_file(&self, path: &str, content: &str) -> Result<(), Error> {

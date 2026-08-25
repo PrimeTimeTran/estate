@@ -1,13 +1,6 @@
-use crate::{
-	native::{daemon::daemon::*, prelude::*, *},
-	prelude::*,
-};
+use crate::{ native::{ daemon::daemon::*, prelude::*, * }, prelude::* };
 
-use std::{
-	fs,
-	io::Result,
-	path::{Path, PathBuf},
-};
+use std::{ fs, io::Result, path::{ Path, PathBuf } };
 
 fn file_link(path: &Path) -> String {
 	let p = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
@@ -30,7 +23,9 @@ fn symbols_json_path() -> Result<PathBuf> {
 fn read_symbols() -> serde_json::Value {
 	let path = match symbols_json_path() {
 		Ok(p) => p,
-		Err(_) => return serde_json::json!([]),
+		Err(_) => {
+			return serde_json::json!([]);
+		}
 	};
 
 	let raw = fs::read_to_string(path).unwrap_or_else(|_| "[]".to_string());
@@ -46,8 +41,9 @@ fn render_symbols(json: &serde_json::Value) -> String {
 	// -------------------------
 	// FILE REGISTRY
 	// -------------------------
-	if let Some(fs) = json.get("filesystem")
-		&& let Some(map) = fs.get("uid_mapping").and_then(|v| v.as_object())
+	if
+		let Some(fs) = json.get("filesystem") &&
+		let Some(map) = fs.get("uid_mapping").and_then(|v| v.as_object())
 	{
 		out.push_str("### File Registry\n\n");
 
@@ -67,10 +63,11 @@ fn render_symbols(json: &serde_json::Value) -> String {
 	// -------------------------
 	// ENGINE SYMBOLS
 	// -------------------------
-	if let Ok(path) = symbols_json_path()
-		&& let Ok(raw) = fs::read_to_string(path)
-		&& let Ok(json) = serde_json::from_str::<serde_json::Value>(&raw)
-		&& let Some(arr) = json.get("symbols").and_then(|v| v.as_array())
+	if
+		let Ok(path) = symbols_json_path() &&
+		let Ok(raw) = fs::read_to_string(path) &&
+		let Ok(json) = serde_json::from_str::<serde_json::Value>(&raw) &&
+		let Some(arr) = json.get("symbols").and_then(|v| v.as_array())
 	{
 		out.push_str("### Estate Engine Symbols\n\n");
 
@@ -80,17 +77,25 @@ fn render_symbols(json: &serde_json::Value) -> String {
 				.and_then(|v| v.as_str())
 				.unwrap_or("unknown");
 
-			let path = symbol.get("path").and_then(|v| v.as_str()).unwrap_or("");
+			let path = symbol
+				.get("path")
+				.and_then(|v| v.as_str())
+				.unwrap_or("");
 
 			let full = PathBuf::from(path);
 
-			out.push_str(&format!(
-				"- `{}` → [{}]({}) — {}\n",
-				id,
-				path,
-				file_link(&full),
-				symbol.get("doc").and_then(|v| v.as_str()).unwrap_or("")
-			));
+			out.push_str(
+				&format!(
+					"- `{}` → [{}]({}) — {}\n",
+					id,
+					path,
+					file_link(&full),
+					symbol
+						.get("doc")
+						.and_then(|v| v.as_str())
+						.unwrap_or("")
+				)
+			);
 		}
 
 		out.push('\n');
@@ -115,8 +120,9 @@ pub fn generate_explain_doc() -> Result<()> {
 
 	let raw = fs::read_to_string(&path)?;
 
-	let json: serde_json::Value =
-		serde_json::from_str(&raw).unwrap_or_else(|_| serde_json::json!({}));
+	let json: serde_json::Value = serde_json
+		::from_str(&raw)
+		.unwrap_or_else(|_| serde_json::json!({}));
 
 	let md = render_explain(&json);
 
@@ -179,7 +185,10 @@ fn render_explain(json: &serde_json::Value) -> String {
 					.and_then(|v| v.as_str())
 					.unwrap_or("unknown");
 
-				let path = symbol.get("path").and_then(|v| v.as_str()).unwrap_or("");
+				let path = symbol
+					.get("path")
+					.and_then(|v| v.as_str())
+					.unwrap_or("");
 
 				out.push_str(&format!("- `{}` → `{}`\n", id, path));
 			}

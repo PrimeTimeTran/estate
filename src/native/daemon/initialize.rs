@@ -1,6 +1,6 @@
-use std::{fs, io::Result};
+use std::{ fs, io::Result };
 
-use crate::{native::daemon::resolver::engine_data_dir, prelude::*};
+use crate::{ native::daemon::resolver::engine_data_dir, prelude::* };
 
 pub fn init() -> Result<()> {
 	let root = engine_data_dir()?;
@@ -17,32 +17,23 @@ pub fn init() -> Result<()> {
 	}
 
 	let files = [
-		(
-			root.join("config.toml"),
-			r#"# estate configuration
+		(root.join("config.toml"), r#"# estate configuration
 
 version = 1
-"#,
-		),
-		(
-			root.join("state.json"),
-			r#"{
+"#),
+		(root.join("state.json"), r#"{
   "starts": 0,
   "started_at": 0,
   "longest_run": 0
 }
-"#,
-		),
+"#),
 		(root.join("daemon.pid"), ""),
 		(root.join("socket"), ""),
 		(root.join("registry/graph.db"), ""),
-		(
-			root.join("views/default.toml"),
-			r#"# Default view
+		(root.join("views/default.toml"), r#"# Default view
 
 name = "default"
-"#,
-		),
+"#),
 		(root.join("logs/estate.log"), ""),
 	];
 

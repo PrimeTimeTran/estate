@@ -1,15 +1,20 @@
 use crate::prelude::*;
-use crate::shared::*;
-// use crate::native::daemon::engine_data_dir;
+use crate::share::*;
 
-use tracing::{debug, error, info, info_span, trace, warn};
+use tracing::{ debug, error, info, info_span, trace, warn };
 use tracing_subscriber::{
-	EnvFilter, Layer, filter::LevelFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt,
+	EnvFilter,
+	Layer,
+	filter::LevelFilter,
+	fmt,
+	layer::SubscriberExt,
+	util::SubscriberInitExt,
 };
 
 pub fn init_logging(config: &LogConfig) -> anyhow::Result<()> {
 	let terminal_filter = config.terminal_filter()?;
-	let terminal = fmt::layer()
+	let terminal = fmt
+		::layer()
 		.without_time()
 		.with_target(true)
 		.with_thread_ids(false)
@@ -47,14 +52,16 @@ pub fn init_logging(config: &LogConfig) -> anyhow::Result<()> {
 	// } else {
 	// 	subscriber.init();
 	// }
-	tracing_subscriber::registry()
+	tracing_subscriber
+		::registry()
 		.with(terminal)
 		// .with(file)
 		.init();
 	Ok(())
 }
 pub fn init() -> anyhow::Result<()> {
-	tracing_subscriber::registry()
+	tracing_subscriber
+		::registry()
 		.with(EnvFilter::from_default_env())
 		.with(tracing_subscriber::fmt::layer())
 		.init();

@@ -1,49 +1,21 @@
-use crate::prelude::*;
-use crate::shared::{prelude::*, *};
+use crate::{ prelude::*, share::{ r#trait::Runtime, prelude::*, * } };
 
 use winit::{
 	application::ApplicationHandler,
 	event::WindowEvent,
-	event_loop::{ActiveEventLoop, EventLoop, EventLoopProxy},
+	event_loop::{ ActiveEventLoop, EventLoop, EventLoopProxy },
 	window::WindowId,
 };
 
-pub trait Runtime {
-	// event/message operations, etc.
+pub struct App<R: Runtime> {
+	pub engine: EstateEngine<R>,
 }
-
-pub struct NativeRuntime {
-	// tokio runtime, channels, daemon communication, etc.
-}
-
-impl Runtime for NativeRuntime {
-	// ...
-}
-
-pub struct WebRuntime {
-	// browser/client-side event system later
-}
-
-impl Runtime for WebRuntime {
-	// ...
-}
-
-pub struct App<R> {
-	engine: EstateEngine<R>,
-	// tray: Option<TrayIcon>,
-	// menu: Option<TrayMenu>,
-
-	// daemon_tx: mpsc::Sender<DaemonCommand>,
-	// hotkey_manager: GlobalHotkeys,
-	// scroll_tray: Option<TrayIcon>,
-	// pub windows: Vec<AppWindow>,
-	// clock_running: Arc<AtomicBool>,
-}
-impl<R> App<R> {
+impl<R: Runtime> App<R> {
 	pub fn new(engine: EstateEngine<R>) -> Self {
 		Self { engine }
 	}
 }
+impl<R: Runtime> App<R> {}
 // impl App {
 // 	pub fn new() -> anyhow::Result<Self> {
 // 		// let (daemon_tx, daemon_rx) = mpsc::channel(100);

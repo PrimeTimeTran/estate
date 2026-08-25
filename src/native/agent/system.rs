@@ -1,26 +1,47 @@
 use crate::{
-	native::agent::{AgentBus, AgentEvent, AgentRegistry, AgentRuntime, RuntimeEvent},
+	native::agent::{ AgentBus, AgentEvent, AgentRegistry, AgentRuntime, RuntimeEvent },
 	prelude::*,
 };
-use tokio::sync::mpsc::{UnboundedReceiver, unbounded_channel};
+use tokio::sync::mpsc::{ UnboundedReceiver, unbounded_channel };
 
 #[derive(Debug, Clone)]
 pub enum SystemEvent {
-	SpawnAgent { agent_id: String },
+	SpawnAgent {
+		agent_id: String,
+	},
 
-	TaskAdd { task_id: String },
-	TaskSpawned { task: AgentTask },
-	TaskQueued { task_id: String },
+	TaskAdd {
+		task_id: String,
+	},
+	TaskSpawned {
+		task: AgentTask,
+	},
+	TaskQueued {
+		task_id: String,
+	},
 
-	TaskStarted { task_id: String },
+	TaskStarted {
+		task_id: String,
+	},
 
-	TaskCompleted { result: TaskResult },
-	TaskFailed { task_id: String, error: String },
+	TaskCompleted {
+		result: TaskResult,
+	},
+	TaskFailed {
+		task_id: String,
+		error: String,
+	},
 
-	AgentSpawned { agent_id: String },
-	AgentFinished { agent_id: String },
+	AgentSpawned {
+		agent_id: String,
+	},
+	AgentFinished {
+		agent_id: String,
+	},
 
-	TaskGroupFinished { group_id: String },
+	TaskGroupFinished {
+		group_id: String,
+	},
 	AllIdle,
 }
 
@@ -55,9 +76,7 @@ pub async fn handle_event(event: AgentEvent, runtime: &AgentRuntime) {
 		}
 
 		AgentEvent::Finished { result } => {
-			let _ = runtime
-				.event_tx
-				.send(RuntimeEvent::System(SystemEvent::TaskCompleted { result }));
+			let _ = runtime.event_tx.send(RuntimeEvent::System(SystemEvent::TaskCompleted { result }));
 		}
 
 		_ => {}

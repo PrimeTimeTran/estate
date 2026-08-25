@@ -1,5 +1,6 @@
 use crate::{
-	native::daemon::{DocCompiler, EstateRuntime, Event},
+	share::r#trait::Runtime,
+	native::daemon::{ DocCompiler, Event, NativeRuntime },
 	prelude::*,
 };
 
@@ -49,40 +50,37 @@ pub trait EstateDaemon {
 	async fn start(&mut self, options: DaemonOptions) -> Result<DaemonResponse>;
 	async fn shutdown(&mut self) -> Result<DaemonResponse>;
 }
-pub struct Daemon {
-	runtime: Arc<EstateRuntime>,
+
+pub struct Daemon<R: Runtime> {
+	pub runtime: Arc<R>,
 	pub dispatcher: EventDispatcher,
 	pub shutdown_token: CancellationToken,
 }
-impl Daemon {
-	pub fn new(engine: EstateEngine) -> Self {
-		let runtime = engine.runtime.clone();
-		let dispatcher = EventDispatcher::new();
+
+impl<R: Runtime> Daemon<R> {
+	pub fn new(runtime: Arc<R>) -> Self {
 		Self {
 			runtime,
-			dispatcher,
+			dispatcher: EventDispatcher::new(),
 			shutdown_token: CancellationToken::new(),
 		}
 	}
 }
-impl Daemon {
-	///--------------------------------------------------------------------------------
-	/// Long lived runner ready todo something
-	/// cargo run daemon
-	///--------------------------------------------------------------------------------
+impl<R: Runtime> Daemon<R> {
 	async fn run_background(&mut self) -> Result<DaemonResponse> {
 		tracing::info!("Run Background");
 		let exe = std::env::current_exe()?;
-		let child = std::process::Command::new(exe)
+		let child = std::process::Command
+			::new(exe)
 			.arg("tray")
 			.stdin(std::process::Stdio::inherit())
 			.stdout(std::process::Stdio::inherit())
 			.stderr(std::process::Stdio::inherit())
 			.spawn()?;
 		let pid = child.id();
-		eprintln!("Daemon started");
-		eprintln!("PID: {}", pid);
-		eprintln!("Socket: {}", SOCKET_PATH);
+		// eprintln!("Daemon started");
+		// eprintln!("PID: {}", pid);
+		// eprintln!("Socket: {}", SOCKET_PATH);
 		Ok(DaemonResponse {
 			status: "ok".into(),
 			message: Some(format!("Daemon started with PID {}", pid)),
@@ -91,13 +89,9 @@ impl Daemon {
 	}
 	pub async fn run_foreground(&mut self) -> anyhow::Result<()> {
 		tracing::info!("daemon running in foreground");
-
 		self.runtime.emit(Event::daemon(EventKind::DaemonStarted));
-
 		self.shutdown_token.cancelled().await;
-
 		tracing::info!("daemon stopped");
-
 		self.runtime.emit(Event::daemon(EventKind::DaemonStopped));
 
 		Ok(())
@@ -105,15 +99,10 @@ impl Daemon {
 }
 
 #[async_trait]
-impl EstateDaemon for Daemon {
+impl<R> EstateDaemon for Daemon<R> where R: Runtime {
 	async fn execute(&mut self, action: ActionRequest) -> Result<DaemonResponse> {
 		match action {
-			ActionRequest::Analyze {
-				path,
-				line,
-				column,
-				mode,
-			} => self.analyze(path, line, column, mode),
+			ActionRequest::Analyze { path, line, column, mode } => self.analyze(path, line, column, mode),
 			ActionRequest::Metrics { path } => self.metrics(path),
 			ActionRequest::ScanWorkspace { path } => self.scan_workspace(path),
 			ActionRequest::InitializeEstate { path } => self.initialize_estate(path),
@@ -133,7 +122,7 @@ impl EstateDaemon for Daemon {
 		Ok(DaemonResponse::default())
 	}
 }
-impl Daemon {
+impl<R: Runtime> Daemon<R> {
 	// pub async fn is_running() -> bool {
 	// 	UnixStream::connect(SOCKET_PATH).await.is_ok()
 	// }
@@ -254,7 +243,7 @@ impl Daemon {
 		path: PathBuf,
 		line: Option<u32>,
 		column: Option<u32>,
-		mode: Option<String>,
+		mode: Option<String>
 	) -> Result<DaemonResponse> {
 		let options = AnalyzerOptions {
 			line,
@@ -265,7 +254,8 @@ impl Daemon {
 		};
 		let system_path = if let Some(s) = path.to_str() {
 			if s.starts_with("file://") {
-				url::Url::parse(s)?
+				url::Url
+					::parse(s)?
 					.to_file_path()
 					.map_err(|_| anyhow::anyhow!("Invalid file URI"))?
 			} else {
@@ -336,7 +326,8 @@ impl ::cli::command::CliCommand for StartDaemon {
 	async fn run(&self, _ctx: &cli::context::Context) {
 		println!("🚀 starting estate daemon");
 		let exe = std::env::current_exe().expect("failed finding current executable");
-		let child = std::process::Command::new(exe)
+		let child = std::process::Command
+			::new(exe)
 			.arg("daemon")
 			.spawn()
 			.expect("failed starting daemon");
@@ -422,7 +413,7 @@ pub enum DaemonCommand {
 }
 #[derive(Clone)]
 pub struct DaemonHandle {
-	runtime: EstateRuntime,
+	runtime: NativeRuntime,
 }
 impl DaemonHandle {
 	pub fn emit(&self, event: Event) {
@@ -472,7 +463,7 @@ impl AnalyzeDaemon {
 	pub async fn run(
 		&self,
 		_ctx: &CliContext,
-		args: &cli::context::AnalyzeArgs,
+		args: &cli::context::AnalyzeArgs
 	) -> Result<Workspace, AnalysisError> {
 		let target_path = PathBuf::from(&args.paths[0]);
 		let request = Analyze {
@@ -513,16 +504,16 @@ impl AnalyzeLoop {
 				.iter()
 				.map(|action| demand::DemandOption::new(action.title.clone()))
 				.collect::<Vec<_>>();
-			let choice = demand::Select::new("What would you like to do?")
-				.options(options)
-				.run();
+			let choice = demand::Select::new("What would you like to do?").options(options).run();
 			match choice {
 				Ok(selected) => {
 					if let Some(action) = actions.iter().find(|a| a.title == selected) {
 						action.execute(&workspace, ActionOptions::default());
 					}
 				}
-				Err(_) => break,
+				Err(_) => {
+					break;
+				}
 			}
 		}
 	}

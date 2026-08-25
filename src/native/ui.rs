@@ -1,9 +1,6 @@
-use crate::{native::prelude::*, prelude::*};
+use crate::{ native::{ self, prelude::* }, prelude::* };
 
-use tray_icon::{
-	Icon, TrayIcon, TrayIconBuilder,
-	menu::{Menu, MenuItem, Submenu},
-};
+use tray_icon::{ Icon, TrayIcon, TrayIconBuilder, menu::{ Menu, MenuItem, Submenu } };
 
 pub fn bootstrap() -> anyhow::Result<(TrayMenu, TrayIcon)> {
 	let menu = Menu::new();
@@ -53,7 +50,8 @@ pub fn bootstrap() -> anyhow::Result<(TrayMenu, TrayIcon)> {
 }
 
 pub fn tray_icon() -> Icon {
-	let image = image::load_from_memory(native::constants::TRAY_ICON)
+	let image = image
+		::load_from_memory(native::constants::TRAY_ICON)
 		.expect("failed to load generated tray icon")
 		.into_rgba8();
 	let (width, height) = image.dimensions();
@@ -62,10 +60,12 @@ pub fn tray_icon() -> Icon {
 
 pub fn scroll_tray_icon() -> tray_icon::Icon {
 	// constants::TRAY_SCROLL_ICON;
-	let image = image::load_from_memory(native::constants::TRAY_SCROLL_ICON)
+	let image = image
+		::load_from_memory(native::constants::TRAY_SCROLL_ICON)
 		.expect("failed to load scroll tray icon")
 		.into_rgba8();
 	let (width, height) = image.dimensions();
-	tray_icon::Icon::from_rgba(image.into_raw(), width, height)
+	tray_icon::Icon
+		::from_rgba(image.into_raw(), width, height)
 		.expect("failed to create scroll tray icon")
 }

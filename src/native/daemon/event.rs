@@ -1,4 +1,4 @@
-use crate::{prelude::*, shared::vfs::*};
+use crate::{ prelude::*, share::{ self, r#trait::Runtime }, share::vfs::* };
 
 // Events = facts that happened
 // Handlers = reactions to facts
@@ -73,126 +73,31 @@ use crate::{prelude::*, shared::vfs::*};
 					watch
 				(latest snapshot)
 */
-#[derive(Debug, Clone, Deserialize, Hash, Serialize)]
-pub struct Event {
-	pub id: u64,
-	pub timestamp: u64,
-	pub source: EventSource,
-	pub kind: EventKind,
-}
-impl Event {
-	pub fn new(source: EventSource, kind: EventKind) -> Self {
-		tracing::info!("new Event {:?}", source);
-		Self {
-			id: EVENT_ID.fetch_add(1, Ordering::Relaxed),
-			kind,
-			source,
-			timestamp: now(),
-		}
-	}
-	pub fn daemon(kind: EventKind) -> Self {
-		Self::new(EventSource::Daemon, kind)
-	}
-	pub fn cli(kind: EventKind) -> Self {
-		Self::new(EventSource::Cli, kind)
-	}
-	pub fn filesystem(kind: EventKind) -> Self {
-		Self::new(EventSource::Filesystem, kind)
-	}
-	pub fn editor(kind: EventKind) -> Self {
-		Self::new(EventSource::Editor, kind)
-	}
-	pub fn app(kind: EventKind) -> Self {
-		Self::new(EventSource::App, kind)
-	}
-}
-#[derive(Debug, Clone, Deserialize, Hash, Serialize)]
-pub enum EventKind {
-	// ─────────────────────────────────────────────
-	// Daemon
-	// ─────────────────────────────────────────────
-	DaemonStarted,
-	DaemonStopped,
-	StatusRequested,
-	// ─────────────────────────────────────────────
-	// Tasks
-	// ─────────────────────────────────────────────
-	TaskRequested { request: TaskRequest },
-	TaskCreated { task_id: TaskId, name: String },
-	TaskStarted { task_id: TaskId },
-	TaskCompleted { task_id: TaskId },
-	TaskFailed { task_id: TaskId, error: String },
-	TaskStopped { task_id: TaskId },
-	TaskDeleted { task_id: TaskId },
-	TasksCleared,
-	// ─────────────────────────────────────────────
-	// Commands
-	// ─────────────────────────────────────────────
-	CommandExecuted { command: String },
-	// ─────────────────────────────────────────────
-	// Files
-	// ─────────────────────────────────────────────
-	FileCreated { inode: Inode, path: String },
-	FileModified { inode: Inode, path: String },
-	FileDeleted { inode: Inode, path: String },
-	// ─────────────────────────────────────────────
-	// Estate / indexing
-	// ─────────────────────────────────────────────
-	EstateDiscovered { inode: Inode, path: String },
-	EstateRemoved { inode: Inode, path: String },
-	IndexUpdated { files_changed: u64 },
-	CacheInvalidated { reason: String },
-}
-#[derive(Debug, Clone, Deserialize, Hash, Serialize)]
-pub enum EventSource {
-	App,
-	Cli,
-	Daemon,
-	Editor,
-	Filesystem,
-}
+
 #[derive(Clone, Debug)]
-pub struct EstateRuntime {
+pub struct NativeRuntime {
 	pub events: EventBus,
 	pub state: Arc<RwLock<EstateState>>,
 	pub tasks: Arc<RwLock<TaskManager>>,
 }
-impl Default for EstateRuntime {
+impl Default for NativeRuntime {
 	fn default() -> Self {
 		Self::new()
 	}
 }
-impl EstateRuntime {
-	pub fn new() -> Self {
-		tracing::info!("EstateRuntime new");
-		Self {
-			events: EventBus::new(),
-			state: Arc::new(RwLock::new(EstateState::load())),
-			tasks: Arc::new(RwLock::new(TaskManager::new())),
-		}
-	}
-	pub fn emit(&self, event: Event) {
+impl share::r#trait::Runtime for NativeRuntime {
+	fn emit(&self, event: Event) {
 		self.events.emit(event);
 	}
-	pub fn event_processed(&self) {
-		let mut state = self.state.write().unwrap();
-		state.events_processed += 1;
-	}
-	// pub fn increment_events_processed() {}
-	pub fn start_dispatcher(self: &Arc<Self>) {
-		// println!("🔥 start_dispatcher()");
+	fn start_dispatcher(self: &Arc<Self>) {
 		let runtime = Arc::clone(self);
-		// println!("🔥 subscribing to event bus");
 		let mut receiver = runtime.events.subscribe();
-		// println!("🔥 event bus subscribed");
 		let mut dispatcher = EventDispatcher::new();
 		dispatcher.register(TaskHandler);
 		dispatcher.register(StateHandler);
 		dispatcher.register(CommandHandler);
 		dispatcher.register(FileWatcherHandler);
-		// println!("🔥 handlers registered");
 		tokio::spawn(async move {
-			// println!("🔥 EVENT DISPATCHER TASK STARTED");
 			loop {
 				match receiver.recv().await {
 					Ok(event) => {
@@ -211,6 +116,21 @@ impl EstateRuntime {
 		});
 	}
 }
+impl NativeRuntime {
+	pub fn new() -> Self {
+		tracing::info!("NativeRuntime new");
+		Self {
+			events: EventBus::new(),
+			state: Arc::new(RwLock::new(EstateState::load())),
+			tasks: Arc::new(RwLock::new(TaskManager::new())),
+		}
+	}
+	pub fn event_processed(&self) {
+		let mut state = self.state.write().unwrap();
+		state.events_processed += 1;
+	}
+}
+
 #[derive(Debug, Clone)]
 pub struct EventBus {
 	sender: broadcast::Sender<Event>,
@@ -246,12 +166,12 @@ impl EventBus {
 }
 #[async_trait::async_trait]
 pub trait EventHandler: Send + Sync {
-	async fn handle(&self, event: &Event, runtime: &EstateRuntime);
+	async fn handle(&self, event: &Event, runtime: &NativeRuntime);
 }
 pub struct LogHandler;
 #[async_trait::async_trait]
 impl EventHandler for LogHandler {
-	async fn handle(&self, event: &Event, _runtime: &EstateRuntime) {
+	async fn handle(&self, event: &Event, _runtime: &NativeRuntime) {
 		tracing::info!("📡 received {:?}", event);
 	}
 }
@@ -269,18 +189,15 @@ impl EventDispatcher {
 			handlers: Vec::new(),
 		}
 	}
-	pub fn register<H>(&mut self, handler: H)
-	where
-		H: EventHandler + 'static,
-	{
+	pub fn register<H>(&mut self, handler: H) where H: EventHandler + 'static {
 		self.handlers.push(Box::new(handler));
 	}
-	pub async fn run(self, mut rx: broadcast::Receiver<Event>, runtime: EstateRuntime) {
+	pub async fn run(self, mut rx: broadcast::Receiver<Event>, runtime: NativeRuntime) {
 		while let Ok(event) = rx.recv().await {
 			self.dispatch(event, &runtime).await;
 		}
 	}
-	pub async fn dispatch(&self, event: Event, runtime: &EstateRuntime) {
+	pub async fn dispatch(&self, event: Event, runtime: &NativeRuntime) {
 		for handler in &self.handlers {
 			handler.handle(&event, runtime).await;
 		}
@@ -290,7 +207,7 @@ impl EventDispatcher {
 pub struct FileWatcherHandler;
 #[async_trait::async_trait]
 impl EventHandler for FileWatcherHandler {
-	async fn handle(&self, event: &Event, runtime: &EstateRuntime) {
+	async fn handle(&self, event: &Event, runtime: &NativeRuntime) {
 		if let EventKind::FileModified { inode, path } = &event.kind {
 			tracing::info!("📡 FileWatcherHandler handle {:?} ({:?})", event, inode);
 			runtime.emit(Event::daemon(EventKind::IndexUpdated { files_changed: 1 }));
@@ -300,7 +217,7 @@ impl EventHandler for FileWatcherHandler {
 pub struct TaskHandler;
 #[async_trait::async_trait]
 impl EventHandler for TaskHandler {
-	async fn handle(&self, event: &Event, runtime: &EstateRuntime) {
+	async fn handle(&self, event: &Event, runtime: &NativeRuntime) {
 		tracing::info!("📡 EventHandler.handle {:?}", event);
 		let EventKind::TaskRequested { request } = &event.kind else {
 			return;
@@ -310,14 +227,18 @@ impl EventHandler for TaskHandler {
 				tracing::info!("TaskRequest::Create {:?}", kind);
 				let mut tasks = runtime.tasks.write().unwrap();
 				let task = tasks.create(kind.clone());
-				runtime.emit(Event::daemon(EventKind::TaskCreated {
-					task_id: task,
-					name: kind.name(),
-				}));
+				runtime.emit(
+					Event::daemon(EventKind::TaskCreated {
+						task_id: task,
+						name: kind.name(),
+					})
+				);
 				task
 			}
 			TaskRequest::Run(task_id) => *task_id,
-			_ => return,
+			_ => {
+				return;
+			}
 		};
 		let task = {
 			let tasks = runtime.tasks.read().unwrap();
@@ -348,10 +269,12 @@ impl EventHandler for TaskHandler {
 					runtime.emit(Event::daemon(EventKind::TaskCompleted { task_id }));
 				}
 				Err(error) => {
-					runtime.emit(Event::daemon(EventKind::TaskFailed {
-						task_id,
-						error: error.to_string(),
-					}));
+					runtime.emit(
+						Event::daemon(EventKind::TaskFailed {
+							task_id,
+							error: error.to_string(),
+						})
+					);
 				}
 			}
 		});
@@ -360,7 +283,7 @@ impl EventHandler for TaskHandler {
 pub struct StateHandler;
 #[async_trait::async_trait]
 impl EventHandler for StateHandler {
-	async fn handle(&self, event: &Event, runtime: &EstateRuntime) {
+	async fn handle(&self, event: &Event, runtime: &NativeRuntime) {
 		tracing::info!("🔥 StateHandler received: {:?}", event.kind);
 		let mut state = runtime.state.write().unwrap();
 		match &event.kind {
@@ -394,7 +317,7 @@ impl EventHandler for StateHandler {
 pub struct CommandHandler;
 #[async_trait::async_trait]
 impl EventHandler for CommandHandler {
-	async fn handle(&self, event: &Event, runtime: &EstateRuntime) {
+	async fn handle(&self, event: &Event, runtime: &NativeRuntime) {
 		tracing::info!("CommandHandler handler {:?}", event);
 		let EventKind::CommandExecuted { command } = &event.kind else {
 			tracing::info!("CommandHandler handle {:?}", event);
@@ -403,9 +326,11 @@ impl EventHandler for CommandHandler {
 		match command.as_str() {
 			"TaskRequest::Createtask_create" => {
 				tracing::info!("CommandHandler task_create {:?}", event);
-				runtime.emit(Event::app(EventKind::TaskRequested {
-					request: TaskRequest::Create(TaskKind::SyncBookmarks),
-				}));
+				runtime.emit(
+					Event::app(EventKind::TaskRequested {
+						request: TaskRequest::Create(TaskKind::SyncBookmarks),
+					})
+				);
 			}
 			"task_list" => {
 				let tasks = runtime.tasks.read().unwrap();
@@ -440,24 +365,32 @@ impl EventHandler for CommandHandler {
 				runtime.emit(Event::daemon(EventKind::TasksCleared));
 			}
 			"dev_info" => {
-				runtime.emit(Event::daemon(EventKind::TaskRequested {
-					request: TaskRequest::Create(TaskKind::BuildEstatePrototype),
-				}));
+				runtime.emit(
+					Event::daemon(EventKind::TaskRequested {
+						request: TaskRequest::Create(TaskKind::BuildEstatePrototype),
+					})
+				);
 			}
 			"rebuild_index" => {
-				runtime.emit(Event::daemon(EventKind::TaskRequested {
-					request: TaskRequest::Create(TaskKind::RebuildIndex),
-				}));
+				runtime.emit(
+					Event::daemon(EventKind::TaskRequested {
+						request: TaskRequest::Create(TaskKind::RebuildIndex),
+					})
+				);
 			}
 			"sync_bookmarks" => {
-				runtime.emit(Event::daemon(EventKind::TaskRequested {
-					request: TaskRequest::Create(TaskKind::SyncBookmarks),
-				}));
+				runtime.emit(
+					Event::daemon(EventKind::TaskRequested {
+						request: TaskRequest::Create(TaskKind::SyncBookmarks),
+					})
+				);
 			}
 			"generate_dashboard" => {
-				runtime.emit(Event::daemon(EventKind::TaskRequested {
-					request: TaskRequest::Create(TaskKind::GenerateView("dashboard".into())),
-				}));
+				runtime.emit(
+					Event::daemon(EventKind::TaskRequested {
+						request: TaskRequest::Create(TaskKind::GenerateView("dashboard".into())),
+					})
+				);
 			}
 			_ => {
 				println!("⚠️ unknown command: {command}");
@@ -498,12 +431,6 @@ impl TaskRunner {
 		}
 		Ok(())
 	}
-}
-fn now() -> u64 {
-	std::time::SystemTime::now()
-		.duration_since(std::time::UNIX_EPOCH)
-		.unwrap()
-		.as_secs()
 }
 
 // struct Inode;

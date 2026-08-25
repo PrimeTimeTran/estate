@@ -550,7 +550,7 @@ pub struct Store {
 }
 use std::sync::Arc;
 
-use crate::shared::prelude::*;
+use crate::share::prelude::*;
 
 #[derive(Debug, Clone, Default)]
 pub struct RuntimeCache {
@@ -558,12 +558,12 @@ pub struct RuntimeCache {
 	pub compiled: HashMap<u64, CompiledNode>,
 	pub dirty: HashSet<u64>,
 }
-pub struct Runtime {
-	pub tree: HashMap<u64, Vec<u64>>,
-	pub parents: HashMap<u64, u64>,
-	pub compiled: HashMap<u64, CompiledNode>,
-	pub dirty: HashSet<u64>,
-}
+// pub struct Runtime {
+// 	pub tree: HashMap<u64, Vec<u64>>,
+// 	pub parents: HashMap<u64, u64>,
+// 	pub compiled: HashMap<u64, CompiledNode>,
+// 	pub dirty: HashSet<u64>,
+// }
 
 // ┌─────────────────┐
 // │     Inode       │
@@ -760,9 +760,15 @@ pub struct TreeNode {
 }
 #[derive(Debug, Clone)]
 pub enum Payload {
-	Module { source: Vec<u8> },
-	Ast { nodes: String },
-	DirectoryIndex { children: Vec<u64> },
+	Module {
+		source: Vec<u8>,
+	},
+	Ast {
+		nodes: String,
+	},
+	DirectoryIndex {
+		children: Vec<u64>,
+	},
 }
 impl DependencyGraph {
 	pub fn contains_cycle(&self) -> bool {
@@ -772,7 +778,7 @@ impl DependencyGraph {
 			id: u64,
 			deps: &std::collections::HashMap<u64, std::collections::HashSet<u64>>,
 			visited: &mut std::collections::HashSet<u64>,
-			rec_stack: &mut std::collections::HashSet<u64>,
+			rec_stack: &mut std::collections::HashSet<u64>
 		) -> bool {
 			visited.insert(id);
 			rec_stack.insert(id);
@@ -810,7 +816,7 @@ impl CompiledNode {
 		source_version: u64,
 		raw_source: Vec<u8>,
 		imports: Vec<String>,
-		exports: Vec<String>,
+		exports: Vec<String>
 	) -> Self {
 		let payload = Payload::Module { source: raw_source };
 		Self {

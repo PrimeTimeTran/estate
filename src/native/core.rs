@@ -1,15 +1,15 @@
-use crate::prelude::*;
+use crate::{ share::r#trait::Runtime, prelude::* };
 
-impl EstateEngine {
+impl<R: Runtime> EstateEngine<R> {
 	pub async fn format(self, args: &FormatArgs) -> anyhow::Result<String, anyhow::Error> {
 		LintDaemon.run(&args).await;
 		Ok("Success".to_string())
 	}
 
-	pub fn with_runtime(&mut self) -> anyhow::Result<Self> {
-		self.runtime = Some(Arc::new(EstateRuntime::new()));
-		Ok(self)
-	}
+	// pub fn with_runtime(&mut self) -> anyhow::Result<Self> {
+	// 	self.runtime = EstateEngine::new();
+	// 	Ok(self)
+	// }
 }
 
 // estate discover --profile rust-workspace
@@ -162,8 +162,7 @@ pub enum WalkControl {
 	Stop,
 }
 pub fn walk_root_to_path<F>(target: impl AsRef<Path>, mut visit: F) -> std::io::Result<WalkControl>
-where
-	F: FnMut(&Path) -> WalkControl,
+	where F: FnMut(&Path) -> WalkControl
 {
 	let target = target.as_ref().canonicalize()?;
 	let mut current = filesystem_root(&target);
@@ -232,10 +231,7 @@ impl FsWalker {
 			target,
 		}
 	}
-	pub fn walk_up_to_target<F>(&self, mut visit: F) -> std::io::Result<()>
-	where
-		F: FnMut(&Path),
-	{
+	pub fn walk_up_to_target<F>(&self, mut visit: F) -> std::io::Result<()> where F: FnMut(&Path) {
 		let mut current = self.root.clone();
 		loop {
 			visit(&current);
@@ -243,13 +239,7 @@ impl FsWalker {
 				break;
 			}
 			let next = current.join(
-				self
-					.target
-					.strip_prefix(&current)
-					.unwrap()
-					.components()
-					.next()
-					.unwrap(),
+				self.target.strip_prefix(&current).unwrap().components().next().unwrap()
 			);
 			current = next;
 		}

@@ -1,8 +1,14 @@
-use crate::{native::backend::tool::AddVars, prelude::*};
+use crate::{ native::backend::tool::AddVars, prelude::* };
 
 use rmcp::{
-	ErrorData as McpError, handler::server::wrapper::Parameters, model::*, prompt, prompt_router,
-	schemars::JsonSchema, tool, tool_router,
+	ErrorData as McpError,
+	handler::server::wrapper::Parameters,
+	model::*,
+	prompt,
+	prompt_router,
+	schemars::JsonSchema,
+	tool,
+	tool_router,
 };
 
 #[derive(Debug, Serialize, Deserialize, JsonSchema)]
@@ -24,10 +30,7 @@ impl MyServer {
 	}
 	pub fn get_info(&self) -> ServerInfo {
 		let mut handler = ServerInfo::default();
-		handler.capabilities = ServerCapabilities::builder()
-			.enable_resources()
-			.enable_tools()
-			.build();
+		handler.capabilities = ServerCapabilities::builder().enable_resources().enable_tools().build();
 		handler
 	}
 	pub fn add(&self, Parameters(args): Parameters<AddVars>) -> String {
@@ -39,32 +42,25 @@ impl MyServer {
 impl MyServer {
 	#[prompt(name = "greeting", description = "A simple greeting")]
 	pub async fn greeting(&self) -> Vec<PromptMessage> {
-		vec![PromptMessage::new_text(
-			PromptMessageRole::User,
-			"Hello! How can you help me today?",
-		)]
+		vec![PromptMessage::new_text(PromptMessageRole::User, "Hello! How can you help me today?")]
 	}
 	#[prompt(name = "code_review", description = "Review code in a given language")]
 	pub async fn code_review(
 		&self,
-		Parameters(args): Parameters<CodeReviewArgs>,
+		Parameters(args): Parameters<CodeReviewArgs>
 	) -> Result<GetPromptResult, McpError> {
-		let focus = args
-			.focus_areas
-			.unwrap_or_else(|| vec!["correctness".into()]);
+		let focus = args.focus_areas.unwrap_or_else(|| vec!["correctness".into()]);
 
-		let mut messages = vec![PromptMessage::new_text(
-			PromptMessageRole::User,
-			format!(
-				"Please review my {} code. Focus on: {}",
-				args.language,
-				focus.join(", ")
-			),
-		)];
+		let mut messages = vec![
+			PromptMessage::new_text(
+				PromptMessageRole::User,
+				format!("Please review my {} code. Focus on: {}", args.language, focus.join(", "))
+			)
+		];
 
 		let system_message = PromptMessage::new_text(
 			PromptMessageRole::Assistant,
-			"You are a helpful code reviewer. Provide constructive feedback.",
+			"You are a helpful code reviewer. Provide constructive feedback."
 		);
 		messages.insert(0, system_message);
 		let mut result = GetPromptResult::default();
