@@ -16,5 +16,4 @@ pub mod app;
 pub mod prelude;
 pub mod share;
 pub mod theme;
-#[path = "common/util/mod.rs"]
 pub mod util;

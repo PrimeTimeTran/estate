@@ -1,4 +1,4 @@
-/// ### Rust Ownership & Conversion Cheatsheet
+/// ### Rust Ownership & Conversion Cheat sheet
 
 // ==========================================
 // RUST OWNERSHIP & CONVERSION METHODS CHEAT SHEET
@@ -9,6 +9,7 @@
 // 1. .into()
 // Converts a value into another type by consuming ownership. Often used for
 // ergonomic function arguments (e.g., impl Into<PathBuf>).
+
 fn take_path(path: impl Into<std::path::PathBuf>) {
 	let _p: std::path::PathBuf = path.into();
 }

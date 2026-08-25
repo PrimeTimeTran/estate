@@ -31,28 +31,21 @@ pub fn start() {
 	install_api();
 	wasm_bindgen_futures::spawn_local(async {
 		log("🔥 RUST START() RUNNING");
-
 		let payload = create_payload().expect("failed to create payload");
-
-		log("🔥 ABOUT TO CALL js_test()");
-
 		js_test(payload);
-
-		log("🔥 js_test() RETURNED");
-
 		let document = web_sys::window().expect("no window").document().expect("no document");
-
 		let canvas = document
 			.get_element_by_id("the_canvas_id")
 			.expect("canvas not found")
 			.dyn_into::<web_sys::HtmlCanvasElement>()
 			.expect("not a canvas");
-
 		WebRunner::new()
 			.start(
 				canvas,
 				WebOptions::default(),
 				Box::new(|_cc| {
+					log("🔥 EFRAME APP CREATOR RUNNING");
+
 					Ok(
 						Box::new(WebApp {
 							graphics: Graphics::new(),
@@ -61,6 +54,14 @@ pub fn start() {
 				})
 			).await
 			.expect("failed to start eframe");
+		log("🔥 EFRAME START RETURNED");
 	});
 }
+
+#[wasm_bindgen]
+pub fn evaluate_ui(canvas: web_sys::HtmlCanvasElement) {
+	let rect = canvas.get_bounding_client_rect();
+	let rect = canvas.get_bounding_client_rect();
+}
+
 pub fn main() {}

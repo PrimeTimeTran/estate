@@ -1,4 +1,29 @@
 console.log("🔥 app.js LOADED");
+console.log("DPR:", window.devicePixelRatio);
+console.log("viewport:", window.innerWidth, window.innerHeight);
+
+function resizeCanvas() {
+  const canvas = document.getElementById("the_canvas_id");
+  const rect = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+
+  canvas.width = Math.round(rect.width * dpr);
+  canvas.height = Math.round(rect.height * dpr);
+
+  console.log(
+    "[WEB] canvas:",
+    rect.width,
+    rect.height,
+    "backing:",
+    canvas.width,
+    canvas.height,
+    "dpr:",
+    dpr,
+  );
+}
+
+window.addEventListener("load", resizeCanvas);
+window.addEventListener("resize", resizeCanvas);
 
 window.js_test = function (payload) {
   console.log("🔥🔥🔥 JS_TEST CALLED", payload);

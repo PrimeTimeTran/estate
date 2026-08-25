@@ -20,6 +20,7 @@
     "egui",
     "Egui",
     "frontends",
+    "gloo",
     "Gpui",
     "hashset",
     "Horiz",

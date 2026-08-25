@@ -15,10 +15,9 @@ long_description = "Estate development environment"
 icon = ["assets/icon.icns"]
 
 [[bin]]
-name = "main"
-path = "src/main.rs"
-# required-features = ["native"]
-
+name = "estate"
+path = "src/bin/estate.rs"
+required-features = ["native"]
 
 [[bin]]
 name = "web"
@@ -40,85 +39,13 @@ required-features = ["native"]
 name = "threads"
 path = "src/bin/threads.rs"
 
-# [[bin]]
-# name = "init"
-# path = "src/bin/init.rs"
-
-# [[bin]]
-# name = "bootstrap"
-# path = "src/bin/bootstrap-1.rs"
-
-[dependencies]
-# Internal
-foo.workspace = true
-macros-decl.workspace = true
-macros-proc.workspace = true
-macros.workspace = true
-revelation.workspace = true
-# External
-anyhow.workspace = true
-async-trait.workspace = true
-chrono.workspace = true
-dirs.workspace = true
-egui-wgpu.workspace = true
-egui.workspace = true
-egui_plot.workspace = true
-eframe.workspace = true
-futures.workspace = true
-global-hotkey.workspace = true
-image.workspace = true
-lazy_static.workspace = true
-pollster.workspace = true
-reqwest.workspace = true
-resvg.workspace = true
-schemars.workspace = true
-serde-wasm-bindgen.workspace = true
-serde.workspace = true
-serde_json.workspace = true
-serde_yaml.workspace = true
-toml.workspace = true
-tracing-subscriber.workspace = true
-tracing.workspace = true
-url.workspace = true
-wasm-bindgen-futures.workspace = true
-wasm-bindgen.workspace = true
-wasm-bridge.workspace = true
-web-sys.workspace = true
-wgpu.workspace = true
-winit.workspace = true
-uuid = { version = "1.24", features = ["v4", "js", "serde"] }
-
-# Make all these optional so they can be toggled by the native feature
-notify = { workspace = true, optional = true }
-cli = { workspace = true, optional = true }
-demand = { workspace = true, optional = true }
-tokio = { workspace = true, optional = true, features = [
-  "rt",
-  "macros",
-] } # Make sure features don't force 'net' on WASM if compiled
-rmcp = { workspace = true, optional = true }
-tower-lsp = { workspace = true, optional = true }
-tokio-util = { workspace = true, optional = true }
-objc2-app-kit = { workspace = true, optional = true }
-objc2-foundation = { workspace = true, optional = true }
-objc2 = { workspace = true, optional = true }
-core-foundation = { workspace = true, optional = true }
-core-graphics = { workspace = true, optional = true }
-signal-hook = { version = "0.4.4", optional = true }
-comfy-table = { workspace = true, optional = true }
-jsonschema = { workspace = true, optional = true }
-tray-icon = { workspace = true, optional = true }
-egui-winit = { workspace = true, optional = true }
-macos-accessibility-client = { workspace = true, optional = true }
-
 [features]
-# This overwrites IDE speficification causing diagnostics to be wrong given the targetted platform.
+# This overwrites IDE config causing diagnostics to be wrong given the targetted platform.
 #
 # To get IDE diagnostics functioning correctly remove the hardcoded default when troubleshooting another build target.
 #
 # default = []
 default = ["web"]
-# default = ["wasm"]
 web = []
 mobile = []
 native = [
@@ -141,5 +68,70 @@ native = [
   "dep:egui-winit",
   "dep:macos-accessibility-client",
 ]
+
+[dependencies]
+# Internal
+foo.workspace = true
+macros-decl.workspace = true
+macros-proc.workspace = true
+macros.workspace = true
+revelation.workspace = true
+# External
+anyhow.workspace = true
+async-trait.workspace = true
+chrono.workspace = true
+dirs.workspace = true
+eframe.workspace = true
+egui_plot.workspace = true
+egui-wgpu.workspace = true
+egui.workspace = true
+futures.workspace = true
+global-hotkey.workspace = true
+image.workspace = true
+lazy_static.workspace = true
+pollster.workspace = true
+reqwest.workspace = true
+resvg.workspace = true
+schemars.workspace = true
+serde_json.workspace = true
+serde_yaml.workspace = true
+serde-wasm-bindgen.workspace = true
+serde.workspace = true
+toml.workspace = true
+tracing-subscriber.workspace = true
+tracing.workspace = true
+url.workspace = true
+uuid.workspace = true
+wasm-bindgen-futures.workspace = true
+wasm-bindgen.workspace = true
+wasm-bridge.workspace = true
+web-sys.workspace = true
+wgpu.workspace = true
+winit.workspace = true
+
+# Make all these optional so they can be toggled by the native feature
+cli = { workspace = true, optional = true }
+comfy-table = { workspace = true, optional = true }
+core-foundation = { workspace = true, optional = true }
+core-graphics = { workspace = true, optional = true }
+demand = { workspace = true, optional = true }
+egui-winit = { workspace = true, optional = true }
+gloo-timers = { version = "0.4.0", features = ["futures"] }
+jsonschema = { workspace = true, optional = true }
+macos-accessibility-client = { workspace = true, optional = true }
+notify = { workspace = true, optional = true }
+objc2 = { workspace = true, optional = true }
+objc2-app-kit = { workspace = true, optional = true }
+objc2-foundation = { workspace = true, optional = true }
+rmcp = { workspace = true, optional = true }
+signal-hook = { version = "0.4.4", optional = true }
+tokio = { workspace = true, optional = true, features = [
+  "rt",
+  "macros",
+] } # Make sure features don't force 'net' on WASM if compiled
+tokio-util = { workspace = true, optional = true }
+tower-lsp = { workspace = true, optional = true }
+tray-icon = { workspace = true, optional = true }
+
 [build-dependencies]
 resvg.workspace = true

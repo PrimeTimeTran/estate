@@ -1,3 +1,4 @@
 # Sets default target
 # [build]
 # target = "wasm32-unknown-unknown"
+

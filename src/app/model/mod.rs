@@ -3,10 +3,6 @@ use crate::app::Runtime;
 
 #[derive(Clone, Debug)]
 pub struct EstateEngine<R: Runtime> {
-	// Meaning of EstateEngine is "an engine with a Runtime" then
-	// pub struct EstateEngine<R: Runtime>
-	// Is reasonable.
-
 	// Domain
 	pub estate: Estate,
 	pub runtime: Arc<R>,
