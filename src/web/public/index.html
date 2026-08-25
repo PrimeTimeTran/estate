@@ -4,18 +4,20 @@
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<title>Page Title Goes Here</title>
-		<!-- SEO Metadata -->
 		<meta
 			name="description"
 			content="A brief description of your website content."
 		/>
 		<meta name="author" content="Your Name" />
-
-		<!-- External Stylesheet -->
 		<link rel="stylesheet" href="style.css" />
-		<!-- Favicon -->
 		<link rel="icon" href="favicon.ico" type="image/x-icon" />
-		<link data-trunk rel="rust" data-bin="wasm" data-cargo-features="wasm" />
+		<link
+			data-trunk
+			rel="rust"
+			href="../../../Cargo.toml"
+			data-bin="web"
+			data-cargo-features="web"
+		/>
 		<style>
 			html,
 			body {
@@ -34,5 +36,6 @@
 	</head>
 	<body>
 		<canvas id="the_canvas_id"></canvas>
+		<script data-trunk src="js/app.js"></script>
 	</body>
 </html>

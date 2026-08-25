@@ -1,4 +1,19 @@
 {
+  "files.exclude": {
+    "**/.git": true,
+    "**/tmp": true,
+    "**/assets": true,
+    "**/fixtures": true,
+    // "**/public": true,
+    "**/ownership.rs": true,
+    "**/template": true,
+    "**/estate": true,
+    "**/README.md": true,
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "tmp": true,
+  },
   "cSpell.words": [
     "correponding",
     "eframe",
@@ -6,6 +21,7 @@
     "Egui",
     "frontends",
     "Gpui",
+    "hashset",
     "Horiz",
     "noninteractive",
     "runloop",

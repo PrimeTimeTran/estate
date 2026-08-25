@@ -15,7 +15,7 @@
 // estate fmt path/to/file.rs
 // ```
 
-use estate::prelude::{logger, *};
+use estate::{ prelude::{ logger, * } };
 
 fn main() -> anyhow::Result<()> {
 	let cli = cli::context::parse();

@@ -44,7 +44,7 @@ use cli;
 /// estate format path/to/file.rs
 /// ```
 
-use crate::share::r#trait::Runtime;
+use crate::app::modules::runtime::Runtime;
 
 pub async fn execute<R: Runtime>(
 	parsed_cli: Cli,

@@ -96,6 +96,5 @@ pub mod shell;
 pub use daemon::*;
 pub use event::*;
 pub use lint::*;
-pub use projection::*;
 pub use resolver::*;
 pub use shell::*;

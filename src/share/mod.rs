@@ -1,5 +1,4 @@
 pub mod shared;
-pub mod app;
 pub mod constants;
 pub mod constants_ui;
 pub mod core;
@@ -8,6 +7,5 @@ pub mod event;
 pub mod graph;
 pub mod logger;
 pub mod prelude;
-pub mod r#trait;
 pub mod vfs;
 pub mod ve;

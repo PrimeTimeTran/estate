@@ -1,18 +1,12 @@
-use crate::{
-	prelude::*,
-	share::constants_ui::{DEFAULT_CONFIG as CONFIG, palette, *},
-};
+use crate::{ prelude::*, share::constants_ui::{ DEFAULT_CONFIG as CONFIG, * }, theme::palette };
 
 use egui::Ui;
-use egui_plot::{Bar, BarChart, Line, Plot, Points};
-use std::time::Duration;
-use winit::event_loop::EventLoopProxy;
+use egui_plot::{ Bar, BarChart, Line, Plot, Points };
 
 pub trait Veable {
 	fn draw(&mut self, ui: &mut egui::Ui);
 }
 pub struct Ve {
-	// Top left to bottom right ordering for mental model.
 	pub activity_bar: Region,
 	pub dock_left: Panel,
 	pub main: Region,
@@ -31,33 +25,26 @@ impl Ve {
 		Self {
 			activity_bar: Region::fixed(DebugPanel::new("ACTIVITY"), config.activity_bar.size),
 			dock_left: Panel::new(
-				Region::resizable(DebugPanel::new("LEFT"), config.dock_left.size, 0.0, 600.0)
-					.with_fill(config.bg),
-			)
-			.with_open(config.dock_left.active),
+				Region::resizable(DebugPanel::new("LEFT"), config.dock_left.size, 0.0, 600.0).with_fill(
+					config.bg
+				)
+			).with_open(config.dock_left.active),
 			primary_bar: Region::fixed(DebugPanel::new("TABS"), config.primary_bar.size),
 			secondary_bar: Region::fixed(DebugPanel::new("BREADCRUMBS"), config.activity_bar.size),
 			main: Region::content(view).with_padding(8 as i32),
-			bottom_panel: Panel::new(Region::resizable(
-				DebugPanel::new("BOTTOM"),
-				config.bottom_panel.size,
-				0.0,
-				600.0,
-			)),
+			bottom_panel: Panel::new(
+				Region::resizable(DebugPanel::new("BOTTOM"), config.bottom_panel.size, 0.0, 600.0)
+			),
 			status_bar: Region::fixed(DebugPanel::new("STATUS BAR"), config.status_bar.size)
 				.with_fill(config.bg)
 				.with_top_border(true),
 			dock_right: Panel::new(
-				Region::resizable(DebugPanel::new("RIGHT"), config.dock_right.size, 0.0, 600.0)
-					.with_fill(config.bg),
-			)
-			.with_open(config.dock_right.active),
+				Region::resizable(DebugPanel::new("RIGHT"), config.dock_right.size, 0.0, 600.0).with_fill(
+					config.bg
+				)
+			).with_open(config.dock_right.active),
 		}
 	}
-	/// Forwards the drawing contract to the concrete implementation.
-	///
-	/// `Ve` doesn't know how the view is drawn. It only knows that the
-	/// contained implementation satisfies `Veable`.
 	pub fn draw(&mut self, ui: &mut egui::Ui) {
 		let available = ui.available_rect_before_wrap();
 		ui.painter().rect_filled(available, 0.0, CONFIG.bg);
@@ -78,7 +65,7 @@ impl Ve {
 				left_rect,
 				&mut self.dock_left.region,
 				ResizeEdge::Right,
-				1.0,
+				1.0
 			);
 		}
 		Self::draw_region(ui, tabs_rect, &mut self.primary_bar);
@@ -92,7 +79,7 @@ impl Ve {
 				bottom_rect,
 				&mut self.bottom_panel.region,
 				ResizeEdge::Top,
-				-1.0,
+				-1.0
 			);
 		}
 		if self.dock_right.open {
@@ -103,49 +90,33 @@ impl Ve {
 				right_rect,
 				&mut self.dock_right.region,
 				ResizeEdge::Left,
-				-1.0,
+				-1.0
 			);
 		}
 		Self::draw_region(ui, status_bar_rect, &mut self.status_bar);
 	}
 	fn calculate_region_boundaries(
 		&mut self,
-		available: egui::Rect,
-	) -> (
-		egui::Rect,
-		egui::Rect,
-		egui::Rect,
-		egui::Rect,
-		egui::Rect,
-		egui::Rect,
-		egui::Rect,
-	) {
+		available: egui::Rect
+	) -> (egui::Rect, egui::Rect, egui::Rect, egui::Rect, egui::Rect, egui::Rect, egui::Rect) {
 		// =========================================================
 		// Bottom Status Bar
 		// =========================================================
 		let status_bar_height = CONFIG.status_bar.size;
 		let workspace_rect = egui::Rect::from_min_max(
 			available.min,
-			egui::pos2(available.right(), available.bottom() - status_bar_height),
+			egui::pos2(available.right(), available.bottom() - status_bar_height)
 		);
 		let status_bar_rect = egui::Rect::from_min_max(
 			egui::pos2(available.left(), workspace_rect.bottom()),
-			available.max,
+			available.max
 		);
 		// =========================================================
 		// Workspace: left / center / right
 		// =========================================================
 		let min_main_width = 100.0;
-		let requested_left = if self.dock_left.open {
-			self.dock_left.region.size
-		} else {
-			0.0
-		};
-		let requested_right = if self.dock_right.open {
-			self.dock_right.region.size
-		} else {
-			0.0
-		};
+		let requested_left = if self.dock_left.open { self.dock_left.region.size } else { 0.0 };
+		let requested_right = if self.dock_right.open { self.dock_right.region.size } else { 0.0 };
 		let available_side_width = (workspace_rect.width() - min_main_width).max(0.0);
 		let requested_total = requested_left + requested_right;
 		let scale = if requested_total > available_side_width {
@@ -157,18 +128,15 @@ impl Ve {
 		let right_width = requested_right * scale;
 		let left_rect = egui::Rect::from_min_max(
 			workspace_rect.min,
-			egui::pos2(workspace_rect.left() + left_width, workspace_rect.bottom()),
+			egui::pos2(workspace_rect.left() + left_width, workspace_rect.bottom())
 		);
 		let right_rect = egui::Rect::from_min_max(
 			egui::pos2(workspace_rect.right() - right_width, workspace_rect.top()),
-			workspace_rect.max,
+			workspace_rect.max
 		);
 		let center_rect = egui::Rect::from_min_max(
 			egui::pos2(workspace_rect.left() + left_width, workspace_rect.top()),
-			egui::pos2(
-				workspace_rect.right() - right_width,
-				workspace_rect.bottom(),
-			),
+			egui::pos2(workspace_rect.right() - right_width, workspace_rect.bottom())
 		);
 		// =========================================================
 		// CENTER: tabs / breadcrumbs / main / bottom
@@ -181,62 +149,47 @@ impl Ve {
 		// =========================================================
 		let tabs_rect = egui::Rect::from_min_max(
 			center_rect.min,
-			egui::pos2(center_rect.right(), center_rect.top() + tabs_height),
+			egui::pos2(center_rect.right(), center_rect.top() + tabs_height)
 		);
 		// =========================================================
 		// Breadcrumbs
 		// =========================================================
 		let breadcrumbs_rect = egui::Rect::from_min_max(
 			egui::pos2(center_rect.left(), tabs_rect.bottom()),
-			egui::pos2(center_rect.right(), tabs_rect.bottom() + breadcrumbs_height),
+			egui::pos2(center_rect.right(), tabs_rect.bottom() + breadcrumbs_height)
 		);
 		// =========================================================
 		// Center content
 		// =========================================================
 		let content_rect = egui::Rect::from_min_max(
 			egui::pos2(center_rect.left(), breadcrumbs_rect.bottom()),
-			center_rect.max,
+			center_rect.max
 		);
 		// =========================================================
 		// Main / bottom
 		// =========================================================
 		let bottom_height = if self.bottom_panel.open {
-			self
-				.bottom_panel
-				.region
-				.size
-				.min((content_rect.height() - min_main_height).max(0.0))
+			self.bottom_panel.region.size.min((content_rect.height() - min_main_height).max(0.0))
 		} else {
 			0.0
 		};
 		let main_rect = egui::Rect::from_min_max(
 			content_rect.min,
-			egui::pos2(content_rect.right(), content_rect.bottom() - bottom_height),
+			egui::pos2(content_rect.right(), content_rect.bottom() - bottom_height)
 		);
 		let bottom_rect = egui::Rect::from_min_max(
 			egui::pos2(content_rect.left(), content_rect.bottom() - bottom_height),
-			content_rect.max,
+			content_rect.max
 		);
-		(
-			left_rect,
-			right_rect,
-			tabs_rect,
-			breadcrumbs_rect,
-			main_rect,
-			bottom_rect,
-			status_bar_rect,
-		)
+		(left_rect, right_rect, tabs_rect, breadcrumbs_rect, main_rect, bottom_rect, status_bar_rect)
 	}
 	fn draw_region(ui: &mut egui::Ui, rect: egui::Rect, region: &mut Region) {
 		let fill = region.fill.unwrap_or(CONFIG.bg);
 		ui.painter().rect_filled(rect, 0.0, fill);
 		if region.top_border {
 			ui.painter().line_segment(
-				[
-					egui::pos2(rect.left(), rect.top()),
-					egui::pos2(rect.right(), rect.top()),
-				],
-				egui::Stroke::new(1.0, CONFIG.surface),
+				[egui::pos2(rect.left(), rect.top()), egui::pos2(rect.right(), rect.top())],
+				egui::Stroke::new(1.0, CONFIG.surface)
 			);
 		}
 		let content_rect = region.content_rect(rect);
@@ -244,9 +197,7 @@ impl Ve {
 	}
 	fn draw_view(ui: &mut egui::Ui, rect: egui::Rect, view: &mut dyn Veable) {
 		let mut child = ui.new_child(
-			egui::UiBuilder::new()
-				.max_rect(rect)
-				.layout(egui::Layout::top_down(egui::Align::LEFT)),
+			egui::UiBuilder::new().max_rect(rect).layout(egui::Layout::top_down(egui::Align::LEFT))
 		);
 		view.draw(&mut child);
 	}
@@ -294,28 +245,32 @@ impl Ve {
 		rect: egui::Rect,
 		region: &mut Region,
 		edge: ResizeEdge,
-		direction: f32,
+		direction: f32
 	) {
 		if !region.resizable {
 			return;
 		}
 		let handle = match edge {
-			ResizeEdge::Left => egui::Rect::from_min_max(
-				egui::pos2(rect.left() - 3.0, rect.top()),
-				egui::pos2(rect.left() + 3.0, rect.bottom()),
-			),
-			ResizeEdge::Right => egui::Rect::from_min_max(
-				egui::pos2(rect.right() - 3.0, rect.top()),
-				egui::pos2(rect.right() + 3.0, rect.bottom()),
-			),
-			ResizeEdge::Top => egui::Rect::from_min_max(
-				egui::pos2(rect.left(), rect.top() - 3.0),
-				egui::pos2(rect.right(), rect.top() + 3.0),
-			),
-			ResizeEdge::Bottom => egui::Rect::from_min_max(
-				egui::pos2(rect.left(), rect.bottom() - 3.0),
-				egui::pos2(rect.right(), rect.bottom() + 3.0),
-			),
+			ResizeEdge::Left =>
+				egui::Rect::from_min_max(
+					egui::pos2(rect.left() - 3.0, rect.top()),
+					egui::pos2(rect.left() + 3.0, rect.bottom())
+				),
+			ResizeEdge::Right =>
+				egui::Rect::from_min_max(
+					egui::pos2(rect.right() - 3.0, rect.top()),
+					egui::pos2(rect.right() + 3.0, rect.bottom())
+				),
+			ResizeEdge::Top =>
+				egui::Rect::from_min_max(
+					egui::pos2(rect.left(), rect.top() - 3.0),
+					egui::pos2(rect.right(), rect.top() + 3.0)
+				),
+			ResizeEdge::Bottom =>
+				egui::Rect::from_min_max(
+					egui::pos2(rect.left(), rect.bottom() - 3.0),
+					egui::pos2(rect.right(), rect.bottom() + 3.0)
+				),
 		};
 		Self::resize_handle(ui, id, handle, |delta| {
 			let delta = match edge {
@@ -379,8 +334,7 @@ pub struct BarData {
 impl BarData {
 	pub fn ui(&self, ui: &mut Ui) {
 		ui.heading(&self.title);
-		let bars = self
-			.bars
+		let bars = self.bars
 			.iter()
 			.enumerate()
 			.map(|(index, bar)| Bar::new(index as f64, bar.value))
@@ -401,8 +355,7 @@ pub struct LineData {
 impl LineData {
 	pub fn ui(&self, ui: &mut Ui) {
 		ui.heading(&self.title);
-		let points = self
-			.points
+		let points = self.points
 			.iter()
 			.map(|point| [point.x, point.y])
 			.collect::<Vec<_>>();
@@ -426,7 +379,10 @@ impl PieData {
 		let size = available.x.min(available.y);
 		let radius = size * 0.35;
 		let center = ui.available_rect_before_wrap().center();
-		let total: f64 = self.slices.iter().map(|slice| slice.value).sum();
+		let total: f64 = self.slices
+			.iter()
+			.map(|slice| slice.value)
+			.sum();
 		if total <= 0.0 {
 			ui.label("No data");
 			return;
@@ -438,15 +394,17 @@ impl PieData {
 			let sweep = (fraction as f32) * std::f32::consts::TAU;
 			let end_angle = start_angle + sweep;
 			let points = Self::pie_slice_points(center, radius, start_angle, end_angle);
-			painter.add(egui::Shape::convex_polygon(
-				points,
-				egui::Color32::from_rgb(
-					((50 + index * 35) % 255) as u8,
-					((100 + index * 45) % 255) as u8,
-					((180 + index * 20) % 255) as u8,
-				),
-				egui::Stroke::NONE,
-			));
+			painter.add(
+				egui::Shape::convex_polygon(
+					points,
+					egui::Color32::from_rgb(
+						((50 + index * 35) % 255) as u8,
+						((100 + index * 45) % 255) as u8,
+						((180 + index * 20) % 255) as u8
+					),
+					egui::Stroke::NONE
+				)
+			);
 			start_angle = end_angle;
 		}
 	}
@@ -470,8 +428,7 @@ pub struct ScatterData {
 impl ScatterData {
 	pub fn ui(&self, ui: &mut Ui) {
 		ui.heading(&self.title);
-		let points = self
-			.points
+		let points = self.points
 			.iter()
 			.map(|point| [point.x, point.y])
 			.collect::<Vec<_>>();
@@ -613,8 +570,7 @@ impl Veable for Graphics {
 			// 	ui.label("Not loaded yet");
 			// }
 			// Request a continuous repaint so the timer increments live every second
-			ui.ctx()
-				.request_repaint_after(std::time::Duration::from_secs(1));
+			ui.ctx().request_repaint_after(std::time::Duration::from_secs(1));
 		});
 	}
 }
@@ -641,11 +597,7 @@ impl Veable for DebugPanel {
 		ui.vertical_centered(|ui| {
 			ui.heading(&self.title);
 			ui.separator();
-			ui.label(format!(
-				"{} × {}",
-				ui.available_width(),
-				ui.available_height()
-			));
+			ui.label(format!("{} × {}", ui.available_width(), ui.available_height()));
 		});
 	}
 }
@@ -722,14 +674,11 @@ impl Region {
 	}
 	pub fn content_rect(&self, rect: egui::Rect) -> egui::Rect {
 		egui::Rect::from_min_max(
-			egui::pos2(
-				rect.left() + (self.padding.left as f32),
-				rect.top() + (self.padding.top as f32),
-			),
+			egui::pos2(rect.left() + (self.padding.left as f32), rect.top() + (self.padding.top as f32)),
 			egui::pos2(
 				rect.right() - (self.padding.right as f32),
-				rect.bottom() - (self.padding.bottom as f32),
-			),
+				rect.bottom() - (self.padding.bottom as f32)
+			)
 		)
 	}
 }

@@ -1,4 +1,8 @@
-use crate::{ native::*, native::state::EstateEngine, prelude::*, share::r#trait::Runtime };
+pub use crate::{
+	app::{ Runtime, App, model::EstateEngine, model::* },
+	native::{ *, runtime::{ NativeRuntime } },
+	prelude::*,
+};
 
 use signal_hook::{ consts::SIGINT, iterator::Signals };
 use tray_icon::{ TrayIcon, TrayIconBuilder, menu::MenuEvent };
@@ -19,10 +23,6 @@ pub struct NativeApp {
 	scroll_tray: Option<TrayIcon>,
 	pub windows: Vec<AppWindow>,
 	clock_running: Arc<AtomicBool>,
-	// daemon: Option<DaemonHandle>,
-	// daemon: Option<Daemon>,
-	// daemon_rx: Option<mpsc::Receiver<DaemonCommand>>,
-	// daemon_rx: mpsc::Receiver<DaemonCommand>,
 }
 impl NativeApp {
 	pub fn new() -> anyhow::Result<Self> {

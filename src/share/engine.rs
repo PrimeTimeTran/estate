@@ -28,7 +28,10 @@
 //                        ▼          ▼          ▼
 //                      Zed       VS Code      CLI
 
-use crate::{ share::r#trait::Runtime, prelude::* };
+use crate::{
+	app::{model::*, modules::runtime::Runtime},
+	prelude::*,
+};
 use revelation::analyzer::Workspace;
 
 pub trait Engine {
@@ -167,74 +170,13 @@ pub struct Resolution {
 // }
 
 /// LSP, Linter, FS Registry/index,
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash, Serialize, Deserialize)]
-pub enum EstateScope {
-	System,
-	User,
-	#[default]
-	Workspace,
-}
-
-/// Estate owns the capabilities and domain model; the daemon exposes those capabilities as a long-lived service.
-#[derive(Clone, Debug)]
-pub struct EstateEngine<R: Runtime> {
-	// Meaning of EstateEngine is "an engine with a Runtime" then
-	// pub struct EstateEngine<R: Runtime>
-	// Is reasonable.
-
-	// Domain
-	pub estate: Estate,
-	pub runtime: Arc<R>,
-	// Infrastructure
-	pub vfs: EstateVfs,
-	pub index: EstateIndex,
-	pub workspace: Workspace,
-
-	// pub index: OnceCell<EstateIndex>,
-	// pub search: OnceCell<SearchService>,
-	// pub analysis: OnceCell<AnalysisService>,
-
-	// domain representation
-	pub graph: EstateGraph,
-
-	// persistence/coordination
-	pub registry: EstateRegistry,
-
-	/// Capabilities
-	pub resolver: EstateResolver,
-	pub discovery: EstateDiscovery,
-	pub anchors: AnchorService,
-	pub search: SearchService,
-	pub analysis: AnalysisService,
-}
-impl<R: Runtime> EstateEngine<R> {
-	pub fn new(runtime: R) -> anyhow::Result<Self> {
-		Ok(Self {
-			runtime: Arc::new(runtime),
-			estate: Estate::default(),
-			workspace: Workspace::new(),
-			registry: EstateRegistry::default(),
-			index: EstateIndex::default(),
-			resolver: EstateResolver::default(),
-			graph: EstateGraph::default(),
-			discovery: EstateDiscovery::default(),
-			vfs: EstateVfs::default(),
-			anchors: AnchorService::default(),
-			search: SearchService::default(),
-			analysis: AnalysisService::default(),
-		})
-	}
-}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Change {
 	Created(Uuid),
 	Modified(Uuid),
 	Deleted(Uuid),
-	Renamed {
-		from: Uuid,
-		to: Uuid,
-	},
+	Renamed { from: Uuid, to: Uuid },
 	ConfigChanged,
 	WorkspaceChanged,
 }
@@ -246,69 +188,3 @@ pub struct Query {
 }
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
 struct ResolutionContext;
-
-/// Data / truth
-/// - Registry
-/// Derived infrastructure
-/// - Index
-/// - Graph
-/// - Cache
-/// Domain behavior
-/// - AnchorService
-/// - SearchService
-/// - AnalysisService
-/// - Formatter
-/// Runtime / infrastructure
-/// - Daemon
-/// - VFS
-/// - logging
-/// - tasks
-/// - IPC
-/// - watchers
-/// - retry
-/// The root entity containing the complete Estate project state.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-struct EstateRegistry;
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-struct EstateIndex;
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-struct EstateResolver;
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-struct EstateGraph;
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-struct EstateDiscovery;
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-struct EstateVfs;
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-pub struct AnchorService {
-	registry: EstateRegistry,
-	index: EstateIndex,
-	resolver: EstateResolver,
-}
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-struct SearchService;
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-struct AnalysisService;
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-pub enum ReferenceKind {
-	#[default]
-	File,
-	Link,
-	Embed,
-	Relative,
-	// potentially:
-	Anchor,
-	Asset,
-}
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-pub struct Reference<'a> {
-	pub target: &'a str,
-	pub fragment: Option<&'a str>,
-	pub kind: ReferenceKind,
-}
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-pub struct ResolveContext {
-	pub scope: EstateScope,
-	pub from: Uuid,
-}

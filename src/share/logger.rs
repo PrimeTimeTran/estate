@@ -119,7 +119,7 @@ impl LogConfig {
 		let path = Path::new(env!("CARGO_MANIFEST_DIR"))
 			.ancestors()
 			.find_map(|dir| {
-				let path = dir.join("Cargo.toml");
+				let path = dir.join("Estate.toml");
 				path.exists().then_some(path)
 			});
 		let Some(path) = path else {
@@ -130,14 +130,14 @@ impl LogConfig {
 		Ok(manifest.logging)
 	}
 	fn workspace_cargo_toml() -> PathBuf {
-		PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../Cargo.toml")
+		PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../Estate.toml")
 	}
 	fn load_global() -> anyhow::Result<Option<Self>> {
 		let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 			.parent()
 			.and_then(Path::parent)
 			.ok_or_else(|| anyhow::anyhow!("could not find workspace root"))?
-			.join("Cargo.toml");
+			.join("Estate.toml");
 		let raw = fs::read_to_string(path)?;
 		let cargo = toml::from_str::<CargoConfig>(&raw)?;
 		Ok(Some(cargo.logging))
@@ -253,7 +253,7 @@ struct CargoConfig {
 	#[serde(default)]
 	logging: LogConfig,
 }
-/// Minimal representation of a Cargo.toml manifest used by Estate.
+/// Minimal representation of a Estate.toml manifest used by Estate.
 /// This intentionally models only the fields Estate needs rather than
 ///
 /// depending on Cargo's complete manifest schema.

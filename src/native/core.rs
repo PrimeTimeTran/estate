@@ -1,29 +1,12 @@
-use crate::{ share::r#trait::Runtime, prelude::* };
+use crate::{ app::Runtime, prelude::* };
 
 impl<R: Runtime> EstateEngine<R> {
 	pub async fn format(self, args: &FormatArgs) -> anyhow::Result<String, anyhow::Error> {
 		LintDaemon.run(&args).await;
 		Ok("Success".to_string())
 	}
-
-	// pub fn with_runtime(&mut self) -> anyhow::Result<Self> {
-	// 	self.runtime = EstateEngine::new();
-	// 	Ok(self)
-	// }
 }
 
-// estate discover --profile rust-workspace
-// estate discover --profile personal
-// estate doctor
-// pub const RUST_WORKSPACE: DiscoveryProfile = DiscoveryProfile {
-// 	name: "rust-workspace",
-// 	probes: PROBES_RUST_ZED,
-// };
-// pub const PERSONAL_ESTATE: DiscoveryProfile = DiscoveryProfile {
-// 	name: "personal-estate",
-// 	probes: PROBES_PERSONAL,
-// };
-// Data Store used while initializing an Estate Context
 #[derive(Clone, Debug)]
 pub struct EstateDiscovery {
 	pub store: DiscoveryStore,

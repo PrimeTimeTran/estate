@@ -14,7 +14,7 @@ impl Event {
 			id: EVENT_ID.fetch_add(1, Ordering::Relaxed),
 			kind,
 			source,
-			timestamp: now(),
+			timestamp: crate::util::now(),
 		}
 	}
 	pub fn daemon(kind: EventKind) -> Self {

@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{ prelude::*, theme::palette };
 
 use core_foundation::runloop::{ CFRunLoop, kCFRunLoopCommonModes };
 use core_graphics::{

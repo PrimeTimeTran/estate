@@ -6,7 +6,7 @@
 // | Individual background execution | `Job`          | Has lifecycle/state           |
 // | UI representation               | `Task` / `Job` | Shows pending/running/etc.    |
 
-use crate::{ native::agent::AgentContext, prelude::*, share::* };
+use crate::{ native::agent::AgentContext, prelude::* };
 
 #[derive(Debug, Clone)]
 pub struct Task {

@@ -83,7 +83,10 @@ pub enum ResourceLocation {
 	File(PathBuf),
 	Directory(PathBuf),
 	Url(String),
-	External { provider: String, id: String },
+	External {
+		provider: String,
+		id: String,
+	},
 }
 impl Default for ResourceLocation {
 	fn default() -> Self {

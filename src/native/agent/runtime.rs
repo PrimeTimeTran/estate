@@ -1,4 +1,7 @@
-use crate::{ native::{ agent::{ Agent, AgentEvent, RuntimeEvent, SystemEvent }, * }, prelude::* };
+use crate::{
+	native::{ self, agent::{ Agent, AgentEvent, RuntimeEvent, SystemEvent } },
+	prelude::*,
+};
 use tokio::sync::mpsc::{ UnboundedReceiver, UnboundedSender };
 
 #[derive(Debug, Default)]

@@ -1,5 +1,5 @@
 use crate::{
-	share::r#trait::Runtime,
+	app::modules::runtime::Runtime,
 	native::daemon::{ DocCompiler, Event, NativeRuntime },
 	prelude::*,
 };
