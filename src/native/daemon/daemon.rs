@@ -1,5 +1,5 @@
 use crate::{
-	app::modules::runtime::Runtime,
+	app::{ EstateState, modules::runtime::Runtime },
 	native::daemon::{ DocCompiler, Event, NativeRuntime },
 	prelude::*,
 };
@@ -424,7 +424,7 @@ pub struct StatusDaemon;
 #[async_trait::async_trait]
 impl CliCommand for StatusDaemon {
 	async fn run(&self, _ctx: &CliContext) {
-		let state = EstateState::load();
+		let state = EstateState::load_from_disk().unwrap();
 		let pid = std::fs::read_to_string(PID_PATH).unwrap_or_else(|_| "unknown".to_string());
 		println!("📊 Estate Daemon Status");
 		println!("──────────────────────");

@@ -1,4 +1,9 @@
-use crate::app::AppContext;
+use crate::app::{
+	AppContext,
+	EstateState,
+	modules::runtime::RuntimeState,
+	monitor::{ self, NativeMonitor },
+};
 
 pub use crate::{
 	app::{ Runtime, App, model::EstateEngine, model::* },
@@ -17,7 +22,9 @@ use winit::{
 };
 
 pub struct NativeApp {
-	app: App<NativeRuntime>,
+	pub app: App<NativeRuntime>,
+	monitor: monitor::NativeMonitor,
+	last_state_revision: u64,
 	tray: Option<TrayIcon>,
 	menu: Option<TrayMenu>,
 	daemon_tx: mpsc::Sender<DaemonCommand>,
@@ -29,12 +36,17 @@ pub struct NativeApp {
 impl NativeApp {
 	pub fn new() -> anyhow::Result<Self> {
 		let (daemon_tx, daemon_rx) = mpsc::channel(100);
-		let runtime = NativeRuntime::new();
+
+		let runtime = NativeRuntime::new()?;
 		let engine = EstateEngine::new(runtime)?;
-		let app = App::new(engine);
+		let app = App::new(engine)?;
+
 		Self::spawn_daemon(daemon_rx, Arc::clone(&app.engine.runtime));
+
 		Ok(Self {
 			app,
+			monitor: monitor::NativeMonitor::new()?,
+			last_state_revision: 0,
 			clock_running: Arc::new(AtomicBool::new(true)),
 			daemon_tx,
 			hotkey_manager: GlobalHotkeys::new().unwrap(),
@@ -159,7 +171,11 @@ impl NativeApp {
 		}
 		tracing::info!(">>> runtime shutdown complete");
 	}
+	pub fn monitor() {
+		todo!("poll")
+	}
 }
+
 impl ApplicationHandler<AppEvent> for NativeApp {
 	fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
 		while let Ok(event) = MenuEvent::receiver().try_recv() {
@@ -226,6 +242,7 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 				}
 				let mut ctx = AppContext {
 					app: &mut self.app,
+					monitor: &mut NativeMonitor::new().unwrap(),
 				};
 				if let Err(e) = window.window.draw(&mut ctx) {
 					tracing::error!("DEV >>> draw failed: {e:#}");

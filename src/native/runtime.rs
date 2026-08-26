@@ -1,16 +1,22 @@
-use crate::{ app::{ Runtime }, prelude::*, share::{ self }, share::vfs::* };
+use crate::{
+	app::{
+		EstateState,
+		Runtime,
+		host::AppHost,
+		modules::runtime::RuntimeState,
+		state_native::NativeStateStore,
+		state::StateStore,
+	},
+	prelude::*,
+	share::{ self, vfs::* },
+};
 
 #[derive(Clone, Debug)]
 pub struct NativeRuntime {
+	pub store: NativeStateStore,
 	pub events: EventBus,
-	pub state: Arc<RwLock<EstateState>>,
+	pub state: Arc<RuntimeState>,
 	pub tasks: Arc<RwLock<TaskManager>>,
-}
-
-impl Default for NativeRuntime {
-	fn default() -> Self {
-		Self::new()
-	}
 }
 
 impl Runtime for NativeRuntime {
@@ -43,19 +49,35 @@ impl Runtime for NativeRuntime {
 			}
 		});
 	}
+	fn state(&self) -> &RuntimeState {
+		&self.state
+	}
+	fn save(&self, state: &EstateState) -> anyhow::Result<()> {
+		self.store.save(state)
+	}
 }
 
 impl NativeRuntime {
-	pub fn new() -> Self {
-		tracing::info!("NativeRuntime new");
-		Self {
+	pub fn new() -> anyhow::Result<Self> {
+		let store = NativeStateStore::new()?;
+		let state = store.load()?;
+		let runtime_state = RuntimeState::new(state);
+
+		Ok(Self {
+			store,
 			events: EventBus::new(),
-			state: Arc::new(RwLock::new(EstateState::load())),
+			state: Arc::new(runtime_state),
 			tasks: Arc::new(RwLock::new(TaskManager::new())),
-		}
+		})
 	}
 	pub fn event_processed(&self) {
-		let mut state = self.state.write().unwrap();
+		let mut state = self.state.write();
 		state.events_processed += 1;
+	}
+}
+
+impl AppHost<NativeRuntime> for NativeApp {
+	fn app(&mut self) -> &mut App<NativeRuntime> {
+		&mut self.app
 	}
 }

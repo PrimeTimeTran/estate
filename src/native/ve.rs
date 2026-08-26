@@ -1,4 +1,4 @@
-use crate::{ app::AppContext, prelude::*, theme::palette };
+use crate::{ app::{ AppContext, EstateState, Job }, prelude::*, theme::palette };
 
 use core_foundation::runloop::{ CFRunLoop, kCFRunLoopCommonModes };
 use core_graphics::{
@@ -32,7 +32,7 @@ use winit::event_loop::EventLoopProxy;
 ///      The implementation details belong to the concrete type; the caller
 ///      only depends on the behavior promised by the contract.
 pub trait Veable {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_>);
+	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, NativeRuntime>);
 }
 ///      A type-erased container for any concrete `Veable`.
 ///
@@ -71,7 +71,7 @@ impl Ve {
 			secondary_bar: Region::fixed(DebugPanel::new("BREADCRUMBS"), config.activity_bar.size),
 			main: Region::content(view).with_padding(8 as i32),
 			bottom_panel: Panel::new(
-				Region::resizable(DebugPanel::new("BOTTOM"), config.bottom_panel.size, 0.0, 600.0)
+				Region::resizable(WaterfallChart::new(), config.bottom_panel.size, 0.0, 600.0)
 			),
 			status_bar: Region::fixed(DebugPanel::new("STATUS BAR"), config.status_bar.size)
 				.with_fill(config.bg)
@@ -87,7 +87,7 @@ impl Ve {
 	///
 	/// `Ve` doesn't know how the view is drawn. It only knows that the
 	/// contained implementation satisfies `Veable`.
-	pub fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_>) {
+	pub fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, NativeRuntime>) {
 		let available = ui.available_rect_before_wrap();
 		ui.painter().rect_filled(available, 0.0, DEFAULT_CONFIG.bg);
 		let (
@@ -139,7 +139,7 @@ impl Ve {
 	}
 	fn draw_region(
 		ui: &mut egui::Ui,
-		ctx: &mut AppContext<'_>,
+		ctx: &mut AppContext<'_, NativeRuntime>,
 		rect: egui::Rect,
 		region: &mut Region
 	) {
@@ -158,14 +158,19 @@ impl Ve {
 		ui: &mut egui::Ui,
 		rect: egui::Rect,
 		view: &mut dyn Veable,
-		ctx: &mut AppContext<'_>
+		ctx: &mut AppContext<'_, NativeRuntime>
 	) {
 		let mut child = ui.new_child(
 			egui::UiBuilder::new().max_rect(rect).layout(egui::Layout::top_down(egui::Align::LEFT))
 		);
 		view.draw(&mut child, ctx);
 	}
-	fn draw_panel(ui: &mut egui::Ui, ctx: &mut AppContext<'_>, rect: egui::Rect, panel: &mut Panel) {
+	fn draw_panel(
+		ui: &mut egui::Ui,
+		ctx: &mut AppContext<'_, NativeRuntime>,
+		rect: egui::Rect,
+		panel: &mut Panel
+	) {
 		if !panel.open {
 			return;
 		}
@@ -370,14 +375,14 @@ pub struct EguiVeable {
 	side_tab: DevSideTab,
 }
 impl Veable for EguiVeable {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_>) {
+	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, NativeRuntime>) {
 		self.draw_ui(ui);
 	}
 }
 impl EguiVeable {
 	pub fn new() -> Self {
 		Self {
-			state: EstateState::load(),
+			state: EstateState::load_from_disk().unwrap(),
 			top_tab: DevTopTab::Status,
 			side_tab: DevSideTab::Overview,
 		}
@@ -860,7 +865,7 @@ impl Graphics {
 	}
 }
 impl Veable for Graphics {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_>) {
+	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, NativeRuntime>) {
 		// 1. Poll the channel for file changes on every frame render tick
 		self.check_for_changes(ui.ctx());
 		// 2. Split the available space to reserve room for the bottom status bar
@@ -1144,7 +1149,7 @@ impl Oracle {
 	}
 }
 impl Veable for Oracle {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_>) {
+	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, NativeRuntime>) {
 		// 1. Poll the channel for file changes on every frame render tick
 		// self.check_for_changes(ui.ctx());
 		// 2. Split the available space to reserve room for the bottom status bar
@@ -1272,23 +1277,32 @@ impl TaskManager {
 		egui::Frame::group(ui.style()).show(ui, |ui| {
 			ui.horizontal(|ui| {
 				ui.label(job.status.icon());
+
 				ui.vertical(|ui| {
-					ui.strong(&job.name);
+					ui.strong(job.kind.name());
 					ui.small(format!("Job #{}", job.id));
 				});
+
 				ui.add_space(20.0);
+
 				// Status
 				ui.label(job.status.label());
+
 				ui.add_space(20.0);
-				// Progress
-				if let Some(progress) = job.progress {
-					ui.add(egui::ProgressBar::new(progress).desired_width(180.0).show_percentage());
-				}
-				// Runtime
+
+				// Duration
 				if let Some(started_at) = job.started_at {
-					let elapsed = started_at.elapsed();
-					ui.label(format_duration(elapsed));
+					let duration_ms = match job.completed_at {
+						Some(completed_at) => completed_at.saturating_sub(started_at),
+						None => {
+							// Still running. Calculate elapsed wall-clock time.
+							EstateState::now().saturating_sub(started_at)
+						}
+					};
+
+					ui.label(format_duration_ms(duration_ms));
 				}
+
 				ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
 					ui.button("⋮");
 				});
@@ -1297,7 +1311,7 @@ impl TaskManager {
 	}
 }
 impl Veable for TaskManager {
-	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_>) {
+	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, NativeRuntime>) {
 		if self.poll_changes() {
 			ui.ctx().request_repaint();
 		}
@@ -1828,7 +1842,7 @@ impl DebugPanel {
 	}
 }
 impl Veable for DebugPanel {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_>) {
+	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, NativeRuntime>) {
 		ui.vertical_centered(|ui| {
 			ui.heading(&self.title);
 			ui.separator();
@@ -2006,7 +2020,7 @@ enum ResizeEdge {
 struct ActivityBar {}
 
 impl Veable for ActivityBar {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_>) {
+	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, NativeRuntime>) {
 		// ui.vertical(|ui| {
 		// 	if ui.button("Dashboard").clicked() {
 		// 		ctx.app.open_window(WindowType::Dashboard);
@@ -2036,7 +2050,7 @@ impl Sidebar {
 }
 
 impl Veable for Sidebar {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_>) {
+	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, NativeRuntime>) {
 		ui.vertical(|ui| {
 			for button in &self.buttons {
 				if ui.button(*button).clicked() {
@@ -2050,4 +2064,160 @@ impl Veable for Sidebar {
 			}
 		});
 	}
+}
+
+pub struct WaterfallChart;
+
+impl WaterfallChart {
+	pub fn new() -> Self {
+		Self
+	}
+
+	pub fn draw_chart<'a>(&self, ui: &mut Ui, jobs: impl Iterator<Item = &'a Job>) {
+		let jobs: Vec<&Job> = jobs.collect();
+
+		if jobs.is_empty() {
+			ui.centered_and_justified(|ui| {
+				ui.label("No job history");
+			});
+			return;
+		}
+
+		let now = EstateState::now();
+
+		// (job, start, end)
+		let mut timed_jobs = Vec::new();
+
+		for job in jobs {
+			let Some(started_at) = job.started_at else {
+				continue;
+			};
+
+			let start = started_at as f64;
+			let end = job.completed_at.unwrap_or(now) as f64;
+
+			timed_jobs.push((job, start, end.max(start + 1.0)));
+		}
+
+		if timed_jobs.is_empty() {
+			ui.centered_and_justified(|ui| {
+				ui.label("No timed jobs");
+			});
+			return;
+		}
+
+		// Sort chronologically so we can pack jobs into the
+		// smallest possible number of horizontal lanes.
+		timed_jobs.sort_by(|a, b| { a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal) });
+
+		// Each lane stores the end time of its last job.
+		let mut lanes: Vec<f64> = Vec::new();
+
+		let mut bars = Vec::with_capacity(timed_jobs.len());
+
+		let mut min_time = f64::MAX;
+		let mut max_time = f64::MIN;
+
+		for (job, start, end) in timed_jobs {
+			min_time = min_time.min(start);
+			max_time = max_time.max(end);
+
+			// Reuse the first lane whose previous job has
+			// already finished.
+			let lane = lanes
+				.iter()
+				.position(|lane_end| *lane_end <= start)
+				.unwrap_or_else(|| {
+					lanes.push(0.0);
+					lanes.len() - 1
+				});
+
+			lanes[lane] = end;
+
+			let duration = end - start;
+
+			bars.push(
+				Bar::new(lane as f64, duration)
+					.horizontal()
+					.base_offset(start)
+					.width(0.7)
+					.name(job.kind.name())
+			);
+		}
+
+		let padding = ((max_time - min_time) * 0.05).max(1.0);
+
+		let lane_count = lanes.len() as f64;
+
+		Plot::new("job_timeline")
+			.height(280.0)
+
+			// Horizontal range is time.
+			.include_x(min_time - padding)
+			.include_x(max_time + padding)
+
+			// Vertical range is ONLY the lanes we actually needed.
+			.include_y(-0.75)
+			.include_y((lane_count - 1.0).max(0.0) + 0.75)
+
+			.allow_drag(true)
+			.allow_zoom(true)
+			.allow_scroll(true)
+
+			// Don't allow independent Y-axis zooming.
+			.allow_axis_zoom_drag(false)
+
+			.show_x(true)
+			.show_y(false)
+			.legend(egui_plot::Legend::default())
+			.x_axis_formatter(|mark, _range| { format_timestamp(mark.value) })
+			.show(ui, |plot_ui| {
+				plot_ui.bar_chart(BarChart::new("jobs", bars).horizontal());
+			});
+	}
+}
+
+impl Veable for WaterfallChart {
+	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, NativeRuntime>) {
+		if ctx.poll_state() {
+			ui.ctx().request_repaint();
+		}
+
+		ui.heading("Job History");
+
+		let state = ctx.state();
+
+		self.draw_chart(ui, state.jobs.iter());
+	}
+}
+#[derive(Clone, Copy)]
+struct WaterfallItem {
+	label: &'static str,
+	value: f64,
+	total: bool,
+}
+
+fn format_duration_ms(ms: u64) -> String {
+	let total_seconds = ms / 1_000;
+	let hours = total_seconds / 3_600;
+	let minutes = (total_seconds % 3_600) / 60;
+	let seconds = total_seconds % 60;
+	let millis = ms % 1_000;
+
+	if hours > 0 {
+		format!("{hours}h {minutes:02}m {seconds:02}s")
+	} else if minutes > 0 {
+		format!("{minutes}m {seconds:02}s")
+	} else {
+		format!("{seconds}.{millis:03}s")
+	}
+}
+fn format_timestamp(timestamp: f64) -> String {
+	let timestamp = timestamp as u64;
+
+	let datetime = std::time::UNIX_EPOCH + std::time::Duration::from_secs(timestamp);
+
+	let datetime: chrono::DateTime<chrono::Local> = datetime.into();
+
+	datetime.format("%H:%M:%S").to_string()
 }

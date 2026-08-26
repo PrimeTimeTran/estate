@@ -1,9 +1,23 @@
-use crate::{ share::prelude::* };
+use crate::share::prelude::*;
+use std::collections::VecDeque;
 
-pub(crate) mod modules;
+pub(crate) mod host;
+pub(crate) mod job;
 pub(crate) mod model;
+pub(crate) mod modules;
 
-pub use modules::runtime::Runtime;
+#[path = "modules/monitor.rs"]
+pub(crate) mod monitor;
+
+#[cfg(not(target_arch = "wasm32"))]
+#[path = "modules/monitor_native.rs"]
+pub(crate) mod monitor_native;
+
+pub(crate) mod state;
+
+pub use job::*;
+pub use modules::runtime::{ Runtime, RuntimeState };
+pub use state::{ EstateState, NativeStateStore, StateStore };
 
 // Generic traits should exist inside of ./src/app module
 // Platform implementations for native, mobile, web should exist in their own respective namespaces
@@ -11,13 +25,22 @@ pub use modules::runtime::Runtime;
 // ./src/web
 // ./src/mobile
 
-#[derive(Clone)]
 pub struct App<R: Runtime> {
 	pub engine: model::EstateEngine<R>,
 }
 impl<R: Runtime> App<R> {
-	pub fn new(engine: model::EstateEngine<R>) -> Self {
-		Self { engine }
+	pub fn new(engine: model::EstateEngine<R>) -> anyhow::Result<Self> {
+		Ok(Self { engine })
+	}
+}
+
+impl<R: Runtime> App<R> {
+	pub fn state(&self) -> std::sync::RwLockReadGuard<'_, EstateState> {
+		self.engine.runtime.state().read()
+	}
+
+	pub fn jobs(&self) -> std::sync::RwLockReadGuard<'_, EstateState> {
+		self.state()
 	}
 }
 
@@ -47,7 +70,12 @@ impl<R: Runtime> App<R> {
 	}
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-pub struct AppContext<'a> {
-	pub app: &'a mut App<crate::native::app::NativeRuntime>,
-}
+#[cfg(feature = "native")]
+pub(crate) mod context;
+#[cfg(feature = "native")]
+pub use context::*;
+
+#[cfg(feature = "native")]
+pub(crate) mod state_native;
+#[cfg(feature = "native")]
+pub use state_native::*;

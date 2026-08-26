@@ -130,7 +130,7 @@ pub enum TaskRequest {
 	Delete(TaskId),
 }
 
-#[derive(Debug, Clone, Deserialize, Hash, Serialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Deserialize, Hash, Serialize)]
 pub enum TaskKind {
 	BuildEstatePrototype,
 	GenerateView(String),

@@ -1,11 +1,16 @@
+// use crate::app::monitor::StateMonitor;
 use crate::{ prelude::* };
-use crate::app::Runtime;
+use crate::app::{ EstateState, Runtime };
 
 #[derive(Clone, Debug)]
 pub struct EstateEngine<R: Runtime> {
 	// Domain
 	pub estate: Estate,
 	pub runtime: Arc<R>,
+
+	// pub state: EstateState,
+	// pub state_monitor: StateMonitor,
+
 	// Infrastructure
 	pub vfs: EstateVfs,
 	pub index: EstateIndex,
@@ -30,7 +35,11 @@ pub struct EstateEngine<R: Runtime> {
 }
 impl<R: Runtime> EstateEngine<R> {
 	pub fn new(runtime: R) -> anyhow::Result<Self> {
+		// let state = EstateState::load_from_disk().unwrap();
+		// let state_monitor = StateMonitor::new(&state_path)?;
 		Ok(Self {
+			// state,
+			// state_monitor,
 			runtime: Arc::new(runtime),
 			estate: Estate::default(),
 			workspace: Workspace::new(),

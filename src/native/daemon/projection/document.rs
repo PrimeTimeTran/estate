@@ -1,4 +1,8 @@
-use crate::{ native::{ daemon::daemon::*, prelude::*, * }, prelude::* };
+use crate::{
+	app::EstateState,
+	native::{ resolver::*, daemon::daemon::*, prelude::*, * },
+	prelude::*,
+};
 
 use std::{ fs, io::Result, path::{ Path, PathBuf } };
 

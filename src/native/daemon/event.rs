@@ -1,4 +1,4 @@
-use crate::{ app::*, prelude::*, share::{ self }, share::vfs::* };
+use crate::{ app::{ *, state }, prelude::*, share::{ self }, share::vfs::* };
 use crate::app::modules::runtime::Runtime;
 
 // Events = facts that happened
@@ -171,6 +171,9 @@ impl EventHandler for TaskHandler {
 				tracing::info!("TaskRequest::Create {:?}", kind);
 				let mut tasks = runtime.tasks.write().unwrap();
 				let task = tasks.create(kind.clone());
+				// let job_id = tasks.create_job(task);
+				let task_id = tasks.create(kind.clone());
+				// let job_id = tasks.start_job(task_id);
 				runtime.emit(
 					Event::daemon(EventKind::TaskCreated {
 						task_id: task,
@@ -194,10 +197,10 @@ impl EventHandler for TaskHandler {
 		};
 		{
 			let mut tasks = runtime.tasks.write().unwrap();
-			if let Err(error) = tasks.set_status(task_id, TaskStatus::Running) {
-				tracing::warn!(%task_id, %error, "failed to set task running");
-				return;
-			}
+			// if let Err(error) = tasks.set_status(task_id, TaskStatus::Running) {
+			// 	tracing::warn!(%task_id, %error, "failed to set task running");
+			// 	return;
+			// }
 		}
 		runtime.emit(Event::daemon(EventKind::TaskStarted { task_id }));
 		let runtime = runtime.clone();
@@ -227,35 +230,69 @@ impl EventHandler for TaskHandler {
 pub struct StateHandler;
 #[async_trait::async_trait]
 impl EventHandler for StateHandler {
+	// async fn handle(&self, event: &Event, runtime: &NativeRuntime) -> anyhow::Result<()> {
 	async fn handle(&self, event: &Event, runtime: &NativeRuntime) {
 		tracing::info!("🔥 StateHandler received: {:?}", event.kind);
-		let mut state = runtime.state.write().unwrap();
-		match &event.kind {
-			EventKind::DaemonStarted => {
-				state.starts += 1;
-				state.status_checks += 1;
-				state.started_at = event.timestamp;
+
+		let snapshot = {
+			let mut state = runtime.state.write();
+			match &event.kind {
+				EventKind::DaemonStarted => {
+					state.starts += 1;
+					state.status_checks += 1;
+					state.started_at = event.timestamp;
+				}
+				EventKind::StatusRequested => {
+					state.status_checks += 1;
+				}
+				EventKind::IndexUpdated { files_changed } => {
+					state.files_indexed += files_changed;
+				}
+				EventKind::TaskCreated { task_id, name } => {
+					state.tasks_created += 1;
+					state.jobs.push_back(Job {
+						id: *task_id,
+						task_id: *task_id,
+						name: name.clone(),
+						kind: TaskKind::BuildEstatePrototype,
+						status: JobStatus::Pending,
+						created_at: event.timestamp,
+						started_at: None,
+						completed_at: None,
+					});
+				}
+				EventKind::TaskStarted { task_id } => {
+					if let Some(job) = state.jobs.iter_mut().find(|job| job.id == *task_id) {
+						job.status = JobStatus::Running;
+						job.started_at = Some(event.timestamp);
+					}
+				}
+				EventKind::TaskCompleted { task_id } => {
+					state.tasks_completed += 1;
+					if let Some(job) = state.jobs.iter_mut().find(|job| job.id == *task_id) {
+						job.status = JobStatus::Completed;
+						job.completed_at = Some(event.timestamp);
+					}
+				}
+
+				EventKind::TaskFailed { task_id, error } => {
+					if let Some(job) = state.jobs.iter_mut().find(|job| job.id == *task_id) {
+						job.status = JobStatus::Failed;
+						job.completed_at = Some(event.timestamp);
+					}
+				}
+				EventKind::DaemonStopped => {
+					let run_duration = event.timestamp.saturating_sub(state.started_at);
+					state.longest_run = state.longest_run.max(run_duration);
+				}
+				_ => {}
 			}
-			EventKind::StatusRequested => {
-				state.status_checks += 1;
-			}
-			EventKind::IndexUpdated { files_changed } => {
-				state.files_indexed += files_changed;
-			}
-			EventKind::TaskCompleted { .. } => {
-				state.tasks_completed += 1;
-			}
-			EventKind::TaskCreated { .. } => {
-				state.tasks_created += 1;
-			}
-			EventKind::DaemonStopped => {
-				let run_duration = event.timestamp.saturating_sub(state.started_at);
-				state.longest_run = state.longest_run.max(run_duration);
-			}
-			_ => {}
-		}
-		state.events_processed += 1;
-		EstateState::save(&state);
+			state.events_processed += 1;
+			state.revision += 1;
+			state.clone()
+		};
+		// Ok(runtime.save(&snapshot)?)
+		runtime.save(&snapshot);
 	}
 }
 pub struct CommandHandler;
@@ -268,7 +305,7 @@ impl EventHandler for CommandHandler {
 			return;
 		};
 		match command.as_str() {
-			"TaskRequest::Createtask_create" => {
+			"task_create" => {
 				tracing::info!("CommandHandler task_create {:?}", event);
 				runtime.emit(
 					Event::app(EventKind::TaskRequested {
@@ -289,7 +326,7 @@ impl EventHandler for CommandHandler {
 					}
 				}
 				drop(tasks);
-				let state = EstateState::load();
+				let state = EstateState::load_from_disk().unwrap();
 				println!();
 				println!("──────────── persisted state ────────────");
 				println!("starts:           {}", state.starts);

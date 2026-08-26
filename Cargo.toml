@@ -50,10 +50,10 @@ path = "src/bin/macros.rs"
 # To get IDE diagnostics functioning correctly remove the hardcoded default when troubleshooting another build target.
 # 
 # cargo build --bin web --no-default-features --features="web" --target wasm32-unknown-unknown
-default = ["native"]
+# default = ["native"]
 # cargo build --bin web --no-default-features --features="web" --target wasm32-unknown-unknown
-# default = ["web"]
-# default = []
+# default = ["native"]
+default = []
 mobile = []
 web = ["dep:wasm-bindgen", "dep:web-sys", "dep:eframe"]
 native = [

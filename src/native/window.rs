@@ -111,7 +111,7 @@ impl Window {
 			view,
 		})
 	}
-	pub fn draw(&mut self, ctx: &mut AppContext<'_>) -> anyhow::Result<()> {
+	pub fn draw(&mut self, ctx: &mut AppContext<'_, NativeRuntime>) -> anyhow::Result<()> {
 		self.begin_egui();
 		let output = self.build_ui(ctx);
 		let Some(surface_texture) = self.acquire_surface()? else {
@@ -121,7 +121,7 @@ impl Window {
 		self.render_egui(surface_texture, output)?;
 		Ok(())
 	}
-	fn build_ui(&mut self, ctx: &mut AppContext<'_>) -> egui::FullOutput {
+	fn build_ui(&mut self, ctx: &mut AppContext<'_, NativeRuntime>) -> egui::FullOutput {
 		let mut ui = egui::Ui::new(
 			self.egui_ctx.clone(),
 			egui::Id::new("window_root"),

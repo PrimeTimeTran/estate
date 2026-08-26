@@ -6,7 +6,7 @@
 // | Individual background execution | `Job`          | Has lifecycle/state           |
 // | UI representation               | `Task` / `Job` | Shows pending/running/etc.    |
 
-use crate::{ native::agent::AgentContext, prelude::* };
+use crate::{ app::EstateState, native::agent::AgentContext, prelude::* };
 
 #[derive(Debug, Clone)]
 pub struct Task {
@@ -216,13 +216,13 @@ impl TaskResult {
 	}
 	pub fn completed_with_summary(task_id: String, ctx: AgentContext, summary: String) -> Self {
 		Self {
-			task_id,
-			status: TaskStatus::Completed,
-			summary: Some(summary),
 			artifacts: ctx.artifacts,
+			chat: None,
 			logs: ctx.logs,
 			spawned_tasks: ctx.spawned_tasks,
-			chat: None,
+			status: TaskStatus::Completed,
+			summary: Some(summary),
+			task_id,
 		}
 	}
 	pub fn failed(
@@ -232,13 +232,13 @@ impl TaskResult {
 		summary: Option<String>
 	) -> Self {
 		Self {
-			task_id,
-			status: TaskStatus::Failed(reason.into()),
-			summary,
 			artifacts: ctx.artifacts,
+			chat: None,
 			logs: ctx.logs,
 			spawned_tasks: ctx.spawned_tasks,
-			chat: None,
+			status: TaskStatus::Failed(reason.into()),
+			summary,
+			task_id,
 		}
 	}
 }
@@ -254,40 +254,4 @@ pub enum Artifact {
 	},
 	Observation(String),
 	ToolOutput(String),
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum JobStatus {
-	Pending,
-	Running,
-	Completed,
-	Failed,
-	Cancelled,
-}
-pub struct Job {
-	pub id: u64,
-	pub name: String,
-	pub progress: Option<f32>,
-	pub started_at: Option<Instant>,
-	pub status: JobStatus,
-}
-impl JobStatus {
-	pub fn label(self) -> &'static str {
-		match self {
-			Self::Cancelled => "Cancelled",
-			Self::Completed => "Completed",
-			Self::Failed => "Failed",
-			Self::Pending => "Pending",
-			Self::Running => "Running",
-		}
-	}
-	pub fn icon(self) -> &'static str {
-		match self {
-			Self::Cancelled => "⊘",
-			Self::Completed => "✓",
-			Self::Failed => "✗",
-			Self::Pending => "○",
-			Self::Running => "●",
-		}
-	}
 }
