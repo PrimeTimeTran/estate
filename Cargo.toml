@@ -1,3 +1,4 @@
+# https://doc.rust-lang.org/cargo/reference/manifest.html
 [package]
 name = "estate"
 version = "0.1.0"
@@ -14,6 +15,7 @@ short_description = "Estate development environment"
 long_description = "Estate development environment"
 icon = ["assets/icon.icns"]
 
+# https://doc.rust-lang.org/cargo/reference/cargo-targets.html#configuring-a-target
 [[bin]]
 name = "estate"
 path = "src/bin/estate.rs"
@@ -24,7 +26,6 @@ name = "web"
 path = "src/bin/web.rs"
 required-features = ["web"]
 # target = "wasm32-unknown-unknown"
-# feature = "web"
 
 [[bin]]
 name = "native"
@@ -47,9 +48,12 @@ path = "src/bin/macros.rs"
 # This overwrites IDE config causing diagnostics to be wrong given the targetted platform.
 #
 # To get IDE diagnostics functioning correctly remove the hardcoded default when troubleshooting another build target.
-#
-# default = []
+# 
+# cargo build --bin web --no-default-features --features="web" --target wasm32-unknown-unknown
 default = ["native"]
+# cargo build --bin web --no-default-features --features="web" --target wasm32-unknown-unknown
+# default = ["web"]
+# default = []
 mobile = []
 web = ["dep:wasm-bindgen", "dep:web-sys", "dep:eframe"]
 native = [
@@ -85,7 +89,6 @@ anyhow.workspace = true
 async-trait.workspace = true
 chrono.workspace = true
 dirs.workspace = true
-
 egui_plot.workspace = true
 egui-wgpu.workspace = true
 egui.workspace = true
@@ -110,7 +113,6 @@ wasm-bindgen-futures.workspace = true
 wasm-bridge.workspace = true
 wgpu.workspace = true
 winit.workspace = true
-
 # Make all these optional so they can be toggled by the native feature
 eframe = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }

@@ -17,15 +17,93 @@ pub struct Task {
 }
 
 #[derive(Debug)]
-pub struct TaskManager {
-	pub _watcher: notify::RecommendedWatcher,
+pub struct TaskManagerRuntime {
+	watcher: notify::RecommendedWatcher,
+	rx: tokio::sync::mpsc::Receiver<()>,
+}
+impl TaskManagerRuntime {
+	pub fn new(path: &Path) -> anyhow::Result<Self> {
+		use notify::{ Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher };
+		let (tx, rx) = tokio::sync::mpsc::channel::<()>(1);
+		let mut watcher = RecommendedWatcher::new(move |res: Result<Event, notify::Error>| {
+			if let Ok(event) = res {
+				if matches!(event.kind, EventKind::Modify(_) | EventKind::Create(_)) {
+					let _ = tx.blocking_send(());
+				}
+			}
+		}, Config::default())?;
+		if let Some(parent) = path.parent() {
+			watcher.watch(parent, RecursiveMode::NonRecursive)?;
+		}
+
+		Ok(Self { watcher, rx })
+	}
+}
+#[derive(Debug, Default)]
+pub struct TaskManagerState {
 	pub dirty: bool,
 	pub error: Option<String>,
 	pub last_loaded: Option<SystemTime>,
-	pub rx: tokio::sync::mpsc::Receiver<()>,
 	pub state: Option<EstateState>,
 	pub state_path: PathBuf,
 	pub tasks: HashMap<TaskId, Task>,
+}
+
+#[derive(Debug)]
+pub struct TaskManager {
+	runtime: TaskManagerRuntime,
+	pub state: TaskManagerState,
+}
+
+impl TaskManager {
+	pub fn new() -> Self {
+		// pub fn new() -> anyhow::Result<Self> {
+		let path = PathBuf::from("/Users/future/Library/Application Support/estate/state.json");
+		Self::from_path(path).unwrap()
+	}
+	pub fn from_path(path: impl Into<PathBuf>) -> anyhow::Result<Self> {
+		let state_path = path.into();
+		let runtime = TaskManagerRuntime::new(&state_path)?;
+		let mut state = TaskManagerState {
+			state_path,
+			..Default::default()
+		};
+		let mut manager = Self {
+			runtime,
+			state,
+		};
+		manager.reload();
+
+		Ok(manager)
+	}
+	pub fn reload(&mut self) {
+		match EstateState::load_from_path(&self.state.state_path) {
+			Ok(state) => {
+				self.state.state = Some(state);
+				self.state.dirty = false;
+				self.state.error = None;
+				self.state.last_loaded = fs
+					::metadata(&self.state.state_path)
+					.and_then(|metadata| metadata.modified())
+					.ok();
+			}
+			Err(error) => {
+				self.state.error = Some(error.to_string());
+				self.state.dirty = true;
+			}
+		}
+	}
+	pub fn poll_changes(&mut self) -> bool {
+		#[cfg(not(target_arch = "wasm32"))]
+		{
+			if self.runtime.rx.try_recv().is_ok() {
+				self.reload();
+				return true;
+			}
+		}
+
+		false
+	}
 }
 impl TaskManager {
 	pub fn create(&mut self, kind: TaskKind) -> TaskId {
@@ -38,30 +116,30 @@ impl TaskManager {
 			status: TaskStatus::Pending,
 		};
 
-		self.tasks.insert(id, task);
-		self.dirty = true;
+		self.state.tasks.insert(id, task);
+		self.state.dirty = true;
 
 		id
 	}
 
 	pub fn get(&self, id: TaskId) -> Option<&Task> {
-		self.tasks.get(&id)
+		self.state.tasks.get(&id)
 	}
 
 	fn get_mut(&mut self, id: TaskId) -> Option<&mut Task> {
-		self.tasks.get_mut(&id)
+		self.state.tasks.get_mut(&id)
 	}
 
 	pub fn count(&self) -> usize {
-		self.tasks.len()
+		self.state.tasks.len()
 	}
 
 	pub fn list(&self) -> impl Iterator<Item = &Task> {
-		self.tasks.values()
+		self.state.tasks.values()
 	}
 
 	pub fn set_status(&mut self, id: TaskId, status: TaskStatus) -> anyhow::Result<()> {
-		let task = self.tasks.get_mut(&id).ok_or_else(|| anyhow::anyhow!("task {id} not found"))?;
+		let task = self.state.tasks.get_mut(&id).ok_or_else(|| anyhow::anyhow!("task {id} not found"))?;
 
 		task.status = status;
 
@@ -73,20 +151,20 @@ impl TaskManager {
 	}
 
 	pub fn clear(&mut self) -> bool {
-		if self.tasks.is_empty() {
+		if self.state.tasks.is_empty() {
 			return false;
 		}
 
-		self.tasks.clear();
-		self.dirty = true;
+		self.state.tasks.clear();
+		self.state.dirty = true;
 		true
 	}
 
 	pub fn delete(&mut self, id: TaskId) -> Option<Task> {
-		let task = self.tasks.remove(&id);
+		let task = self.state.tasks.remove(&id);
 
 		if task.is_some() {
-			self.dirty = true;
+			self.state.dirty = true;
 		}
 
 		task

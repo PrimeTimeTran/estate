@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::{ app::{ Runtime, AppContext }, prelude::* };
 
 use egui::{ Context as EguiContext, TexturesDelta };
 use egui_wgpu::{ Renderer, wgpu::{ self } };
@@ -10,58 +10,61 @@ use tray_icon::menu::{ MenuItem, Submenu };
 use wgpu::{ Adapter, Device, SurfaceColorSpace };
 use winit::{ dpi::{ PhysicalPosition, PhysicalSize }, event_loop::ActiveEventLoop };
 
-/// Estate UI Container
-///
-/// Owns the native window, egui state, wgpu rendering resources, and the
-/// application state required to render and interact with the development UI.
-/// CPU / Rust
-///    │
-///    │ create resources + record commands
-///    ▼
-/// wgpu::Device
-///    │
-///    │ command encoder
-///    ▼
-/// wgpu::Queue
-///    │
-///    │ submit
-///    ▼
-/// ┌─────────────────────────────────────────────┐
-/// │                 GPU PIPELINE                │
-/// │                                             │
-/// │ Vertex Input                                │
-/// │      ↓                                      │
-/// │ Vertex Shader                                │
-/// │      ↓                                      │
-/// │ Primitive Assembly                          │
-/// │      ↓                                      │
-/// │ Rasterization                               │
-/// │      ↓                                      │
-/// │ Fragment Shader                              │
-/// │      ↓                                      │
-/// │ Depth / Stencil / Blending                  │
-/// │      ↓                                      │
-/// │ Render Target                               │
-/// └─────────────────────────────────────────────┘
-///    │
-///    ▼
-/// Surface Texture
-///    │
-///    ▼
-/// Window
-/// Vertex data
-///     ↓
-/// Vertex Shader
-///     ↓
-/// Primitive assembly
-///     ↓
-/// Rasterization
-///     ↓
-/// Fragment Shader
-///     ↓
-/// Depth / Stencil / Blending
-///     ↓
-/// Color attachment
+// Estate UI Container
+
+// Owns the native window, egui state, wgpu rendering resources, and the
+// application state required to render and interact with the development UI.
+// CPU / Rust
+//   │
+//   │ create resources + record commands
+//   ▼
+// wgpu::Device
+//   │
+//   │ command encoder
+//   ▼
+// wgpu::Queue
+//   │
+//   │ submit
+//   ▼
+// ┌─────────────────────────────────────────────┐
+// │                 GPU PIPELINE                │
+// │                                             │
+// │ Vertex Input                                │
+// │      ↓                                      │
+// │ Vertex Shader                                │
+// │      ↓                                      │
+// │ Primitive Assembly                          │
+// │      ↓                                      │
+// │ Rasterization                               │
+// │      ↓                                      │
+// │ Fragment Shader                              │
+// │      ↓                                      │
+// │ Depth / Stencil / Blending                  │
+// │      ↓                                      │
+// │ Render Target                               │
+// └─────────────────────────────────────────────┘
+//   │
+//   ▼
+// Surface Texture
+//   │
+//   ▼
+// Window
+// Vertex data
+//    ↓
+// Vertex Shader
+//    ↓
+// Primitive assembly
+//    ↓
+// Rasterization
+//    ↓
+// Fragment Shader
+//    ↓
+// Depth / Stencil / Blending
+//    ↓
+// Color attachment
+
+/// R is the generic type parameter. R: Runtime is the constraint saying what R is allowed to be.
+/// Window has a generic type R, and R must implement Runtime.
 pub struct Window {
 	pub instance: Arc<winit::window::Window>,
 	pub egui_ctx: egui::Context,
@@ -75,6 +78,7 @@ pub struct Window {
 	renderer: egui_wgpu::Renderer,
 	pending_textures: TexturesDelta,
 	view: Ve,
+	// pub app: App<R>,
 	// 1. input assembler
 	// 2.vertex shader
 	// 3.hull shader
@@ -97,6 +101,7 @@ impl Window {
 			device,
 			egui_ctx,
 			egui_state,
+			instance: window,
 			needs_resize: false,
 			occluded: true,
 			pending_textures: TexturesDelta::default(),
@@ -104,23 +109,19 @@ impl Window {
 			renderer,
 			surface,
 			view,
-			instance: window,
 		})
 	}
-	pub fn draw(&mut self) -> anyhow::Result<()> {
+	pub fn draw(&mut self, ctx: &mut AppContext<'_>) -> anyhow::Result<()> {
 		self.begin_egui();
-		let output = self.build_ui();
+		let output = self.build_ui(ctx);
 		let Some(surface_texture) = self.acquire_surface()? else {
+			tracing::warn!("NO SURFACE");
 			return Ok(());
 		};
 		self.render_egui(surface_texture, output)?;
 		Ok(())
 	}
-	fn begin_egui(&mut self) {
-		let input = self.egui_state.take_egui_input(&self.instance);
-		self.egui_ctx.begin_pass(input);
-	}
-	fn build_ui(&mut self) -> egui::FullOutput {
+	fn build_ui(&mut self, ctx: &mut AppContext<'_>) -> egui::FullOutput {
 		let mut ui = egui::Ui::new(
 			self.egui_ctx.clone(),
 			egui::Id::new("window_root"),
@@ -129,9 +130,14 @@ impl Window {
 		egui::Frame::NONE
 			// .inner_margin(egui::Margin::same(16))
 			.show(&mut ui, |ui| {
-				self.view.draw(ui);
+				self.view.draw(ui, ctx);
 			});
 		self.egui_ctx.end_pass()
+	}
+
+	fn begin_egui(&mut self) {
+		let input = self.egui_state.take_egui_input(&self.instance);
+		self.egui_ctx.begin_pass(input);
 	}
 	fn acquire_surface(&mut self) -> anyhow::Result<Option<wgpu::SurfaceTexture>> {
 		match self.surface.get_current_texture() {
@@ -658,9 +664,17 @@ impl Window {
 	}
 }
 pub struct AppWindow {
-	pub kind: AppWindowType,
+	// pub runtime: R,
+	pub kind: WindowType,
 	pub window: Window,
 }
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WindowType {
+	Dashboard,
+	TelemetryInspector,
+	TaskManager,
+}
+
 #[derive(Debug)]
 pub enum AppEvent {
 	Shutdown,
@@ -670,12 +684,7 @@ pub enum AppEvent {
 	},
 	TickClock(String),
 }
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AppWindowType {
-	Dashboard,
-	TelemetryInspector,
-	TaskManager,
-}
+
 pub struct GlobalHotkeys {
 	hotkey_id: u32,
 	manager: GlobalHotKeyManager,

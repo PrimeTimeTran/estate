@@ -1,4 +1,4 @@
-// $ cargo build --bin web --target wasm32-unknown-unknown
+// $ cargo build --bin web --no-default-features --features="web" --target wasm32-unknown-unknown
 // $ trunk serve src/web/public/index.html --features web
 //
 // cargo build \
@@ -7,7 +7,7 @@
 //   --no-default-features \
 //   --features web
 //
-//   cargo build --bin web --target wasm32-unknown-unknown && trunk serve src/web/public/index.html --features web
+//   cargo build --bin web --no-default-features --features="web" --target wasm32-unknown-unknown && trunk serve src/web/public/index.html --features web
 //
 // "rust-analyzer.cargo.target": "wasm32-unknown-unknown",
 #[cfg(target_arch = "wasm32")]
@@ -77,5 +77,6 @@ fn main() {
 	todo!("main")
 }
 
+// #[cfg(feature = "web")]
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {}

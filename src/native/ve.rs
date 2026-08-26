@@ -1,4 +1,4 @@
-use crate::{ prelude::*, theme::palette };
+use crate::{ app::AppContext, prelude::*, theme::palette };
 
 use core_foundation::runloop::{ CFRunLoop, kCFRunLoopCommonModes };
 use core_graphics::{
@@ -32,7 +32,7 @@ use winit::event_loop::EventLoopProxy;
 ///      The implementation details belong to the concrete type; the caller
 ///      only depends on the behavior promised by the contract.
 pub trait Veable {
-	fn draw(&mut self, ui: &mut egui::Ui);
+	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_>);
 }
 ///      A type-erased container for any concrete `Veable`.
 ///
@@ -60,10 +60,13 @@ impl Ve {
 		Self {
 			activity_bar: Region::fixed(DebugPanel::new("ACTIVITY"), config.activity_bar.size),
 			dock_left: Panel::new(
-				Region::resizable(DebugPanel::new("LEFT"), config.dock_left.size, 0.0, 600.0).with_fill(
-					config.bg
-				)
+				Region::resizable(Sidebar::new(), config.dock_left.size, 0.0, 600.0).with_fill(config.bg)
 			).with_open(config.dock_left.active),
+			// dock_left: Panel::new(
+			// 	Region::resizable(DebugPanel::new("LEFT"), config.dock_left.size, 0.0, 600.0).with_fill(
+			// 		config.bg
+			// 	)
+			// ).with_open(config.dock_left.active),
 			primary_bar: Region::fixed(DebugPanel::new("TABS"), config.primary_bar.size),
 			secondary_bar: Region::fixed(DebugPanel::new("BREADCRUMBS"), config.activity_bar.size),
 			main: Region::content(view).with_padding(8 as i32),
@@ -84,7 +87,7 @@ impl Ve {
 	///
 	/// `Ve` doesn't know how the view is drawn. It only knows that the
 	/// contained implementation satisfies `Veable`.
-	pub fn draw(&mut self, ui: &mut egui::Ui) {
+	pub fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_>) {
 		let available = ui.available_rect_before_wrap();
 		ui.painter().rect_filled(available, 0.0, DEFAULT_CONFIG.bg);
 		let (
@@ -97,7 +100,7 @@ impl Ve {
 			status_bar_rect,
 		) = self.calculate_region_boundaries(available);
 		if self.dock_left.open {
-			Self::draw_panel(ui, left_rect, &mut self.dock_left);
+			Self::draw_panel(ui, ctx, left_rect, &mut self.dock_left);
 			Self::resize_region(
 				ui,
 				"dock_left_resize",
@@ -107,11 +110,11 @@ impl Ve {
 				1.0
 			);
 		}
-		Self::draw_region(ui, tabs_rect, &mut self.primary_bar);
-		Self::draw_region(ui, breadcrumbs_rect, &mut self.secondary_bar);
-		Self::draw_region(ui, main_rect, &mut self.main);
+		Self::draw_region(ui, ctx, tabs_rect, &mut self.primary_bar);
+		Self::draw_region(ui, ctx, breadcrumbs_rect, &mut self.secondary_bar);
+		Self::draw_region(ui, ctx, main_rect, &mut self.main);
 		if self.bottom_panel.open {
-			Self::draw_panel(ui, bottom_rect, &mut self.bottom_panel);
+			Self::draw_panel(ui, ctx, bottom_rect, &mut self.bottom_panel);
 			Self::resize_region(
 				ui,
 				"bottom_panel_resize",
@@ -122,7 +125,7 @@ impl Ve {
 			);
 		}
 		if self.dock_right.open {
-			Self::draw_panel(ui, right_rect, &mut self.dock_right);
+			Self::draw_panel(ui, ctx, right_rect, &mut self.dock_right);
 			Self::resize_region(
 				ui,
 				"dock_right_resize",
@@ -132,8 +135,48 @@ impl Ve {
 				-1.0
 			);
 		}
-		Self::draw_region(ui, status_bar_rect, &mut self.status_bar);
+		Self::draw_region(ui, ctx, status_bar_rect, &mut self.status_bar);
 	}
+	fn draw_region(
+		ui: &mut egui::Ui,
+		ctx: &mut AppContext<'_>,
+		rect: egui::Rect,
+		region: &mut Region
+	) {
+		let fill = region.fill.unwrap_or(DEFAULT_CONFIG.bg);
+		ui.painter().rect_filled(rect, 0.0, fill);
+		if region.top_border {
+			ui.painter().line_segment(
+				[egui::pos2(rect.left(), rect.top()), egui::pos2(rect.right(), rect.top())],
+				egui::Stroke::new(1.0, DEFAULT_CONFIG.surface)
+			);
+		}
+		let content_rect = region.content_rect(rect);
+		Self::draw_view(ui, content_rect, &mut *region.content, ctx);
+	}
+	fn draw_view(
+		ui: &mut egui::Ui,
+		rect: egui::Rect,
+		view: &mut dyn Veable,
+		ctx: &mut AppContext<'_>
+	) {
+		let mut child = ui.new_child(
+			egui::UiBuilder::new().max_rect(rect).layout(egui::Layout::top_down(egui::Align::LEFT))
+		);
+		view.draw(&mut child, ctx);
+	}
+	fn draw_panel(ui: &mut egui::Ui, ctx: &mut AppContext<'_>, rect: egui::Rect, panel: &mut Panel) {
+		if !panel.open {
+			return;
+		}
+		// Region owns visual styling.
+		if let Some(fill) = panel.region.fill {
+			ui.painter().rect_filled(rect, 0.0, fill);
+		}
+		// Region owns the actual content.
+		Self::draw_view(ui, rect, &mut *panel.region.content, ctx);
+	}
+
 	fn calculate_region_boundaries(
 		&mut self,
 		available: egui::Rect
@@ -221,35 +264,6 @@ impl Ve {
 			content_rect.max
 		);
 		(left_rect, right_rect, tabs_rect, breadcrumbs_rect, main_rect, bottom_rect, status_bar_rect)
-	}
-	fn draw_region(ui: &mut egui::Ui, rect: egui::Rect, region: &mut Region) {
-		let fill = region.fill.unwrap_or(DEFAULT_CONFIG.bg);
-		ui.painter().rect_filled(rect, 0.0, fill);
-		if region.top_border {
-			ui.painter().line_segment(
-				[egui::pos2(rect.left(), rect.top()), egui::pos2(rect.right(), rect.top())],
-				egui::Stroke::new(1.0, DEFAULT_CONFIG.surface)
-			);
-		}
-		let content_rect = region.content_rect(rect);
-		Self::draw_view(ui, content_rect, &mut *region.content);
-	}
-	fn draw_view(ui: &mut egui::Ui, rect: egui::Rect, view: &mut dyn Veable) {
-		let mut child = ui.new_child(
-			egui::UiBuilder::new().max_rect(rect).layout(egui::Layout::top_down(egui::Align::LEFT))
-		);
-		view.draw(&mut child);
-	}
-	fn draw_panel(ui: &mut egui::Ui, rect: egui::Rect, panel: &mut Panel) {
-		if !panel.open {
-			return;
-		}
-		// Region owns visual styling.
-		if let Some(fill) = panel.region.fill {
-			ui.painter().rect_filled(rect, 0.0, fill);
-		}
-		// Region owns the actual content.
-		Self::draw_view(ui, rect, &mut *panel.region.content);
 	}
 	fn resize_handle(ui: &mut egui::Ui, id: &str, rect: egui::Rect, mut resize: impl FnMut(f32)) {
 		let cursor = if id == "bottom_panel_resize" {
@@ -356,7 +370,7 @@ pub struct EguiVeable {
 	side_tab: DevSideTab,
 }
 impl Veable for EguiVeable {
-	fn draw(&mut self, ui: &mut egui::Ui) {
+	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_>) {
 		self.draw_ui(ui);
 	}
 }
@@ -846,7 +860,7 @@ impl Graphics {
 	}
 }
 impl Veable for Graphics {
-	fn draw(&mut self, ui: &mut egui::Ui) {
+	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_>) {
 		// 1. Poll the channel for file changes on every frame render tick
 		self.check_for_changes(ui.ctx());
 		// 2. Split the available space to reserve room for the bottom status bar
@@ -1130,7 +1144,7 @@ impl Oracle {
 	}
 }
 impl Veable for Oracle {
-	fn draw(&mut self, ui: &mut egui::Ui) {
+	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_>) {
 		// 1. Poll the channel for file changes on every frame render tick
 		// self.check_for_changes(ui.ctx());
 		// 2. Split the available space to reserve room for the bottom status bar
@@ -1226,53 +1240,17 @@ pub fn move_cursor_to(pos: ScreenPosition) {
 		}
 	}
 }
+
 impl TaskManager {
-	pub fn new() -> Self {
-		Self::from_path("/Users/future/Library/Application Support/estate/state.json")
-	}
-	pub fn from_path(path: impl Into<PathBuf>) -> Self {
-		let state_path = path.into();
-		let (tx, rx) = tokio::sync::mpsc::channel::<()>(1);
-		let watcher = Self::init_watcher(&state_path, tx).expect("Failed to initialize state watcher");
-		let mut view = Self {
-			tasks: HashMap::new(),
-			state_path,
-			state: None,
-			dirty: false,
-			last_loaded: None,
-			error: None,
-			rx,
-			_watcher: watcher,
-		};
-		view.reload();
-		view
-	}
-	pub fn reload(&mut self) {
-		match EstateState::loadFromPath(&self.state_path) {
-			Ok(state) => {
-				self.state = Some(state);
-				self.dirty = false;
-				self.error = None;
-				self.last_loaded = fs
-					::metadata(&self.state_path)
-					.and_then(|metadata| metadata.modified())
-					.ok();
-			}
-			Err(error) => {
-				self.error = Some(error.to_string());
-				self.dirty = true;
-			}
-		}
-	}
-	pub fn check_for_changes(&mut self, ctx: &egui::Context) {
-		#[cfg(not(target_arch = "wasm32"))]
-		{
-			if self.rx.try_recv().is_ok() {
-				self.reload();
-				ctx.request_repaint();
-			}
-		}
-	}
+	// pub fn check_for_changes(&mut self, ctx: &egui::Context) {
+	// 	#[cfg(not(target_arch = "wasm32"))]
+	// 	{
+	// 		if self.runtime.rx.try_recv().is_ok() {
+	// 			self.reload();
+	// 			ctx.request_repaint();
+	// 		}
+	// 	}
+	// }
 	fn init_watcher(
 		path: &Path,
 		tx: tokio::sync::mpsc::Sender<()>
@@ -1319,15 +1297,17 @@ impl TaskManager {
 	}
 }
 impl Veable for TaskManager {
-	fn draw(&mut self, ui: &mut Ui) {
-		self.check_for_changes(ui.ctx());
-		if let Some(error) = &self.error {
+	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_>) {
+		if self.poll_changes() {
+			ui.ctx().request_repaint();
+		}
+		if let Some(error) = &self.state.error {
 			ui.heading("Task Manager");
 			ui.colored_label(palette::DANGER, error);
-			ui.label(self.state_path.display().to_string());
+			ui.label(self.state.state_path.display().to_string());
 			return;
 		}
-		let Some(state) = &self.state else {
+		let Some(state) = &self.state.state else {
 			ui.centered_and_justified(|ui| {
 				ui.label("Loading task state...");
 			});
@@ -1848,7 +1828,7 @@ impl DebugPanel {
 	}
 }
 impl Veable for DebugPanel {
-	fn draw(&mut self, ui: &mut egui::Ui) {
+	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_>) {
 		ui.vertical_centered(|ui| {
 			ui.heading(&self.title);
 			ui.separator();
@@ -2021,4 +2001,53 @@ enum ResizeEdge {
 	Right,
 	Top,
 	Bottom,
+}
+
+struct ActivityBar {}
+
+impl Veable for ActivityBar {
+	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_>) {
+		// ui.vertical(|ui| {
+		// 	if ui.button("Dashboard").clicked() {
+		// 		ctx.app.open_window(WindowType::Dashboard);
+		// 	}
+
+		// 	if ui.button("Tasks").clicked() {
+		// 		ctx.app.open_window(WindowType::TaskManager);
+		// 	}
+
+		// 	if ui.button("Telemetry").clicked() {
+		// 		ctx.app.open_window(WindowType::TelemetryInspector);
+		// 	}
+		// });
+	}
+}
+
+pub struct Sidebar {
+	buttons: Vec<&'static str>,
+}
+
+impl Sidebar {
+	pub fn new() -> Self {
+		Self {
+			buttons: vec!["New Task", "Show Tasks", "Clear Tasks"],
+		}
+	}
+}
+
+impl Veable for Sidebar {
+	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_>) {
+		ui.vertical(|ui| {
+			for button in &self.buttons {
+				if ui.button(*button).clicked() {
+					match *button {
+						"New Task" => ctx.app.new_task(),
+						"Show Tasks" => ctx.app.show_tasks(),
+						"Clear Tasks" => ctx.app.clear_tasks(),
+						_ => {}
+					}
+				}
+			}
+		});
+	}
 }

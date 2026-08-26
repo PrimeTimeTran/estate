@@ -12,6 +12,7 @@
     "**/README.md": true,
   },
   "cSpell.words": [
+    "Bgra",
     "correponding",
     "eframe",
     "egui",
@@ -21,12 +22,18 @@
     "Gpui",
     "hashset",
     "Horiz",
+    "multiview",
     "noninteractive",
+    "objc",
+    "rasterizer",
     "runloop",
     "Targert",
+    "tesselator",
     "trackpad",
     "Trackpad",
+    "Unorm",
     "Veable",
+    "wgpu",
     "Wikilinks",
     "winit"
   ]

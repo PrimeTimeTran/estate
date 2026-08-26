@@ -24,6 +24,7 @@ pub mod ui;
 pub mod ve;
 pub mod window;
 pub mod windows;
+pub use window::*;
 
 pub use tokio::{
 	io::{ AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader },

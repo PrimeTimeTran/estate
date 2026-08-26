@@ -1,4 +1,4 @@
-use crate::{ app::*, prelude::*, share::{ self }, share::vfs::* };
+use crate::{ app::{ Runtime }, prelude::*, share::{ self }, share::vfs::* };
 
 #[derive(Clone, Debug)]
 pub struct NativeRuntime {
@@ -6,13 +6,14 @@ pub struct NativeRuntime {
 	pub state: Arc<RwLock<EstateState>>,
 	pub tasks: Arc<RwLock<TaskManager>>,
 }
+
 impl Default for NativeRuntime {
 	fn default() -> Self {
 		Self::new()
 	}
 }
 
-impl modules::runtime::Runtime for NativeRuntime {
+impl Runtime for NativeRuntime {
 	fn emit(&self, event: Event) {
 		self.events.emit(event);
 	}
@@ -43,6 +44,7 @@ impl modules::runtime::Runtime for NativeRuntime {
 		});
 	}
 }
+
 impl NativeRuntime {
 	pub fn new() -> Self {
 		tracing::info!("NativeRuntime new");

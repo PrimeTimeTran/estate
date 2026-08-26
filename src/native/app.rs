@@ -1,3 +1,5 @@
+use crate::app::AppContext;
+
 pub use crate::{
 	app::{ Runtime, App, model::EstateEngine, model::* },
 	native::{ *, runtime::{ NativeRuntime } },
@@ -166,7 +168,7 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 	}
 	fn resumed(&mut self, event_loop: &ActiveEventLoop) {
 		if self.windows.is_empty() {
-			self.open_window(event_loop, AppWindowType::TaskManager);
+			self.open_window(event_loop, WindowType::TaskManager);
 		}
 		if self.tray.is_none() {
 			let (menu, tray) = match Self::bootstrap() {
@@ -222,7 +224,10 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 				if window.window.occluded {
 					return;
 				}
-				if let Err(e) = window.window.draw() {
+				let mut ctx = AppContext {
+					app: &mut self.app,
+				};
+				if let Err(e) = window.window.draw(&mut ctx) {
 					tracing::error!("DEV >>> draw failed: {e:#}");
 				}
 			}
@@ -282,23 +287,27 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 		}
 	}
 }
+
 impl NativeApp {
 	fn handle_event(&mut self, event: MenuEvent, event_loop: &ActiveEventLoop) {
 		let Some(menu) = self.menu.as_ref() else {
 			return;
 		};
 		let id = event.id();
+		tracing::info!(">>> opening window: {:?}", event.id());
+		tracing::info!(">>> opening window: {:?}", id);
+
 		if id == menu.quit.id() {
 			tracing::info!(">>> tray quit requested");
 			self.shutdown_runtime();
 			event_loop.exit();
 			tracing::info!(">>> event_loop.exit() called");
 		} else if id == menu.dev.id() {
-			self.open_window(event_loop, AppWindowType::Dashboard);
+			self.open_window(event_loop, WindowType::Dashboard);
 		} else if id == menu.telemetry.id() {
-			self.open_window(event_loop, AppWindowType::TelemetryInspector);
+			self.open_window(event_loop, WindowType::TelemetryInspector);
 		} else if id == menu.task_manager.id() {
-			self.open_window(event_loop, AppWindowType::TaskManager);
+			self.open_window(event_loop, WindowType::TaskManager);
 		} else if id == menu.new_task.id() {
 			self.new_task();
 		} else if id == menu.list_tasks.id() {
@@ -310,17 +319,17 @@ impl NativeApp {
 	fn bootstrap() -> anyhow::Result<(TrayMenu, TrayIcon)> {
 		bootstrap()
 	}
-	fn window_by_type(&mut self, kind: AppWindowType) -> Option<&mut AppWindow> {
+	fn window_by_type(&mut self, kind: WindowType) -> Option<&mut AppWindow> {
 		self.windows.iter_mut().find(|window| window.kind == kind)
 	}
-	fn open_window(&mut self, event_loop: &ActiveEventLoop, kind: AppWindowType) {
+	fn open_window(&mut self, event_loop: &ActiveEventLoop, kind: WindowType) {
 		if self.window_by_type(kind).is_some() {
 			return;
 		}
 		let (title, view) = match kind {
-			AppWindowType::Dashboard => ("Estate Dashboard", Ve::new(Graphics::new())),
-			AppWindowType::TaskManager => ("Task Manager", Ve::new(TaskManager::new())),
-			AppWindowType::TelemetryInspector => ("Telemetry Inspector", Ve::new(Oracle::new())),
+			WindowType::Dashboard => ("Estate Dashboard", Ve::new(Graphics::new())),
+			WindowType::TaskManager => ("Task Manager", Ve::new(TaskManager::new())),
+			WindowType::TelemetryInspector => ("Telemetry Inspector", Ve::new(Oracle::new())),
 		};
 		match Window::new(event_loop, view) {
 			Ok(window) => {
@@ -391,32 +400,3 @@ impl NativeApp {
 		Ok(())
 	}
 }
-// #[derive(Clone, Debug, Default)]
-// pub struct Context {
-// 	pub source: RuntimeMode,
-// 	pub workspace: PathBuf,
-// 	pub estate_root: PathBuf,
-// 	pub engine_root: PathBuf,
-// }
-// impl Context {
-// 	pub fn new(source: RuntimeMode) -> std::io::Result<Self> {
-// 		Ok(Self {
-// 			source,
-// 			workspace: std::env::current_dir()?,
-// 			estate_root: crate::daemon::resolver::global_estate_dir()?,
-// 			engine_root: crate::daemon::resolver::engine_data_dir()?,
-// 		})
-// 	}
-// }
-// #[derive(Clone, Debug, Default)]
-// pub enum RuntimeMode {
-// 	#[default]
-// 	NativeApp,
-// 	Cli,
-// 	Daemon,
-// 	Lsp,
-// 	Tray,
-// 	// ZedEditor,
-// 	// CompilerPipeline,
-// 	// KnowledgeBase,
-// }

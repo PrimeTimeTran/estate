@@ -31,14 +31,11 @@ impl EstateState {
 		println!("💾 save_workspace not implemented yet: {:?}", path);
 	}
 	pub fn now() -> u64 {
-		std::time::SystemTime::now()
-			.duration_since(std::time::UNIX_EPOCH)
-			.unwrap()
-			.as_secs()
+		std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs()
 	}
 }
 impl EstateState {
-	pub fn loadFromPath(path: impl AsRef<Path>) -> Result<Self> {
+	pub fn load_from_path(path: impl AsRef<Path>) -> Result<Self> {
 		let contents = fs::read_to_string(path)?;
 		Ok(serde_json::from_str(&contents)?)
 	}
@@ -50,20 +47,26 @@ impl EstateState {
 	}
 	pub fn load() -> Self {
 		let path = Self::path().expect("could not resolve daemon state path");
+
 		if !path.exists() {
+			tracing::warn!("EstateState does not exist: {:?}", path);
 			return Self::default();
 		}
-		tracing::info!("EstateState load path={:?}", path);
-		let raw = fs::read_to_string(path).expect("failed reading daemon state");
-		let pretty: serde_json::Value = match serde_json::from_str(&raw) {
-			Ok(value) => value,
+
+		let raw = fs::read_to_string(&path).expect("failed reading daemon state");
+
+		match serde_json::from_str(&raw) {
+			Ok(state) => state,
 			Err(error) => {
-				tracing::error!(%error, "failed to parse EstateState JSON");
-				return Self::default();
+				tracing::error!(
+                %error,
+                path = ?path,
+                "failed to parse EstateState JSON"
+            );
+
+				panic!("EstateState is corrupted");
 			}
-		};
-		tracing::info!("EstateState:\n{pretty:#}");
-		serde_json::from_str(&raw).expect("failed parsing daemon state")
+		}
 	}
 	pub fn save(state: &Self) {
 		let path = Self::path().expect("could not resolve daemon state path");
