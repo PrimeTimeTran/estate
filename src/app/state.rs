@@ -58,13 +58,3 @@ impl StateStore for WebStateStore {
 		todo!("save")
 	}
 }
-
-pub struct NativeStateStore;
-impl StateStore for NativeStateStore {
-	fn load(&self) -> anyhow::Result<EstateState> {
-		todo!("load")
-	}
-	fn save(&self, state: &EstateState) -> anyhow::Result<()> {
-		todo!("save")
-	}
-}

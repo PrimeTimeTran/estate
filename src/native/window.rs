@@ -78,7 +78,6 @@ pub struct Window {
 	renderer: egui_wgpu::Renderer,
 	pending_textures: TexturesDelta,
 	view: Ve,
-	// pub app: App<R>,
 	// 1. input assembler
 	// 2.vertex shader
 	// 3.hull shader
@@ -673,16 +672,6 @@ pub enum WindowType {
 	Dashboard,
 	TelemetryInspector,
 	TaskManager,
-}
-
-#[derive(Debug)]
-pub enum AppEvent {
-	Shutdown,
-	CursorPosition {
-		x: f64,
-		y: f64,
-	},
-	TickClock(String),
 }
 
 pub struct GlobalHotkeys {

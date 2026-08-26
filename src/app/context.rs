@@ -1,11 +1,10 @@
-use crate::app::EstateState;
-use crate::{ app::{ App, Runtime, monitor::Monitor } };
+use crate::app::{ *, monitor::Monitor };
 
 pub struct AppContext<'a, R: Runtime> {
 	pub app: &'a mut App<R>,
 
 	#[cfg(not(target_arch = "wasm32"))]
-	pub monitor: &'a mut crate::app::monitor::NativeMonitor,
+	pub monitor: &'a mut monitor_native::NativeMonitor,
 }
 
 impl<'a, R: Runtime> AppContext<'a, R> {

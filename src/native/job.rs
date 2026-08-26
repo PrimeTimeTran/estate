@@ -6,9 +6,9 @@
 // | Individual background execution | `Job`          | Has lifecycle/state           |
 // | UI representation               | `Task` / `Job` | Shows pending/running/etc.    |
 
-use crate::{ app::EstateState, native::agent::AgentContext, prelude::* };
+use crate::{ app::*, app::EstateState, native::agent::AgentContext, prelude::* };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, Deserialize, PartialEq, Serialize)]
 pub struct Task {
 	pub id: TaskId,
 	pub name: String,
@@ -170,7 +170,7 @@ impl TaskManager {
 		task
 	}
 }
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TaskStatus {
 	Pending,
 	Running,

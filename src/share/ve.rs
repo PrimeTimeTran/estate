@@ -1,4 +1,4 @@
-use crate::{ prelude::*, share::constants_ui::{ DEFAULT_CONFIG as CONFIG, * }, theme::palette };
+use crate::{ prelude::*, share::ui::{ DEFAULT_CONFIG as CONFIG, * }, theme::palette };
 
 use egui::Ui;
 use egui_plot::{ Bar, BarChart, Line, Plot, Points };

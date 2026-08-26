@@ -1,14 +1,12 @@
-use std::sync::{ Mutex, OnceLock, atomic::{ AtomicBool, AtomicU64 } };
+use std::sync::{ atomic::{ AtomicBool } };
 
-use crate::{ share::prelude::*, theme::palette };
+use crate::{ theme::palette };
 
 pub const TRAY_ICON: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/estate-tray.png"));
 pub const TRAY_SCROLL_ICON: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/estate-tray.png"));
 
 pub static HOTKEY_INITIALIZED: AtomicBool = AtomicBool::new(false);
 pub static REDIRECTING_SCROLL: AtomicBool = AtomicBool::new(false);
-
-// pub static SCROLL_STATE: OnceLock<Mutex<ScrollRedirectState>> = OnceLock::new();
 pub static SHIFT_HELD: AtomicBool = AtomicBool::new(false);
 
 pub const DEFAULT_CONFIG: VeConfig = VeConfig {
@@ -37,7 +35,6 @@ pub struct VeConfig {
 }
 
 pub struct PanelConfig {
-	// It's region is visible & this panel is the focused one
 	pub active: bool,
 	pub size: f32,
 	pub resizable: bool,
@@ -50,14 +47,6 @@ impl PanelConfig {
 			size,
 			resizable: true,
 			docked: true,
-		}
-	}
-	fn with_active() -> Self {
-		Self {
-			active: true,
-			docked: true,
-			resizable: true,
-			size: 280.0,
 		}
 	}
 }

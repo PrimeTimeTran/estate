@@ -1,4 +1,4 @@
-use crate::{ app::{ AppContext, EstateState, Job }, prelude::*, theme::palette };
+use crate::{ app::*, prelude::*, share::ui::ResizeEdge, theme::palette };
 
 use core_foundation::runloop::{ CFRunLoop, kCFRunLoopCommonModes };
 use core_graphics::{
@@ -339,28 +339,7 @@ impl Ve {
 		});
 	}
 }
-pub struct Size {
-	pub value: f32,
-	pub min: f32,
-	pub max: f32,
-	pub resizable: bool,
-}
-impl Size {
-	pub fn new(value: f32, min: f32, max: f32) -> Self {
-		Self {
-			value: value.clamp(min, max),
-			min,
-			max,
-			resizable: true,
-		}
-	}
-	pub fn set(&mut self, value: f32) {
-		self.value = value.clamp(self.min, self.max);
-	}
-	pub fn resize(&mut self, delta: f32) {
-		self.set(self.value + delta);
-	}
-}
+
 ///! The first concrete implementation of Veable is here.
 ///!
 ///! EguiVeable defines it's own state which is specific to its own implementation
@@ -1216,35 +1195,6 @@ pub struct TrackpadState {
 	pub shift_held: bool,
 	pub mouse_pos: Option<egui::Pos2>,
 }
-#[derive(Debug, Copy, Clone)]
-pub enum ScreenPosition {
-	Left,
-	Center,
-	Right,
-}
-pub fn move_cursor_to(pos: ScreenPosition) {
-	let max_width = 1920.0; // Adjust to your primary display width
-	let center_y = 500.0;
-	let (x, y) = match pos {
-		ScreenPosition::Left => (max_width * 0.2, center_y),
-		ScreenPosition::Center => (max_width * 0.5, center_y),
-		ScreenPosition::Right => (max_width * 0.8, center_y),
-	};
-	let point = CGPoint { x, y };
-	if let Ok(source) = CGEventSource::new(CGEventSourceStateID::CombinedSessionState) {
-		if
-			let Ok(event) = CGEvent::new_mouse_event(
-				source,
-				CGEventType::MouseMoved,
-				point,
-				CGMouseButton::Left
-			)
-		{
-			event.post(CGEventTapLocation::HID);
-			println!("✨ Teleported cursor to position: X={:.1}, Y={:.1}", x, y);
-		}
-	}
-}
 
 impl TaskManager {
 	// pub fn check_for_changes(&mut self, ctx: &egui::Context) {
@@ -1861,161 +1811,6 @@ impl Veable for DebugPanel {
 // and how that space is visually presented.
 // A region may contain arbitrary UI content, potentially composed
 // from smaller slots.
-pub struct Region {
-	pub content: Box<dyn Veable>,
-	// Layout
-	pub size: f32,
-	pub min_size: f32,
-	pub max_size: f32,
-	pub resizable: bool,
-	// Presentation
-	pub padding: egui::Margin,
-	pub fill: Option<egui::Color32>,
-	pub is_docked: bool,
-	pub top_border: bool,
-}
-impl Region {
-	pub fn new(view: impl Veable + 'static, size: f32) -> Self {
-		Self {
-			content: Box::new(view),
-			fill: None,
-			is_docked: false,
-			max_size: size,
-			min_size: size,
-			padding: egui::Margin::ZERO,
-			resizable: false,
-			size,
-			top_border: false,
-		}
-	}
-	pub fn fixed(view: impl Veable + 'static, size: f32) -> Self {
-		Self::new(view, size)
-	}
-	pub fn resizable(view: impl Veable + 'static, size: f32, min_size: f32, max_size: f32) -> Self {
-		let mut region = Self::new(view, size);
-		region.size = size.clamp(min_size, max_size);
-		region.min_size = min_size;
-		region.max_size = max_size;
-		region.resizable = true;
-		region.fill = Some(palette::SURFACE);
-		region.is_docked = true;
-		region
-	}
-	pub fn content(view: impl Veable + 'static) -> Self {
-		Self {
-			content: Box::new(view),
-			size: 0.0,
-			min_size: 0.0,
-			max_size: f32::MAX,
-			fill: None,
-			padding: egui::Margin::ZERO,
-			resizable: false,
-			is_docked: false,
-			top_border: false,
-		}
-	}
-	pub fn with_fill(mut self, fill: egui::Color32) -> Self {
-		self.fill = Some(fill);
-		self
-	}
-	pub fn set_size(&mut self, size: f32) {
-		self.size = size.clamp(self.min_size, self.max_size);
-	}
-	pub fn resize(&mut self, delta: f32) {
-		self.set_size(self.size + delta);
-	}
-	pub fn with_padding(mut self, padding: i32) -> Self {
-		self.padding = egui::Margin::same(padding as i8);
-		self
-	}
-	pub fn with_top_border(mut self, enabled: bool) -> Self {
-		self.top_border = enabled;
-		self
-	}
-	pub fn content_rect(&self, rect: egui::Rect) -> egui::Rect {
-		egui::Rect::from_min_max(
-			egui::pos2(rect.left() + (self.padding.left as f32), rect.top() + (self.padding.top as f32)),
-			egui::pos2(
-				rect.right() - (self.padding.right as f32),
-				rect.bottom() - (self.padding.bottom as f32)
-			)
-		)
-	}
-}
-/// A named, interactive view that occupies a region.
-///
-/// Panels add interaction and lifecycle behavior to a Region.
-/// They may be opened, closed, overlaid, auto-hidden, moved,
-/// or potentially detached from their parent layout.
-pub struct Panel {
-	pub region: Region,
-	pub open: bool,
-	pub overlay: bool,
-	pub auto_hide: bool,
-}
-impl Panel {
-	pub fn new(region: Region) -> Self {
-		Self {
-			region,
-			open: true,
-			overlay: false,
-			auto_hide: false,
-		}
-	}
-	pub fn with_open(mut self, open: bool) -> Self {
-		self.open = open;
-		self
-	}
-	pub fn with_overlay(mut self, overlay: bool) -> Self {
-		self.overlay = overlay;
-		self
-	}
-	pub fn with_auto_hide(mut self, auto_hide: bool) -> Self {
-		self.auto_hide = auto_hide;
-		self
-	}
-	pub fn open(&mut self) {
-		self.open = true;
-	}
-	pub fn close(&mut self) {
-		self.open = false;
-	}
-	pub fn toggle(&mut self) {
-		self.open = !self.open;
-	}
-}
-pub struct PanelConfig {
-	// It's region is visible & this panel is the focused one
-	pub active: bool,
-	pub size: f32,
-	pub resizable: bool,
-	pub docked: bool,
-}
-impl PanelConfig {
-	pub const fn new(active: bool, size: f32) -> Self {
-		Self {
-			active,
-			size,
-			resizable: true,
-			docked: true,
-		}
-	}
-	fn with_active() -> Self {
-		Self {
-			active: true,
-			docked: true,
-			resizable: true,
-			size: 280.0,
-		}
-	}
-}
-#[derive(Clone, Copy)]
-enum ResizeEdge {
-	Left,
-	Right,
-	Top,
-	Bottom,
-}
 
 struct ActivityBar {}
 
@@ -2072,7 +1867,6 @@ impl WaterfallChart {
 	pub fn new() -> Self {
 		Self
 	}
-
 	pub fn draw_chart<'a>(&self, ui: &mut Ui, jobs: impl Iterator<Item = &'a Job>) {
 		let jobs: Vec<&Job> = jobs.collect();
 
@@ -2190,14 +1984,15 @@ impl Veable for WaterfallChart {
 		self.draw_chart(ui, state.jobs.iter());
 	}
 }
-#[derive(Clone, Copy)]
-struct WaterfallItem {
-	label: &'static str,
-	value: f64,
-	total: bool,
+
+fn format_timestamp(timestamp: f64) -> String {
+	let timestamp = timestamp as u64;
+	let datetime = std::time::UNIX_EPOCH + std::time::Duration::from_secs(timestamp);
+	let datetime: chrono::DateTime<chrono::Local> = datetime.into();
+	datetime.format("%H:%M:%S").to_string()
 }
 
-fn format_duration_ms(ms: u64) -> String {
+pub fn format_duration_ms(ms: u64) -> String {
 	let total_seconds = ms / 1_000;
 	let hours = total_seconds / 3_600;
 	let minutes = (total_seconds % 3_600) / 60;
@@ -2211,13 +2006,4 @@ fn format_duration_ms(ms: u64) -> String {
 	} else {
 		format!("{seconds}.{millis:03}s")
 	}
-}
-fn format_timestamp(timestamp: f64) -> String {
-	let timestamp = timestamp as u64;
-
-	let datetime = std::time::UNIX_EPOCH + std::time::Duration::from_secs(timestamp);
-
-	let datetime: chrono::DateTime<chrono::Local> = datetime.into();
-
-	datetime.format("%H:%M:%S").to_string()
 }

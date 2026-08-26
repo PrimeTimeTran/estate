@@ -1,4 +1,4 @@
-#![allow(warnings)]
+// #![allow(warnings)]
 
 // #[cfg(feature = "native")]
 #[cfg(not(target_arch = "wasm32"))]

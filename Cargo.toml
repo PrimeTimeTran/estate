@@ -53,7 +53,10 @@ path = "src/bin/macros.rs"
 # default = ["native"]
 # cargo build --bin web --no-default-features --features="web" --target wasm32-unknown-unknown
 # default = ["native"]
+# Default this this
+# default = []
 default = ["native"]
+# default = ["web"]
 mobile = []
 web = ["dep:wasm-bindgen", "dep:web-sys", "dep:eframe"]
 native = [

@@ -1,18 +1,10 @@
-use crate::{ prelude::* };
+use crate::{ prelude::{ *, Uuid } };
+use crate::app::*;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
-pub enum JobStatus {
-	Pending,
-	Running,
-	Completed,
-	Failed,
-	Cancelled,
-	Interrupted,
-}
 #[derive(Debug, Clone, Eq, Deserialize, PartialEq, Serialize)]
 pub struct Job {
 	pub id: Uuid,
-	pub task_id: TaskId,
+	pub task_id: Uuid,
 	pub kind: TaskKind,
 	pub name: String,
 
@@ -43,4 +35,14 @@ impl JobStatus {
 			_ => todo!("icon"),
 		}
 	}
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+pub enum JobStatus {
+	Pending,
+	Running,
+	Completed,
+	Failed,
+	Cancelled,
+	Interrupted,
 }

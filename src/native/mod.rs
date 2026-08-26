@@ -10,7 +10,7 @@ pub mod macos;
 pub mod agent;
 pub mod app;
 pub mod backend;
-pub mod constants;
+pub mod constants_native;
 pub mod core;
 pub mod daemon;
 pub mod job;

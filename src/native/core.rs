@@ -10,7 +10,6 @@ impl<R: Runtime> EstateEngine<R> {
 #[derive(Clone, Debug)]
 pub struct EstateDiscovery {
 	pub store: DiscoveryStore,
-	// pub tasks: DiscoveryStore,
 	pub task_tx: mpsc::Sender<DiscoveryTask>,
 }
 impl Default for EstateDiscovery {

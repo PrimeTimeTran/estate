@@ -1,4 +1,4 @@
-pub use crate::{ app::{ EstateState, job::Job, state::StateStore }, prelude::{ self, * } };
+pub use crate::{ app::{ job::Job, state::StateStore, app::EstateState }, prelude::{ self, * } };
 #[derive(Clone, Debug)]
 pub struct NativeStateStore;
 impl NativeStateStore {
@@ -19,7 +19,6 @@ impl StateStore for NativeStateStore {
 		let raw = fs::read_to_string(path)?;
 		Ok(serde_json::from_str(&raw)?)
 	}
-
 	fn save(&self, state: &EstateState) -> anyhow::Result<()> {
 		let path = prelude::native::resolver::engine_data_dir()?.join("state.json");
 
@@ -35,20 +34,9 @@ impl EstateState {
 		let contents = fs::read_to_string(path)?;
 		Ok(serde_json::from_str(&contents)?)
 	}
-}
-
-impl EstateState {
-	// pub fn save(state: &Self) {
-	// 	let path = Self::path().expect("could not resolve daemon state path");
-	// 	tracing::info!("💾 EstateState received: {:?}", path);
-	// 	let json = serde_json::to_string_pretty(state).expect("failed serializing daemon state");
-	// 	fs::write(path, json).expect("failed writing daemon state");
-	// }
-
 	pub fn path() -> std::io::Result<PathBuf> {
 		Ok(crate::native::resolver::engine_data_dir()?.join("state.json"))
 	}
-
 	pub fn load_from_disk() -> anyhow::Result<Self> {
 		let path = Self::path()?;
 
@@ -63,12 +51,9 @@ impl EstateState {
 
 	pub fn save_to_disk(&self) -> anyhow::Result<()> {
 		let path = Self::path()?;
-
 		tracing::info!("💾 EstateState saving: {:?}", path);
-
 		let json = serde_json::to_string_pretty(self)?;
 		fs::write(path, json)?;
-
 		Ok(())
 	}
 }

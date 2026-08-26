@@ -1,9 +1,6 @@
-use std::sync::{ Mutex, OnceLock, atomic::{ AtomicBool, AtomicU64 } };
-
-use crate::share::prelude::*;
+use std::sync::{ atomic::{ AtomicU64 } };
 
 pub static EVENT_ID: AtomicU64 = AtomicU64::new(1);
-
 pub const FILE_EXTENSIONS: &[&str] = &[
 	"rs",
 	"loi",

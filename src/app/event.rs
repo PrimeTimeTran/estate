@@ -33,7 +33,6 @@ impl Event {
 		Self::new(EventSource::App, kind)
 	}
 }
-
 #[derive(Debug, Clone, Deserialize, Hash, Serialize)]
 pub enum EventKind {
 	// ─────────────────────────────────────────────
@@ -117,9 +116,6 @@ pub enum EventSource {
 	Filesystem,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
-pub struct Inode;
-
 pub type TaskId = Uuid;
 
 #[derive(Debug, Clone, Deserialize, Hash, Serialize)]
@@ -147,3 +143,16 @@ impl TaskKind {
 		}
 	}
 }
+
+#[derive(Debug)]
+pub enum AppEvent {
+	Shutdown,
+	CursorPosition {
+		x: f64,
+		y: f64,
+	},
+	TickClock(String),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
+pub struct Inode;

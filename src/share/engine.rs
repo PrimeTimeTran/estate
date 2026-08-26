@@ -28,10 +28,7 @@
 //                        ▼          ▼          ▼
 //                      Zed       VS Code      CLI
 
-use crate::{
-	app::{model::*, modules::runtime::Runtime},
-	prelude::*,
-};
+use crate::{ app::{ model::*, modules::runtime::Runtime }, prelude::* };
 use revelation::analyzer::Workspace;
 
 pub trait Engine {
@@ -176,7 +173,10 @@ pub enum Change {
 	Created(Uuid),
 	Modified(Uuid),
 	Deleted(Uuid),
-	Renamed { from: Uuid, to: Uuid },
+	Renamed {
+		from: Uuid,
+		to: Uuid,
+	},
 	ConfigChanged,
 	WorkspaceChanged,
 }
@@ -187,4 +187,4 @@ pub struct Query {
 	pub context: ResolutionContext,
 }
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-struct ResolutionContext;
+pub struct ResolutionContext;

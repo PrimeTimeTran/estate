@@ -1,4 +1,4 @@
-use std::{ env, fs, path::{ Path, PathBuf } };
+use std::{ path::{ Path } };
 use notify::{ Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher };
 
 use crate::app::monitor::{ Monitor };

@@ -1,9 +1,10 @@
 use std::sync::{ Mutex, OnceLock, atomic::{ AtomicBool } };
 
-use crate::{ native::prelude::{ PanelConfig, ScrollRedirectState, * }, theme::palette };
+use crate::{ native::prelude::{ ScrollRedirectState, * }, share::ui::*, theme::palette };
 
 pub const TRAY_ICON: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/estate-tray.png"));
 pub const TRAY_SCROLL_ICON: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/estate-tray.png"));
+
 pub static HOTKEY_INITIALIZED: AtomicBool = AtomicBool::new(false);
 pub static REDIRECTING_SCROLL: AtomicBool = AtomicBool::new(false);
 pub static SCROLL_STATE: OnceLock<Mutex<ScrollRedirectState>> = OnceLock::new();
@@ -20,19 +21,6 @@ pub const DEFAULT_CONFIG: VeConfig = VeConfig {
 	dock_left: PanelConfig::new(true, 280.0),
 	dock_right: PanelConfig::new(true, 320.0),
 };
-
-pub struct VeConfig {
-	pub bg: egui::Color32,
-	pub surface: egui::Color32,
-
-	pub activity_bar: PanelConfig,
-	pub dock_left: PanelConfig,
-	pub primary_bar: PanelConfig,
-	pub secondary_bar: PanelConfig,
-	pub status_bar: PanelConfig,
-	pub dock_right: PanelConfig,
-	pub bottom_panel: PanelConfig,
-}
 
 pub const PROBES_MINIMAL: ProbeSet = &[
 	Probe {

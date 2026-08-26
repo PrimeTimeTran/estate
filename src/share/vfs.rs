@@ -772,13 +772,13 @@ pub enum Payload {
 }
 impl DependencyGraph {
 	pub fn contains_cycle(&self) -> bool {
-		let mut visited = std::collections::HashSet::new();
-		let mut rec_stack = std::collections::HashSet::new();
+		let mut visited = HashSet::new();
+		let mut rec_stack = HashSet::new();
 		pub fn has_cycle(
 			id: u64,
-			deps: &std::collections::HashMap<u64, std::collections::HashSet<u64>>,
-			visited: &mut std::collections::HashSet<u64>,
-			rec_stack: &mut std::collections::HashSet<u64>
+			deps: &HashMap<u64, HashSet<u64>>,
+			visited: &mut HashSet<u64>,
+			rec_stack: &mut HashSet<u64>
 		) -> bool {
 			visited.insert(id);
 			rec_stack.insert(id);

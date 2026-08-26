@@ -1,15 +1,15 @@
-// use crate::app::monitor::StateMonitor;
 use crate::{ prelude::* };
-use crate::app::{ EstateState, Runtime };
+
+use crate::app::{ Runtime };
+
+mod estate;
+use estate::Estate;
 
 #[derive(Clone, Debug)]
 pub struct EstateEngine<R: Runtime> {
 	// Domain
 	pub estate: Estate,
 	pub runtime: Arc<R>,
-
-	// pub state: EstateState,
-	// pub state_monitor: StateMonitor,
 
 	// Infrastructure
 	pub vfs: EstateVfs,

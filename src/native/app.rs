@@ -1,9 +1,4 @@
-use crate::app::{
-	AppContext,
-	EstateState,
-	modules::runtime::RuntimeState,
-	monitor::{ self, NativeMonitor },
-};
+use crate::app::{ * };
 
 pub use crate::{
 	app::{ Runtime, App, model::EstateEngine, model::* },
@@ -23,7 +18,7 @@ use winit::{
 
 pub struct NativeApp {
 	pub app: App<NativeRuntime>,
-	monitor: monitor::NativeMonitor,
+	monitor: monitor_native::NativeMonitor,
 	last_state_revision: u64,
 	tray: Option<TrayIcon>,
 	menu: Option<TrayMenu>,
@@ -45,7 +40,7 @@ impl NativeApp {
 
 		Ok(Self {
 			app,
-			monitor: monitor::NativeMonitor::new()?,
+			monitor: monitor_native::NativeMonitor::new()?,
 			last_state_revision: 0,
 			clock_running: Arc::new(AtomicBool::new(true)),
 			daemon_tx,
@@ -171,9 +166,6 @@ impl NativeApp {
 		}
 		tracing::info!(">>> runtime shutdown complete");
 	}
-	pub fn monitor() {
-		todo!("poll")
-	}
 }
 
 impl ApplicationHandler<AppEvent> for NativeApp {
@@ -242,7 +234,7 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 				}
 				let mut ctx = AppContext {
 					app: &mut self.app,
-					monitor: &mut NativeMonitor::new().unwrap(),
+					monitor: &mut monitor_native::NativeMonitor::new().unwrap(),
 				};
 				if let Err(e) = window.window.draw(&mut ctx) {
 					tracing::error!("DEV >>> draw failed: {e:#}");
