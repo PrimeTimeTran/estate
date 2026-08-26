@@ -1,5 +1,4 @@
-/// ### Rust Ownership & Conversion Cheat sheet
-
+// # Rust Ownership & Conversion Cheat sheet
 // ==========================================
 // RUST OWNERSHIP & CONVERSION METHODS CHEAT SHEET
 // ==========================================
@@ -46,7 +45,6 @@ fn take_string_field(s: &mut String) -> String {
 fn swap_string(s: &mut String) {
 	let _old = std::mem::replace(s, String::from("new default"));
 }
-
 // --- CATEGORY 2: CLONING & DUPLICATING ---
 
 // 7. .clone()
@@ -185,10 +183,4 @@ fn safe_cast(val: u64) -> Result<u32, std::num::TryFromIntError> {
 	val.try_into()
 }
 
-// ```
-
-// ---
-
-// ### Follow-Up Question
-
-// When working with your window and widget loops, do you find yourself needing to share state across multiple threads more often via `Arc<Mutex<T>>`, or do you prefer passing messages through channels?
+fn main() {}

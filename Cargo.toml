@@ -23,8 +23,8 @@ required-features = ["native"]
 name = "web"
 path = "src/bin/web.rs"
 required-features = ["web"]
-# feature = "web"
 # target = "wasm32-unknown-unknown"
+# feature = "web"
 
 [[bin]]
 name = "native"
@@ -39,15 +39,19 @@ required-features = ["native"]
 name = "threads"
 path = "src/bin/threads.rs"
 
+[[bin]]
+name = "macros"
+path = "src/bin/macros.rs"
+
 [features]
 # This overwrites IDE config causing diagnostics to be wrong given the targetted platform.
 #
 # To get IDE diagnostics functioning correctly remove the hardcoded default when troubleshooting another build target.
 #
 # default = []
-default = ["web"]
-web = []
+default = ["native"]
 mobile = []
+web = ["dep:wasm-bindgen", "dep:web-sys", "dep:eframe"]
 native = [
   "dep:notify",
   "dep:cli",
@@ -81,7 +85,7 @@ anyhow.workspace = true
 async-trait.workspace = true
 chrono.workspace = true
 dirs.workspace = true
-eframe.workspace = true
+
 egui_plot.workspace = true
 egui-wgpu.workspace = true
 egui.workspace = true
@@ -103,13 +107,14 @@ tracing.workspace = true
 url.workspace = true
 uuid.workspace = true
 wasm-bindgen-futures.workspace = true
-wasm-bindgen.workspace = true
 wasm-bridge.workspace = true
-web-sys.workspace = true
 wgpu.workspace = true
 winit.workspace = true
 
 # Make all these optional so they can be toggled by the native feature
+eframe = { workspace = true, optional = true }
+wasm-bindgen = { workspace = true, optional = true }
+web-sys = { workspace = true, optional = true }
 cli = { workspace = true, optional = true }
 comfy-table = { workspace = true, optional = true }
 core-foundation = { workspace = true, optional = true }

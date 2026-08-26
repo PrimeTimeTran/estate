@@ -4,15 +4,12 @@
     "**/tmp": true,
     "**/assets": true,
     "**/fixtures": true,
-    // "**/public": true,
+    "**/dist": true,
+    "**/public": true,
     "**/ownership.rs": true,
     "**/template": true,
     "**/estate": true,
     "**/README.md": true,
-  },
-  "search.exclude": {
-    "**/node_modules": true,
-    "tmp": true,
   },
   "cSpell.words": [
     "correponding",

@@ -1,3 +1,7 @@
+# Smart Pointers
+
+## Types
+
 [Box]: "Can I store this data on the heap instead of the stack, or give it a fixed, known size for recursive types and trait objects?"
 [Rc (Reference Counting)]: "Can multiple parts of my single-threaded code share ownership of this data without copying it?"
 [Arc (Atomic Reference Counting)]: "Can multiple threads safely share ownership of this data concurrently?"
@@ -37,48 +41,60 @@ Root --> Init[INITIALIZATION]
     end
 ```
 
-OWNERSHIP
+## OWNERSHIP
 
-Box<T>
+### `Box<T>`
+
 single owner
 
-Rc<T>
+### `Rc<T>`
+
 multiple owners, same thread
 
-Arc<T>
+### `Arc<T>`
+
 multiple owners, multiple threads
 
 INTERIOR MUTABILITY
 
-Cell<T>
+### `Cell<T>`
+
 mutate by replacing/getting values
 
-RefCell<T>
+### `RefCell<T>`
+
 runtime borrow checking
 
-Mutex<T>
+### `Mutex<T>`
+
 thread-safe exclusive access
 
-RwLock<T>
+### `RwLock<T>`
+
 thread-safe shared/exclusive access
 
 BORROWED ↔ OWNED
 
-Cow<'a, T>
+### `Cow<'a, T>`
+
 borrowed until mutation requires ownership
 
 ONE-TIME INITIALIZATION
 
-OnceCell<T>
+### `OnceCell<T>`
+
 initialize once, single-threaded
 
-OnceLock<T>
+### `OnceLock<T>`
+
 initialize once, thread-safe
 
-LazyCell<T, F>
+### `LazyCell<T, F>`
+
 initialize once, lazily, single-threaded
 
-LazyLock<T, F>
+### `LazyLock<T, F>`
+
 initialize once, lazily, thread-safe
 
 ```rust
