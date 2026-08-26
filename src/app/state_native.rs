@@ -16,7 +16,13 @@ impl StateStore for NativeStateStore {
 			return Ok(EstateState::default());
 		}
 
-		let raw = fs::read_to_string(path)?;
+		let raw = fs::read_to_string(&path)?;
+
+		if raw.trim().is_empty() {
+			tracing::warn!("EstateState is empty: {:?}", path);
+			return Ok(EstateState::default());
+		}
+
 		Ok(serde_json::from_str(&raw)?)
 	}
 	fn save(&self, state: &EstateState) -> anyhow::Result<()> {

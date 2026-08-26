@@ -43,12 +43,12 @@ use cli;
 /// estate fmt path/to/file.rs
 /// estate format path/to/file.rs
 /// ```
-use crate::app::modules::runtime::Runtime;
+use crate::app::{ model, modules::runtime::Runtime };
 
-pub async fn execute<R: Runtime>(
+pub(crate) async fn execute<R: Runtime>(
 	parsed_cli: Cli,
 	ctx: cli::context::Context,
-	engine: EstateEngine<R>
+	engine: model::EstateEngine<R>
 ) -> anyhow::Result<(), anyhow::Error> {
 	let command = parsed_cli.command.unwrap_or(Command::Start { tail: false });
 	match command {

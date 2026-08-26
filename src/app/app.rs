@@ -1,14 +1,14 @@
-use crate::app::*;
+use crate::app::{ *, model };
 
 pub use modules::runtime::{ Runtime, RuntimeState };
 pub use state::{ EstateState, StateStore };
 
 pub struct App<R: Runtime> {
-	pub engine: model::EstateEngine<R>,
+	pub(crate) engine: model::EstateEngine<R>,
 }
 
 impl<R: Runtime> App<R> {
-	pub fn new(engine: model::EstateEngine<R>) -> anyhow::Result<Self> {
+	pub(crate) fn new(engine: model::EstateEngine<R>) -> anyhow::Result<Self> {
 		Ok(Self { engine })
 	}
 }

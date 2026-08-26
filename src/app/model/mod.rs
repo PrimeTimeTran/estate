@@ -6,7 +6,7 @@ mod estate;
 use estate::Estate;
 
 #[derive(Clone, Debug)]
-pub struct EstateEngine<R: Runtime> {
+pub(crate) struct EstateEngine<R: Runtime> {
 	// Domain
 	pub estate: Estate,
 	pub runtime: Arc<R>,
@@ -57,30 +57,30 @@ impl<R: Runtime> EstateEngine<R> {
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-struct EstateRegistry;
+pub(crate) struct EstateRegistry;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-struct EstateIndex;
+pub(crate) struct EstateIndex;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-struct EstateResolver;
+pub(crate) struct EstateResolver;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-struct EstateGraph;
+pub(crate) struct EstateGraph;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-struct EstateDiscovery;
+pub(crate) struct EstateDiscovery;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-struct EstateVfs;
+pub(crate) struct EstateVfs;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-pub struct AnchorService {
+pub(crate) struct AnchorService {
 	registry: EstateRegistry,
 	index: EstateIndex,
 	resolver: EstateResolver,
 }
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-struct SearchService;
+pub(crate) struct SearchService;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-struct AnalysisService;
+pub(crate) struct AnalysisService;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-pub enum ReferenceKind {
+pub(crate) enum ReferenceKind {
 	#[default]
 	File,
 	Link,
@@ -91,19 +91,19 @@ pub enum ReferenceKind {
 	Asset,
 }
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-pub struct Reference<'a> {
+pub(crate) struct Reference<'a> {
 	pub target: &'a str,
 	pub fragment: Option<&'a str>,
 	pub kind: ReferenceKind,
 }
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-pub struct ResolveContext {
+pub(crate) struct ResolveContext {
 	pub scope: EstateScope,
 	pub from: Uuid,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash, Serialize, Deserialize)]
-pub enum EstateScope {
+pub(crate) enum EstateScope {
 	System,
 	User,
 	#[default]

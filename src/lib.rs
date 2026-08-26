@@ -1,6 +1,5 @@
 // #![allow(warnings)]
 
-// #[cfg(feature = "native")]
 #[cfg(not(target_arch = "wasm32"))]
 pub mod native;
 

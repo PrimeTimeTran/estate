@@ -1,4 +1,4 @@
-use crate::{ native::{ self, prelude::* } };
+use crate::{ native::{ prelude::* } };
 
 use core_graphics::{
 	event::{ CGEvent, CGEventTapLocation, CGEventType, CGMouseButton },
