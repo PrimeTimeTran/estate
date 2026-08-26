@@ -43,7 +43,6 @@ use cli;
 /// estate fmt path/to/file.rs
 /// estate format path/to/file.rs
 /// ```
-
 use crate::app::modules::runtime::Runtime;
 
 pub async fn execute<R: Runtime>(

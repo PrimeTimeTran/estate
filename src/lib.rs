@@ -1,6 +1,7 @@
 #![allow(warnings)]
 
-#[cfg(feature = "native")]
+// #[cfg(feature = "native")]
+#[cfg(not(target_arch = "wasm32"))]
 pub mod native;
 
 #[cfg(feature = "web")]
@@ -10,8 +11,6 @@ pub mod web;
 pub mod mobile;
 
 pub mod app;
-// pub use app::Runtime;
-// pub use app::modules::runtime::Runtime;
 
 pub mod prelude;
 pub mod share;

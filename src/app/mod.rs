@@ -9,9 +9,20 @@ pub(crate) mod modules;
 #[path = "modules/monitor.rs"]
 pub(crate) mod monitor;
 
+// #[cfg(feature = "native")]
 #[cfg(not(target_arch = "wasm32"))]
 #[path = "modules/monitor_native.rs"]
 pub(crate) mod monitor_native;
+
+#[cfg(feature = "native")]
+pub(crate) mod context;
+#[cfg(feature = "native")]
+pub use context::*;
+
+#[cfg(feature = "native")]
+pub(crate) mod state_native;
+#[cfg(feature = "native")]
+pub use state_native::*;
 
 pub(crate) mod state;
 
@@ -69,13 +80,3 @@ impl<R: Runtime> App<R> {
 		);
 	}
 }
-
-#[cfg(feature = "native")]
-pub(crate) mod context;
-#[cfg(feature = "native")]
-pub use context::*;
-
-#[cfg(feature = "native")]
-pub(crate) mod state_native;
-#[cfg(feature = "native")]
-pub use state_native::*;

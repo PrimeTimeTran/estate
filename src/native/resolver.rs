@@ -1,12 +1,11 @@
 use crate::prelude::*;
 
 pub fn home_dir() -> std::io::Result<PathBuf> {
-	dirs::home_dir().ok_or_else(|| {
-		std::io::Error::new(
-			std::io::ErrorKind::NotFound,
-			"Could not determine home directory",
-		)
-	})
+	dirs
+		::home_dir()
+		.ok_or_else(|| {
+			std::io::Error::new(std::io::ErrorKind::NotFound, "Could not determine home directory")
+		})
 }
 
 /// User global estate.
@@ -44,12 +43,13 @@ pub fn global_project_dir() -> std::io::Result<PathBuf> {
 /// - daemon state
 /// - logs
 pub fn engine_data_dir() -> std::io::Result<PathBuf> {
-	dirs::data_dir()
+	dirs
+		::data_dir()
 		.map(|dir| dir.join("estate"))
 		.ok_or_else(|| {
 			std::io::Error::new(
 				std::io::ErrorKind::NotFound,
-				"Could not determine application data directory",
+				"Could not determine application data directory"
 			)
 		})
 }
@@ -57,17 +57,15 @@ pub fn engine_data_dir() -> std::io::Result<PathBuf> {
 /// Estate engine cache.
 /// Used for disposable generated data.
 pub fn engine_cache_dir() -> std::io::Result<PathBuf> {
-	dirs::cache_dir()
+	dirs
+		::cache_dir()
 		.map(|dir| dir.join("estate"))
 		.ok_or_else(|| {
-			std::io::Error::new(
-				std::io::ErrorKind::NotFound,
-				"Could not determine cache directory",
-			)
+			std::io::Error::new(std::io::ErrorKind::NotFound, "Could not determine cache directory")
 		})
 }
 
-pub fn pathz() -> std::io::Result<PathBuf> {
+pub fn path() -> std::io::Result<PathBuf> {
 	let path = engine_data_dir()?.join("state.json");
 	println!("STATE PATH: {}", path.display());
 	Ok(path)
