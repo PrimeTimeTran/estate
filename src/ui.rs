@@ -1,13 +1,7 @@
-use std::sync::{ atomic::{ AtomicBool } };
-
 use crate::{ theme::palette };
 
 pub const TRAY_ICON: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/estate-tray.png"));
 pub const TRAY_SCROLL_ICON: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/estate-tray.png"));
-
-pub static HOTKEY_INITIALIZED: AtomicBool = AtomicBool::new(false);
-pub static REDIRECTING_SCROLL: AtomicBool = AtomicBool::new(false);
-pub static SHIFT_HELD: AtomicBool = AtomicBool::new(false);
 
 pub const DEFAULT_CONFIG: VeConfig = VeConfig {
 	bg: palette::BG,

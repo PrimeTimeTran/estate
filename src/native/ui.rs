@@ -57,7 +57,7 @@ pub fn bootstrap() -> anyhow::Result<(TrayMenu, TrayIcon)> {
 
 pub fn tray_icon() -> Icon {
 	let image = image
-		::load_from_memory(native::constants_native::TRAY_ICON)
+		::load_from_memory(crate::ui::TRAY_ICON)
 		.expect("failed to load generated tray icon")
 		.into_rgba8();
 	let (width, height) = image.dimensions();
@@ -65,9 +65,8 @@ pub fn tray_icon() -> Icon {
 }
 
 pub fn scroll_tray_icon() -> tray_icon::Icon {
-	// constants::TRAY_SCROLL_ICON;
 	let image = image
-		::load_from_memory(native::constants_native::TRAY_SCROLL_ICON)
+		::load_from_memory(crate::ui::TRAY_SCROLL_ICON)
 		.expect("failed to load scroll tray icon")
 		.into_rgba8();
 	let (width, height) = image.dimensions();

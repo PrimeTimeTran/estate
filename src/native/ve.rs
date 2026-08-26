@@ -1,4 +1,4 @@
-use crate::{ app::*, prelude::*, share::ui::ResizeEdge, theme::palette };
+use crate::{ app::*, prelude::*, ui::*, theme::palette };
 
 use core_foundation::runloop::{ CFRunLoop, kCFRunLoopCommonModes };
 use core_graphics::{

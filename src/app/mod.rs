@@ -4,8 +4,9 @@
 // ./src/web
 // ./src/mobile
 
-pub mod prelude;
 pub use std::collections::{ HashMap, HashSet, VecDeque };
+
+pub mod prelude;
 pub use crate::app::prelude::*;
 
 pub(crate) mod host;
@@ -25,11 +26,6 @@ pub(crate) mod state_native;
 
 #[path = "modules/monitor.rs"]
 pub(crate) mod monitor;
-
-// #[cfg(feature = "native")]
 #[cfg(not(target_arch = "wasm32"))]
 #[path = "modules/monitor_native.rs"]
 pub(crate) mod monitor_native;
-
-// #[cfg(not(target_arch = "wasm32"))]
-// pub use monitor_native::*;
