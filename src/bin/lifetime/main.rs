@@ -11,26 +11,26 @@ use lifetime::*;
 // such as
 //  - Memory
 fn main() {
-  // 1. Memory
-  // The setting in which data & memory usage appears throughout any app
-  // or programming language
+	// 1. Memory
+	// The setting in which data & memory usage appears throughout any app
+	// or programming language
 	one::memory_considerations();
 
 	// 2. Sharing
-	two::sharing_forces_new_abstractions();
+	two::owning_and_sharing();
 
 	// 3. Lifetimes
-	three::three();
+	three::lifetimes();
 
 	// 4. Functions
 	// Structs have unit fields attached automatically.
-	four::four();
-	// 5. Structs
-	five::five();
-	// 6. Ownership Transfer
-	six::six();
-	// 7. Transformation & Duplication
-	seven::seven();
+	// four::four();
+	// // 5. Structs
+	// five::five();
+	// // 6. Ownership Transfer
+	// six::six();
+	// // 7. Transformation & Duplication
+	// seven::seven();
 
 	// 8. Collections & Iteration
 	// ## 9. Lifetimes in Types
@@ -80,5 +80,5 @@ fn main() {
 // Lifetime-bearing Types
 //    ↓
 // Abstractions that make those constraints manageable
-// 
+//
 // # Introduction to Lifetimes in Rust

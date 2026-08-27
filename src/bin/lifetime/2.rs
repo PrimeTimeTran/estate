@@ -14,19 +14,20 @@
 // we want to transfer ownership, temporarily borrow it, or copy it.
 //
 // Each approach has tradeoffs worth understanding.
-pub fn sharing_forces_new_abstractions() {
+pub fn owning_and_sharing() {
 	let city = "London";
 
-	// This borrows a ref to it's param.
+	// This creates a `borrow ref`
+	// which is sent to the function as a param.
 	borrow_string_param(city);
 
-	// The borrow from the previous call has ended,
-	// so `city` can be borrowed again in this scope.
+	// The previous call has returned,
+	// so `city` can be borrowed again.
 	borrow_string_param(city);
 
-	// `city` is an `&str`, so `.to_string()` creates a new owned `String`.
+	// `city` is a `&str`, so `.to_string()` creates a new owned `String`.
 	//
-	// The new String is moved into the function.
+	// The new String is moved into the function and
 	// `city` itself is unaffected because we created a separate String.
 	string_param_demands_ownership(city.to_string());
 
@@ -36,22 +37,32 @@ pub fn sharing_forces_new_abstractions() {
 	// For an `&str`, `.to_owned()` also produces a new `String`.
 	string_param_demands_ownership(city.to_owned());
 
-	// `.clone()` creates another owned String from the String produced
-	// by `.to_string()`.
-	//
-	// The clone is unnecessary for this call, but demonstrates that
-	// cloning an owned value creates a separate owned allocation.
-	ownership_of_a_clone_counts(city.to_string().clone());
-
-	// Without `.clone()`, the String created by `.to_string()` is
-	// simply moved directly into the function.
-	ownership_of_a_clone_counts(city.to_string());
-
-
+	// The type here is not a borrowed ref.
+	// It's an `owned` String.
 	let city = String::from("New York");
 
-	// `city` is still available because neither function took ownership
-	// of `city` itself.
+	// # Semi Safe
+	// Now we can pass city to ownership demanding String param.
+	// But that transfers ownership
+	// string_param_demands_ownership(city);
+
+	// we produce a "borrow of moved value: `city`" error.
+	// if we try to use `city` again.
+	// string_param_demands_ownership(city);
+
+	// # Safe
+	// If we use .to_string() first
+	string_param_demands_ownership(city.to_string());
+
+	// Or .to_owned()
+	string_param_demands_ownership(city.to_owned());
+
+	// We don't produce the use of borrowed move error.
+	// and can reuse multiple times.
+	string_param_demands_ownership(city.to_owned());
+
+	// `city` is still available because neither
+	// function took ownership of `city` itself.
 	println!("main still has access to city: {}", city);
 
 	let (six, nine) = (6, 9);

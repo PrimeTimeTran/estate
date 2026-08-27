@@ -6,7 +6,7 @@
 // - Moves
 // - Copies
 // - Destruction / Drop
-// 
+//
 pub fn memory_considerations() {
 	// Data is not sealed in a vacuum.
 	let i = 3;
