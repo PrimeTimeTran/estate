@@ -110,6 +110,7 @@ global-hotkey.workspace = true
 image.workspace = true
 lazy_static.workspace = true
 pollster.workspace = true
+owo-colors = "4.3.0"
 reqwest.workspace = true
 resvg.workspace = true
 schemars.workspace = true

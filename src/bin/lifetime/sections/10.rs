@@ -1,15 +1,13 @@
-
-
-
-	// ## 10. Lifetime Patterns
-	// - Borrowing a value
-	// - Sharing data
-	// - Temporarily borrowing
-	// - Returning borrowed data
-	// - Storing borrowed data
-	// - Owning data instead
-	// - Passing ownership across boundaries
-fn main() {
+// ## 10. Lifetime Patterns
+// 
+// - Borrowing a value
+// - Sharing data
+// - Temporarily borrowing
+// - Returning borrowed data
+// - Storing borrowed data
+// - Owning data instead
+// - Passing ownership across boundaries
+pub fn ten() {
 	{
 		// Make a `string` literal and print it:
 		let static_string = "I'm in read-only memory";
@@ -46,7 +44,6 @@ static NUM: i32 = 18;
 fn coerce_static<'a>(_: &'a i32) -> &'a i32 {
 	&NUM
 }
-
 
 // 2.
 // extern crate rand;

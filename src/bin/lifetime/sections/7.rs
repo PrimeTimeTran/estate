@@ -1,4 +1,5 @@
 // ## 7. Transformation & Duplication
+// 
 // - `.clone()`
 // - `.to_owned()`
 // - `.to_string()`
@@ -6,6 +7,7 @@
 // - `Clone`
 // - Owned vs borrowed representations
 // - Converting borrowed data into owned data
+
 pub fn seven() {
 	// 1. A reference has a lifetime
 	let x = 10;

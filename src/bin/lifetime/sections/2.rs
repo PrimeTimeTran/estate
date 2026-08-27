@@ -1,4 +1,5 @@
 // ## 2. Sharing
+//
 // - Borrowing
 // - Shared references (`&T`)
 // - Mutable references (`&mut T`)
@@ -14,7 +15,11 @@
 // we want to transfer ownership, temporarily borrow it, or copy it.
 //
 // Each approach has tradeoffs worth understanding.
-pub fn owning_and_sharing() {
+
+use crate::section;
+
+pub fn ownership_borrows_sharing() {
+	section!("2. Ownership, Borrowing, Sharing");
 	let city = "London";
 
 	// This creates a `borrow ref`

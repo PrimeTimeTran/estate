@@ -1,4 +1,7 @@
+use crate::helpers::*;
+
 // ## 1. Memory
+// 
 // - Stack vs Heap
 // - Ownership
 // - Allocation and deallocation
@@ -6,9 +9,9 @@
 // - Moves
 // - Copies
 // - Destruction / Drop
-//
+
 pub fn memory_considerations() {
-	// Data is not sealed in a vacuum.
+	section!("1. Memory");
 	let i = 3;
 
 	// It's used to define more data.

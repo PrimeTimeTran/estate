@@ -1,23 +1,20 @@
+// ## 8. Collections & Iteration
+//
+// - References into collections
+// - Iterator lifetimes
+// - `iter()`
+// - `iter_mut()`
+// - `into_iter()`
+// - Borrowing while mutating
+// - Collection reallocation and reference validity
 
-
-	// ## 8. Collections & Iteration
-	// - References into collections
-	// - Iterator lifetimes
-	// - `iter()`
-	// - `iter_mut()`
-	// - `into_iter()`
-	// - Borrowing while mutating
-	// - Collection reallocation and reference validity
-	
-fn eight() {
+pub fn eight() {
 	let x = 7;
 	let ref_x = Ref(&x);
 
 	print_ref(&ref_x);
 	print(ref_x);
 }
-
-
 
 use std::fmt::Debug;
 #[derive(Debug)]
@@ -28,21 +25,13 @@ struct Ref<'a, T: 'a>(&'a T);
 // of `Ref` may not exceed `'a`.
 
 // A generic function which prints using the `Debug` trait.
-fn print<T>(t: T)
-where
-	T: Debug,
-{
+fn print<T>(t: T) where T: Debug {
 	println!("`print`: t is {:?}", t);
 }
 
 // Here a reference to `T` is taken where `T` implements
 // `Debug` and all *references* in `T` outlive `'a`. In
 // addition, `'a` must outlive the function.
-fn print_ref<'a, T>(t: &'a T)
-where
-	T: Debug + 'a,
-{
+fn print_ref<'a, T>(t: &'a T) where T: Debug + 'a {
 	println!("`print_ref`: t is {:?}", t);
 }
-
-
