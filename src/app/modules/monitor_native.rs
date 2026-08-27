@@ -1,17 +1,34 @@
-use std::{ path::{ Path } };
-use notify::{ Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher };
+use std::path::Path;
 
-use crate::app::monitor::{ Monitor };
+use anyhow::Result;
+use notify::{ Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher };
+use tokio::sync::mpsc;
+
+use crate::app::{ event_channel, monitor::Monitor };
 
 #[derive(Debug)]
 pub struct StateMonitor {
-	watcher: notify::RecommendedWatcher,
-	rx: tokio::sync::mpsc::Receiver<()>,
+	watcher: RecommendedWatcher,
+	rx: mpsc::Receiver<()>,
 }
 
+/// Types
+/// - FS Change (CRUD)- A filesystem watcher has an underlying blocking/event-driven mechanism:
+/// 	runtime.emit(Event::FileChanged(...))
+/// - Clock Running (Pomodoro) - tokio::interval(...)
+/// 	runtime.emit(Event::PomodoroTick(...))
+/// - Task Lifecycle (CRUD) - Task/Job lifecycle event stream. Also needs write access
+/// 	runtime.emit(Event::Shortcut(...))
+/// - Cursor Movement - OS event stream
+/// - Shortcut Trigger - OS event stream
+/// - Notification -
+/// - Events - Analysis of Ownership, FS indexer, File Downloads
 impl StateMonitor {
-	pub fn new(path: &Path) -> anyhow::Result<Self> {
-		let (tx, rx) = tokio::sync::mpsc::channel(1);
+	pub fn with_file() {
+		let (sender, receiver) = event_channel::channel::<i32>(10);
+	}
+	pub fn new(path: &Path) -> Result<Self> {
+		let (tx, rx) = mpsc::channel(1);
 
 		let mut watcher = RecommendedWatcher::new(move |result: Result<Event, notify::Error>| {
 			let Ok(event) = result else {
@@ -19,22 +36,45 @@ impl StateMonitor {
 			};
 
 			if matches!(event.kind, EventKind::Modify(_) | EventKind::Create(_)) {
+				// Channel size is 1 intentionally: we only care that
+				// something changed, not how many filesystem events
+				// occurred.
 				let _ = tx.blocking_send(());
 			}
 		}, Config::default())?;
 
-		if let Some(parent) = path.parent() {
-			watcher.watch(parent, RecursiveMode::NonRecursive)?;
-		}
+		// Watch the parent directory rather than the file itself.
+		//
+		// Editors commonly save by writing a temporary file and then
+		// renaming it over the original file.
+		let watch_path = path.parent().unwrap_or(path);
+
+		watcher.watch(watch_path, RecursiveMode::NonRecursive)?;
 
 		Ok(Self { watcher, rx })
 	}
 
+	/// Returns true if the watched resource changed since the last poll.
+	///
+	/// Multiple filesystem events are collapsed into one logical change.
 	pub fn poll(&mut self) -> bool {
-		self.rx.try_recv().is_ok()
+		let mut changed = false;
+
+		while self.rx.try_recv().is_ok() {
+			changed = true;
+		}
+
+		changed
 	}
 }
 
+impl Monitor for StateMonitor {
+	fn watch(&mut self) {}
+	fn rx(&mut self) {}
+	fn poll(&mut self) -> bool {
+		self.poll()
+	}
+}
 #[derive(Debug)]
 pub struct NativeMonitor {
 	watcher: notify::RecommendedWatcher,
@@ -43,7 +83,6 @@ pub struct NativeMonitor {
 
 impl NativeMonitor {
 	pub fn new() -> anyhow::Result<Self> {
-		use notify::{ Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher };
 		let (tx, rx) = tokio::sync::mpsc::channel(1);
 		let mut watcher = RecommendedWatcher::new(move |result: Result<Event, notify::Error>| {
 			let Ok(event) = result else {
@@ -68,5 +107,3 @@ impl Monitor for NativeMonitor {
 		self.rx.try_recv().is_ok()
 	}
 }
-
-// pub(crate) mod monitor_native;

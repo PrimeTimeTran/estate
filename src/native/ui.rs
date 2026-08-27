@@ -13,9 +13,9 @@ pub fn bootstrap() -> anyhow::Result<(TrayMenu, TrayIcon)> {
 	let clock_item = MenuItem::new("Clock: 30s", true, None);
 	let scroll_item = MenuItem::new("Scroll: Idle", true, None);
 	let status = MenuItem::new("● Estate Daemon Running", false, None);
-	let dev = MenuItem::new("Open Dashboard", true, None);
-	let telemetry = MenuItem::new("Open Telemetry Inspector", true, None);
-	let task_manager = MenuItem::new("Open Task Manager", true, None);
+	let dev = MenuItem::new("Dashboard", true, None);
+	let telemetry = MenuItem::new("Telemetry", true, None);
+	let task_manager = MenuItem::new("Task Manager", true, None);
 	let new_task = MenuItem::new("New Task", true, None);
 	let list_tasks = MenuItem::new("List Tasks", true, None);
 	let clear_tasks = MenuItem::new("Clear Tasks", true, None);

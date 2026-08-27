@@ -1,4 +1,4 @@
-//! Centralized dependency exposure & visibilities definitions for both internal and external use.
+// ! Centralized dependency exposure & visibilities definitions for both internal and external use.
 //!
 //! # Description
 //!

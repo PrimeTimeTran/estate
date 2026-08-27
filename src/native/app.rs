@@ -28,6 +28,7 @@ pub struct NativeApp {
 }
 impl NativeApp {
 	pub fn new() -> anyhow::Result<Self> {
+		// let (sender, receiver) = event_channel::channel::<i32>(10);
 		let (daemon_tx, daemon_rx) = mpsc::channel(100);
 
 		let runtime = NativeRuntime::new()?;
@@ -334,9 +335,10 @@ impl NativeApp {
 			return;
 		}
 		let (title, view) = match kind {
-			WindowType::Dashboard => ("Estate Dashboard", Ve::new(Graphics::new())),
 			WindowType::TaskManager => ("Task Manager", Ve::new(TaskManager::new())),
-			WindowType::TelemetryInspector => ("Telemetry Inspector", Ve::new(Oracle::new())),
+			WindowType::Dashboard => ("Estate Dashboard", Ve::new(Graphics::new())),
+			// WindowType::TelemetryInspector => ("Telemetry Inspector", Ve::new(Oracle::new())),
+			_ => { todo!("abstraction_of_references_and_pointers") }
 		};
 		match Window::new(event_loop, view) {
 			Ok(window) => {

@@ -17,6 +17,9 @@ pub(crate) mod app;
 pub(crate) mod state;
 pub(crate) mod event;
 #[cfg(feature = "native")]
+pub(crate) mod event_channel;
+
+#[cfg(feature = "native")]
 pub(crate) mod context;
 #[cfg(feature = "native")]
 pub use context::*;

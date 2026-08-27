@@ -41,6 +41,10 @@ name = "threads"
 path = "src/bin/threads.rs"
 
 [[bin]]
+name = "lifetime"
+path = "src/bin/lifetime/main.rs"
+
+[[bin]]
 name = "macros"
 path = "src/bin/macros.rs"
 

@@ -1,5 +1,10 @@
 use crate::{ app::*, prelude::* };
 
+/// Services own long-lived responsibilities and their concurrency/lifecycle;
+///
+/// Events are the standardized mechanism by which those services expose meaningful
+/// changes to the rest of the application; the Runtime owns the services and EventBus,
+/// while the Dispatcher routes those events to consumers.
 pub trait Runtime: Clone + Send + Sync {
 	fn emit(&self, event: Event);
 	fn start_dispatcher(self: &Arc<Self>);
