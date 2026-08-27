@@ -1,5 +1,25 @@
-use std::fmt::Debug; // Trait to bound with.
 
+
+	// ## 8. Collections & Iteration
+	// - References into collections
+	// - Iterator lifetimes
+	// - `iter()`
+	// - `iter_mut()`
+	// - `into_iter()`
+	// - Borrowing while mutating
+	// - Collection reallocation and reference validity
+	
+fn eight() {
+	let x = 7;
+	let ref_x = Ref(&x);
+
+	print_ref(&ref_x);
+	print(ref_x);
+}
+
+
+
+use std::fmt::Debug;
 #[derive(Debug)]
 struct Ref<'a, T: 'a>(&'a T);
 // `Ref` contains a reference to a generic type `T` that has
@@ -25,10 +45,4 @@ where
 	println!("`print_ref`: t is {:?}", t);
 }
 
-fn main() {
-	let x = 7;
-	let ref_x = Ref(&x);
 
-	print_ref(&ref_x);
-	print(ref_x);
-}

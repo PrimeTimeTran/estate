@@ -1,85 +1,90 @@
-/// Lifetime Primitives
-///
-/// Static
-/// Mutate
-/// Reference
-/// Pointer
-/// Ownership
-///		[`.into()`]
-///		[`.take()`]
-///		[`.unwrap()`]
-///		[`.drain()`]
-///		[`mem::take()`]
-///		[`mem::replace()`]
-///		[`.clone()`]
-///		[`.to_owned()`]
-///		[`.to_string()`]
-///		[`.to_vec()`]
-///		[`.as_ref()`]
-///		[`.as_mut()`]
-///		[`.borrow()`]
-///		[`.deref()`]
-///		[`Arc::try_unwrap()`]
-///		[`Box::into_inner`]
-///		[`Box::leak`]
-///		[`.iter()`]
-///		[`.into_iter()`]
-///		[`.iter_mut()`]
-///		[`Rc::clone()`]
-///		[`Arc::clone()`]
-///		[`.as_deref()`]
-///		[`.map()`]
-///		[`.and_then()`]
-///		[`.ok()`]
-///		[`std::convert::TryInto::try_into()`]
-/// 	to_owned()
-/// Consume
-///
-/// Borrow
-///
-///
-///
-pub fn abstraction_of_references_and_pointers() {
+// ## 1. Memory
+// - Stack vs Heap
+// - Ownership
+// - Allocation and deallocation
+// - Values vs references
+// - Moves
+// - Copies
+// - Destruction / Drop
+// 
+pub fn memory_considerations() {
+	// Data is not sealed in a vacuum.
 	let i = 3;
+
+	// It's used to define more data.
 	let borrow1 = &i;
-	print!("borrow1: {}", borrow1);
+
+	// It's passed to functions.
+	println!("borrow1: {}", borrow1);
+
+	// And can also be borrowed multiple times at once.
 	let borrow2 = &i;
-	dbg!("borrow2: {}", borrow2);
-	// dbg! macro prefixes prints with
+	println!("borrow2: {}", borrow2);
+
 	{
+		// Data can flow "down" into child scopes.
 		let borrow3 = &i;
 		println!("borrow3: {}", borrow3);
+
+		// When this scope ends, borrow3 disappears.
 	}
+
 	{
+		// This can repeat as many times as needed.
 		let borrow4 = &i;
 		println!("borrow4: {}", borrow4);
 	}
+
+	// So far, everything is easy:
+	//
+	//       i
+	//      /|\
+	//     / | \
+	//    b1 b2 b3...
+	//
+	// Multiple borrows can point at the same data.
+
 	let borrow5 = &i;
 	println!("borrow5: {}", borrow5);
+
+	// But references introduce an important question:
+	//
+	// "How long is each borrow allowed to exist?"
+	//
+	// Rust needs to know:
+	//
+	// 1. Does the borrowed data still exist?
+	// 2. Is the reference still being used?
+	// 3. Can the owner be moved or mutated yet?
+	// 4. Can this reference escape the scope that created it?
+
+	// The fundamental rule:
+	//
+	//     A reference must never outlive the data it references.
+	//
+	// Therefore:
+	//
+	//     data lifetime >= borrow lifetime
+	//
+	let borrow;
+	{
+		let x = 10;
+		borrow = &x;
+		// `x` exists here, so `borrow` is valid.
+		println!("{}", borrow);
+	}
+	// x is gone, but borrow would still exist.
+	// Rust rejects this because borrow would outlive x.
+
+	// let invalid = borrow; // ❌
+	let mut x = 10;
+	let borrow = &x;
+
+	// `borrow` keeps an immutable borrow alive
+	// while it is still being used.
+	println!("{}", borrow);
+
+	// Once the borrow's lifetime ends,
+	// `x` can be mutably borrowed again.
+	x += 1;
 }
-
-// pub fn abstraction_of_references_and_pointers() {
-// 	let i = 3;
-// 	let borrow1 = &i;
-// 	print!("borrow1: {}\n", borrow1);
-
-// 	let borrow2 = &i;
-// 	dbg!(borrow2); // Note: dbg! macro prints with file/line location
-
-// 	{
-// 		let borrow3 = &i;
-// 		println!("borrow3: {}", borrow3);
-// 	} // borrow3 goes out of scope here, but `i` and `borrow1`/`borrow2` remain valid.
-
-// 	{
-// 		let borrow4 = &i;
-// 		println!("borrow4: {}", borrow4);
-// 	}
-
-// 	let borrow5 = &i;
-// 	println!("borrow5: {}", borrow5);
-// }
-
-// fn main() {
-// 	abstraction_of_references_and_pointers();
-// }

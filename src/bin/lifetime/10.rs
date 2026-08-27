@@ -1,18 +1,14 @@
-// // A reference with 'static lifetime:
-// let s: &'static str = "hello world";
 
-// // 'static as part of a trait bound:
-// fn generic<T>(x: T) where T: 'static {}
 
-// Make a constant with `'static` lifetime.
-static NUM: i32 = 18;
 
-// Returns a reference to `NUM` where its `'static`
-// lifetime is coerced to that of the input argument.
-fn coerce_static<'a>(_: &'a i32) -> &'a i32 {
-	&NUM
-}
-
+	// ## 10. Lifetime Patterns
+	// - Borrowing a value
+	// - Sharing data
+	// - Temporarily borrowing
+	// - Returning borrowed data
+	// - Storing borrowed data
+	// - Owning data instead
+	// - Passing ownership across boundaries
 fn main() {
 	{
 		// Make a `string` literal and print it:
@@ -35,6 +31,22 @@ fn main() {
 
 	println!("NUM: {} stays accessible!", NUM);
 }
+
+// // A reference with 'static lifetime:
+// let s: &'static str = "hello world";
+
+// // 'static as part of a trait bound:
+// fn generic<T>(x: T) where T: 'static {}
+
+// Make a constant with `'static` lifetime.
+static NUM: i32 = 18;
+
+// Returns a reference to `NUM` where its `'static`
+// lifetime is coerced to that of the input argument.
+fn coerce_static<'a>(_: &'a i32) -> &'a i32 {
+	&NUM
+}
+
 
 // 2.
 // extern crate rand;

@@ -1,22 +1,11 @@
-// A type `Borrowed` which houses a reference to an
-// `i32`. The reference to `i32` must outlive `Borrowed`.
-#[derive(Debug)]
-struct Borrowed<'a>(&'a i32);
-
-// Similarly, both references here must outlive this structure.
-#[derive(Debug)]
-struct NamedBorrowed<'a> {
-	x: &'a i32,
-	y: &'a i32,
-}
-
-// An enum which is either an `i32` or a reference to one.
-#[derive(Debug)]
-enum Either<'a> {
-	Num(i32),
-	Ref(&'a i32),
-}
-
+// ## 5. Structs
+// - References inside structs
+// - Struct lifetime parameters
+// - `struct Foo<'a>`
+// - Lifetime constraints between fields
+// - Struct construction
+// - Self-referential structs
+// - Why self-references are difficult
 pub fn five() {
 	let mut x = 10;
 	let mut y: i32 = 20;
@@ -46,4 +35,23 @@ pub fn five() {
 	println!("x {:?}", x);
 	// println!("referenceOfY {:?}", referenceOfY);
 	// let mut y = y + 1;
+}
+
+// A type `Borrowed` which houses a reference to an
+// `i32`. The reference to `i32` must outlive `Borrowed`.
+#[derive(Debug)]
+struct Borrowed<'a>(&'a i32);
+
+// Similarly, both references here must outlive this structure.
+#[derive(Debug)]
+struct NamedBorrowed<'a> {
+	x: &'a i32,
+	y: &'a i32,
+}
+
+// An enum which is either an `i32` or a reference to one.
+#[derive(Debug)]
+enum Either<'a> {
+	Num(i32),
+	Ref(&'a i32),
 }

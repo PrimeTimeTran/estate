@@ -1,3 +1,30 @@
+// ## 3. Lifetimes
+// - What a lifetime actually represents
+// - Lifetime of a value vs lifetime of a reference
+// - Reference validity
+// - Lifetime annotations (`'a`)
+// - Lifetime parameters
+// - Elision rules
+// - Lifetime constraints
+// - Outliving (`'a: 'b`)
+// - `'static`
+// 
+pub fn three() {
+	println!("Lifetime: scope annotations");
+	let x = 7;
+	let y = 9;
+
+	print_one(&x);
+	print_multi(&x, &y);
+
+	let z = pass_x(&x, &y);
+	print_one(z);
+
+	let mut t = 0;
+	add_one(&mut t);
+	print_one(&t);
+}
+
 // One input reference with lifetime `'a` which must live
 // at least as long as the function.
 fn print_one<'a>(x: &'a i32) {
@@ -35,19 +62,3 @@ fn valid_output() -> String {
 // Here, `&String::from("foo")` would create a `String`, followed by a
 // reference. Then the data is dropped upon exiting the scope, leaving
 // a reference to invalid data to be returned.
-
-pub fn three() {
-	println!("Lifetime: scope annotations");
-	let x = 7;
-	let y = 9;
-
-	print_one(&x);
-	print_multi(&x, &y);
-
-	let z = pass_x(&x, &y);
-	print_one(z);
-
-	let mut t = 0;
-	add_one(&mut t);
-	print_one(&t);
-}

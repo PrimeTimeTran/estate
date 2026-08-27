@@ -1,3 +1,24 @@
+
+// ## 9. Lifetimes in Types
+	// - References as part of a type
+	// - Generic lifetimes
+	// - Lifetime bounds
+	// - `T: 'a`
+	// - Trait objects and lifetimes
+	// - `dyn Trait + 'a`
+	// - `'static` bounds
+fn main() {
+	let first = 2; // Longer lifetime
+
+	{
+		let second = 3; // Shorter lifetime
+
+		println!("The product is {}", multiply(&first, &second));
+		println!("{} is the first", choose_first(&first, &second));
+	};
+}
+
+
 // Here, Rust infers a lifetime that is as short as possible.
 // The two references are then coerced to that lifetime.
 fn multiply<'a>(first: &'a i32, second: &'a i32) -> i32 {
@@ -8,15 +29,4 @@ fn multiply<'a>(first: &'a i32, second: &'a i32) -> i32 {
 // Here, we take in an `&'a i32` and return a `&'b i32` as a result of coercion.
 fn choose_first<'a: 'b, 'b>(first: &'a i32, _: &'b i32) -> &'b i32 {
 	first
-}
-
-fn main() {
-	let first = 2; // Longer lifetime
-
-	{
-		let second = 3; // Shorter lifetime
-
-		println!("The product is {}", multiply(&first, &second));
-		println!("{} is the first", choose_first(&first, &second));
-	};
 }
