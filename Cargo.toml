@@ -48,11 +48,17 @@ path = "src/bin/lifetime/main.rs"
 name = "macros"
 path = "src/bin/macros.rs"
 
+[[bin]]
+name = "settings"
+path = "src/bin/settings.rs"
+required-features = ["native"]
+
+# cargo nextest run --bin settings --test-threads 1 --no-fail-fast
 [features]
 # This overwrites IDE config causing diagnostics to be wrong given the targetted platform.
 #
 # To get IDE diagnostics functioning correctly remove the hardcoded default when troubleshooting another build target.
-# 
+#
 # cargo build --bin web --no-default-features --features="web" --target wasm32-unknown-unknown
 # default = ["native"]
 # cargo build --bin web --no-default-features --features="web" --target wasm32-unknown-unknown
@@ -146,6 +152,7 @@ tokio = { workspace = true, optional = true, features = [
 tokio-util = { workspace = true, optional = true }
 tower-lsp = { workspace = true, optional = true }
 tray-icon = { workspace = true, optional = true }
+jsonc-parser = { version = "0.33.1", features = ["cst"] }
 
 [build-dependencies]
 resvg.workspace = true
