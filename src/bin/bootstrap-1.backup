@@ -518,7 +518,7 @@ fn is_file(path: &Path) -> bool {
 		None => false,
 	}
 }
-fn materialize_file(node: &Node, resource: &Resource, path: &Path) -> anyhow::Result<()> {
+fn materialize_file(node: &Node, resource: &Resource, path: &Path) -> Result<()> {
 	match resource.kind {
 		ResourceKind::Config
 		| ResourceKind::Source
@@ -545,7 +545,7 @@ fn materialize_location(
 	node: &Node,
 	resource: &Resource,
 	location: &ResourceLocation,
-) -> anyhow::Result<()> {
+) -> Result<()> {
 	match location {
 		ResourceLocation::Directory(path) => {
 			fs::create_dir_all(path)?;

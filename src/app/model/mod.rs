@@ -34,7 +34,7 @@ pub(crate) struct EstateEngine<R: Runtime> {
 	pub analysis: AnalysisService,
 }
 impl<R: Runtime> EstateEngine<R> {
-	pub fn new(runtime: R) -> anyhow::Result<Self> {
+	pub fn new(runtime: R) -> Result<Self> {
 		// let state = EstateState::load_from_disk().unwrap();
 		// let state_monitor = StateMonitor::new(&state_path)?;
 		Ok(Self {

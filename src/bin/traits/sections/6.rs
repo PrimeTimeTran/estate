@@ -10,10 +10,7 @@ impl<T> Point<T> {
 }
 
 // 4. Use the trait in your generic implementation
-impl<T> Point<T>
-where
-	T: ToFloat,
-{
+impl<T> Point<T> where T: ToFloat {
 	fn distance(&self, other: &Point<T>) -> f64 {
 		let dx = self.x.to_f64() - other.x.to_f64();
 		let dy = self.y.to_f64() - other.y.to_f64();

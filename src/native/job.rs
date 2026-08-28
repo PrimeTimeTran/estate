@@ -23,7 +23,7 @@ pub struct TaskManagerRuntime {
 	rx: tokio::sync::mpsc::Receiver<()>,
 }
 impl TaskManagerRuntime {
-	pub fn new(path: &Path) -> anyhow::Result<Self> {
+	pub fn new(path: &Path) -> Result<Self> {
 		let (tx, rx) = tokio::sync::mpsc::channel::<()>(1);
 		let mut watcher = RecommendedWatcher::new(
 			move |res: Result<Event, notify::Error>| {
@@ -63,7 +63,7 @@ impl TaskManager {
 		let path = PathBuf::from(STATE_PATH);
 		Self::from_path(path).unwrap()
 	}
-	pub fn from_path(path: impl Into<PathBuf>) -> anyhow::Result<Self> {
+	pub fn from_path(path: impl Into<PathBuf>) -> Result<Self> {
 		let state_path = path.into();
 		let runtime = TaskManagerRuntime::new(&state_path)?;
 		let mut state = TaskManagerState {
@@ -136,7 +136,7 @@ impl TaskManager {
 		self.state.tasks.values()
 	}
 
-	pub fn set_status(&mut self, id: TaskId, status: TaskStatus) -> anyhow::Result<()> {
+	pub fn set_status(&mut self, id: TaskId, status: TaskStatus) -> Result<()> {
 		let task = self
 			.state
 			.tasks
@@ -148,7 +148,7 @@ impl TaskManager {
 		Ok(())
 	}
 
-	pub fn save(&mut self) -> anyhow::Result<()> {
+	pub fn save(&mut self) -> Result<()> {
 		todo!("save")
 	}
 

@@ -1,5 +1,5 @@
 use crate::{native::daemon::daemon_config::derive_runtime_context, prelude::*};
-use anyhow::Error;
+use Error;
 
 fn manifest_path() -> Result<PathBuf, Error> {
 	Ok(engine_data_dir()?.join("manifest.json"))

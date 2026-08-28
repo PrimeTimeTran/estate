@@ -1,5 +1,5 @@
 use crate::{ native::poc::McpClient, prelude::* };
-use anyhow::Error;
+use Error;
 
 #[derive(Debug, Default, Clone)]
 pub struct FileInfo {
@@ -64,22 +64,22 @@ pub struct FileSystemTool {
 }
 
 impl FileSystemTool {
-	pub fn search(&self, query: &str) -> anyhow::Result<Vec<FileInfo>> {
+	pub fn search(&self, query: &str) -> Result<Vec<FileInfo>> {
 		todo!("search");
 		// self.vfs.search_files(query)
 	}
 
-	pub fn read(&self, path: &str) -> anyhow::Result<String> {
+	pub fn read(&self, path: &str) -> Result<String> {
 		todo!("read");
 		// self.vfs.read_file(path)
 	}
 
-	pub fn write(&self, path: &str, content: &str) -> anyhow::Result<()> {
+	pub fn write(&self, path: &str, content: &str) -> Result<()> {
 		todo!("write");
 		// self.vfs.write_file(path, content)
 	}
 
-	pub fn create(&self, path: &str, content: &str) -> anyhow::Result<()> {
+	pub fn create(&self, path: &str, content: &str) -> Result<()> {
 		todo!("create");
 		// self.vfs.create_file(path, content)
 	}

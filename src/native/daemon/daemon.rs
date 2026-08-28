@@ -1,7 +1,7 @@
 use crate::{
-	app::{ *, Runtime },
+	app::{Runtime, *},
 	// app::{ *, modules::runtime::Runtime },
-	native::daemon::{ DocCompiler, NativeRuntime },
+	native::daemon::{DocCompiler, NativeRuntime},
 	prelude::*,
 };
 
@@ -71,8 +71,7 @@ impl<R: Runtime> Daemon<R> {
 	async fn run_background(&mut self) -> Result<DaemonResponse> {
 		tracing::info!("Run Background");
 		let exe = std::env::current_exe()?;
-		let child = std::process::Command
-			::new(exe)
+		let child = std::process::Command::new(exe)
 			.arg("tray")
 			.stdin(std::process::Stdio::inherit())
 			.stdout(std::process::Stdio::inherit())
@@ -88,7 +87,7 @@ impl<R: Runtime> Daemon<R> {
 			..Default::default()
 		})
 	}
-	pub async fn run_foreground(&mut self) -> anyhow::Result<()> {
+	pub async fn run_foreground(&mut self) -> Result<()> {
 		tracing::info!("daemon running in foreground");
 		self.runtime.emit(Event::daemon(EventKind::DaemonStarted));
 		self.shutdown_token.cancelled().await;
@@ -100,10 +99,18 @@ impl<R: Runtime> Daemon<R> {
 }
 
 #[async_trait]
-impl<R> EstateDaemon for Daemon<R> where R: Runtime {
+impl<R> EstateDaemon for Daemon<R>
+where
+	R: Runtime,
+{
 	async fn execute(&mut self, action: ActionRequest) -> Result<DaemonResponse> {
 		match action {
-			ActionRequest::Analyze { path, line, column, mode } => self.analyze(path, line, column, mode),
+			ActionRequest::Analyze {
+				path,
+				line,
+				column,
+				mode,
+			} => self.analyze(path, line, column, mode),
 			ActionRequest::Metrics { path } => self.metrics(path),
 			ActionRequest::ScanWorkspace { path } => self.scan_workspace(path),
 			ActionRequest::InitializeEstate { path } => self.initialize_estate(path),
@@ -221,7 +228,7 @@ impl<R: Runtime> Daemon<R> {
 	// 					target: "estate::daemon::socket",
 	// 					"response sent"
 	// 			);
-	// 			Ok::<(), anyhow::Error>(())
+	// 			Ok::<(), Error>(())
 	// 		});
 	// 	}
 	// }
@@ -244,7 +251,7 @@ impl<R: Runtime> Daemon<R> {
 		path: PathBuf,
 		line: Option<u32>,
 		column: Option<u32>,
-		mode: Option<String>
+		mode: Option<String>,
 	) -> Result<DaemonResponse> {
 		let options = AnalyzerOptions {
 			line,
@@ -255,8 +262,7 @@ impl<R: Runtime> Daemon<R> {
 		};
 		let system_path = if let Some(s) = path.to_str() {
 			if s.starts_with("file://") {
-				url::Url
-					::parse(s)?
+				url::Url::parse(s)?
 					.to_file_path()
 					.map_err(|_| anyhow::anyhow!("Invalid file URI"))?
 			} else {
@@ -327,8 +333,7 @@ impl ::cli::command::CliCommand for StartDaemon {
 	async fn run(&self, _ctx: &cli::context::Context) {
 		println!("🚀 starting estate daemon");
 		let exe = std::env::current_exe().expect("failed finding current executable");
-		let child = std::process::Command
-			::new(exe)
+		let child = std::process::Command::new(exe)
 			.arg("daemon")
 			.spawn()
 			.expect("failed starting daemon");
@@ -464,7 +469,7 @@ impl AnalyzeDaemon {
 	pub async fn run(
 		&self,
 		_ctx: &CliContext,
-		args: &cli::context::AnalyzeArgs
+		args: &cli::context::AnalyzeArgs,
 	) -> Result<Workspace, AnalysisError> {
 		let target_path = PathBuf::from(&args.paths[0]);
 		let request = Analyze {
@@ -505,7 +510,9 @@ impl AnalyzeLoop {
 				.iter()
 				.map(|action| demand::DemandOption::new(action.title.clone()))
 				.collect::<Vec<_>>();
-			let choice = demand::Select::new("What would you like to do?").options(options).run();
+			let choice = demand::Select::new("What would you like to do?")
+				.options(options)
+				.run();
 			match choice {
 				Ok(selected) => {
 					if let Some(action) = actions.iter().find(|a| a.title == selected) {

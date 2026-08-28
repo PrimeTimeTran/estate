@@ -61,7 +61,7 @@ impl Runtime for NativeRuntime {
 	fn state(&self) -> &RuntimeState {
 		&self.state
 	}
-	fn save(&self, state: &EstateState) -> anyhow::Result<()> {
+	fn save(&self, state: &EstateState) -> Result<()> {
 		self.store.save(state)
 	}
 	// fn poll_state(&mut self) -> bool {
@@ -70,7 +70,7 @@ impl Runtime for NativeRuntime {
 }
 
 impl NativeRuntime {
-	pub fn new() -> anyhow::Result<Self> {
+	pub fn new() -> Result<Self> {
 		let store = NativeStateStore::new()?;
 		let state = store.load()?;
 		let runtime_state = RuntimeState::new(state);

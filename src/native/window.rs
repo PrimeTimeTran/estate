@@ -1,6 +1,6 @@
 use crate::{
 	app::{AppContext, Runtime},
-	prelude::*,
+	prelude::{anyhow::anyhow, *},
 };
 
 use egui_wgpu::{
@@ -99,7 +99,7 @@ pub struct Window {
 	// 9.output merger
 }
 impl Window {
-	pub fn new(event_loop: &ActiveEventLoop, view: Ve<NativeRuntime>) -> anyhow::Result<Self> {
+	pub fn new(event_loop: &ActiveEventLoop, view: Ve<NativeRuntime>) -> Result<Self> {
 		let (gui_ctx, gui_state) = build_egui(event_loop);
 		let (window, instance, surface) = create_gpu_surface(event_loop)?;
 		let (adapter, device, queue) = initialize_gpu(&instance, &surface)?;
@@ -120,7 +120,7 @@ impl Window {
 			view,
 		})
 	}
-	pub fn draw(&mut self, ctx: &mut AppContext<'_, NativeRuntime>) -> anyhow::Result<()> {
+	pub fn draw(&mut self, ctx: &mut AppContext<'_, NativeRuntime>) -> Result<()> {
 		self.begin_egui();
 		let output = self.build_ui(ctx);
 		let Some(surface_texture) = self.acquire_surface()? else {
@@ -148,7 +148,7 @@ impl Window {
 		let input = self.gui_state.take_egui_input(&self.instance);
 		self.gui_ctx.begin_pass(input);
 	}
-	fn acquire_surface(&mut self) -> anyhow::Result<Option<wgpu::SurfaceTexture>> {
+	fn acquire_surface(&mut self) -> Result<Option<wgpu::SurfaceTexture>> {
 		match self.surface.get_current_texture() {
 			wgpu::CurrentSurfaceTexture::Success(texture)
 			| wgpu::CurrentSurfaceTexture::Suboptimal(texture) => Ok(Some(texture)),
@@ -161,7 +161,7 @@ impl Window {
 				self.reconfigure_surface();
 				Ok(None)
 			}
-			wgpu::CurrentSurfaceTexture::Validation => Err(anyhow::anyhow!("surface validation error")),
+			wgpu::CurrentSurfaceTexture::Validation => Err(anyhow!("surface validation error")),
 		}
 	}
 	fn reconfigure_surface(&mut self) {
@@ -177,7 +177,7 @@ impl Window {
 		&mut self,
 		surface_texture: wgpu::SurfaceTexture,
 		output: gui::FullOutput,
-	) -> anyhow::Result<()> {
+	) -> Result<()> {
 		let gui::FullOutput {
 			pixels_per_point,
 			platform_output: _,
@@ -265,7 +265,7 @@ impl Window {
 fn initialize_gpu(
 	instance: &wgpu::Instance,
 	surface: &wgpu::Surface<'_>,
-) -> anyhow::Result<(Adapter, Device, wgpu::Queue)> {
+) -> Result<(Adapter, Device, wgpu::Queue)> {
 	let adapter = pollster::block_on(instance.request_adapter(
 		&(wgpu::RequestAdapterOptions {
 			apply_limit_buckets: true,
@@ -274,7 +274,7 @@ fn initialize_gpu(
 			force_fallback_adapter: false,
 		}),
 	))
-	.map_err(|e| anyhow::anyhow!("failed to find suitable GPU adapter: {e}"))?;
+	.map_err(|e| anyhow!("failed to find suitable GPU adapter: {e}"))?;
 	let (device, queue) = pollster::block_on(adapter.request_device(
 		&(wgpu::DeviceDescriptor {
 			experimental_features: wgpu::ExperimentalFeatures::disabled(),
@@ -289,7 +289,7 @@ fn initialize_gpu(
 }
 fn create_gpu_surface(
 	event_loop: &ActiveEventLoop,
-) -> anyhow::Result<(
+) -> Result<(
 	Arc<winit::window::Window>,
 	wgpu::Instance,
 	wgpu::Surface<'static>,
@@ -311,7 +311,7 @@ fn build_egui(event_loop: &ActiveEventLoop) -> (gui::Context, EguiState) {
 	);
 	(gui_ctx, gui_state)
 }
-fn build_window(event_loop: &ActiveEventLoop) -> anyhow::Result<Arc<winit::window::Window>> {
+fn build_window(event_loop: &ActiveEventLoop) -> Result<Arc<winit::window::Window>> {
 	let width = 1920;
 	let height = 1280;
 	let icon_file = include_bytes!("../../assets/icon.png");
@@ -383,7 +383,7 @@ fn build_renderer(
 			)
 		})
 		.or_else(|| caps.formats.first().copied())
-		.ok_or_else(|| anyhow::anyhow!("GPU surface has no supported formats"))?;
+		.ok_or_else(|| anyhow!("GPU surface has no supported formats"))?;
 	let present_mode = caps
 		.present_modes
 		.iter()
@@ -394,7 +394,7 @@ fn build_renderer(
 		.alpha_modes
 		.first()
 		.copied()
-		.ok_or_else(|| anyhow::anyhow!("GPU surface has no alpha modes"))?;
+		.ok_or_else(|| anyhow!("GPU surface has no alpha modes"))?;
 	let config = wgpu::SurfaceConfiguration {
 		format,
 		alpha_mode,
@@ -709,7 +709,7 @@ pub struct GlobalHotkeys {
 	shutdown: Arc<AtomicBool>,
 }
 impl GlobalHotkeys {
-	pub fn new() -> anyhow::Result<Self> {
+	pub fn new() -> Result<Self> {
 		let manager = GlobalHotKeyManager::new()?;
 		let hotkey = HotKey::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyP);
 		let hotkey_id = hotkey.id();

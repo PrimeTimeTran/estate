@@ -4,7 +4,13 @@
 // ./src/web
 // ./src/mobile
 
-pub use std::collections::{HashMap, HashSet, VecDeque};
+pub use std::{
+	collections::{HashMap, HashSet, VecDeque},
+	// May not work on WASM?
+	// path::Path,
+};
+
+pub use anyhow::{Error, Result};
 
 pub mod prelude;
 pub use crate::app::prelude::*;

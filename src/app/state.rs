@@ -4,8 +4,8 @@ use crate::app::job::Job;
 pub use crate::prelude::*;
 
 pub trait StateStore: Send + Sync {
-	fn load(&self) -> anyhow::Result<EstateState>;
-	fn save(&self, state: &EstateState) -> anyhow::Result<()>;
+	fn load(&self) -> Result<EstateState>;
+	fn save(&self, state: &EstateState) -> Result<()>;
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -51,10 +51,10 @@ impl EstateState {
 
 pub struct WebStateStore;
 impl StateStore for WebStateStore {
-	fn load(&self) -> anyhow::Result<EstateState> {
+	fn load(&self) -> Result<EstateState> {
 		todo!("load")
 	}
-	fn save(&self, state: &EstateState) -> anyhow::Result<()> {
+	fn save(&self, state: &EstateState) -> Result<()> {
 		todo!("save")
 	}
 }

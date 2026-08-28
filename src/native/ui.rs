@@ -12,7 +12,7 @@ use tray_icon::{
 	menu::{Menu, MenuItem, Submenu},
 };
 
-pub fn bootstrap() -> anyhow::Result<(TrayMenu, TrayIcon)> {
+pub fn bootstrap() -> Result<(TrayMenu, TrayIcon)> {
 	let menu = Menu::new();
 	let clock_item = MenuItem::new("Clock: 30s", true, None);
 	let scroll_item = MenuItem::new("Scroll: Idle", true, None);

@@ -1,5 +1,3 @@
-use crate::{ native::daemon::projection::command, prelude::* };
-use cli;
 /// # Estate Engine CLI
 ///
 /// Build and install the `estate` CLI.
@@ -43,13 +41,15 @@ use cli;
 /// estate fmt path/to/file.rs
 /// estate format path/to/file.rs
 /// ```
-use crate::app::{ model, modules::runtime::Runtime };
+use crate::app::{model, modules::runtime::Runtime, *};
+use crate::{native::daemon::projection::command, prelude::*};
+use cli;
 
 pub(crate) async fn execute<R: Runtime>(
 	parsed_cli: Cli,
 	ctx: cli::context::Context,
-	engine: model::EstateEngine<R>
-) -> anyhow::Result<(), anyhow::Error> {
+	engine: model::EstateEngine<R>,
+) -> Result<(), Error> {
 	let command = parsed_cli.command.unwrap_or(Command::Start { tail: false });
 	match command {
 		Command::Start { tail: false } => {
@@ -92,8 +92,7 @@ pub(crate) async fn execute<R: Runtime>(
 			for path in &args.paths {
 				let clean_path = path.canonicalize().unwrap_or_else(|_| path.clone());
 				// Just pass the file path and line/offset directly as raw fields
-				let request =
-					serde_json::json!({
+				let request = serde_json::json!({
 						"path": clean_path,
 						"line": args.line,
 						"column": &args.column,
@@ -120,16 +119,15 @@ pub(crate) async fn execute<R: Runtime>(
 		Command::DaemonServer => {
 			daemon::DaemonServer::run().await;
 		}
-		Command::Capabilities(args) =>
-			match AnalyzeDaemon.run(&ctx, &args).await {
-				Ok(result) => {
-					MetricsRenderer::render(&result);
-				}
-				Err(err) => {
-					eprintln!("Analyze failed: {err}");
-					std::process::exit(1);
-				}
+		Command::Capabilities(args) => match AnalyzeDaemon.run(&ctx, &args).await {
+			Ok(result) => {
+				MetricsRenderer::render(&result);
 			}
+			Err(err) => {
+				eprintln!("Analyze failed: {err}");
+				std::process::exit(1);
+			}
+		},
 		Command::Status => StatusDaemon.run(&ctx).await,
 		Command::Bookmark => command::ViewList.run(&ctx).await,
 		Command::Bookmarks => command::ViewList.run(&ctx).await,

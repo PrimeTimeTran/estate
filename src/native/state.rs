@@ -3,13 +3,13 @@ pub use crate::{ app::{ state::StateStore, app::EstateState }, prelude::{ self, 
 #[derive(Clone, Debug)]
 pub struct NativeStateStore;
 impl NativeStateStore {
-	pub fn new() -> anyhow::Result<Self> {
+	pub fn new() -> Result<Self> {
 		Ok(Self {})
 	}
 }
 
 impl StateStore for NativeStateStore {
-	fn load(&self) -> anyhow::Result<EstateState> {
+	fn load(&self) -> Result<EstateState> {
 		let path = prelude::native::resolver::engine_data_dir()?.join("state.json");
 
 		if !path.exists() {
@@ -26,7 +26,7 @@ impl StateStore for NativeStateStore {
 
 		Ok(serde_json::from_str(&raw)?)
 	}
-	fn save(&self, state: &EstateState) -> anyhow::Result<()> {
+	fn save(&self, state: &EstateState) -> Result<()> {
 		let path = prelude::native::resolver::engine_data_dir()?.join("state.json");
 
 		let json = serde_json::to_string_pretty(state)?;
@@ -44,7 +44,7 @@ impl EstateState {
 	pub fn path() -> std::io::Result<PathBuf> {
 		Ok(crate::native::resolver::engine_data_dir()?.join("state.json"))
 	}
-	pub fn load_from_disk() -> anyhow::Result<Self> {
+	pub fn load_from_disk() -> Result<Self> {
 		let path = Self::path()?;
 
 		if !path.exists() {
@@ -56,7 +56,7 @@ impl EstateState {
 		Ok(serde_json::from_str(&raw)?)
 	}
 
-	pub fn save_to_disk(&self) -> anyhow::Result<()> {
+	pub fn save_to_disk(&self) -> Result<()> {
 		let path = Self::path()?;
 		tracing::info!("💾 EstateState saving: {:?}", path);
 		let json = serde_json::to_string_pretty(self)?;

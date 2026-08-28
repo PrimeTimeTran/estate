@@ -1,20 +1,14 @@
-use crate::prelude::*;
 use crate::share::*;
+use crate::prelude::*;
 
-use tracing::{ debug, error, info, info_span, trace, warn };
+use tracing::{debug, error, info, info_span, trace, warn};
 use tracing_subscriber::{
-	EnvFilter,
-	Layer,
-	filter::LevelFilter,
-	fmt,
-	layer::SubscriberExt,
-	util::SubscriberInitExt,
+	EnvFilter, Layer, filter::LevelFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt,
 };
 
-pub fn init_logging(config: &LogConfig) -> anyhow::Result<()> {
+pub fn init_logging(config: &LogConfig) -> Result<()> {
 	let terminal_filter = config.terminal_filter()?;
-	let terminal = fmt
-		::layer()
+	let terminal = fmt::layer()
 		.without_time()
 		.with_target(true)
 		.with_thread_ids(false)
@@ -52,16 +46,14 @@ pub fn init_logging(config: &LogConfig) -> anyhow::Result<()> {
 	// } else {
 	// 	subscriber.init();
 	// }
-	tracing_subscriber
-		::registry()
+	tracing_subscriber::registry()
 		.with(terminal)
 		// .with(file)
 		.init();
 	Ok(())
 }
-pub fn init() -> anyhow::Result<()> {
-	tracing_subscriber
-		::registry()
+pub fn init() -> Result<()> {
+	tracing_subscriber::registry()
 		.with(EnvFilter::from_default_env())
 		.with(tracing_subscriber::fmt::layer())
 		.init();
@@ -80,7 +72,7 @@ pub struct LogConfig {
 }
 impl LogConfig {
 	#[cfg(feature = "native")]
-	pub fn apply_cli(&mut self, cli: &cli::context::Cli) -> anyhow::Result<()> {
+	pub fn apply_cli(&mut self, cli: &cli::context::Cli) -> Result<()> {
 		match &cli.command {
 			Some(cli::context::Command::Start { tail }) => {
 				if *tail {
@@ -91,7 +83,7 @@ impl LogConfig {
 		}
 		Ok(())
 	}
-	fn terminal_filter(&self) -> anyhow::Result<EnvFilter> {
+	fn terminal_filter(&self) -> Result<EnvFilter> {
 		// let mut filter = EnvFilter::new("off");
 		// for (target, level) in &self.targets {
 		// 	let directive = format!("{target}={level}");
@@ -108,14 +100,14 @@ impl LogConfig {
 		}
 		Ok(filter)
 	}
-	pub fn load() -> anyhow::Result<Self> {
+	pub fn load() -> Result<Self> {
 		let mut config = Self::default();
 		if let Some(global) = Self::load_global()? {
 			config.merge(global);
 		}
 		Ok(config)
 	}
-	fn load_from_cargo() -> anyhow::Result<Option<LogConfig>> {
+	fn load_from_cargo() -> Result<Option<LogConfig>> {
 		let path = Path::new(env!("CARGO_MANIFEST_DIR"))
 			.ancestors()
 			.find_map(|dir| {
@@ -132,7 +124,7 @@ impl LogConfig {
 	fn workspace_cargo_toml() -> PathBuf {
 		PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../Estate.toml")
 	}
-	fn load_global() -> anyhow::Result<Option<Self>> {
+	fn load_global() -> Result<Option<Self>> {
 		let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 			.parent()
 			.and_then(Path::parent)

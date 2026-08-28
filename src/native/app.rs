@@ -28,7 +28,7 @@ pub struct NativeApp {
 	tray: Option<TrayIcon>,
 }
 impl NativeApp {
-	pub fn new() -> anyhow::Result<Self> {
+	pub fn new() -> Result<Self> {
 		let (daemon_tx, daemon_rx) = mpsc::channel(100);
 		let runtime = NativeRuntime::new()?;
 		let engine = EstateEngine::new(runtime)?;
@@ -49,7 +49,7 @@ impl NativeApp {
 			windows: vec![],
 		})
 	}
-	pub fn run(&mut self, cli: Cli) -> anyhow::Result<()> {
+	pub fn run(&mut self, cli: Cli) -> Result<()> {
 		tracing::info!(">>> NativeApp::run entered");
 		let result = match cli.command {
 			None | Some(Command::Start { .. }) | Some(Command::Tray) => self.start_runtime(),
@@ -64,7 +64,7 @@ impl NativeApp {
 		tracing::info!(">>> NativeApp::run returning");
 		result
 	}
-	fn start_runtime(&mut self) -> anyhow::Result<()> {
+	fn start_runtime(&mut self) -> Result<()> {
 		tracing::info!(">>> NativeApp::start_runtime start");
 		self.spawn_global_hotkey_daemon()?;
 		let event_loop = EventLoop::<AppEvent>::with_user_event()
@@ -98,7 +98,7 @@ impl NativeApp {
 	fn spawn_cursor_daemon(&mut self, proxy: EventLoopProxy<AppEvent>) {
 		spawn_global_cursor_daemon(proxy)
 	}
-	fn spawn_global_hotkey_daemon(&mut self) -> anyhow::Result<()> {
+	fn spawn_global_hotkey_daemon(&mut self) -> Result<()> {
 		self.hotkey_manager.start();
 		Ok(())
 	}
@@ -336,7 +336,7 @@ impl NativeApp {
 			self.clear_tasks();
 		}
 	}
-	fn bootstrap() -> anyhow::Result<(TrayMenu, TrayIcon)> {
+	fn bootstrap() -> Result<(TrayMenu, TrayIcon)> {
 		bootstrap()
 	}
 	fn window_by_type(&mut self, kind: WindowType) -> Option<&mut AppWindow> {
@@ -403,7 +403,7 @@ impl NativeApp {
 		skip(self),
 		fields(flow_id = %Uuid::new_v4())
 	)]
-	async fn _scan_workspace(&mut self, path: &Path) -> anyhow::Result<()> {
+	async fn _scan_workspace(&mut self, path: &Path) -> Result<()> {
 		tracing::info!("starting workspace scan");
 		self._discover(path).await?;
 		tracing::debug!("discovery complete");
@@ -414,17 +414,17 @@ impl NativeApp {
 		Ok(())
 	}
 	#[tracing::instrument(target = "estate::discovery", skip(self, path))]
-	async fn _discover(&mut self, path: &Path) -> anyhow::Result<()> {
+	async fn _discover(&mut self, path: &Path) -> Result<()> {
 		tracing::debug!(path = %path.display(), "discovering workspace");
 		Ok(())
 	}
 	#[tracing::instrument(target = "estate::analysis", skip(self))]
-	async fn _analyze(&mut self) -> anyhow::Result<()> {
+	async fn _analyze(&mut self) -> Result<()> {
 		tracing::debug!("analyzing workspace");
 		Ok(())
 	}
 	#[tracing::instrument(target = "estate::graph", skip(self))]
-	async fn _build_graph(&mut self) -> anyhow::Result<()> {
+	async fn _build_graph(&mut self) -> Result<()> {
 		tracing::debug!("building semantic graph");
 		Ok(())
 	}

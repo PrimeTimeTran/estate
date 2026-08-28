@@ -49,7 +49,7 @@ impl Graphics {
 	}
 	// #[cfg(target_arch = "wasm32")]
 	#[cfg(not(target_arch = "wasm32"))]
-	fn from_path(path: impl Into<PathBuf>) -> anyhow::Result<Self> {
+	fn from_path(path: impl Into<PathBuf>) -> Result<Self> {
 		use crate::app::monitor_native::StateMonitor;
 		let data_path = path.into();
 		let monitor = StateMonitor::new(&data_path)?;

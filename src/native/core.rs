@@ -1,7 +1,7 @@
 use crate::{ app::{ *, Runtime, model }, prelude::* };
 
 impl<R: Runtime> model::EstateEngine<R> {
-	pub async fn format(self, args: &FormatArgs) -> anyhow::Result<String, anyhow::Error> {
+	pub async fn format(self, args: &FormatArgs) -> Result<String, Error> {
 		LintDaemon.run(&args).await;
 		Ok("Success".to_string())
 	}

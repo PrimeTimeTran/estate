@@ -1,4 +1,4 @@
-use crate::native::agent::FileInfo;
+use crate::{app::*, native::agent::FileInfo};
 
 #[derive(Debug, Default, Clone)]
 pub struct WorkspaceContext {
@@ -12,7 +12,7 @@ impl WorkspaceContext {
 }
 
 impl WorkspaceContext {
-	pub fn load() -> anyhow::Result<Self> {
+	pub fn load() -> Result<Self> {
 		Ok(Self { files: vec![] })
 	}
 }

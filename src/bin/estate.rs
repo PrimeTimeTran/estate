@@ -1,6 +1,6 @@
 use estate::prelude::{ logger, * };
 
-fn main() -> anyhow::Result<()> {
+fn main() -> Result<()> {
 	let cli = cli::context::parse();
 	let mut config = LogConfig::load()?;
 	config.apply_cli(&cli)?;

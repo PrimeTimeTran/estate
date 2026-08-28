@@ -1,10 +1,9 @@
 use std::path::Path;
 
-use anyhow::Result;
-use notify::{ Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher };
+use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use tokio::sync::mpsc;
 
-use crate::app::{ event_channel, monitor::Monitor };
+use crate::app::{event_channel, monitor::Monitor, *};
 
 #[derive(Debug)]
 pub struct StateMonitor {
@@ -30,18 +29,21 @@ impl StateMonitor {
 	pub fn new(path: &Path) -> Result<Self> {
 		let (tx, rx) = mpsc::channel(1);
 
-		let mut watcher = RecommendedWatcher::new(move |result: Result<Event, notify::Error>| {
-			let Ok(event) = result else {
-				return;
-			};
+		let mut watcher = RecommendedWatcher::new(
+			move |result: Result<Event, notify::Error>| {
+				let Ok(event) = result else {
+					return;
+				};
 
-			if matches!(event.kind, EventKind::Modify(_) | EventKind::Create(_)) {
-				// Channel size is 1 intentionally: we only care that
-				// something changed, not how many filesystem events
-				// occurred.
-				let _ = tx.blocking_send(());
-			}
-		}, Config::default())?;
+				if matches!(event.kind, EventKind::Modify(_) | EventKind::Create(_)) {
+					// Channel size is 1 intentionally: we only care that
+					// something changed, not how many filesystem events
+					// occurred.
+					let _ = tx.blocking_send(());
+				}
+			},
+			Config::default(),
+		)?;
 
 		// Watch the parent directory rather than the file itself.
 		//
@@ -82,21 +84,21 @@ pub struct NativeMonitor {
 }
 
 impl NativeMonitor {
-	pub fn new() -> anyhow::Result<Self> {
+	pub fn new() -> Result<Self> {
 		let (tx, rx) = tokio::sync::mpsc::channel(1);
-		let mut watcher = RecommendedWatcher::new(move |result: Result<Event, notify::Error>| {
-			let Ok(event) = result else {
-				return;
-			};
-			if matches!(event.kind, EventKind::Modify(_) | EventKind::Create(_)) {
-				let _ = tx.blocking_send(());
-			}
-		}, Config::default())?;
+		let mut watcher = RecommendedWatcher::new(
+			move |result: Result<Event, notify::Error>| {
+				let Ok(event) = result else {
+					return;
+				};
+				if matches!(event.kind, EventKind::Modify(_) | EventKind::Create(_)) {
+					let _ = tx.blocking_send(());
+				}
+			},
+			Config::default(),
+		)?;
 
-		Ok(Self {
-			watcher,
-			rx,
-		})
+		Ok(Self { watcher, rx })
 	}
 }
 

@@ -378,7 +378,7 @@ impl DaemonClient {
 			socket_path: SOCKET_PATH,
 		}
 	}
-	pub async fn execute(&self, action: ActionRequest) -> anyhow::Result<DaemonResponse> {
+	pub async fn execute(&self, action: ActionRequest) -> Result<DaemonResponse> {
 		let mut stream = UnixStream::connect(self.socket_path).await?;
 		let request = serde_json::to_string(&action)?;
 		stream.write_all(request.as_bytes()).await?;

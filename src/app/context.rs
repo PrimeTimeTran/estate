@@ -25,7 +25,4 @@ impl<'a, R: Runtime> AppContext<'a, R> {
 			false
 		}
 	}
-	// pub fn poll_state(&mut self) -> bool {
-	// 	false
-	// }
 }

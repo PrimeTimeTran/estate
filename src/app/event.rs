@@ -3,10 +3,11 @@ use crate::prelude::*;
 #[derive(Debug, Clone, Deserialize, Hash, Serialize)]
 pub struct Event {
 	pub id: u64,
-	pub timestamp: u64,
-	pub source: EventSource,
 	pub kind: EventKind,
+	pub source: EventSource,
+	pub timestamp: u64,
 }
+
 impl Event {
 	pub fn new(source: EventSource, kind: EventKind) -> Self {
 		tracing::info!("new Event {:?}", source);

@@ -8,7 +8,7 @@ pub struct App<R: Runtime> {
 }
 
 impl<R: Runtime> App<R> {
-	pub(crate) fn new(engine: model::EstateEngine<R>) -> anyhow::Result<Self> {
+	pub(crate) fn new(engine: model::EstateEngine<R>) -> Result<Self> {
 		Ok(Self { engine })
 	}
 	pub fn runtime(&self) -> &R {

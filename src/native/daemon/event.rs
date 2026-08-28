@@ -230,7 +230,7 @@ impl EventHandler for TaskHandler {
 pub struct StateHandler;
 #[async_trait::async_trait]
 impl EventHandler for StateHandler {
-	// async fn handle(&self, event: &Event, runtime: &NativeRuntime) -> anyhow::Result<()> {
+	// async fn handle(&self, event: &Event, runtime: &NativeRuntime) -> Result<()> {
 	async fn handle(&self, event: &Event, runtime: &NativeRuntime) {
 		tracing::info!("🔥 StateHandler received: {:?}", event.kind);
 
@@ -383,7 +383,7 @@ impl EventHandler for CommandHandler {
 /// "Given this task, actually perform it."
 pub struct TaskRunner;
 impl TaskRunner {
-	pub async fn execute(task: Task) -> anyhow::Result<()> {
+	pub async fn execute(task: Task) -> Result<()> {
 		tracing::info!("TaskRunner execute {:?}", task);
 		match task.kind {
 			TaskKind::RebuildIndex => {
