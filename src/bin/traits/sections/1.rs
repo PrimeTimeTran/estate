@@ -1,6 +1,9 @@
 use std::vec;
 
+use crate::helpers::*;
+
 pub fn capability() {
+  section!("1. Capabilities");
 	println!("There exists code that works.");
 	single_type_param();
 

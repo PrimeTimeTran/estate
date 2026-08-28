@@ -16,7 +16,7 @@
 //
 // Each approach has tradeoffs worth understanding.
 
-use crate::section;
+use crate::helpers::*;
 
 pub fn ownership_borrows_sharing() {
 	section!("2. Ownership, Borrowing, Sharing");

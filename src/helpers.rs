@@ -12,9 +12,9 @@ macro_rules! section {
 	};
 }
 
-pub(crate) use section;
+pub use section;
 
-pub(crate) fn print_section(title: &str, file: &str, line: u32) {
+pub fn print_section(title: &str, file: &str, line: u32) {
 	let file = normalize_file(file);
 	println!("{}", "-".repeat(80).dimmed());
 	println!("{}", title.bold().cyan());

@@ -4,7 +4,6 @@ pub fn generic_abstraction() {
 	println!("Distance: {}", point1.distance(&point2));
 }
 
-
 struct Point<T> {
 	x: T,
 	y: T,

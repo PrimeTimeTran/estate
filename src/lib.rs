@@ -12,6 +12,7 @@ pub mod mobile;
 pub mod app;
 
 pub mod prelude;
+pub mod helpers;
 pub mod share;
 pub mod theme;
 pub mod tool;

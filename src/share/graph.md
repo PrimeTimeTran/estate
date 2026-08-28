@@ -1,4 +1,3 @@
-//!
 //! # Graph
 //! The semantic graph describes how entities relate to one another across
 //! different contexts.
