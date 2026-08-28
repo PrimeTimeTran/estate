@@ -1,6 +1,6 @@
 use std::vec;
 
-pub fn context() {
+pub fn capability() {
 	println!("There exists code that works.");
 	single_type_param();
 
@@ -8,7 +8,7 @@ pub fn context() {
 	dynamic_problem();
 
 	println!("We can share code with generic types.");
-	dynamic_type_solution();
+	generic_param_types();
 }
 
 fn find_largest(nums: Vec<i32>) -> i32 {
@@ -34,7 +34,7 @@ pub fn dynamic_problem() {
 	// println!("Largest: {}", find_largest(nums2));
 }
 
-pub fn dynamic_type_solution() {
+pub fn generic_param_types() {
 	fn find_largest<T: PartialOrd + Copy>(nums: Vec<T>) -> T {
 		let mut largest = nums[0];
 		for num in nums {

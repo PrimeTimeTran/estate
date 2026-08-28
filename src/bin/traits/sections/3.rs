@@ -1,3 +1,10 @@
+pub fn generic_abstraction() {
+	let point1 = Point::new(1.0, 2.0);
+	let point2 = Point::new(4.0, 6.0);
+	println!("Distance: {}", point1.distance(&point2));
+}
+
+
 struct Point<T> {
 	x: T,
 	y: T,
@@ -39,8 +46,3 @@ impl<T: Mathable> Point<T> {
 	}
 }
 
-pub fn three() {
-	let point1 = Point::new(1.0, 2.0);
-	let point2 = Point::new(4.0, 6.0);
-	println!("Distance: {}", point1.distance(&point2));
-}

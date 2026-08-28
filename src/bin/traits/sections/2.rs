@@ -1,6 +1,6 @@
 use std::vec;
 
-pub fn two() {
+pub fn constraints() {
 	println!("We want to share functionality between two different types.");
 	let nums = vec![1, 2, 3, 4, 5];
 	let mut largest = nums[0];
