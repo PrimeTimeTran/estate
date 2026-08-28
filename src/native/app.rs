@@ -236,6 +236,7 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 				let mut ctx = AppContext {
 					input: VeInputState::default(),
 					app: &mut self.app,
+					last_revision: 0,
 					// monitor: &mut monitor_native::NativeMonitor::new().unwrap(),
 				};
 				if let Err(e) = window.window.draw(&mut ctx) {

@@ -21,16 +21,12 @@ pub(crate) mod ve;
 #[cfg(feature = "native")]
 pub(crate) mod event_channel;
 
-// #[cfg(feature = "native")]
 pub(crate) mod context;
-// #[cfg(feature = "native")]
 pub use context::*;
-
-// #[cfg(feature = "native")]
-// pub(crate) mod state_native;
 
 #[path = "modules/monitor.rs"]
 pub(crate) mod monitor;
+
 #[cfg(not(target_arch = "wasm32"))]
 #[path = "modules/monitor_native.rs"]
 pub(crate) mod monitor_native;

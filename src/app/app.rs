@@ -11,6 +11,9 @@ impl<R: Runtime> App<R> {
 	pub(crate) fn new(engine: model::EstateEngine<R>) -> anyhow::Result<Self> {
 		Ok(Self { engine })
 	}
+	pub fn runtime(&self) -> &R {
+		&self.engine.runtime
+	}
 }
 
 impl<R: Runtime> App<R> {

@@ -17,7 +17,6 @@ impl<'a> NativeAppContext<'a> {
 	#[cfg(not(target_arch = "wasm32"))]
 	pub fn poll_state(&mut self) -> bool {
 		todo!("")
-		// self.monitor.poll()
 	}
 }
 
@@ -65,6 +64,9 @@ impl Runtime for NativeRuntime {
 	fn save(&self, state: &EstateState) -> anyhow::Result<()> {
 		self.store.save(state)
 	}
+	// fn poll_state(&mut self) -> bool {
+	// 	self.state.revision()
+	// }
 }
 
 impl NativeRuntime {

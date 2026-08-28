@@ -1,4 +1,4 @@
-use crate::{ app::*, prelude::* };
+use crate::{app::*, prelude::*};
 
 /// Services own long-lived responsibilities and their concurrency/lifecycle;
 ///
@@ -6,21 +6,24 @@ use crate::{ app::*, prelude::* };
 /// changes to the rest of the application; the Runtime owns the services and EventBus,
 /// while the Dispatcher routes those events to consumers.
 pub trait Runtime: Clone + Send + Sync {
+	// fn poll_state(&mut self) -> bool;
 	fn emit(&self, event: Event);
 	fn start_dispatcher(self: &Arc<Self>);
 	fn state(&self) -> &RuntimeState;
 	fn save(&self, state: &EstateState) -> anyhow::Result<()>;
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct RuntimeState {
-	pub state: Arc<RwLock<EstateState>>,
+	state: Arc<RwLock<EstateState>>,
+	revision: AtomicU64,
 }
 
 impl RuntimeState {
 	pub fn new(state: EstateState) -> Self {
 		Self {
 			state: Arc::new(RwLock::new(state)),
+			revision: AtomicU64::new(0),
 		}
 	}
 
@@ -29,6 +32,11 @@ impl RuntimeState {
 	}
 
 	pub fn write(&self) -> std::sync::RwLockWriteGuard<'_, EstateState> {
+		self.revision.fetch_add(1, Ordering::Relaxed);
 		self.state.write().expect("RuntimeState lock poisoned")
+	}
+
+	pub fn revision(&self) -> u64 {
+		self.revision.load(Ordering::Relaxed)
 	}
 }

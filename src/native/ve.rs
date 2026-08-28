@@ -1364,7 +1364,7 @@ impl WaterfallChart {
 }
 impl<R: Runtime> Veable<R> for WaterfallChart {
 	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, R>) {
-		if ctx.poll_state() {
+		if ctx.state_changed() {
 			ui.ctx().request_repaint();
 		}
 		ui.heading("Job History");
