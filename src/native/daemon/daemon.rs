@@ -1,5 +1,5 @@
 use crate::{
-	app::{Runtime, *},
+	app::{Runtime, event, *},
 	// app::{ *, modules::runtime::Runtime },
 	native::daemon::{DocCompiler, NativeRuntime},
 	prelude::*,
@@ -89,10 +89,14 @@ impl<R: Runtime> Daemon<R> {
 	}
 	pub async fn run_foreground(&mut self) -> Result<()> {
 		tracing::info!("daemon running in foreground");
-		self.runtime.emit(Event::daemon(EventKind::DaemonStarted));
+		self
+			.runtime
+			.emit(Event::daemon(event::EventKind::DaemonStarted));
 		self.shutdown_token.cancelled().await;
 		tracing::info!("daemon stopped");
-		self.runtime.emit(Event::daemon(EventKind::DaemonStopped));
+		self
+			.runtime
+			.emit(Event::daemon(event::EventKind::DaemonStopped));
 
 		Ok(())
 	}

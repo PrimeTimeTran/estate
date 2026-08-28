@@ -7,7 +7,7 @@
 // | UI representation               | `Task` / `Job` | Shows pending/running/etc.    |
 
 use crate::{app::EstateState, app::*, native::agent::AgentContext, prelude::*};
-use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use notify::{Event, EventKind};
 
 #[derive(Debug, Clone, Eq, Deserialize, PartialEq, Serialize)]
 pub struct Task {
@@ -106,36 +106,28 @@ impl TaskManager {
 impl TaskManager {
 	pub fn create(&mut self, kind: TaskKind) -> TaskId {
 		let id = Uuid::new_v4();
-
 		let task = Task {
 			id,
 			name: kind.name(),
 			kind,
 			status: TaskStatus::Pending,
 		};
-
 		self.state.tasks.insert(id, task);
 		self.state.dirty = true;
-
 		id
 	}
-
 	pub fn get(&self, id: TaskId) -> Option<&Task> {
 		self.state.tasks.get(&id)
 	}
-
 	fn get_mut(&mut self, id: TaskId) -> Option<&mut Task> {
 		self.state.tasks.get_mut(&id)
 	}
-
 	pub fn count(&self) -> usize {
 		self.state.tasks.len()
 	}
-
 	pub fn list(&self) -> impl Iterator<Item = &Task> {
 		self.state.tasks.values()
 	}
-
 	pub fn set_status(&mut self, id: TaskId, status: TaskStatus) -> Result<()> {
 		let task = self
 			.state
@@ -147,11 +139,9 @@ impl TaskManager {
 
 		Ok(())
 	}
-
 	pub fn save(&mut self) -> Result<()> {
 		todo!("save")
 	}
-
 	pub fn clear(&mut self) -> bool {
 		if self.state.tasks.is_empty() {
 			return false;
@@ -161,7 +151,6 @@ impl TaskManager {
 		self.state.dirty = true;
 		true
 	}
-
 	pub fn delete(&mut self, id: TaskId) -> Option<Task> {
 		let task = self.state.tasks.remove(&id);
 

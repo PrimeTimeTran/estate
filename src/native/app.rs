@@ -1,5 +1,5 @@
 use crate::{
-	app::{App, Runtime, model::EstateEngine, *},
+	app::{self, App, Runtime, event::*, model::EstateEngine, *},
 	native::{runtime::NativeRuntime, screens::*, *},
 	prelude::*,
 };
@@ -17,7 +17,6 @@ use winit::{
 pub struct NativeApp {
 	pub app: App<NativeRuntime>,
 	pub windows: Vec<AppWindow>,
-
 	clock_running: Arc<AtomicBool>,
 	daemon_tx: mpsc::Sender<DaemonCommand>,
 	hotkey_manager: GlobalHotkeys,
@@ -375,7 +374,7 @@ impl NativeApp {
 			.app
 			.engine
 			.runtime
-			.emit(Event::app(EventKind::TaskRequested {
+			.emit(Event::app(app::EventKind::TaskRequested {
 				request: TaskRequest::Create(TaskKind::SyncBookmarks),
 			}));
 	}
@@ -384,7 +383,7 @@ impl NativeApp {
 			.app
 			.engine
 			.runtime
-			.emit(Event::app(EventKind::CommandExecuted {
+			.emit(Event::app(app::EventKind::CommandExecuted {
 				command: "task_list".into(),
 			}));
 	}
@@ -393,7 +392,7 @@ impl NativeApp {
 			.app
 			.engine
 			.runtime
-			.emit(Event::app(EventKind::CommandExecuted {
+			.emit(Event::app(app::EventKind::CommandExecuted {
 				command: "task_clear".into(),
 			}));
 	}

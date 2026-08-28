@@ -27,7 +27,7 @@ pub fn single_type_param() {
 
 pub fn dynamic_problem() {
 	let nums1 = vec![1, 2, 3];
-	let ums2 = vec![1.0, 2.0, 3.0];
+	let nums2 = vec![1.0, 2.0, 3.0];
 	println!("Largest: {}", find_largest(nums1));
 	// Unfortunately this doesn't work.
 	// We could define a float impl but that's annoying

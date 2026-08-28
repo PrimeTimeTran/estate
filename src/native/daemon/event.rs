@@ -1,5 +1,8 @@
-use crate::{ app::{ * }, prelude::* };
 use crate::app::modules::runtime::Runtime;
+use crate::{
+	app::{event, *},
+	prelude::*,
+};
 
 // Events = facts that happened
 // Handlers = reactions to facts
@@ -133,7 +136,10 @@ impl EventDispatcher {
 			handlers: Vec::new(),
 		}
 	}
-	pub fn register<H>(&mut self, handler: H) where H: EventHandler + 'static {
+	pub fn register<H>(&mut self, handler: H)
+	where
+		H: EventHandler + 'static,
+	{
 		self.handlers.push(Box::new(handler));
 	}
 	pub async fn run(self, mut rx: broadcast::Receiver<Event>, runtime: NativeRuntime) {
@@ -152,9 +158,11 @@ pub struct FileWatcherHandler;
 #[async_trait::async_trait]
 impl EventHandler for FileWatcherHandler {
 	async fn handle(&self, event: &Event, runtime: &NativeRuntime) {
-		if let EventKind::FileModified { inode, path } = &event.kind {
+		if let event::EventKind::FileModified { inode, path } = &event.kind {
 			tracing::info!("📡 FileWatcherHandler handle {:?} ({:?})", event, inode);
-			runtime.emit(Event::daemon(EventKind::IndexUpdated { files_changed: 1 }));
+			runtime.emit(Event::daemon(event::EventKind::IndexUpdated {
+				files_changed: 1,
+			}));
 		}
 	}
 }
@@ -163,7 +171,7 @@ pub struct TaskHandler;
 impl EventHandler for TaskHandler {
 	async fn handle(&self, event: &Event, runtime: &NativeRuntime) {
 		tracing::info!("📡 EventHandler.handle {:?}", event);
-		let EventKind::TaskRequested { request } = &event.kind else {
+		let event::EventKind::TaskRequested { request } = &event.kind else {
 			return;
 		};
 		let task_id = match request {
@@ -174,12 +182,10 @@ impl EventHandler for TaskHandler {
 				// let job_id = tasks.create_job(task);
 				let task_id = tasks.create(kind.clone());
 				// let job_id = tasks.start_job(task_id);
-				runtime.emit(
-					Event::daemon(EventKind::TaskCreated {
-						task_id: task,
-						name: kind.name(),
-					})
-				);
+				runtime.emit(Event::daemon(event::EventKind::TaskCreated {
+					task_id: task,
+					name: kind.name(),
+				}));
 				task
 			}
 			TaskRequest::Run(task_id) => *task_id,
@@ -202,7 +208,7 @@ impl EventHandler for TaskHandler {
 			// 	return;
 			// }
 		}
-		runtime.emit(Event::daemon(EventKind::TaskStarted { task_id }));
+		runtime.emit(Event::daemon(event::EventKind::TaskStarted { task_id }));
 		let runtime = runtime.clone();
 		tokio::spawn(async move {
 			tracing::info!(
@@ -213,15 +219,13 @@ impl EventHandler for TaskHandler {
 			match TaskRunner::execute(task.clone()).await {
 				Ok(()) => {
 					tracing::info!("TaskHandler match TaskRunner::execute {:?}", task);
-					runtime.emit(Event::daemon(EventKind::TaskCompleted { task_id }));
+					runtime.emit(Event::daemon(event::EventKind::TaskCompleted { task_id }));
 				}
 				Err(error) => {
-					runtime.emit(
-						Event::daemon(EventKind::TaskFailed {
-							task_id,
-							error: error.to_string(),
-						})
-					);
+					runtime.emit(Event::daemon(event::EventKind::TaskFailed {
+						task_id,
+						error: error.to_string(),
+					}));
 				}
 			}
 		});
@@ -237,18 +241,18 @@ impl EventHandler for StateHandler {
 		let snapshot = {
 			let mut state = runtime.state.write();
 			match &event.kind {
-				EventKind::DaemonStarted => {
+				event::EventKind::DaemonStarted => {
 					state.starts += 1;
 					state.status_checks += 1;
 					state.started_at = event.timestamp;
 				}
-				EventKind::StatusRequested => {
+				event::EventKind::StatusRequested => {
 					state.status_checks += 1;
 				}
-				EventKind::IndexUpdated { files_changed } => {
+				event::EventKind::IndexUpdated { files_changed } => {
 					state.files_indexed += files_changed;
 				}
-				EventKind::TaskCreated { task_id, name } => {
+				event::EventKind::TaskCreated { task_id, name } => {
 					state.tasks_created += 1;
 					state.jobs.push_back(Job {
 						id: *task_id,
@@ -261,13 +265,13 @@ impl EventHandler for StateHandler {
 						completed_at: None,
 					});
 				}
-				EventKind::TaskStarted { task_id } => {
+				event::EventKind::TaskStarted { task_id } => {
 					if let Some(job) = state.jobs.iter_mut().find(|job| job.id == *task_id) {
 						job.status = JobStatus::Running;
 						job.started_at = Some(event.timestamp);
 					}
 				}
-				EventKind::TaskCompleted { task_id } => {
+				event::EventKind::TaskCompleted { task_id } => {
 					state.tasks_completed += 1;
 					if let Some(job) = state.jobs.iter_mut().find(|job| job.id == *task_id) {
 						job.status = JobStatus::Completed;
@@ -275,13 +279,13 @@ impl EventHandler for StateHandler {
 					}
 				}
 
-				EventKind::TaskFailed { task_id, error } => {
+				event::EventKind::TaskFailed { task_id, error } => {
 					if let Some(job) = state.jobs.iter_mut().find(|job| job.id == *task_id) {
 						job.status = JobStatus::Failed;
 						job.completed_at = Some(event.timestamp);
 					}
 				}
-				EventKind::DaemonStopped => {
+				event::EventKind::DaemonStopped => {
 					let run_duration = event.timestamp.saturating_sub(state.started_at);
 					state.longest_run = state.longest_run.max(run_duration);
 				}
@@ -300,18 +304,16 @@ pub struct CommandHandler;
 impl EventHandler for CommandHandler {
 	async fn handle(&self, event: &Event, runtime: &NativeRuntime) {
 		tracing::info!("CommandHandler handler {:?}", event);
-		let EventKind::CommandExecuted { command } = &event.kind else {
+		let event::EventKind::CommandExecuted { command } = &event.kind else {
 			tracing::info!("CommandHandler handle {:?}", event);
 			return;
 		};
 		match command.as_str() {
 			"task_create" => {
 				tracing::info!("CommandHandler task_create {:?}", event);
-				runtime.emit(
-					Event::app(EventKind::TaskRequested {
-						request: TaskRequest::Create(TaskKind::SyncBookmarks),
-					})
-				);
+				runtime.emit(Event::app(event::EventKind::TaskRequested {
+					request: TaskRequest::Create(TaskKind::SyncBookmarks),
+				}));
 			}
 			"task_list" => {
 				let tasks = runtime.tasks.read().unwrap();
@@ -336,42 +338,34 @@ impl EventHandler for CommandHandler {
 				println!("events processed: {}", state.events_processed);
 				println!("longest run:      {}", state.longest_run);
 				println!("started at:       {}", state.started_at);
-				runtime.emit(Event::daemon(EventKind::StatusRequested));
+				runtime.emit(Event::daemon(event::EventKind::StatusRequested));
 			}
 			"task_clear" => {
 				{
 					let mut tasks = runtime.tasks.write().unwrap();
 					tasks.clear();
 				}
-				runtime.emit(Event::daemon(EventKind::TasksCleared));
+				runtime.emit(Event::daemon(event::EventKind::TasksCleared));
 			}
 			"dev_info" => {
-				runtime.emit(
-					Event::daemon(EventKind::TaskRequested {
-						request: TaskRequest::Create(TaskKind::BuildEstatePrototype),
-					})
-				);
+				runtime.emit(Event::daemon(event::EventKind::TaskRequested {
+					request: TaskRequest::Create(TaskKind::BuildEstatePrototype),
+				}));
 			}
 			"rebuild_index" => {
-				runtime.emit(
-					Event::daemon(EventKind::TaskRequested {
-						request: TaskRequest::Create(TaskKind::RebuildIndex),
-					})
-				);
+				runtime.emit(Event::daemon(event::EventKind::TaskRequested {
+					request: TaskRequest::Create(TaskKind::RebuildIndex),
+				}));
 			}
 			"sync_bookmarks" => {
-				runtime.emit(
-					Event::daemon(EventKind::TaskRequested {
-						request: TaskRequest::Create(TaskKind::SyncBookmarks),
-					})
-				);
+				runtime.emit(Event::daemon(event::EventKind::TaskRequested {
+					request: TaskRequest::Create(TaskKind::SyncBookmarks),
+				}));
 			}
 			"generate_dashboard" => {
-				runtime.emit(
-					Event::daemon(EventKind::TaskRequested {
-						request: TaskRequest::Create(TaskKind::GenerateView("dashboard".into())),
-					})
-				);
+				runtime.emit(Event::daemon(event::EventKind::TaskRequested {
+					request: TaskRequest::Create(TaskKind::GenerateView("dashboard".into())),
+				}));
 			}
 			_ => {
 				println!("⚠️ unknown command: {command}");

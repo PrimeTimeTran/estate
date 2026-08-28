@@ -9,7 +9,6 @@ pub static REDIRECTING_SCROLL: AtomicBool = AtomicBool::new(false);
 pub static SCROLL_STATE: OnceLock<Mutex<ScrollRedirectState>> = OnceLock::new();
 pub static SHIFT_HELD: AtomicBool = AtomicBool::new(false);
 pub static TELEPORT_RIGHT: AtomicBool = AtomicBool::new(false);
-
 pub static CURSOR_INSET: f64 = 0.125;
 
 pub fn target_position(bounds: CGRect, target: ScreenPosition, y: f64) -> CGPoint {
