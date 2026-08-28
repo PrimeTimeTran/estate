@@ -1,7 +1,7 @@
 pub fn associated_types() {
-	let point1 = Point::new("1.0", "2.0");
-	let point2 = Point::new("4.0", "6.0");
-	println!("Distance: {}", point1.distance(&point2));
+	let p1 = Point::new("1.0", "2.0");
+	let p2 = Point::new("4.0", "6.0");
+	println!("Distance: {}", p1.distance(&p2));
 }
 
 

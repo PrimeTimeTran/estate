@@ -1,7 +1,10 @@
+use crate::helpers::*;
+
 pub fn generic_abstraction() {
-	let point1 = Point::new(1.0, 2.0);
-	let point2 = Point::new(4.0, 6.0);
-	println!("Distance: {}", point1.distance(&point2));
+	section!("3. Generic Abstractions");
+	let p1 = Point::new(1.0, 2.0);
+	let p2 = Point::new(4.0, 6.0);
+	println!("Distance: {}", p1.distance(&p2));
 }
 
 struct Point<T> {
@@ -12,6 +15,14 @@ struct Point<T> {
 impl<T> Point<T> {
 	fn new(x: T, y: T) -> Self {
 		Self { x, y }
+	}
+}
+
+impl<T: Mathable> Point<T> {
+	fn distance(&self, other: &Point<T>) -> T {
+		let dx = self.x.sub(other.x);
+		let dy = self.y.sub(other.y);
+		dx.mul(dx).add(dy.mul(dy)).sqrt()
 	}
 }
 
@@ -36,12 +47,3 @@ impl Mathable for f64 {
 		self.sqrt()
 	}
 }
-
-impl<T: Mathable> Point<T> {
-	fn distance(&self, other: &Point<T>) -> T {
-		let dx = self.x.sub(other.x);
-		let dy = self.y.sub(other.y);
-		dx.mul(dx).add(dy.mul(dy)).sqrt()
-	}
-}
-
