@@ -16,6 +16,7 @@ pub(crate) mod modules;
 pub(crate) mod app;
 pub(crate) mod state;
 pub(crate) mod event;
+
 #[cfg(feature = "native")]
 pub(crate) mod event_channel;
 
@@ -24,8 +25,8 @@ pub(crate) mod context;
 #[cfg(feature = "native")]
 pub use context::*;
 
-#[cfg(feature = "native")]
-pub(crate) mod state_native;
+// #[cfg(feature = "native")]
+// pub(crate) mod state_native;
 
 #[path = "modules/monitor.rs"]
 pub(crate) mod monitor;

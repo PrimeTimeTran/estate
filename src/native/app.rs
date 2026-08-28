@@ -1,36 +1,35 @@
 use crate::{
+	app::{ Runtime, App, model::EstateEngine, * },
 	native::{ *, runtime::{ NativeRuntime } },
 	prelude::*,
-	app::{ Runtime, App, model::EstateEngine, * },
 };
 
 use signal_hook::{ consts::SIGINT, iterator::Signals };
 use tray_icon::{ TrayIcon, TrayIconBuilder, menu::MenuEvent };
 use winit::{
 	application::ApplicationHandler,
-	event::WindowEvent,
 	event_loop::{ ActiveEventLoop, EventLoop, EventLoopProxy },
+	event::WindowEvent,
 	platform::macos::{ ActivationPolicy, EventLoopBuilderExtMacOS },
 	window::WindowId,
 };
 
 pub struct NativeApp {
 	pub app: App<NativeRuntime>,
-	monitor: monitor_native::NativeMonitor,
-	last_state_revision: u64,
-	tray: Option<TrayIcon>,
-	menu: Option<TrayMenu>,
+	pub windows: Vec<AppWindow>,
+
+	clock_running: Arc<AtomicBool>,
 	daemon_tx: mpsc::Sender<DaemonCommand>,
 	hotkey_manager: GlobalHotkeys,
+	last_state_revision: u64,
+	menu: Option<TrayMenu>,
+	monitor: monitor_native::NativeMonitor,
 	scroll_tray: Option<TrayIcon>,
-	pub windows: Vec<AppWindow>,
-	clock_running: Arc<AtomicBool>,
+	tray: Option<TrayIcon>,
 }
 impl NativeApp {
 	pub fn new() -> anyhow::Result<Self> {
-		// let (sender, receiver) = event_channel::channel::<i32>(10);
 		let (daemon_tx, daemon_rx) = mpsc::channel(100);
-
 		let runtime = NativeRuntime::new()?;
 		let engine = EstateEngine::new(runtime)?;
 		let app = App::new(engine)?;
@@ -119,8 +118,6 @@ impl NativeApp {
 					Some(DaemonCommand::Stop) => {
 						tracing::info!("daemon stop requested");
 						shutdown_token.cancel();
-						// Wait for run_foreground() to observe the
-						// cancellation and emit DaemonStopped.
 						match daemon_task.await {
 							Ok(Ok(())) => {
 								tracing::info!("daemon stopped cleanly");
@@ -217,7 +214,7 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 			.find(|window| window.window.instance.id() == window_id) else {
 			return;
 		};
-		let response = window.window.egui_state.on_window_event(&window.window.instance, &event);
+		let response = window.window.gui_state.on_window_event(&window.window.instance, &event);
 		if response.repaint {
 			window.window.instance.request_redraw();
 		}

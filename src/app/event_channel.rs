@@ -1,5 +1,3 @@
-// app/event/channel.rs
-
 use tokio::sync::mpsc;
 
 pub fn channel<T>(capacity: usize) -> (EventSender<T>, EventReceiver<T>) {

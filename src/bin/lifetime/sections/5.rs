@@ -22,7 +22,12 @@ pub fn structs_with_lifetimes() {
 	struct_with_borrow();
 	tuple_struct();
 	construct_borrowed();
-	// construct_borrowed();
+	one_struct_lifetime();
+	multiple_struct_lifetimes();
+	lifetime_outlives();
+	lifetime_constraint_direction();
+	constrained_struct();
+	constraint_syntax();
 }
 
 // -----------------------------------------------------------------------------
@@ -81,6 +86,7 @@ fn struct_with_borrow() {
 
 // -----------------------------------------------------------------------------
 // 5.2 A STRUCT LIFETIME PARAMETER (Tuple)
+// 
 // So the struct creates a distinct type around the underlying value.
 // -----------------------------------------------------------------------------
 //
@@ -246,74 +252,403 @@ struct IndependentlyBorrowed<'a, 'b> {
 // valid durations.
 
 // -----------------------------------------------------------------------------
-// 5.7 STRUCT LIFETIME CONSTRAINTS
+// 5.7 STRUCT LIFETIME CONSTRAINTS: ONE LIFETIME
 // -----------------------------------------------------------------------------
 //
-// This is where the syntax becomes important.
+// Start with the simplest case:
 //
-// Consider:
-//
-//     struct Foo<'a> {
+//     struct Borrowed<'a> {
 //         value: &'a i32,
 //     }
 //
-// The relationship is:
+// There is one lifetime:
 //
-//     Foo<'a>
-//        │
-//        └── contains &'a i32
+//     'a
 //
-// Therefore:
-//
-//     the referenced i32 must remain valid for `'a`.
+// The struct contains a reference that is valid for `'a`.
 //
 //
+//     Borrowed<'a>
+//          │
+//          └── value: &'a i32
 //
-// A lifetime parameter can also be constrained:
+// The important relationship is:
+//
+//     reference lifetime
+//            │
+//            ▼
+//           'a
+//
+// The referenced value must remain valid for as long as that
+// reference is required to be valid.
+
+fn one_struct_lifetime() {
+	#[derive(Debug)]
+	struct Borrowed<'a> {
+		value: &'a i32,
+	}
+
+	let x = 42;
+
+	let borrowed = Borrowed {
+		value: &x,
+	};
+
+	println!("borrowed: {:?}", borrowed);
+
+	// `borrowed.value` borrows `x`.
+	//
+	// Therefore `x` must remain valid while this borrow is used.
+	println!("value: {}", borrowed.value);
+}
+
+// -----------------------------------------------------------------------------
+// 5.8 STRUCTS WITH MULTIPLE LIFETIMES
+// -----------------------------------------------------------------------------
+//
+// A struct can contain references with DIFFERENT lifetimes.
+//
+//     struct Pair<'a, 'b> {
+//         first: &'a i32,
+//         second: &'b i32,
+//     }
+//
+// This means:
+//
+//     first  ──> &'a i32
+//     second ──> &'b i32
+//
+// `'a` and `'b` are independent.
+//
+// There is initially NO relationship saying:
+//
+//     'a == 'b'
+//
+// or:
 //
 //     'a: 'b
 //
-// Read this as:
+// or:
+//
+//     'b: 'a
+//
+// They are simply two separate lifetimes.
+
+fn multiple_struct_lifetimes() {
+	#[derive(Debug)]
+	struct Pair<'a, 'b> {
+		first: &'a i32,
+		second: &'b i32,
+	}
+
+	let first = 10;
+	let second = 20;
+
+	let pair = Pair {
+		first: &first,
+		second: &second,
+	};
+
+	println!("pair: {:?}", pair);
+
+	// `first` and `second` can have different lifetimes.
+	//
+	// The struct does not require one to outlive the other.
+	println!("first: {}", pair.first);
+	println!("second: {}", pair.second);
+}
+
+// -----------------------------------------------------------------------------
+// 5.9 WHY WOULD WE NEED A LIFETIME CONSTRAINT?
+// -----------------------------------------------------------------------------
+//
+// Now we have:
+//
+//     'a
+//     'b
+//
+// But sometimes we need to tell Rust that one lifetime lasts
+// at least as long as another.
+//
+// The syntax is:
+//
+//     'a: 'b
+//
+// Read it as:
 //
 //     "'a outlives 'b"
 //
-// Meaning:
+// Or:
 //
-//     'a lasts at least as long as 'b.
+//     "'a lasts at least as long as 'b."
 //
 //
 //
-// For example:
-//
-//     struct Foo<'a, 'b>
-//     where
-//         'a: 'b,
-//     {
-//         x: &'a i32,
-//         y: &'b i32,
-//     }
-//
-// This says:
+// This gives us an ordering:
 //
 //     'a
-//     ├───────────────────────────────┐
-//     │                               │
-//     │      'b                       │
-//     │      ├───────────────┤        │
-//     │      │               │        │
-//     └──────┴───────────────┴────────┘
+//     ├─────────────────────────────┐
+//     │                             │
+//     │     'b                      │
+//     │     ├──────────────┤        │
+//     │     │              │        │
+//     └─────┴──────────────┴────────┘
 //
-// `'a` must outlive `'b`.
+// `'a` is the longer lifetime.
+// `'b` is the shorter lifetime.
 //
+// IMPORTANT:
 //
-// The constraint does NOT mean that the references are the same.
-// It only establishes an ordering between their lifetimes.
+//     'a: 'b
+//
+// does NOT:
+//
+//     - extend `'b`
+//     - extend `'a`
+//     - keep a value alive
+//     - prevent a value from being dropped
+//
+// It only establishes a relationship between lifetimes that
+// already exist.
+
+fn lifetime_outlives() {
+	// This function demonstrates the useful consequence of
+	// an outlives relationship.
+	//
+	// If `'a` outlives `'b`, then a reference valid for `'a`
+	// can also be used where a reference valid for `'b` is required.
+
+	fn shorten<'a, 'b>(value: &'a i32) -> &'b i32 where 'a: 'b {
+		// `value` is valid for `'a`.
+		//
+		// `'a` is guaranteed to last at least as long as `'b`.
+		//
+		// Therefore it is safe to use this reference for `'b`.
+		value
+	}
+
+	let long_lived = 42;
+
+	{
+		let result = shorten(&long_lived);
+
+		println!("result: {result}");
+
+		// Here Rust can choose a shorter `'b` for `result`.
+		//
+		// The important relationship is:
+		//
+		//     lifetime(long_lived)
+		//              │
+		//              │  'a
+		//              │
+		//              ├───────────────────────┐
+		//              │                       │
+		//              │       'b              │
+		//              │       ├────────┤      │
+		//              └───────┴────────┴──────┘
+		//
+		// Since `'a: 'b`, the reference valid for `'a` is also
+		// valid for the shorter `'b`.
+	}
+
+	// `long_lived` is still alive here.
+	println!("long_lived: {long_lived}");
+}
 
 // -----------------------------------------------------------------------------
-// 5.8 CONSTRAINTS IN A STRUCT
+// 5.10 THE DIRECTION OF THE CONSTRAINT
 // -----------------------------------------------------------------------------
 //
-// We can therefore think of this:
+// The direction is important.
+//
+//     'a: 'b
+//
+// means:
+//
+//     'a OUTLIVES 'b
+//
+// Think:
+//
+//     LONGER
+//       │
+//       ▼
+//      'a
+//       │
+//       │ outlives
+//       ▼
+//      'b
+//     SHORTER
+//
+// Therefore:
+//
+//     &'a T
+//
+// can safely be used where:
+//
+//     &'b T
+//
+// is required.
+//
+// But the reverse is NOT guaranteed.
+//
+// A reference that is only valid for `'b` cannot automatically
+// be treated as valid for the longer `'a`.
+//
+//
+//
+// This is the core reason lifetime constraints exist:
+//
+//     LONGER lifetime
+//            │
+//            │ can satisfy
+//            ▼
+//     SHORTER lifetime
+//
+// but:
+//
+//     SHORTER lifetime
+//            │
+//            X cannot satisfy
+//            ▼
+//     LONGER lifetime
+
+fn lifetime_constraint_direction() {
+	fn use_shorter<'a, 'b>(value: &'a i32) where 'a: 'b {
+		// `'a` is guaranteed to outlive `'b`.
+		//
+		// Therefore the `'a` reference can be used for `'b`.
+		let shorter: &'b i32 = value;
+
+		println!("shorter: {shorter}");
+	}
+
+	let value = 100;
+
+	use_shorter(&value);
+
+	println!("value: {value}");
+}
+
+// -----------------------------------------------------------------------------
+// 5.11 APPLYING THE CONSTRAINT TO A STRUCT
+// -----------------------------------------------------------------------------
+//
+// Now bring the same idea back to structs.
+//
+// We can write:
+//
+//     struct Borrowed<'a, 'b>
+//     where
+//         'a: 'b,
+//     {
+//         long: &'a i32,
+//         short: &'b i32,
+//     }
+//
+// There are now TWO independent references:
+//
+//     long  ──> &'a i32
+//     short ──> &'b i32
+//
+// PLUS one relationship:
+//
+//     'a: 'b
+//
+// So the complete meaning is:
+//
+//     "Borrowed contains one reference valid for `'a`,
+//      another reference valid for `'b`,
+//      and `'a` is guaranteed to outlive `'b`."
+//
+//
+//
+// This:
+//
+//     'a: 'b
+//
+// does NOT mean:
+//
+//     long == short
+//
+// and it does NOT mean:
+//
+//     both references have the same lifetime.
+//
+// It only means:
+//
+//     'a is at least as long as 'b.
+//
+//
+//
+// The progression is:
+//
+//     1. &'a T
+//        "this reference has lifetime `'a`"
+//
+//     2. &'a T + &'b T
+//        "these references have potentially different lifetimes"
+//
+//     3. 'a: 'b
+//        "we additionally know that `'a` lasts at least as long
+//         as `'b`."
+
+fn constrained_struct() {
+	#[derive(Debug)]
+	struct Borrowed<'a, 'b> where 'a: 'b {
+		long: &'a i32,
+		short: &'b i32,
+	}
+
+	let long_lived = 10;
+
+	{
+		let short_lived = 20;
+
+		let borrowed = Borrowed {
+			long: &long_lived,
+			short: &short_lived,
+		};
+
+		println!("borrowed: {:?}", borrowed);
+
+		println!("long: {}", borrowed.long);
+		println!("short: {}", borrowed.short);
+
+		// At this point:
+		//
+		//     long_lived
+		//         │
+		//         │
+		//         ▼
+		//     borrowed.long
+		//
+		//     short_lived
+		//         │
+		//         │
+		//         ▼
+		//     borrowed.short
+		//
+		// `'a` is constrained to outlive `'b`.
+		//
+		// The important thing is that the compiler now has an
+		// ordering relationship it can use when reasoning about
+		// these references.
+	}
+
+	// `short_lived` is gone here.
+	//
+	// But `long_lived` is still alive.
+	println!("long_lived: {long_lived}");
+}
+
+// -----------------------------------------------------------------------------
+// 5.12 CONSTRAINT SYNTAX
+// -----------------------------------------------------------------------------
+//
+// The same lifetime relationship can be written in two places.
+//
+// `where` clause:
 //
 //     struct Foo<'a, 'b>
 //     where
@@ -323,78 +658,52 @@ struct IndependentlyBorrowed<'a, 'b> {
 //         y: &'b i32,
 //     }
 //
-// as saying:
+// Or inline:
 //
-//     x ──borrowed for──> 'a
-//     y ──borrowed for──> 'b
-//
-//     'a ────────────────> 'b
-//          outlives
-//
-// This gives the compiler enough information to reason about
-// which reference remains valid for longer.
-
-// -----------------------------------------------------------------------------
-// 5.9 CONSTRAINTS CAN ALSO APPEAR INLINE
-// -----------------------------------------------------------------------------
-//
-// Lifetime bounds can be written in a `where` clause or directly
-// on the parameter list.
-//
-// These describe the same relationship:
-//
-//     fn example<'a, 'b>(x: &'a i32, y: &'b i32)
-//     where
-//         'a: 'b
-//     {
+//     struct Foo<'a: 'b, 'b> {
+//         x: &'a i32,
+//         y: &'b i32,
 //     }
 //
+// Both mean:
 //
+//     'a: 'b
 //
-// and:
-//
-//     fn example<'a: 'b, 'b>(x: &'a i32, y: &'b i32)
-//     {
-//     }
-//
-// The `where` form is often easier to read once constraints become
-// more complicated.
+// The `where` form is often easier to read when there are
+// multiple or complicated constraints.
+
+fn constraint_syntax() {
+	#[derive(Debug)]
+	struct WhereForm<'a, 'b> where 'a: 'b {
+		long: &'a i32,
+		short: &'b i32,
+	}
+
+	#[derive(Debug)]
+	struct InlineForm<'a: 'b, 'b> {
+		long: &'a i32,
+		short: &'b i32,
+	}
+
+	let x = 1;
+	let y = 2;
+
+	let where_form = WhereForm {
+		long: &x,
+		short: &y,
+	};
+
+	let inline_form = InlineForm {
+		long: &x,
+		short: &y,
+	};
+
+	println!("where form: {:?}", where_form);
+	println!("inline form: {:?}", inline_form);
+}
 
 // -----------------------------------------------------------------------------
-// 5.10 WHAT THE CONSTRAINT ACTUALLY PROTECTS
-// -----------------------------------------------------------------------------
-//
-// The purpose of these constraints is always the same:
-//
-//     prevent a stored reference from becoming dangling.
-//
-// For example, this cannot be allowed:
-//
-//     let borrowed;
-//
-//     {
-//         let x = 10;
-//         borrowed = Borrowed(&x);
-//     }
-//
-// `x` would be dropped here.
-//
-// If `borrowed` remained usable afterward:
-//
-//     borrowed
-//         │
-//         ▼
-//        &x
-//         │
-//         ▼
-//      dropped x
-//
-// we would have a dangling reference.
-//
-// Rust rejects this situation.
-
-// -----------------------------------------------------------------------------
-// 5.11 ENUMS CAN ALSO CONTAIN REFERENCES
+// 5.13 ENUMS CAN ALSO CONTAIN REFERENCES
 // -----------------------------------------------------------------------------
 //
 // The same lifetime rules apply to enums.
@@ -423,7 +732,7 @@ enum Either<'a> {
 // validity of the reference when the `Ref` variant is used.
 
 // -----------------------------------------------------------------------------
-// 5.12 STRUCTS AND ENUMS IN PRACTICE
+// 5.14 STRUCTS AND ENUMS IN PRACTICE
 // -----------------------------------------------------------------------------
 
 fn struct_and_enum_example() {
@@ -453,7 +762,7 @@ fn struct_and_enum_example() {
 }
 
 // -----------------------------------------------------------------------------
-// 5.13 STRUCT LIFETIME VS VALUE LIFETIME
+// 5.15 STRUCT LIFETIME VS VALUE LIFETIME
 // -----------------------------------------------------------------------------
 //
 // It is useful to distinguish:
@@ -489,7 +798,7 @@ fn struct_and_enum_example() {
 // The borrow checker enforces that relationship.
 
 // -----------------------------------------------------------------------------
-// 5.14 MUTATING DATA WHILE A STRUCT BORROWS IT
+// 5.16 MUTATING DATA WHILE A STRUCT BORROWS IT
 // -----------------------------------------------------------------------------
 //
 // A struct containing a reference keeps that borrow alive for
@@ -528,7 +837,7 @@ fn mutation_after_borrow() {
 }
 
 // -----------------------------------------------------------------------------
-// 5.15 EXPLICITLY DROPPING A BORROWED STRUCT
+// 5.17 EXPLICITLY DROPPING A BORROWED STRUCT
 // -----------------------------------------------------------------------------
 //
 // `drop` can be used to consume the struct and end its ownership.
@@ -546,7 +855,7 @@ fn mutation_after_borrow() {
 // so explicit `drop` is usually unnecessary.
 
 // -----------------------------------------------------------------------------
-// 5.16 SELF-REFERENTIAL STRUCTS
+// 5.18 SELF-REFERENTIAL STRUCTS
 // -----------------------------------------------------------------------------
 //
 // A much harder case is a struct that tries to contain:
@@ -572,7 +881,7 @@ fn mutation_after_borrow() {
 // intentionally difficult to construct safely.
 
 // -----------------------------------------------------------------------------
-// 5.17 WHY SELF-REFERENTIAL STRUCTS ARE DIFFICULT
+// 5.19 WHY SELF-REFERENTIAL STRUCTS ARE DIFFICULT
 // -----------------------------------------------------------------------------
 //
 // Imagine:
@@ -616,7 +925,7 @@ fn mutation_after_borrow() {
 // more advanced concepts such as pinning.
 
 // -----------------------------------------------------------------------------
-// 5.18 THE BIG STRUCT LIFETIME RULE
+// 5.20 THE BIG STRUCT LIFETIME RULE
 // -----------------------------------------------------------------------------
 //
 // When a struct stores a reference:

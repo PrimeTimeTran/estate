@@ -7,6 +7,9 @@ pub struct AppContext<'a, R: Runtime> {
 	pub monitor: &'a mut monitor_native::NativeMonitor,
 }
 
+// Param Types
+// - R is type param
+// - 'a is lifetime param
 impl<'a, R: Runtime> AppContext<'a, R> {
 	pub fn state(&self) -> std::sync::RwLockReadGuard<'_, EstateState> {
 		self.app.state()

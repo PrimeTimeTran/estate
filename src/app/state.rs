@@ -28,9 +28,9 @@ impl Default for EstateState {
 		Self {
 			events_processed: 0,
 			files_indexed: 0,
+			longest_run: 0,
 			#[cfg(feature = "native")]
 			jobs: VecDeque::new(),
-			longest_run: 0,
 			revision: 0,
 			started_at: 0,
 			starts: 0,

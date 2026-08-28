@@ -1,7 +1,6 @@
 #[cfg(not(target_arch = "wasm32"))]
-use crate::app::monitor_native::StateMonitor;
 use crate::{
-	app::{event_channel::EventReceiver, *},
+	app::{event_channel::EventReceiver, monitor_native::StateMonitor, *},
 	prelude::*,
 	theme::palette,
 	ui::{chart::*, *},
@@ -1226,7 +1225,7 @@ impl Veable for TaskManager {
 		}
 		if let Some(error) = &self.state.error {
 			ui.heading("Task Manager");
-			ui.colored_label(palette::DANGER, error);
+			ui.colored_label(palette::ERROR, error);
 			ui.label(self.state.state_path.display().to_string());
 			return;
 		}
@@ -1844,144 +1843,5 @@ impl Veable for Sidebar {
 				}
 			}
 		});
-	}
-}
-
-pub struct WaterfallChart;
-impl WaterfallChart {
-	pub fn new() -> Self {
-		Self
-	}
-	pub fn draw_chart<'a>(&self, ui: &mut Ui, jobs: impl Iterator<Item = &'a Job>) {
-		let jobs: Vec<&Job> = jobs.collect();
-
-		if jobs.is_empty() {
-			ui.centered_and_justified(|ui| {
-				ui.label("No job history");
-			});
-			return;
-		}
-
-		let now = EstateState::now();
-
-		// (job, start, end)
-		let mut timed_jobs = Vec::new();
-
-		for job in jobs {
-			let Some(started_at) = job.started_at else {
-				continue;
-			};
-
-			let start = started_at as f64;
-			let end = job.completed_at.unwrap_or(now) as f64;
-
-			timed_jobs.push((job, start, end.max(start + 1.0)));
-		}
-
-		if timed_jobs.is_empty() {
-			ui.centered_and_justified(|ui| {
-				ui.label("No timed jobs");
-			});
-			return;
-		}
-
-		// Sort chronologically so we can pack jobs into the
-		// smallest possible number of horizontal lanes.
-		timed_jobs.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
-
-		// Each lane stores the end time of its last job.
-		let mut lanes: Vec<f64> = Vec::new();
-
-		let mut bars = Vec::with_capacity(timed_jobs.len());
-
-		let mut min_time = f64::MAX;
-		let mut max_time = f64::MIN;
-
-		for (job, start, end) in timed_jobs {
-			min_time = min_time.min(start);
-			max_time = max_time.max(end);
-
-			// Reuse the first lane whose previous job has
-			// already finished.
-			let lane = lanes
-				.iter()
-				.position(|lane_end| *lane_end <= start)
-				.unwrap_or_else(|| {
-					lanes.push(0.0);
-					lanes.len() - 1
-				});
-
-			lanes[lane] = end;
-
-			let duration = end - start;
-
-			bars.push(
-				Bar::new(lane as f64, duration)
-					.horizontal()
-					.base_offset(start)
-					.width(0.7)
-					.name(job.kind.name()),
-			);
-		}
-
-		let padding = ((max_time - min_time) * 0.05).max(1.0);
-
-		let lane_count = lanes.len() as f64;
-
-		Plot::new("job_timeline")
-			.height(280.0)
-			// Horizontal range is time.
-			.include_x(min_time - padding)
-			.include_x(max_time + padding)
-			// Vertical range is ONLY the lanes we actually needed.
-			.include_y(-0.75)
-			.include_y((lane_count - 1.0).max(0.0) + 0.75)
-			.allow_drag(true)
-			.allow_zoom(true)
-			.allow_scroll(true)
-			// Don't allow independent Y-axis zooming.
-			.allow_axis_zoom_drag(false)
-			.show_x(true)
-			.show_y(false)
-			.legend(egui_plot::Legend::default())
-			.x_axis_formatter(|mark, _range| format_timestamp(mark.value))
-			.show(ui, |plot_ui| {
-				plot_ui.bar_chart(BarChart::new("jobs", bars).horizontal());
-			});
-	}
-}
-impl Veable for WaterfallChart {
-	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, NativeRuntime>) {
-		if ctx.poll_state() {
-			ui.ctx().request_repaint();
-		}
-
-		ui.heading("Job History");
-
-		let state = ctx.state();
-
-		self.draw_chart(ui, state.jobs.iter());
-	}
-}
-
-fn format_timestamp(timestamp: f64) -> String {
-	let timestamp = timestamp as u64;
-	let datetime = std::time::UNIX_EPOCH + std::time::Duration::from_secs(timestamp);
-	let datetime: chrono::DateTime<chrono::Local> = datetime.into();
-	datetime.format("%H:%M:%S").to_string()
-}
-pub fn format_duration_ms(ms: u64) -> String {
-	let total_seconds = ms / 1_000;
-	let hours = total_seconds / 3_600;
-	let minutes = (total_seconds % 3_600) / 60;
-	let seconds = total_seconds % 60;
-	let millis = ms % 1_000;
-
-	if hours > 0 {
-		format!("{hours}h {minutes:02}m {seconds:02}s")
-	} else if minutes > 0 {
-		format!("{minutes}m {seconds:02}s")
-	} else {
-		format!("{seconds}.{millis:03}s")
 	}
 }

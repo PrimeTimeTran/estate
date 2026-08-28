@@ -1,87 +1,66 @@
-pub use crate::prelude::*;
+pub use crate::{ app::{ state::StateStore, app::EstateState }, prelude::{ self, * } };
 
-// #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-// #[serde(default)]
-// pub struct EstateState {
-// 	pub revision: u64,
+#[derive(Clone, Debug)]
+pub struct NativeStateStore;
+impl NativeStateStore {
+	pub fn new() -> anyhow::Result<Self> {
+		Ok(Self {})
+	}
+}
 
-// 	pub starts: u64,
-// 	pub longest_run: u64,
-// 	pub status_checks: u64,
-// 	pub started_at: u64,
-// 	pub events_processed: u64,
-// 	pub tasks_completed: u64,
-// 	pub tasks_created: u64,
-// 	pub files_indexed: u64,
-// 	pub jobs: VecDeque<Job>,
-// }
-// impl Default for EstateState {
-// 	fn default() -> Self {
-// 		Self {
-// 			revision: 0,
-// 			jobs: VecDeque::new(),
-// 			starts: 0,
-// 			longest_run: 0,
-// 			status_checks: 0,
-// 			started_at: 0,
-// 			events_processed: 0,
-// 			tasks_completed: 0,
-// 			tasks_created: 0,
-// 			files_indexed: 0,
-// 		}
-// 	}
-// }
-// impl EstateState {
-// 	pub fn save_workspace(path: &PathBuf) {
-// 		println!("💾 save_workspace not implemented yet: {:?}", path);
-// 	}
-// 	pub fn now() -> u64 {
-// 		std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs()
-// 	}
-// }
-// impl EstateState {
-// 	pub fn load_from_path(path: impl AsRef<Path>) -> Result<Self> {
-// 		let contents = fs::read_to_string(path)?;
-// 		Ok(serde_json::from_str(&contents)?)
-// 	}
-// }
+impl StateStore for NativeStateStore {
+	fn load(&self) -> anyhow::Result<EstateState> {
+		let path = prelude::native::resolver::engine_data_dir()?.join("state.json");
 
-// impl EstateState {
-// 	fn path() -> std::io::Result<PathBuf> {
-// 		Ok(engine_data_dir()?.join("state.json"))
-// 	}
-// 	pub fn load() -> Self {
-// 		let path = Self::path().expect("could not resolve daemon state path");
+		if !path.exists() {
+			tracing::warn!("EstateState does not exist: {:?}", path);
+			return Ok(EstateState::default());
+		}
 
-// 		if !path.exists() {
-// 			tracing::warn!("EstateState does not exist: {:?}", path);
-// 			return Self::default();
-// 		}
+		let raw = fs::read_to_string(&path)?;
 
-// 		let raw = fs::read_to_string(&path).expect("failed reading daemon state");
+		if raw.trim().is_empty() {
+			tracing::warn!("EstateState is empty: {:?}", path);
+			return Ok(EstateState::default());
+		}
 
-// 		match serde_json::from_str(&raw) {
-// 			Ok(state) => state,
-// 			Err(error) => {
-// 				tracing::error!(
-//                 %error,
-//                 path = ?path,
-//                 "failed to parse EstateState JSON"
-//             );
+		Ok(serde_json::from_str(&raw)?)
+	}
+	fn save(&self, state: &EstateState) -> anyhow::Result<()> {
+		let path = prelude::native::resolver::engine_data_dir()?.join("state.json");
 
-// 				panic!("EstateState is corrupted");
-// 			}
-// 		}
-// 	}
-// 	pub fn save(state: &Self) {
-// 		let path = Self::path().expect("could not resolve daemon state path");
-// 		tracing::info!("💾 EstateState received: {:?}", path);
-// 		let json = serde_json::to_string_pretty(state).expect("failed serializing daemon state");
-// 		fs::write(path, json).expect("failed writing daemon state");
-// 	}
-// 	// pub fn record_status_check() {
-// 	// 	let mut state = Self::load();
-// 	// 	state.status_checks += 1;
-// 	// 	Self::save(&state);
-// 	// }
-// }
+		let json = serde_json::to_string_pretty(state)?;
+		fs::write(path, json)?;
+
+		Ok(())
+	}
+}
+
+impl EstateState {
+	pub fn load_from_path(path: impl AsRef<Path>) -> Result<Self> {
+		let contents = fs::read_to_string(path)?;
+		Ok(serde_json::from_str(&contents)?)
+	}
+	pub fn path() -> std::io::Result<PathBuf> {
+		Ok(crate::native::resolver::engine_data_dir()?.join("state.json"))
+	}
+	pub fn load_from_disk() -> anyhow::Result<Self> {
+		let path = Self::path()?;
+
+		if !path.exists() {
+			tracing::warn!("EstateState does not exist: {:?}", path);
+			return Ok(Self::default());
+		}
+
+		let raw = fs::read_to_string(&path)?;
+		Ok(serde_json::from_str(&raw)?)
+	}
+
+	pub fn save_to_disk(&self) -> anyhow::Result<()> {
+		let path = Self::path()?;
+		tracing::info!("💾 EstateState saving: {:?}", path);
+		let json = serde_json::to_string_pretty(self)?;
+		fs::write(path, json)?;
+		Ok(())
+	}
+}

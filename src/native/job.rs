@@ -6,7 +6,7 @@
 // | Individual background execution | `Job`          | Has lifecycle/state           |
 // | UI representation               | `Task` / `Job` | Shows pending/running/etc.    |
 
-use crate::{ app::*, app::EstateState, native::agent::AgentContext, prelude::* };
+use crate::{app::EstateState, app::*, native::agent::AgentContext, prelude::*};
 
 #[derive(Debug, Clone, Eq, Deserialize, PartialEq, Serialize)]
 pub struct Task {
@@ -23,15 +23,18 @@ pub struct TaskManagerRuntime {
 }
 impl TaskManagerRuntime {
 	pub fn new(path: &Path) -> anyhow::Result<Self> {
-		use notify::{ Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher };
+		use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 		let (tx, rx) = tokio::sync::mpsc::channel::<()>(1);
-		let mut watcher = RecommendedWatcher::new(move |res: Result<Event, notify::Error>| {
-			if let Ok(event) = res {
-				if matches!(event.kind, EventKind::Modify(_) | EventKind::Create(_)) {
-					let _ = tx.blocking_send(());
+		let mut watcher = RecommendedWatcher::new(
+			move |res: Result<Event, notify::Error>| {
+				if let Ok(event) = res {
+					if matches!(event.kind, EventKind::Modify(_) | EventKind::Create(_)) {
+						let _ = tx.blocking_send(());
+					}
 				}
-			}
-		}, Config::default())?;
+			},
+			Config::default(),
+		)?;
 		if let Some(parent) = path.parent() {
 			watcher.watch(parent, RecursiveMode::NonRecursive)?;
 		}
@@ -57,8 +60,7 @@ pub struct TaskManager {
 
 impl TaskManager {
 	pub fn new() -> Self {
-		// pub fn new() -> anyhow::Result<Self> {
-		let path = PathBuf::from("/Users/future/Library/Application Support/estate/state.json");
+		let path = PathBuf::from(STATE_PATH);
 		Self::from_path(path).unwrap()
 	}
 	pub fn from_path(path: impl Into<PathBuf>) -> anyhow::Result<Self> {
@@ -68,10 +70,7 @@ impl TaskManager {
 			state_path,
 			..Default::default()
 		};
-		let mut manager = Self {
-			runtime,
-			state,
-		};
+		let mut manager = Self { runtime, state };
 		manager.reload();
 
 		Ok(manager)
@@ -82,8 +81,7 @@ impl TaskManager {
 				self.state.state = Some(state);
 				self.state.dirty = false;
 				self.state.error = None;
-				self.state.last_loaded = fs
-					::metadata(&self.state.state_path)
+				self.state.last_loaded = fs::metadata(&self.state.state_path)
 					.and_then(|metadata| metadata.modified())
 					.ok();
 			}
@@ -139,7 +137,11 @@ impl TaskManager {
 	}
 
 	pub fn set_status(&mut self, id: TaskId, status: TaskStatus) -> anyhow::Result<()> {
-		let task = self.state.tasks.get_mut(&id).ok_or_else(|| anyhow::anyhow!("task {id} not found"))?;
+		let task = self
+			.state
+			.tasks
+			.get_mut(&id)
+			.ok_or_else(|| anyhow::anyhow!("task {id} not found"))?;
 
 		task.status = status;
 
@@ -229,7 +231,7 @@ impl TaskResult {
 		task_id: String,
 		ctx: AgentContext,
 		reason: impl Into<String>,
-		summary: Option<String>
+		summary: Option<String>,
 	) -> Self {
 		Self {
 			artifacts: ctx.artifacts,
@@ -245,13 +247,8 @@ impl TaskResult {
 
 #[derive(Debug, Clone)]
 pub enum Artifact {
-	FileRead {
-		path: String,
-		content: String,
-	},
-	FileWrite {
-		path: String,
-	},
+	FileRead { path: String, content: String },
+	FileWrite { path: String },
 	Observation(String),
 	ToolOutput(String),
 }

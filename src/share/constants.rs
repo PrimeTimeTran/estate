@@ -61,3 +61,4 @@ pub const PIPELINE_ESTATE_WORKSPACE: &str =
 pub const SCHEMA_VERSION: u32 = 1;
 pub const SOCKET_PATH: &str = "/tmp/estate-daemon.sock";
 pub const TEMPLATE_PATH: &str = "/Users/future/KB/project/crates/estate/template";
+pub const STATE_PATH: &str = "/Users/future/Library/Application Support/estate/state.json";

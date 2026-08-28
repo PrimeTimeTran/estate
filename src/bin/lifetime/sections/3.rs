@@ -27,26 +27,37 @@ pub fn lifetimes() {
 
 	let (a, b) = (10, 100);
 	outlives(&a, &b);
+
 	static_lifetime();
 }
 
 // -----------------------------------------------------------------------------
-// 3.1 VALUE LIFETIME
+// 3.1 SCOPE → VALUE LIFETIME
 // -----------------------------------------------------------------------------
 //
-// A value exists for some duration.
-//
-// The lifetime of a value is determined by ownership and destruction.
-//
-// A local value normally stops existing when its owner goes out of scope:
+// For ordinary local values, scope gives us an easy way to visualize
+// the lifetime of the value.
 //
 //     {
 //         let x = 7;
-//     } // `x` is dropped here
 //
-// Lifetime annotations do NOT control when values are dropped.
+//         // x is in scope
+//         // x's value is alive
 //
-// They describe how long REFERENCES are valid.
+//     } // x goes out of scope and is dropped
+//
+// Therefore:
+//
+//     scope ends
+//          ↓
+//     owner goes away
+//          ↓
+//     value is dropped
+//          ↓
+//     value's lifetime ends
+//
+// Scope is not itself a lifetime, but it is one of the easiest ways
+// to observe when a local value's lifetime ends.
 
 fn value_lifetime() {
 	let x = 7;
@@ -119,7 +130,7 @@ fn reference_lifetime() {
 //     - does NOT extend a lifetime
 //     - does NOT control when a value is dropped
 //
-// It gives a name to a lifetime so that Rust can describe a
+// It gives defines something which already exists so that Rust can describe a
 // relationship involving references.
 //
 // For example:
@@ -148,8 +159,7 @@ fn lifetime_annotations() {
 
 	// `'a` did not make `x` live longer.
 	//
-	// It simply described the lifetime of the reference passed
-	// into `inspect`.
+	// It describes something which is elided in other languages
 }
 
 // -----------------------------------------------------------------------------
@@ -374,10 +384,7 @@ fn borrowing_rules() {
 // This is a relationship between lifetimes.
 // It does not create either lifetime.
 
-fn outlives<'a, 'b>(x: &'a i32, y: &'b i32)
-where
-	'a: 'b,
-{
+fn outlives<'a, 'b>(x: &'a i32, y: &'b i32) where 'a: 'b {
 	println!("x: {x}");
 	println!("y: {y}");
 
@@ -477,3 +484,12 @@ fn static_lifetime() {
 //
 // Explicit annotations become necessary when Rust needs help
 // understanding a relationship between references.
+
+// SCOPE
+//     Where a binding is accessible.
+
+// LIFETIME
+//     How long a value/reference is valid.
+
+// DROP
+//     The destruction event that can end a value's lifetime.
