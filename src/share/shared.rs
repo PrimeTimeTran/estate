@@ -1,12 +1,5 @@
 use crate::prelude::*;
 
-// #[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
-// pub struct Artifact {
-// 	pub id: Uuid,
-// 	pub kind: ArtifactKind,
-// 	pub resource: Uuid,
-// }
-
 #[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum ArtifactKind {
 	#[default]

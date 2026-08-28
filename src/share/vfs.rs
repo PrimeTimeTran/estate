@@ -26,11 +26,9 @@ impl Namespace {
 			paths: HashMap::new(),
 		}
 	}
-
 	pub fn insert(&mut self, path: PathBuf, inode: Uuid) {
 		self.paths.insert(path, inode);
 	}
-
 	pub fn resolve(&self, path: &Path) -> Option<Uuid> {
 		self.paths.get(path).copied()
 	}

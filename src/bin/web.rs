@@ -77,6 +77,5 @@ fn main() {
 	todo!("main")
 }
 
-// #[cfg(feature = "web")]
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {}

@@ -489,7 +489,6 @@ impl Graphics {
 			secondary_scroll_offset: 0.0,
 		}
 	}
-
 	fn load_data() -> ChartsFile {
 		serde_json::from_str(include_str!("../data/chart.json")).expect("failed to parse chart.json")
 	}
