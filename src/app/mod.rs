@@ -4,25 +4,26 @@
 // ./src/web
 // ./src/mobile
 
-pub use std::collections::{ HashMap, HashSet, VecDeque };
+pub use std::collections::{HashMap, HashSet, VecDeque};
 
 pub mod prelude;
 pub use crate::app::prelude::*;
 
+pub(crate) mod app;
+pub(crate) mod event;
 pub(crate) mod host;
 pub(crate) mod job;
 pub(crate) mod model;
 pub(crate) mod modules;
-pub(crate) mod app;
 pub(crate) mod state;
-pub(crate) mod event;
+pub(crate) mod ve;
 
 #[cfg(feature = "native")]
 pub(crate) mod event_channel;
 
-#[cfg(feature = "native")]
+// #[cfg(feature = "native")]
 pub(crate) mod context;
-#[cfg(feature = "native")]
+// #[cfg(feature = "native")]
 pub use context::*;
 
 // #[cfg(feature = "native")]

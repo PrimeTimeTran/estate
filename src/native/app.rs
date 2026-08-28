@@ -236,7 +236,7 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 				let mut ctx = AppContext {
 					input: VeInputState::default(),
 					app: &mut self.app,
-					monitor: &mut monitor_native::NativeMonitor::new().unwrap(),
+					// monitor: &mut monitor_native::NativeMonitor::new().unwrap(),
 				};
 				if let Err(e) = window.window.draw(&mut ctx) {
 					tracing::error!("DEV >>> draw failed: {e:#}");
@@ -297,9 +297,12 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 					let _ = tray.set_title(Some(text));
 				}
 			}
-			AppEvent::ModifiersChanged { alt, command, ctrl, shift } => {
-			
-			}
+			AppEvent::ModifiersChanged {
+				alt,
+				command,
+				ctrl,
+				shift,
+			} => {}
 		}
 	}
 }

@@ -1,3 +1,4 @@
+use crate::app::{Runtime, ve::Veable};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::{
 	app::{event_channel::EventReceiver, monitor_native::StateMonitor, *},
@@ -22,18 +23,19 @@ use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watche
 use std::time::Duration;
 use winit::event_loop::EventLoopProxy;
 
-pub trait Veable {
-	///      A trait implemented by types which agree to its contract.
-	///
-	///      Any type which implements this contract must provide `draw`.
-	///      Code which depends on `Veable` can therefore o on that capability
-	///      without needing to know how the concrete type implements it.
-	///
-	///      The implementation details belong to the concrete type; the caller
-	///      only depends on the behavior promised by the contract.
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, NativeRuntime>);
-}
-pub struct Ve {
+// pub trait Veable {
+// 	///      A trait implemented by types which agree to its contract.
+// 	///
+// 	///      Any type which implements this contract must provide `draw`.
+// 	///      Code which depends on `Veable` can therefore o on that capability
+// 	///      without needing to know how the concrete type implements it.
+// 	///
+// 	///      The implementation details belong to the concrete type; the caller
+// 	///      only depends on the behavior promised by the contract.
+// 	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, NativeRuntime>);
+// }
+
+pub struct Ve<R: Runtime> {
 	///      A type-erased container for any concrete `Veable`.
 	///
 	///      `Box<dyn Veable>` stores the concrete implementation on the heap while
@@ -41,20 +43,22 @@ pub struct Ve {
 	///      concrete implementations to be substituted without changing the code
 	///      which consumes them.
 	// Top left to bottom right ordering for mental model.
-	pub activity_bar: Region,
-	pub dock_left: Panel,
-	pub main: Region,
-	pub primary_bar: Region,
-	pub secondary_bar: Region,
-	pub bottom_panel: Panel,
-	pub status_bar: Region,
-	pub dock_right: Panel,
+	// Top left to bottom right ordering for mental model.
+	pub activity_bar: Region<R>,
+	pub dock_left: Panel<R>,
+	pub main: Region<R>,
+	pub primary_bar: Region<R>,
+	pub secondary_bar: Region<R>,
+	pub bottom_panel: Panel<R>,
+	pub status_bar: Region<R>,
+	pub dock_right: Panel<R>,
 }
-impl Ve {
-	///! Rust uses ownership, borrowing, and lifetimes to determine when values
+
+impl<R: Runtime> Ve<R> {
+	///! Rust uses ownership,borrowing, and lifetimes to determine when values
 	/// may be safely destroyed, allowing memory to be reclaimed deterministically
 	/// without a garbage collector.
-	pub fn new(view: impl Veable + 'static) -> Self {
+	pub fn new(view: impl Veable<R> + 'static) -> Self {
 		let config = DEFAULT_CONFIG;
 		Self {
 			activity_bar: Region::fixed(DebugPanel::new("ACTIVITY"), config.activity_bar.size),
@@ -81,7 +85,7 @@ impl Ve {
 			.with_open(config.dock_right.active),
 		}
 	}
-	pub fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, NativeRuntime>) {
+	pub fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>) {
 		/// Forwards the drawing contract to the concrete implementation.
 		///
 		/// `Ve` doesn't know how the view is drawn. It only knows that the
@@ -150,12 +154,11 @@ impl Ve {
 		}
 		Self::draw_region(ui, ctx, status_bar, &mut self.status_bar);
 	}
-
 	fn draw_region(
 		ui: &mut egui::Ui,
-		ctx: &mut AppContext<'_, NativeRuntime>,
+		ctx: &mut AppContext<'_, R>,
 		rect: egui::Rect,
-		region: &mut Region,
+		region: &mut Region<R>,
 	) {
 		let fill = region.fill.unwrap_or(DEFAULT_CONFIG.bg);
 		ui.painter().rect_filled(rect, 0.0, fill);
@@ -174,30 +177,31 @@ impl Ve {
 	fn draw_view(
 		ui: &mut egui::Ui,
 		rect: egui::Rect,
-		view: &mut dyn Veable,
-		ctx: &mut AppContext<'_, NativeRuntime>,
+		view: &mut dyn Veable<R>,
+		ctx: &mut AppContext<'_, R>,
 	) {
 		let mut child = ui.new_child(
 			egui::UiBuilder::new()
 				.max_rect(rect)
 				.layout(egui::Layout::top_down(egui::Align::LEFT)),
 		);
+
 		view.draw(&mut child, ctx);
 	}
 	fn draw_panel(
 		ui: &mut egui::Ui,
-		ctx: &mut AppContext<'_, NativeRuntime>,
+		ctx: &mut AppContext<'_, R>,
 		rect: egui::Rect,
-		panel: &mut Panel,
+		panel: &mut Panel<R>,
 	) {
 		if !panel.open {
 			return;
 		}
-		// Region owns visual styling.
+
 		if let Some(fill) = panel.region.fill {
 			ui.painter().rect_filled(rect, 0.0, fill);
 		}
-		// Region owns the actual content.
+
 		Self::draw_view(ui, rect, &mut *panel.region.content, ctx);
 	}
 
@@ -356,7 +360,7 @@ impl Ve {
 		ui: &mut egui::Ui,
 		id: &str,
 		rect: egui::Rect,
-		region: &mut Region,
+		region: &mut Region<R>,
 		edge: ResizeEdge,
 		direction: f32,
 	) {
@@ -441,7 +445,7 @@ pub struct EguiVeable {
 	top_tab: DevTopTab,
 	side_tab: DevSideTab,
 }
-impl Veable for EguiVeable {
+impl Veable<NativeRuntime> for EguiVeable {
 	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, NativeRuntime>) {
 		self.draw_ui(ui);
 	}
@@ -863,7 +867,7 @@ impl Oracle {
 // VEABLE
 // -----------------------------------------------------------------------------
 
-impl Veable for Oracle {
+impl Veable<NativeRuntime> for Oracle {
 	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, NativeRuntime>) {
 		self.draw_ui(ui, ctx);
 		self.draw_status_bar(ui);
@@ -1241,8 +1245,8 @@ impl Sidebar {
 	}
 }
 
-impl Veable for Sidebar {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, NativeRuntime>) {
+impl<R: Runtime> Veable<R> for Sidebar {
+	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>) {
 		ui.vertical(|ui| {
 			for button in &self.buttons {
 				if ui.button(*button).clicked() {
@@ -1358,8 +1362,8 @@ impl WaterfallChart {
 			});
 	}
 }
-impl Veable for WaterfallChart {
-	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, NativeRuntime>) {
+impl<R: Runtime> Veable<R> for WaterfallChart {
+	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, R>) {
 		if ctx.poll_state() {
 			ui.ctx().request_repaint();
 		}

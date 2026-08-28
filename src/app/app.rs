@@ -1,7 +1,7 @@
-use crate::app::{ *, model };
+use crate::app::{model, *};
 
-pub use modules::runtime::{ Runtime, RuntimeState };
-pub use state::{ EstateState, StateStore };
+pub use modules::runtime::{Runtime, RuntimeState};
+pub use state::{EstateState, StateStore};
 
 pub struct App<R: Runtime> {
 	pub(crate) engine: model::EstateEngine<R>,
@@ -24,24 +24,27 @@ impl<R: Runtime> App<R> {
 
 impl<R: Runtime> App<R> {
 	pub fn new_task(&mut self) {
-		self.engine.runtime.emit(
-			Event::app(EventKind::TaskRequested {
+		self
+			.engine
+			.runtime
+			.emit(Event::app(EventKind::TaskRequested {
 				request: TaskRequest::Create(TaskKind::SyncBookmarks),
-			})
-		);
+			}));
 	}
 	pub fn show_tasks(&mut self) {
-		self.engine.runtime.emit(
-			Event::app(EventKind::CommandExecuted {
+		self
+			.engine
+			.runtime
+			.emit(Event::app(EventKind::CommandExecuted {
 				command: "task_list".into(),
-			})
-		);
+			}));
 	}
 	pub fn clear_tasks(&mut self) {
-		self.engine.runtime.emit(
-			Event::app(EventKind::CommandExecuted {
+		self
+			.engine
+			.runtime
+			.emit(Event::app(EventKind::CommandExecuted {
 				command: "task_clear".into(),
-			})
-		);
+			}));
 	}
 }

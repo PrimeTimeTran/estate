@@ -1,5 +1,5 @@
 use crate::{
-	app::{event_channel::EventReceiver, monitor_native::StateMonitor, *},
+	app::{event_channel::EventReceiver, monitor_native::StateMonitor, ve::Veable, *},
 	prelude::*,
 	theme::palette,
 	ui::{chart::*, *},
@@ -80,7 +80,7 @@ impl TaskManager {
 		});
 	}
 }
-impl Veable for TaskManager {
+impl Veable<NativeRuntime> for TaskManager {
 	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, NativeRuntime>) {
 		if self.poll_changes() {
 			ui.ctx().request_repaint();

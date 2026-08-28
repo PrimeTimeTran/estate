@@ -1,5 +1,5 @@
 use crate::{
-	app::{event_channel::EventReceiver, monitor_native::StateMonitor, *},
+	app::{event_channel::EventReceiver, monitor_native::StateMonitor, ve::Veable, *},
 	prelude::*,
 	theme::palette,
 	ui::{chart::*, *},
@@ -205,7 +205,7 @@ impl Graphics {
 		}
 	}
 }
-impl Veable for Graphics {
+impl Veable<NativeRuntime> for Graphics {
 	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, NativeRuntime>) {
 		// 1. Poll the channel for file changes on every frame render tick
 		#[cfg(not(target_arch = "wasm32"))]

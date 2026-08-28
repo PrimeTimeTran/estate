@@ -4,6 +4,23 @@ use crate::{
 	prelude::*,
 };
 
+pub struct NativeAppContext<'a> {
+	pub base: AppContext<'a, NativeRuntime>,
+	pub monitor: &'a mut monitor_native::NativeMonitor,
+}
+
+impl<'a> NativeAppContext<'a> {
+	pub fn state(&self) -> std::sync::RwLockReadGuard<'_, EstateState> {
+		self.base.state()
+	}
+
+	#[cfg(not(target_arch = "wasm32"))]
+	pub fn poll_state(&mut self) -> bool {
+		todo!("")
+		// self.monitor.poll()
+	}
+}
+
 #[derive(Clone, Debug)]
 pub struct NativeRuntime {
 	pub store: NativeStateStore,

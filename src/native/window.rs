@@ -23,7 +23,7 @@ use winit::{
 };
 
 pub struct Window {
-  pub config: wgpu::SurfaceConfiguration,
+	pub config: wgpu::SurfaceConfiguration,
 	pub device: wgpu::Device,
 	pub gui_ctx: gui::Context,
 	pub gui_state: EguiState,
@@ -34,7 +34,7 @@ pub struct Window {
 	pending_textures: gui::TexturesDelta,
 	queue: wgpu::Queue,
 	renderer: egui_wgpu::Renderer,
-	view: Ve,
+	view: Ve<NativeRuntime>,
 	// Estate UI Container
 
 	// Owns the native window, egui state, wgpu rendering resources, and the
@@ -87,8 +87,7 @@ pub struct Window {
 	// Depth / Stencil / Blending
 	//    ↓
 	// Color attachment
-	
-	
+
 	// 1. input assembler
 	// 2.vertex shader
 	// 3.hull shader
@@ -100,7 +99,7 @@ pub struct Window {
 	// 9.output merger
 }
 impl Window {
-	pub fn new(event_loop: &ActiveEventLoop, view: Ve) -> anyhow::Result<Self> {
+	pub fn new(event_loop: &ActiveEventLoop, view: Ve<NativeRuntime>) -> anyhow::Result<Self> {
 		let (gui_ctx, gui_state) = build_egui(event_loop);
 		let (window, instance, surface) = create_gpu_surface(event_loop)?;
 		let (adapter, device, queue) = initialize_gpu(&instance, &surface)?;
@@ -413,7 +412,7 @@ fn build_renderer(
 }
 impl Window {
 	fn doc_todo() {
-	
+
 		// ### 6. Embedded WebViews
 		// This is the most interesting one because it connects directly to the stuff you've already been experimenting with.
 		// * **Goal:** Render HTML/CSS/JS inside your Estate desktop application.

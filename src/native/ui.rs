@@ -1,4 +1,4 @@
-use crate::native::prelude::*;
+use crate::{app::Runtime, native::prelude::*};
 
 use core_graphics::{
 	display::CGDisplay,
@@ -108,38 +108,28 @@ pub fn move_cursor_to(pos: ScreenPosition) {
 	let bounds = CGDisplay::main().bounds();
 
 	let x = match pos {
-		ScreenPosition::Left => {
-			bounds.origin.x + bounds.size.width * 0.125
-		}
+		ScreenPosition::Left => bounds.origin.x + bounds.size.width * 0.125,
 
-		ScreenPosition::Center => {
-			bounds.origin.x + bounds.size.width * 0.5
-		}
+		ScreenPosition::Center => bounds.origin.x + bounds.size.width * 0.5,
 
-		ScreenPosition::Right => {
-			bounds.origin.x + bounds.size.width * 0.875
-		}
+		ScreenPosition::Right => bounds.origin.x + bounds.size.width * 0.875,
 	};
 
 	let y = bounds.origin.y + bounds.size.height * 0.5;
 
 	let point = CGPoint { x, y };
 
-	if let Ok(source) =
-		CGEventSource::new(CGEventSourceStateID::CombinedSessionState)
-	{
-		if let Ok(event) = CGEvent::new_mouse_event(
-			source,
-			CGEventType::MouseMoved,
-			point,
-			CGMouseButton::Left,
-		) {
+	if let Ok(source) = CGEventSource::new(CGEventSourceStateID::CombinedSessionState) {
+		if let Ok(event) =
+			CGEvent::new_mouse_event(source, CGEventType::MouseMoved, point, CGMouseButton::Left)
+		{
 			event.post(CGEventTapLocation::HID);
 		}
 	}
 }
-pub struct Region {
-	pub content: Box<dyn Veable>,
+
+pub struct Region<R: Runtime> {
+	pub content: Box<dyn Veable<R>>,
 	// Layout
 	pub size: f32,
 	pub min_size: f32,
@@ -151,8 +141,8 @@ pub struct Region {
 	pub is_docked: bool,
 	pub top_border: bool,
 }
-impl Region {
-	pub fn new(view: impl Veable + 'static, size: f32) -> Self {
+impl<R: Runtime> Region<R> {
+	pub fn new(view: impl Veable<R> + 'static, size: f32) -> Self {
 		Self {
 			content: Box::new(view),
 			fill: None,
@@ -165,20 +155,30 @@ impl Region {
 			top_border: false,
 		}
 	}
-	pub fn fixed(view: impl Veable + 'static, size: f32) -> Self {
+
+	pub fn fixed(view: impl Veable<R> + 'static, size: f32) -> Self {
 		Self::new(view, size)
 	}
-	pub fn resizable(view: impl Veable + 'static, size: f32, min_size: f32, max_size: f32) -> Self {
+
+	pub fn resizable(
+		view: impl Veable<R> + 'static,
+		size: f32,
+		min_size: f32,
+		max_size: f32,
+	) -> Self {
 		let mut region = Self::new(view, size);
+
 		region.size = size.clamp(min_size, max_size);
 		region.min_size = min_size;
 		region.max_size = max_size;
 		region.resizable = true;
 		region.fill = Some(palette::SURFACE);
 		region.is_docked = true;
+
 		region
 	}
-	pub fn content(view: impl Veable + 'static) -> Self {
+
+	pub fn content(view: impl Veable<R> + 'static) -> Self {
 		Self {
 			content: Box::new(view),
 			size: 0.0,
@@ -191,6 +191,7 @@ impl Region {
 			top_border: false,
 		}
 	}
+
 	pub fn with_fill(mut self, fill: egui::Color32) -> Self {
 		self.fill = Some(fill);
 		self
@@ -227,14 +228,22 @@ impl Region {
 /// Panels add interaction and lifecycle behavior to a Region.
 /// They may be opened, closed, overlaid, auto-hidden, moved,
 /// or potentially detached from their parent layout.
-pub struct Panel {
-	pub region: Region,
+
+pub struct Panel<R: Runtime> {
+	pub region: Region<R>,
 	pub open: bool,
 	pub overlay: bool,
 	pub auto_hide: bool,
 }
-impl Panel {
-	pub fn new(region: Region) -> Self {
+
+impl<R: Runtime> Veable<R> for Panel<R> {
+	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>) {
+		self.region.content.draw(ui, ctx);
+	}
+}
+
+impl<R: Runtime> Panel<R> {
+	pub fn new(region: Region<R>) -> Self {
 		Self {
 			region,
 			open: true,
@@ -242,31 +251,68 @@ impl Panel {
 			auto_hide: false,
 		}
 	}
+
 	pub fn with_open(mut self, open: bool) -> Self {
 		self.open = open;
 		self
 	}
+
 	pub fn with_overlay(mut self, overlay: bool) -> Self {
 		self.overlay = overlay;
 		self
 	}
+
 	pub fn with_auto_hide(mut self, auto_hide: bool) -> Self {
 		self.auto_hide = auto_hide;
 		self
 	}
+
 	pub fn open(&mut self) {
 		self.open = true;
 	}
+
 	pub fn close(&mut self) {
 		self.open = false;
 	}
+
 	pub fn toggle(&mut self) {
 		self.open = !self.open;
 	}
 }
 
+// impl<R: Runtime> Panel<R> {
+// 	pub fn new(region: Region<R>) -> Self {
+// 		Self {
+// 			region,
+// 			open: true,
+// 			overlay: false,
+// 			auto_hide: false,
+// 		}
+// 	}
+// 	pub fn with_open(mut self, open: bool) -> Self {
+// 		self.open = open;
+// 		self
+// 	}
+// 	pub fn with_overlay(mut self, overlay: bool) -> Self {
+// 		self.overlay = overlay;
+// 		self
+// 	}
+// 	pub fn with_auto_hide(mut self, auto_hide: bool) -> Self {
+// 		self.auto_hide = auto_hide;
+// 		self
+// 	}
+// 	pub fn open(&mut self) {
+// 		self.open = true;
+// 	}
+// 	pub fn close(&mut self) {
+// 		self.open = false;
+// 	}
+// 	pub fn toggle(&mut self) {
+// 		self.open = !self.open;
+// 	}
+// }
 
-use crate::{app::{AppContext, state::NativeRuntime}, native::ve::Veable};
+use crate::app::{AppContext, state::NativeRuntime, ve::Veable};
 
 pub struct DebugPanel {
 	pub title: String,
@@ -278,9 +324,8 @@ impl DebugPanel {
 		}
 	}
 }
-
-impl Veable for DebugPanel {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, NativeRuntime>) {
+impl<R: Runtime> Veable<R> for DebugPanel {
+	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>) {
 		ui.vertical_centered(|ui| {
 			ui.heading(&self.title);
 			ui.separator();
