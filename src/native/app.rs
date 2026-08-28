@@ -1,16 +1,16 @@
 use crate::{
-	app::{ Runtime, App, model::EstateEngine, * },
-	native::{ *, runtime::{ NativeRuntime } },
+	app::{App, Runtime, model::EstateEngine, *},
+	native::{runtime::NativeRuntime, screens::*, *},
 	prelude::*,
 };
 
-use signal_hook::{ consts::SIGINT, iterator::Signals };
-use tray_icon::{ TrayIcon, TrayIconBuilder, menu::MenuEvent };
+use signal_hook::{consts::SIGINT, iterator::Signals};
+use tray_icon::{TrayIcon, TrayIconBuilder, menu::MenuEvent};
 use winit::{
 	application::ApplicationHandler,
-	event_loop::{ ActiveEventLoop, EventLoop, EventLoopProxy },
 	event::WindowEvent,
-	platform::macos::{ ActivationPolicy, EventLoopBuilderExtMacOS },
+	event_loop::{ActiveEventLoop, EventLoop, EventLoopProxy},
+	platform::macos::{ActivationPolicy, EventLoopBuilderExtMacOS},
 	window::WindowId,
 };
 
@@ -67,8 +67,7 @@ impl NativeApp {
 	fn start_runtime(&mut self) -> anyhow::Result<()> {
 		tracing::info!(">>> NativeApp::start_runtime start");
 		self.spawn_global_hotkey_daemon()?;
-		let event_loop = EventLoop::<AppEvent>
-			::with_user_event()
+		let event_loop = EventLoop::<AppEvent>::with_user_event()
 			.with_activation_policy(ActivationPolicy::Accessory)
 			.build()?;
 		let proxy = event_loop.create_proxy();
@@ -172,7 +171,7 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 	}
 	fn resumed(&mut self, event_loop: &ActiveEventLoop) {
 		if self.windows.is_empty() {
-			self.open_window(event_loop, WindowType::TaskManager);
+			self.open_window(event_loop, WindowType::TelemetryInspector);
 		}
 		if self.tray.is_none() {
 			let (menu, tray) = match Self::bootstrap() {
@@ -187,11 +186,10 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 			tracing::info!("🔥 main tray initialized");
 		}
 		if self.scroll_tray.is_none() {
-			match
-				TrayIconBuilder::new()
-					.with_icon(scroll_tray_icon())
-					.with_tooltip("Estate Scroll Controller")
-					.build()
+			match TrayIconBuilder::new()
+				.with_icon(scroll_tray_icon())
+				.with_tooltip("Estate Scroll Controller")
+				.build()
 			{
 				Ok(tray) => {
 					self.scroll_tray = Some(tray);
@@ -207,21 +205,28 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 		&mut self,
 		event_loop: &ActiveEventLoop,
 		window_id: WindowId,
-		event: WindowEvent
+		event: WindowEvent,
 	) {
-		let Some(window) = self.windows
+		let Some(window) = self
+			.windows
 			.iter_mut()
-			.find(|window| window.window.instance.id() == window_id) else {
+			.find(|window| window.window.instance.id() == window_id)
+		else {
 			return;
 		};
-		let response = window.window.gui_state.on_window_event(&window.window.instance, &event);
+		let response = window
+			.window
+			.gui_state
+			.on_window_event(&window.window.instance, &event);
 		if response.repaint {
 			window.window.instance.request_redraw();
 		}
 		match event {
 			WindowEvent::CloseRequested => {
 				tracing::info!("🛑 Window close requested for id: {:?}", window_id);
-				self.windows.retain(|window| window.window.instance.id() != window_id);
+				self
+					.windows
+					.retain(|window| window.window.instance.id() != window_id);
 				return;
 			}
 			WindowEvent::RedrawRequested => {
@@ -229,6 +234,7 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 					return;
 				}
 				let mut ctx = AppContext {
+					input: VeInputState::default(),
 					app: &mut self.app,
 					monitor: &mut monitor_native::NativeMonitor::new().unwrap(),
 				};
@@ -251,7 +257,10 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 				}
 				window.window.config.width = size.width;
 				window.window.config.height = size.height;
-				window.window.surface.configure(&window.window.device, &window.window.config);
+				window
+					.window
+					.surface
+					.configure(&window.window.device, &window.window.config);
 				window.window.needs_resize = false;
 				window.window.instance.request_redraw();
 			}
@@ -280,7 +289,6 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 				// let text = format!("🔴 {:.0}, {:.0}", x, y);
 				// let region = if x < 960.0 { "← LEFT" } else { "RIGHT →" };
 				if let Some(tray) = &self.scroll_tray {
-					// let _ = tray.set_title(Some(region));
 					let _ = tray.set_title(Some(text));
 				}
 			}
@@ -288,6 +296,9 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 				if let Some(tray) = &self.tray {
 					let _ = tray.set_title(Some(text));
 				}
+			}
+			AppEvent::ModifiersChanged { alt, command, ctrl, shift } => {
+			
 			}
 		}
 	}
@@ -332,10 +343,12 @@ impl NativeApp {
 			return;
 		}
 		let (title, view) = match kind {
+			WindowType::TelemetryInspector => ("Telemetry Inspector", Ve::new(Oracle::new())),
 			WindowType::TaskManager => ("Task Manager", Ve::new(TaskManager::new())),
 			WindowType::Dashboard => ("Estate Dashboard", Ve::new(Graphics::new())),
-			// WindowType::TelemetryInspector => ("Telemetry Inspector", Ve::new(Oracle::new())),
-			_ => { todo!("abstraction_of_references_and_pointers") }
+			_ => {
+				todo!("abstraction_of_references_and_pointers")
+			}
 		};
 		match Window::new(event_loop, view) {
 			Ok(window) => {
@@ -354,25 +367,31 @@ impl NativeApp {
 }
 impl NativeApp {
 	fn new_task(&mut self) {
-		self.app.engine.runtime.emit(
-			Event::app(EventKind::TaskRequested {
+		self
+			.app
+			.engine
+			.runtime
+			.emit(Event::app(EventKind::TaskRequested {
 				request: TaskRequest::Create(TaskKind::SyncBookmarks),
-			})
-		);
+			}));
 	}
 	fn show_tasks(&mut self) {
-		self.app.engine.runtime.emit(
-			Event::app(EventKind::CommandExecuted {
+		self
+			.app
+			.engine
+			.runtime
+			.emit(Event::app(EventKind::CommandExecuted {
 				command: "task_list".into(),
-			})
-		);
+			}));
 	}
 	fn clear_tasks(&mut self) {
-		self.app.engine.runtime.emit(
-			Event::app(EventKind::CommandExecuted {
+		self
+			.app
+			.engine
+			.runtime
+			.emit(Event::app(EventKind::CommandExecuted {
 				command: "task_clear".into(),
-			})
-		);
+			}));
 	}
 	#[tracing::instrument(
 		target = "estate::discovery",

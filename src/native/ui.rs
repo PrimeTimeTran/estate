@@ -1,12 +1,16 @@
-use crate::{ native::{ prelude::* } };
+use crate::native::prelude::*;
 
 use core_graphics::{
-	event::{ CGEvent, CGEventTapLocation, CGEventType, CGMouseButton },
-	event_source::{ CGEventSource, CGEventSourceStateID },
+	display::CGDisplay,
+	event::{CGEvent, CGEventTapLocation, CGEventType, CGMouseButton},
+	event_source::{CGEventSource, CGEventSourceStateID},
 	geometry::CGPoint,
 };
 
-use tray_icon::{ Icon, TrayIcon, TrayIconBuilder, menu::{ Menu, MenuItem, Submenu } };
+use tray_icon::{
+	Icon, TrayIcon, TrayIconBuilder,
+	menu::{Menu, MenuItem, Submenu},
+};
 
 pub fn bootstrap() -> anyhow::Result<(TrayMenu, TrayIcon)> {
 	let menu = Menu::new();
@@ -56,8 +60,7 @@ pub fn bootstrap() -> anyhow::Result<(TrayMenu, TrayIcon)> {
 }
 
 pub fn tray_icon() -> Icon {
-	let image = image
-		::load_from_memory(crate::ui::TRAY_ICON)
+	let image = image::load_from_memory(crate::ui::TRAY_ICON)
 		.expect("failed to load generated tray icon")
 		.into_rgba8();
 	let (width, height) = image.dimensions();
@@ -65,13 +68,11 @@ pub fn tray_icon() -> Icon {
 }
 
 pub fn scroll_tray_icon() -> tray_icon::Icon {
-	let image = image
-		::load_from_memory(crate::ui::TRAY_SCROLL_ICON)
+	let image = image::load_from_memory(crate::ui::TRAY_SCROLL_ICON)
 		.expect("failed to load scroll tray icon")
 		.into_rgba8();
 	let (width, height) = image.dimensions();
-	tray_icon::Icon
-		::from_rgba(image.into_raw(), width, height)
+	tray_icon::Icon::from_rgba(image.into_raw(), width, height)
 		.expect("failed to create scroll tray icon")
 }
 
@@ -104,29 +105,39 @@ pub enum ScreenPosition {
 	Right,
 }
 pub fn move_cursor_to(pos: ScreenPosition) {
-	let max_width = 1920.0; // Adjust to your primary display width
-	let center_y = 500.0;
-	let (x, y) = match pos {
-		ScreenPosition::Left => (max_width * 0.2, center_y),
-		ScreenPosition::Center => (max_width * 0.5, center_y),
-		ScreenPosition::Right => (max_width * 0.8, center_y),
+	let bounds = CGDisplay::main().bounds();
+
+	let x = match pos {
+		ScreenPosition::Left => {
+			bounds.origin.x + bounds.size.width * 0.125
+		}
+
+		ScreenPosition::Center => {
+			bounds.origin.x + bounds.size.width * 0.5
+		}
+
+		ScreenPosition::Right => {
+			bounds.origin.x + bounds.size.width * 0.875
+		}
 	};
+
+	let y = bounds.origin.y + bounds.size.height * 0.5;
+
 	let point = CGPoint { x, y };
-	if let Ok(source) = CGEventSource::new(CGEventSourceStateID::CombinedSessionState) {
-		if
-			let Ok(event) = CGEvent::new_mouse_event(
-				source,
-				CGEventType::MouseMoved,
-				point,
-				CGMouseButton::Left
-			)
-		{
+
+	if let Ok(source) =
+		CGEventSource::new(CGEventSourceStateID::CombinedSessionState)
+	{
+		if let Ok(event) = CGEvent::new_mouse_event(
+			source,
+			CGEventType::MouseMoved,
+			point,
+			CGMouseButton::Left,
+		) {
 			event.post(CGEventTapLocation::HID);
-			println!("✨ Teleported cursor to position: X={:.1}, Y={:.1}", x, y);
 		}
 	}
 }
-
 pub struct Region {
 	pub content: Box<dyn Veable>,
 	// Layout
@@ -200,11 +211,14 @@ impl Region {
 	}
 	pub fn content_rect(&self, rect: egui::Rect) -> egui::Rect {
 		egui::Rect::from_min_max(
-			egui::pos2(rect.left() + (self.padding.left as f32), rect.top() + (self.padding.top as f32)),
+			egui::pos2(
+				rect.left() + (self.padding.left as f32),
+				rect.top() + (self.padding.top as f32),
+			),
 			egui::pos2(
 				rect.right() - (self.padding.right as f32),
-				rect.bottom() - (self.padding.bottom as f32)
-			)
+				rect.bottom() - (self.padding.bottom as f32),
+			),
 		)
 	}
 }
@@ -248,5 +262,33 @@ impl Panel {
 	}
 	pub fn toggle(&mut self) {
 		self.open = !self.open;
+	}
+}
+
+
+use crate::{app::{AppContext, state::NativeRuntime}, native::ve::Veable};
+
+pub struct DebugPanel {
+	pub title: String,
+}
+impl DebugPanel {
+	pub fn new(title: impl Into<String>) -> Self {
+		Self {
+			title: title.into(),
+		}
+	}
+}
+
+impl Veable for DebugPanel {
+	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, NativeRuntime>) {
+		ui.vertical_centered(|ui| {
+			ui.heading(&self.title);
+			ui.separator();
+			ui.label(format!(
+				"{} × {}",
+				ui.available_width(),
+				ui.available_height()
+			));
+		});
 	}
 }

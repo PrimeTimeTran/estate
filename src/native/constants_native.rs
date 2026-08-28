@@ -1,14 +1,27 @@
-use std::sync::{ Mutex, OnceLock, atomic::{ AtomicBool } };
+use std::sync::{Mutex, OnceLock, atomic::AtomicBool};
 
-use crate::{ native::prelude::{ ScrollRedirectState, * } };
+use core_graphics::display::{CGPoint, CGRect};
 
-// pub const TRAY_ICON: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/estate-tray.png"));
-// pub const TRAY_SCROLL_ICON: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/estate-tray.png"));
+use crate::native::prelude::{ScrollRedirectState, *};
 
 pub static HOTKEY_INITIALIZED: AtomicBool = AtomicBool::new(false);
 pub static REDIRECTING_SCROLL: AtomicBool = AtomicBool::new(false);
 pub static SCROLL_STATE: OnceLock<Mutex<ScrollRedirectState>> = OnceLock::new();
 pub static SHIFT_HELD: AtomicBool = AtomicBool::new(false);
+pub static TELEPORT_RIGHT: AtomicBool = AtomicBool::new(false);
+
+pub static CURSOR_INSET: f64 = 0.125;
+
+pub fn target_position(bounds: CGRect, target: ScreenPosition, y: f64) -> CGPoint {
+  let inset = CURSOR_INSET;
+	let inset = inset.clamp(0.0, 0.5);
+	let x = match target {
+		ScreenPosition::Left => bounds.origin.x + bounds.size.width * inset,
+		ScreenPosition::Right => bounds.origin.x + bounds.size.width * (1.0 - inset),
+		ScreenPosition::Center => bounds.origin.x + bounds.size.width * 0.5,
+	};
+	CGPoint { x, y }
+}
 
 pub const PROBES_MINIMAL: ProbeSet = &[
 	Probe {

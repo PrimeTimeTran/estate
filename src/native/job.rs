@@ -7,6 +7,7 @@
 // | UI representation               | `Task` / `Job` | Shows pending/running/etc.    |
 
 use crate::{app::EstateState, app::*, native::agent::AgentContext, prelude::*};
+use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 
 #[derive(Debug, Clone, Eq, Deserialize, PartialEq, Serialize)]
 pub struct Task {
@@ -23,7 +24,6 @@ pub struct TaskManagerRuntime {
 }
 impl TaskManagerRuntime {
 	pub fn new(path: &Path) -> anyhow::Result<Self> {
-		use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 		let (tx, rx) = tokio::sync::mpsc::channel::<()>(1);
 		let mut watcher = RecommendedWatcher::new(
 			move |res: Result<Event, notify::Error>| {

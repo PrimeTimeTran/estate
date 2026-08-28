@@ -1,10 +1,11 @@
 use crate::{ theme::palette };
 
 pub(crate) mod chart;
+pub(crate) mod components;
+pub use components::*;
 
 pub const TRAY_ICON: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/estate-tray.png"));
 pub const TRAY_SCROLL_ICON: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/estate-tray.png"));
-
 pub const DEFAULT_CONFIG: VeConfig = VeConfig {
 	bg: palette::BG,
 	surface: palette::SURFACE,
@@ -46,6 +47,7 @@ impl PanelConfig {
 		}
 	}
 }
+
 #[derive(Clone, Copy)]
 pub enum ResizeEdge {
 	Left,

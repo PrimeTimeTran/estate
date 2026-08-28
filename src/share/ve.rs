@@ -582,25 +582,6 @@ impl Graphics {
 	// }
 }
 
-struct DebugPanel {
-	title: String,
-}
-impl DebugPanel {
-	fn new(title: impl Into<String>) -> Self {
-		Self {
-			title: title.into(),
-		}
-	}
-}
-impl Veable for DebugPanel {
-	fn draw(&mut self, ui: &mut egui::Ui) {
-		ui.vertical_centered(|ui| {
-			ui.heading(&self.title);
-			ui.separator();
-			ui.label(format!("{} × {}", ui.available_width(), ui.available_height()));
-		});
-	}
-}
 pub struct Region {
 	pub content: Box<dyn Veable>,
 	// Layout
@@ -726,4 +707,25 @@ pub enum FocusedPane {
 	SidePanel,
 	CenterGrid,
 	Unknown,
+}
+
+
+struct DebugPanel {
+	title: String,
+}
+impl DebugPanel {
+	fn new(title: impl Into<String>) -> Self {
+		Self {
+			title: title.into(),
+		}
+	}
+}
+impl Veable for DebugPanel {
+	fn draw(&mut self, ui: &mut egui::Ui) {
+		ui.vertical_centered(|ui| {
+			ui.heading(&self.title);
+			ui.separator();
+			ui.label(format!("{} × {}", ui.available_width(), ui.available_height()));
+		});
+	}
 }

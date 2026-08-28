@@ -44,68 +44,31 @@ pub enum EventKind {
 	// ─────────────────────────────────────────────
 	// Tasks
 	// ─────────────────────────────────────────────
-	TaskRequested {
-		request: TaskRequest,
-	},
-	TaskCreated {
-		task_id: TaskId,
-		name: String,
-	},
-	TaskStarted {
-		task_id: TaskId,
-	},
-	TaskCompleted {
-		task_id: TaskId,
-	},
-	TaskFailed {
-		task_id: TaskId,
-		error: String,
-	},
-	TaskStopped {
-		task_id: TaskId,
-	},
-	TaskDeleted {
-		task_id: TaskId,
-	},
+	TaskRequested { request: TaskRequest },
+	TaskCreated { task_id: TaskId, name: String },
+	TaskStarted { task_id: TaskId },
+	TaskCompleted { task_id: TaskId },
+	TaskFailed { task_id: TaskId, error: String },
+	TaskStopped { task_id: TaskId },
+	TaskDeleted { task_id: TaskId },
 	TasksCleared,
 	// ─────────────────────────────────────────────
 	// Commands
 	// ─────────────────────────────────────────────
-	CommandExecuted {
-		command: String,
-	},
+	CommandExecuted { command: String },
 	// ─────────────────────────────────────────────
 	// Files
 	// ─────────────────────────────────────────────
-	FileCreated {
-		inode: Inode,
-		path: String,
-	},
-	FileModified {
-		inode: Inode,
-		path: String,
-	},
-	FileDeleted {
-		inode: Inode,
-		path: String,
-	},
+	FileCreated { inode: Inode, path: String },
+	FileModified { inode: Inode, path: String },
+	FileDeleted { inode: Inode, path: String },
 	// ─────────────────────────────────────────────
 	// Estate / indexing
 	// ─────────────────────────────────────────────
-	EstateDiscovered {
-		inode: Inode,
-		path: String,
-	},
-	EstateRemoved {
-		inode: Inode,
-		path: String,
-	},
-	IndexUpdated {
-		files_changed: u64,
-	},
-	CacheInvalidated {
-		reason: String,
-	},
+	EstateDiscovered { inode: Inode, path: String },
+	EstateRemoved { inode: Inode, path: String },
+	IndexUpdated { files_changed: u64 },
+	CacheInvalidated { reason: String },
 }
 #[derive(Debug, Clone, Deserialize, Hash, Serialize)]
 pub enum EventSource {
@@ -137,7 +100,9 @@ impl TaskKind {
 	pub fn name(&self) -> String {
 		match self {
 			TaskKind::RebuildIndex => "Rebuild Index".into(),
-			TaskKind::GenerateView(name) => { format!("Generate View: {name}") }
+			TaskKind::GenerateView(name) => {
+				format!("Generate View: {name}")
+			}
 			TaskKind::SyncBookmarks => "Sync Bookmarks".into(),
 			TaskKind::BuildEstatePrototype => "Build Estate Prototype".into(),
 		}
@@ -147,6 +112,12 @@ impl TaskKind {
 #[derive(Debug)]
 pub enum AppEvent {
 	Shutdown,
+	ModifiersChanged {
+		alt: bool,
+		command: bool,
+		ctrl: bool,
+		shift: bool,
+	},
 	CursorPosition {
 		x: f64,
 		y: f64,
