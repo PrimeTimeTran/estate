@@ -28,8 +28,7 @@
 //                        ▼          ▼          ▼
 //                      Zed       VS Code      CLI
 
-use crate::{ app::{ model::*, modules::runtime::Runtime }, prelude::* };
-use revelation::analyzer::Workspace;
+use crate::{app::model::*, prelude::*};
 
 pub trait Engine {
 	// IDE anchors/bookmarks
@@ -173,10 +172,7 @@ pub enum Change {
 	Created(Uuid),
 	Modified(Uuid),
 	Deleted(Uuid),
-	Renamed {
-		from: Uuid,
-		to: Uuid,
-	},
+	Renamed { from: Uuid, to: Uuid },
 	ConfigChanged,
 	WorkspaceChanged,
 }

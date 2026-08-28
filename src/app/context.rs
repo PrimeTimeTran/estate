@@ -1,4 +1,4 @@
-use crate::app::{monitor::Monitor, *};
+use crate::app::*;
 
 #[cfg(not(target_arch = "wasm32"))]
 use crate::app::state::VeInputState;

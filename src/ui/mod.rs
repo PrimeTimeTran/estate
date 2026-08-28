@@ -1,8 +1,7 @@
-use crate::{ theme::palette };
+use crate::theme::palette;
 
 pub(crate) mod chart;
 pub(crate) mod components;
-pub use components::*;
 
 pub const TRAY_ICON: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/estate-tray.png"));
 pub const TRAY_SCROLL_ICON: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/estate-tray.png"));
@@ -12,10 +11,10 @@ pub const DEFAULT_CONFIG: VeConfig = VeConfig {
 	activity_bar: PanelConfig::new(true, 48.0),
 	primary_bar: PanelConfig::new(true, 40.0),
 	secondary_bar: PanelConfig::new(true, 48.0),
-	bottom_panel: PanelConfig::new(true, 240.0),
-	status_bar: PanelConfig::new(true, 24.0),
-	dock_left: PanelConfig::new(true, 280.0),
-	dock_right: PanelConfig::new(true, 320.0),
+	bottom_panel: PanelConfig::new(false, 0.0),
+	status_bar: PanelConfig::new(false, 24.0),
+	dock_left: PanelConfig::new(false, 280.0),
+	dock_right: PanelConfig::new(false, 320.0),
 };
 
 pub struct VeConfig {

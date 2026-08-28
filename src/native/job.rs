@@ -6,7 +6,7 @@
 // | Individual background execution | `Job`          | Has lifecycle/state           |
 // | UI representation               | `Task` / `Job` | Shows pending/running/etc.    |
 
-use crate::{app::EstateState, app::*, native::agent::AgentContext, prelude::*};
+use crate::{app::{EstateState, *}, native::{agent::AgentContext, task_manager::WaterfallChart}, prelude::*};
 use notify::{Event, EventKind};
 
 #[derive(Debug, Clone, Eq, Deserialize, PartialEq, Serialize)]
@@ -56,6 +56,7 @@ pub struct TaskManagerState {
 pub struct TaskManager {
 	runtime: TaskManagerRuntime,
 	pub state: TaskManagerState,
+	pub waterfall: WaterfallChart,
 }
 
 impl TaskManager {
@@ -70,7 +71,11 @@ impl TaskManager {
 			state_path,
 			..Default::default()
 		};
-		let mut manager = Self { runtime, state };
+		let mut manager = Self {
+			state,
+			runtime,
+			waterfall: WaterfallChart::default(),
+		};
 		manager.reload();
 
 		Ok(manager)

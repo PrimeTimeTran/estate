@@ -1,25 +1,8 @@
 use crate::{
-	app::{event_channel::EventReceiver, monitor_native::StateMonitor, ve::Veable, *},
-	prelude::*,
-	theme::palette,
-	ui::{chart::*, *},
+	app::{monitor_native::StateMonitor, ve::Veable, *}, native::Oracle, prelude::*, ui::{chart::*, *},
 };
 
-use core_foundation::runloop::{CFRunLoop, kCFRunLoopCommonModes};
-use core_graphics::{
-	display::CGDisplay,
-	event::{
-		CGEvent, CGEventTap, CGEventTapLocation, CGEventTapOptions, CGEventTapPlacement,
-		CGEventTapProxy, CGEventType, CGMouseButton, CallbackResult, *,
-	},
-	event_source::{CGEventSource, CGEventSourceStateID},
-	geometry::CGPoint,
-};
-use egui::Ui;
-use egui_plot::{Bar, BarChart, Plot};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
-use std::time::Duration;
-use winit::event_loop::EventLoopProxy;
 
 pub struct Graphics {
 	#[cfg(not(target_arch = "wasm32"))]
@@ -44,8 +27,8 @@ pub struct Graphics {
 impl Graphics {
 	pub fn new() -> Self {
 		todo!("new");
-		let path = PathBuf::new();
-		path::absolute("/Users/future/kb/project/crates/estate/src/data/chart.json");
+		// let path = PathBuf::new();
+		// std::path::absolute("/Users/future/kb/project/crates/estate/src/data/chart.json");
 	}
 	// #[cfg(target_arch = "wasm32")]
 	#[cfg(not(target_arch = "wasm32"))]

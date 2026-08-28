@@ -150,7 +150,7 @@ impl NativeApp {
 			tracing::info!("SIGNAL: thread exiting");
 		});
 	}
-	fn shutdown_runtime(&mut self) {
+	fn shutdown(&mut self) {
 		tracing::info!(">>> shutting down runtime");
 		self.clock_running.store(false, Ordering::Relaxed);
 		self.hotkey_manager.shutdown();
@@ -170,7 +170,7 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 	}
 	fn resumed(&mut self, event_loop: &ActiveEventLoop) {
 		if self.windows.is_empty() {
-			self.open_window(event_loop, WindowType::TelemetryInspector);
+			self.open_window(event_loop, INITIAL_WINDOW);
 		}
 		if self.tray.is_none() {
 			let (menu, tray) = match Self::bootstrap() {
@@ -271,7 +271,7 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 		match event {
 			AppEvent::Shutdown => {
 				tracing::info!(">>> shutdown event received");
-				self.shutdown_runtime();
+				self.shutdown();
 				event_loop.exit();
 				tracing::info!(">>> event_loop.exit() called");
 			}
@@ -318,7 +318,7 @@ impl NativeApp {
 
 		if id == menu.quit.id() {
 			tracing::info!(">>> tray quit requested");
-			self.shutdown_runtime();
+			self.shutdown();
 			event_loop.exit();
 			tracing::info!(">>> event_loop.exit() called");
 		} else if id == menu.dev.id() {

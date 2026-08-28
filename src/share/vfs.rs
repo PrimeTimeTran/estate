@@ -758,15 +758,9 @@ pub struct TreeNode {
 }
 #[derive(Debug, Clone)]
 pub enum Payload {
-	Module {
-		source: Vec<u8>,
-	},
-	Ast {
-		nodes: String,
-	},
-	DirectoryIndex {
-		children: Vec<u64>,
-	},
+	Module { source: Vec<u8> },
+	Ast { nodes: String },
+	DirectoryIndex { children: Vec<u64> },
 }
 impl DependencyGraph {
 	pub fn contains_cycle(&self) -> bool {
@@ -776,7 +770,7 @@ impl DependencyGraph {
 			id: u64,
 			deps: &HashMap<u64, HashSet<u64>>,
 			visited: &mut HashSet<u64>,
-			rec_stack: &mut HashSet<u64>
+			rec_stack: &mut HashSet<u64>,
 		) -> bool {
 			visited.insert(id);
 			rec_stack.insert(id);
@@ -814,7 +808,7 @@ impl CompiledNode {
 		source_version: u64,
 		raw_source: Vec<u8>,
 		imports: Vec<String>,
-		exports: Vec<String>
+		exports: Vec<String>,
 	) -> Self {
 		let payload = Payload::Module { source: raw_source };
 		Self {

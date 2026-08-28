@@ -154,6 +154,7 @@ tokio-util = { workspace = true, optional = true }
 tower-lsp = { workspace = true, optional = true }
 tray-icon = { workspace = true, optional = true }
 jsonc-parser = { version = "0.33.1", features = ["cst"] }
+egui_extras = { version = "0.36.1", features = ["all_loaders"] }
 
 [build-dependencies]
 resvg.workspace = true

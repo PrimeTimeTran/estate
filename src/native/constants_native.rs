@@ -3,16 +3,16 @@ use std::sync::{Mutex, OnceLock, atomic::AtomicBool};
 use core_graphics::display::{CGPoint, CGRect};
 
 use crate::native::prelude::{ScrollRedirectState, *};
-
+pub static CURSOR_INSET: f64 = 0.125;
 pub static HOTKEY_INITIALIZED: AtomicBool = AtomicBool::new(false);
+pub static INITIAL_WINDOW: WindowType = WindowType::TaskManager;
 pub static REDIRECTING_SCROLL: AtomicBool = AtomicBool::new(false);
 pub static SCROLL_STATE: OnceLock<Mutex<ScrollRedirectState>> = OnceLock::new();
 pub static SHIFT_HELD: AtomicBool = AtomicBool::new(false);
 pub static TELEPORT_RIGHT: AtomicBool = AtomicBool::new(false);
-pub static CURSOR_INSET: f64 = 0.125;
 
 pub fn target_position(bounds: CGRect, target: ScreenPosition, y: f64) -> CGPoint {
-  let inset = CURSOR_INSET;
+	let inset = CURSOR_INSET;
 	let inset = inset.clamp(0.0, 0.5);
 	let x = match target {
 		ScreenPosition::Left => bounds.origin.x + bounds.size.width * inset,

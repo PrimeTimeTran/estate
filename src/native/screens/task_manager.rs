@@ -1,25 +1,14 @@
 use crate::{
-	app::{event_channel::EventReceiver, monitor_native::StateMonitor, ve::Veable, *},
+	app::{AppContext, EstateState, Job, JobStatus, Runtime, ve::Veable},
 	prelude::*,
 	theme::palette,
-	ui::{chart::*, *},
 };
 
-use core_foundation::runloop::{CFRunLoop, kCFRunLoopCommonModes};
-use core_graphics::{
-	display::CGDisplay,
-	event::{
-		CGEvent, CGEventTap, CGEventTapLocation, CGEventTapOptions, CGEventTapPlacement,
-		CGEventTapProxy, CGEventType, CGMouseButton, CallbackResult, *,
-	},
-	event_source::{CGEventSource, CGEventSourceStateID},
-	geometry::CGPoint,
-};
 use egui::Ui;
+use egui_extras::{Column, TableBuilder};
 use egui_plot::{Bar, BarChart, Plot};
-use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use notify::Watcher;
 use std::time::Duration;
-use winit::event_loop::EventLoopProxy;
 
 impl TaskManager {
 	fn init_watcher(
@@ -43,41 +32,196 @@ impl TaskManager {
 		Ok(watcher)
 	}
 
-	fn draw_job(&self, ui: &mut egui::Ui, job: &Job) {
-		egui::Frame::group(ui.style()).show(ui, |ui| {
-			ui.horizontal(|ui| {
-				ui.label(job.status.icon());
+	fn draw_jobs(&self, ui: &mut egui::Ui, jobs: &std::collections::VecDeque<Job>) {
+		let now = EstateState::now();
 
-				ui.vertical(|ui| {
-					ui.strong(job.kind.name());
-					ui.small(format!("Job #{}", job.id));
+		let timeline_start = jobs
+			.iter()
+			.filter_map(|job| job.started_at)
+			.min()
+			.unwrap_or(now);
+
+		let timeline_end = jobs
+			.iter()
+			.filter_map(|job| job.completed_at)
+			.max()
+			.unwrap_or(now)
+			.max(timeline_start + 1);
+
+		TableBuilder::new(ui)
+			.striped(true)
+			.resizable(true)
+			.column(Column::initial(160.0).at_least(100.0))
+			.column(Column::initial(90.0).at_least(70.0))
+			.column(Column::initial(120.0).at_least(80.0))
+			.column(Column::remainder())
+			.header(24.0, |mut header| {
+				header.col(|ui| {
+					ui.label("Name");
 				});
 
-				ui.add_space(20.0);
+				header.col(|ui| {
+					ui.label("Status");
+				});
 
-				// Status
-				ui.label(job.status.label());
+				header.col(|ui| {
+					ui.label("Origin");
+				});
 
-				ui.add_space(20.0);
+				header.col(|ui| {
+					ui.label("Timeline");
+				});
+			})
+			.body(|mut body| {
+				for job in jobs {
+					body.row(28.0, |mut row| {
+						row.col(|ui| {
+							ui.label(job.kind.name());
+						});
 
-				// Duration
-				if let Some(started_at) = job.started_at {
-					let duration_ms = match job.completed_at {
-						Some(completed_at) => completed_at.saturating_sub(started_at),
-						None => {
-							// Still running. Calculate elapsed wall-clock time.
-							EstateState::now().saturating_sub(started_at)
-						}
-					};
+						row.col(|ui| {
+							ui.label(format!("{} {}", job.status.icon(), job.status.label()));
+						});
 
-					ui.label(format_duration_ms(duration_ms));
+						row.col(|ui| {
+							ui.label("Runtime");
+						});
+
+						row.col(|ui| {
+							self
+								.waterfall
+								.draw_job(ui, job, timeline_start, timeline_end);
+						});
+					});
 				}
-
-				ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-					ui.button("⋮");
-				});
 			});
+	}
+	fn draw_job(
+		&self,
+		ui: &mut egui::Ui,
+		job: &Job,
+		name_width: f32,
+		status_width: f32,
+		duration_width: f32,
+		timeline_width: f32,
+	) {
+		let started_at = job.started_at.unwrap_or(0);
+		let ended_at = match job.completed_at {
+			Some(completed_at) => completed_at,
+			None => EstateState::now(),
+		};
+		let duration_ms = ended_at.saturating_sub(started_at);
+
+		ui.horizontal(|ui| {
+			// -----------------------------------------------------
+			// Job name
+			// -----------------------------------------------------
+			ui.add_sized(
+				[name_width, 32.0],
+				egui::Label::new(egui::RichText::new(job.kind.name()).color(palette::TEXT)),
+			);
+
+			// -----------------------------------------------------
+			// Status
+			// -----------------------------------------------------
+			ui.add_sized(
+				[status_width, 32.0],
+				egui::Label::new(format!("{} {}", job.status.icon(), job.status.label())),
+			);
+
+			// -----------------------------------------------------
+			// Duration
+			// -----------------------------------------------------
+			ui.add_sized(
+				[duration_width, 32.0],
+				egui::Label::new(
+					egui::RichText::new(format_duration_ms(duration_ms)).color(palette::TEXT_MUTED),
+				),
+			);
+
+			// -----------------------------------------------------
+			// Waterfall
+			// -----------------------------------------------------
+			self.draw_job_timeline(ui, job, started_at, ended_at, timeline_width);
 		});
+	}
+	fn draw_job_timeline(
+		&self,
+		ui: &mut egui::Ui,
+		job: &Job,
+		started_at: u64,
+		ended_at: u64,
+		width: f32,
+	) {
+		let height = 32.0;
+
+		let (response, painter) = ui.allocate_painter(egui::vec2(width, height), egui::Sense::hover());
+
+		let now = EstateState::now();
+
+		// ---------------------------------------------------------
+		// Determine the global timeline window.
+		//
+		// For now this is relative to the runtime's current
+		// observation window.
+		// ---------------------------------------------------------
+		let timeline_start = started_at.min(now);
+		let timeline_end = ended_at.max(timeline_start + 1);
+
+		let total = (timeline_end - timeline_start).max(1) as f32;
+
+		// ---------------------------------------------------------
+		// Convert timestamps -> pixels
+		// ---------------------------------------------------------
+		let x = |timestamp: u64| {
+			let offset = timestamp.saturating_sub(timeline_start) as f32;
+			response.rect.left() + (offset / total) * width
+		};
+
+		let x1 = x(started_at);
+		let x2 = x(ended_at);
+
+		let bar_rect = egui::Rect::from_min_max(
+			egui::pos2(x1, response.rect.top() + 8.0),
+			egui::pos2(x2.max(x1 + 2.0), response.rect.bottom() - 8.0),
+		);
+
+		// ---------------------------------------------------------
+		// Background
+		// ---------------------------------------------------------
+		painter.rect_filled(response.rect, 0.0, palette::SURFACE);
+
+		// ---------------------------------------------------------
+		// Job bar
+		// ---------------------------------------------------------
+		painter.rect_filled(
+			bar_rect,
+			2.0,
+			match job.status {
+				JobStatus::Completed => palette::SUCCESS,
+				JobStatus::Running => palette::PRIMARY,
+				JobStatus::Failed => palette::ERROR,
+				_ => palette::TEXT_MUTED,
+			},
+		);
+
+		// ---------------------------------------------------------
+		// Hover
+		// ---------------------------------------------------------
+		if response.hovered() {
+			painter.rect_stroke(
+				bar_rect,
+				2.0,
+				egui::Stroke::new(1.0, palette::TEXT),
+				egui::StrokeKind::Outside,
+			);
+			response.on_hover_text(format!(
+				"{}\n{}\n{}",
+				job.kind.name(),
+				job.status.label(),
+				format_duration_ms(ended_at.saturating_sub(started_at)),
+			));
+		}
 	}
 }
 impl Veable<NativeRuntime> for TaskManager {
@@ -152,6 +296,27 @@ impl Veable<NativeRuntime> for TaskManager {
 		let gap = 6.0;
 		let card_width = (available.x - gap) / 2.0;
 		let card_height = 280.0;
+		// =========================================================
+		// Jobs / Waterfall
+		// =========================================================
+		ui.add_space(16.0);
+		ui.label(
+			egui::RichText::new("Jobs")
+				.size(16.0)
+				.strong()
+				.color(palette::TEXT),
+		);
+		// Replace this with however your EstateState stores jobs.
+		self.draw_jobs(ui, &ctx.state().jobs);
+		ui.add_space(24.0);
+		// =========================================================
+		// Aggregate Charts
+		// =========================================================
+		let available = ui.available_size();
+		let gap = 6.0;
+		let card_width = (available.x - gap) / 2.0;
+		let card_height = 280.0;
+
 		render_graphs(ui, state, available, gap, card_width, card_height);
 	}
 }
@@ -477,5 +642,167 @@ fn format_duration(duration: Duration) -> String {
 		format!("{}m {}s", secs / 60, secs % 60)
 	} else {
 		format!("{}h {}m", secs / 3600, (secs % 3600) / 60)
+	}
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+pub struct WaterfallChart;
+
+impl<R: Runtime> Veable<R> for WaterfallChart {
+	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, R>) {
+		if ctx.state_changed() {
+			ui.ctx().request_repaint();
+		}
+		ui.heading("Job History");
+		let state = ctx.state();
+		self.draw_chart(ui, state.jobs.iter());
+	}
+}
+
+impl WaterfallChart {
+	pub fn new() -> Self {
+		Self
+	}
+	pub fn draw_chart<'a>(&self, ui: &mut Ui, jobs: impl Iterator<Item = &'a Job>) {
+		let jobs: Vec<&Job> = jobs.collect();
+
+		if jobs.is_empty() {
+			ui.centered_and_justified(|ui| {
+				ui.label("No job history");
+			});
+			return;
+		}
+
+		let now = EstateState::now();
+
+		let mut timed_jobs = Vec::new();
+
+		for job in jobs {
+			let Some(started_at) = job.started_at else {
+				continue;
+			};
+
+			let start = started_at as f64;
+			let end = job.completed_at.unwrap_or(now) as f64;
+
+			timed_jobs.push((job, start, end.max(start + 1.0)));
+		}
+
+		if timed_jobs.is_empty() {
+			ui.centered_and_justified(|ui| {
+				ui.label("No timed jobs");
+			});
+			return;
+		}
+
+		// Oldest -> newest.
+		timed_jobs.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+
+		let mut lanes: Vec<f64> = Vec::new();
+		let mut bars = Vec::with_capacity(timed_jobs.len());
+
+		let mut min_time = f64::MAX;
+		let mut max_time = f64::MIN;
+
+		for (job, start, end) in timed_jobs {
+			min_time = min_time.min(start);
+			max_time = max_time.max(end);
+
+			let lane = lanes
+				.iter()
+				.position(|lane_end| *lane_end <= start)
+				.unwrap_or_else(|| {
+					lanes.push(0.0);
+					lanes.len() - 1
+				});
+
+			lanes[lane] = end;
+
+			bars.push(
+				Bar::new(lane as f64, end - start)
+					.horizontal()
+					.base_offset(start)
+					.width(0.7)
+					.name(job.kind.name()),
+			);
+		}
+
+		let padding = ((max_time - min_time) * 0.05).max(1.0);
+
+		Plot::new("job_history")
+			.height(300.0)
+			.include_x(min_time - padding)
+			.include_x(max_time + padding)
+			.include_y(-0.75)
+			.include_y(lanes.len() as f64)
+			.show_axes([true, true])
+			.show_grid([true, true])
+			.legend(egui_plot::Legend::default())
+			.x_axis_formatter(|mark, _range| format_timestamp(mark.value))
+			.show(ui, |plot_ui| {
+				// Keep the Y viewport bounded.
+				let mut bounds = plot_ui.plot_bounds();
+
+				bounds.set_y_center_height(bounds.center().y.clamp(0.0, 20.0), 20.0);
+
+				plot_ui.set_plot_bounds(bounds);
+
+				plot_ui.bar_chart(BarChart::new("jobs", bars).horizontal());
+			});
+	}
+	pub fn draw_job(&self, ui: &mut Ui, job: &Job, timeline_start: u64, timeline_end: u64) {
+		let height = 28.0;
+
+		let (response, painter) = ui.allocate_painter(
+			egui::vec2(ui.available_width(), height),
+			egui::Sense::hover(),
+		);
+
+		let total = (timeline_end - timeline_start).max(1) as f32;
+
+		let x = |timestamp: u64| {
+			let offset = timestamp.saturating_sub(timeline_start) as f32;
+			response.rect.left() + (offset / total) * response.rect.width()
+		};
+
+		let started_at = job.started_at.unwrap_or(timeline_start);
+		let ended_at = job.completed_at.unwrap_or_else(EstateState::now);
+
+		let x1 = x(started_at);
+		let x2 = x(ended_at);
+
+		let bar_rect = egui::Rect::from_min_max(
+			egui::pos2(x1, response.rect.top() + 5.0),
+			egui::pos2(x2.max(x1 + 2.0), response.rect.bottom() - 5.0),
+		);
+
+		painter.rect_filled(response.rect, 0.0, palette::SURFACE);
+
+		painter.rect_filled(
+			bar_rect,
+			2.0,
+			match job.status {
+				JobStatus::Completed => palette::SUCCESS,
+				JobStatus::Running => palette::PRIMARY,
+				JobStatus::Failed => palette::ERROR,
+				_ => palette::TEXT_MUTED,
+			},
+		);
+
+		if response.hovered() {
+			painter.rect_stroke(
+				bar_rect,
+				2.0,
+				egui::Stroke::new(1.0, palette::TEXT),
+				egui::StrokeKind::Outside,
+			);
+
+			response.on_hover_text(format!(
+				"{}\n{}\n{}",
+				job.kind.name(),
+				job.status.label(),
+				format_duration_ms(ended_at.saturating_sub(started_at)),
+			));
+		}
 	}
 }

@@ -6,8 +6,8 @@ pub use chrono::{DateTime, Duration, Utc};
 pub use crate::native::{self, prelude::*};
 pub use crate::share::prelude::*;
 pub use crate::theme::*;
-pub use crate::tool::time::*;
-pub use crate::tool::*;
+// pub use crate::tool::time::*;
+pub use crate::tool::{time::*, *};
 
 pub use ::serde::{Deserialize, Serialize, de::DeserializeOwned};
 pub use futures::FutureExt;
@@ -24,7 +24,6 @@ pub use std::{
 		atomic::{AtomicBool, AtomicU64, Ordering},
 	},
 	time::{Instant, SystemTime},
-	*,
 };
 
 pub use uuid::Uuid;

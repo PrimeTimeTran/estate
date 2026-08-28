@@ -301,6 +301,6 @@ impl CommentStyle {
 }
 #[derive(Debug, Clone)]
 pub struct CommentBlock {
-	pub line_range: ops::Range<usize>,
+	pub line_range: std::ops::Range<usize>,
 	pub style: CommentStyle,
 }

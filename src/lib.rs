@@ -15,5 +15,6 @@ pub mod prelude;
 pub mod share;
 pub mod theme;
 pub mod tool;
-pub mod util;
 pub mod ui;
+pub mod util;
+

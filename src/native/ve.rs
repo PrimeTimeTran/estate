@@ -1,11 +1,7 @@
 use crate::app::{Runtime, ve::Veable};
+
 #[cfg(not(target_arch = "wasm32"))]
-use crate::{
-	app::{event_channel::EventReceiver, monitor_native::StateMonitor, *},
-	prelude::*,
-	theme::palette,
-	ui::{chart::*, *},
-};
+use crate::{app::*, prelude::*, ui::*};
 
 use core_foundation::runloop::{CFRunLoop, kCFRunLoopCommonModes};
 use core_graphics::{
@@ -18,22 +14,8 @@ use core_graphics::{
 	geometry::CGPoint,
 };
 use egui::Ui;
-use egui_plot::{Bar, BarChart, Plot};
-use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
-use std::time::Duration;
+use egui_plot::{Bar, BarChart, Plot, PlotBounds, PlotUi, Points};
 use winit::event_loop::EventLoopProxy;
-
-// pub trait Veable {
-// 	///      A trait implemented by types which agree to its contract.
-// 	///
-// 	///      Any type which implements this contract must provide `draw`.
-// 	///      Code which depends on `Veable` can therefore o on that capability
-// 	///      without needing to know how the concrete type implements it.
-// 	///
-// 	///      The implementation details belong to the concrete type; the caller
-// 	///      only depends on the behavior promised by the contract.
-// 	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, NativeRuntime>);
-// }
 
 pub struct Ve<R: Runtime> {
 	///      A type-erased container for any concrete `Veable`.
@@ -70,7 +52,7 @@ impl<R: Runtime> Ve<R> {
 			secondary_bar: Region::fixed(DebugPanel::new("BREADCRUMBS"), config.activity_bar.size),
 			main: Region::content(view).with_padding(8 as i32),
 			bottom_panel: Panel::new(Region::resizable(
-				WaterfallChart::new(),
+				DebugPanel::new("DebugPanel"),
 				config.bottom_panel.size,
 				0.0,
 				600.0,
@@ -612,268 +594,6 @@ impl DevSideTab {
 	}
 }
 
-// -----------------------------------------------------------------------------
-// ORACLE
-// -----------------------------------------------------------------------------
-
-pub struct Oracle {
-	pub active_focus: FocusedPane,
-	dirty: bool,
-	error: Option<String>,
-	last_direction: String,
-	last_loaded: Option<SystemTime>,
-	scroll_x: f32,
-	scroll_y: f32,
-	gesture: GestureController,
-}
-
-impl Oracle {
-	pub fn new() -> Self {
-		Self {
-			active_focus: FocusedPane::MainEditor,
-			dirty: false,
-			error: None,
-			last_direction: String::new(),
-			last_loaded: None,
-			scroll_x: 0.0,
-			scroll_y: 0.0,
-			gesture: GestureController::new(),
-		}
-	}
-
-	// -------------------------------------------------------------------------
-	// INPUT
-	// -------------------------------------------------------------------------
-
-	fn inspect_trackpad(
-		&mut self,
-		ui: &mut egui::Ui,
-		ctx: &AppContext<'_, NativeRuntime>,
-	) -> TrackpadState {
-		self.gesture.inspect(ui, &ctx.input)
-	}
-
-	// -------------------------------------------------------------------------
-	// UI
-	// -------------------------------------------------------------------------
-
-	fn draw_ui(&mut self, ui: &mut egui::Ui, ctx: &AppContext<'_, NativeRuntime>) {
-		self.draw_header(ui);
-
-		let trackpad = self.inspect_trackpad(ui, ctx);
-
-		self.draw_telemetry(ui, &trackpad);
-		self.draw_trigger_preview(ui, &trackpad);
-		self.draw_controls(ui);
-	}
-
-	fn draw_header(&mut self, ui: &mut egui::Ui) {
-		ui.heading("Trackpad & Gesture Telemetry PoC");
-
-		ui.label(
-			"Goal: Inspect raw multi-axis vectors, modifiers, cursor position, hover target, and focus.",
-		);
-
-		ui.separator();
-	}
-
-	// -------------------------------------------------------------------------
-	// TELEMETRY
-	// -------------------------------------------------------------------------
-
-	fn draw_telemetry(&mut self, ui: &mut egui::Ui, trackpad: &TrackpadState) {
-		ui.columns(2, |columns| {
-			// =================================================================
-			// INPUT
-			// =================================================================
-
-			columns[0].group(|ui| {
-				ui.heading("Input");
-
-				ui.add_space(4.0);
-
-				ui.label(format!("Scroll Delta X: {:.2}", trackpad.delta.x));
-
-				ui.label(format!("Scroll Delta Y: {:.2}", trackpad.delta.y));
-
-				ui.label(format!("Primary Axis: {}", trackpad.primary_axis()));
-
-				ui.label(format!("Direction: {:?}", trackpad.direction));
-
-				ui.add_space(8.0);
-
-				Self::draw_modifier(ui, "Shift", trackpad.shift_held);
-				Self::draw_modifier(ui, "Ctrl", trackpad.ctrl_held);
-				Self::draw_modifier(ui, "Alt", trackpad.alt_held);
-				Self::draw_modifier(ui, "Command", trackpad.command_held);
-			});
-
-			// =================================================================
-			// CURSOR / FOCUS
-			// =================================================================
-
-			columns[1].group(|ui| {
-				ui.heading("Cursor & Focus");
-
-				ui.add_space(4.0);
-
-				// -------------------------------------------------------------
-				// Cursor position
-				// -------------------------------------------------------------
-
-				match trackpad.mouse_pos {
-					Some(pos) => {
-						ui.label(format!("Cursor X: {:.1}", pos.x));
-						ui.label(format!("Cursor Y: {:.1}", pos.y));
-						ui.label(format!("Cursor: ({:.1}, {:.1})", pos.x, pos.y));
-					}
-
-					None => {
-						ui.label("Cursor: Outside viewport");
-					}
-				}
-
-				ui.add_space(8.0);
-
-				// -------------------------------------------------------------
-				// Cursor target
-				// -------------------------------------------------------------
-
-				ui.horizontal(|ui| {
-					ui.label("Hovered:");
-
-					let hovered = trackpad.hovered != CursorTarget::None;
-
-					ui.colored_label(
-						if hovered {
-							egui::Color32::LIGHT_GREEN
-						} else {
-							egui::Color32::GRAY
-						},
-						trackpad.hovered_name(),
-					);
-				});
-
-				// -------------------------------------------------------------
-				// Focus
-				// -------------------------------------------------------------
-
-				ui.horizontal(|ui| {
-					ui.label("Focus:");
-
-					ui.colored_label(egui::Color32::LIGHT_BLUE, format!("{:?}", trackpad.focus));
-				});
-
-				ui.add_space(8.0);
-
-				// -------------------------------------------------------------
-				// Gesture state
-				// -------------------------------------------------------------
-
-				ui.label(format!(
-					"Side Panel Width: {:.1}px",
-					self.gesture.state.side_panel_width
-				));
-
-				ui.label(format!(
-					"Secondary Scroll: {:.1}",
-					self.gesture.state.secondary_scroll_offset
-				));
-			});
-		});
-
-		ui.add_space(12.0);
-		ui.separator();
-	}
-
-	fn draw_modifier(ui: &mut egui::Ui, name: &str, held: bool) {
-		ui.horizontal(|ui| {
-			ui.label(format!("{name}:"));
-
-			ui.colored_label(
-				if held {
-					egui::Color32::LIGHT_GREEN
-				} else {
-					egui::Color32::GRAY
-				},
-				if held { "HELD" } else { "Released" },
-			);
-		});
-	}
-
-	// -------------------------------------------------------------------------
-	// TRIGGER PREVIEW
-	// -------------------------------------------------------------------------
-
-	fn draw_trigger_preview(&mut self, ui: &mut egui::Ui, trackpad: &TrackpadState) {
-		ui.group(|ui| {
-			ui.heading("Target Action Trigger Preview");
-
-			ui.add_space(4.0);
-
-			// First verify the modifier independently of the gesture.
-			if trackpad.shift_held {
-				ui.colored_label(egui::Color32::LIGHT_GREEN, "SHIFT DETECTED");
-			} else {
-				ui.label("SHIFT NOT HELD");
-			}
-
-			ui.add_space(4.0);
-
-			let is_horizontal = trackpad.delta.x.abs() > trackpad.delta.y.abs();
-
-			let is_vertical = trackpad.delta.y.abs() > trackpad.delta.x.abs();
-
-			if trackpad.shift_held && is_horizontal {
-				ui.colored_label(
-					egui::Color32::LIGHT_BLUE,
-					format!(
-						"⚡ TRIGGER MATCH: Resize Panel Vector -> {:.2}px",
-						trackpad.delta.x
-					),
-				);
-			} else if trackpad.shift_held && is_vertical {
-				ui.colored_label(
-					egui::Color32::LIGHT_GREEN,
-					format!(
-						"⚡ TRIGGER MATCH: Cross-Scroll Secondary Pane -> {:.2} units",
-						trackpad.delta.y
-					),
-				);
-			} else {
-				ui.label("Waiting for scroll...");
-			}
-		});
-	}
-
-	fn draw_controls(&mut self, _ui: &mut egui::Ui) {}
-
-	fn draw_status_bar(&mut self, ui: &mut egui::Ui) {
-		ui.add_space(8.0);
-
-		ui.horizontal(|ui| {
-			if ui.button("Reset Telemetry States").clicked() {
-				// Reset state here when you decide what "reset" means.
-			}
-
-			ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-				ui.label("PoC V1.0 - Ready for OS Daemon translation");
-			});
-		});
-	}
-}
-
-// -----------------------------------------------------------------------------
-// VEABLE
-// -----------------------------------------------------------------------------
-
-impl Veable<NativeRuntime> for Oracle {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, NativeRuntime>) {
-		self.draw_ui(ui, ctx);
-		self.draw_status_bar(ui);
-	}
-}
-
 #[derive(Debug)]
 pub struct GestureState {
 	pub active_focus: FocusedPane,
@@ -896,16 +616,16 @@ impl Default for GestureState {
 }
 #[derive(Debug)]
 pub struct GestureController {
-	state: GestureState,
+	pub state: GestureState,
 }
 
 impl GestureController {
-	pub fn new() -> Self {
+	pub(crate) fn new() -> Self {
 		Self {
 			state: GestureState::default(),
 		}
 	}
-	fn inspect(&mut self, ui: &egui::Ui, input: &VeInputState) -> TrackpadState {
+	pub(crate) fn inspect(&mut self, ui: &egui::Ui, input: &VeInputState) -> TrackpadState {
 		let current = ui.input(|input| {
 			let delta = input.smooth_scroll_delta;
 			(
@@ -935,7 +655,7 @@ impl GestureController {
 			shift_held: shift,
 		}
 	}
-	fn direction(delta: egui::Vec2) -> ScrollDirection {
+	pub(crate) fn direction(delta: egui::Vec2) -> ScrollDirection {
 		if delta.x == 0.0 && delta.y == 0.0 {
 			ScrollDirection::None
 		} else if delta.x.abs() > delta.y.abs() {
@@ -950,7 +670,10 @@ impl GestureController {
 			ScrollDirection::Up
 		}
 	}
-	fn hover_target(mouse_pos: Option<egui::Pos2>, viewport: egui::Rect) -> Option<CursorTarget> {
+	pub(crate) fn hover_target(
+		mouse_pos: Option<egui::Pos2>,
+		viewport: egui::Rect,
+	) -> Option<CursorTarget> {
 		let Some(pos) = mouse_pos else {
 			return None;
 		};
@@ -960,7 +683,7 @@ impl GestureController {
 		// Replace this with your actual target rectangles.
 		Some(CursorTarget::Main)
 	}
-	fn focus_for_target(target: CursorTarget) -> FocusedPane {
+	pub(crate) fn focus_for_target(target: CursorTarget) -> FocusedPane {
 		match target {
 			CursorTarget::Main => FocusedPane::MainEditor,
 			CursorTarget::DockLeft | CursorTarget::DockRight => FocusedPane::SidePanel,
@@ -996,7 +719,7 @@ pub struct TrackpadState {
 	pub focus: FocusedPane,
 }
 impl TrackpadState {
-	fn primary_axis(&self) -> &'static str {
+	pub(crate) fn primary_axis(&self) -> &'static str {
 		if self.delta.x.abs() > self.delta.y.abs() {
 			"Horizontal (X)"
 		} else if self.delta.y.abs() > self.delta.x.abs() {
@@ -1005,7 +728,7 @@ impl TrackpadState {
 			"None"
 		}
 	}
-	fn hovered_name(&self) -> &'static str {
+	pub(crate) fn hovered_name(&self) -> &'static str {
 		self.hovered.name()
 	}
 }
@@ -1271,104 +994,4 @@ pub struct VeInputState {
 	pub cursor_target: CursorTarget,
 	pub primary_down: bool,
 	pub shift_held: bool,
-}
-
-pub struct WaterfallChart;
-impl WaterfallChart {
-	pub fn new() -> Self {
-		Self
-	}
-	pub fn draw_chart<'a>(&self, ui: &mut Ui, jobs: impl Iterator<Item = &'a Job>) {
-		let jobs: Vec<&Job> = jobs.collect();
-		if jobs.is_empty() {
-			ui.centered_and_justified(|ui| {
-				ui.label("No job history");
-			});
-			return;
-		}
-		let now = EstateState::now();
-		let mut timed_jobs = Vec::new();
-		for job in jobs {
-			let Some(started_at) = job.started_at else {
-				continue;
-			};
-			let start = started_at as f64;
-			let end = job.completed_at.unwrap_or(now) as f64;
-			timed_jobs.push((job, start, end.max(start + 1.0)));
-		}
-		if timed_jobs.is_empty() {
-			ui.centered_and_justified(|ui| {
-				ui.label("No timed jobs");
-			});
-			return;
-		}
-		// Sort chronologically so we can pack jobs into the
-		// smallest possible number of horizontal lanes.
-		timed_jobs.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
-		// Each lane stores the end time of its last job.
-		let mut lanes: Vec<f64> = Vec::new();
-		let mut bars = Vec::with_capacity(timed_jobs.len());
-		let mut min_time = f64::MAX;
-		let mut max_time = f64::MIN;
-		for (job, start, end) in timed_jobs {
-			min_time = min_time.min(start);
-			max_time = max_time.max(end);
-			// Reuse the first lane whose previous job has
-			// already finished.
-			let lane = lanes
-				.iter()
-				.position(|lane_end| *lane_end <= start)
-				.unwrap_or_else(|| {
-					lanes.push(0.0);
-					lanes.len() - 1
-				});
-
-			lanes[lane] = end;
-
-			let duration = end - start;
-
-			bars.push(
-				Bar::new(lane as f64, duration)
-					.horizontal()
-					.base_offset(start)
-					.width(0.7)
-					.name(job.kind.name()),
-			);
-		}
-
-		let padding = ((max_time - min_time) * 0.05).max(1.0);
-
-		let lane_count = lanes.len() as f64;
-
-		Plot::new("job_timeline")
-			.height(280.0)
-			// Horizontal range is time.
-			.include_x(min_time - padding)
-			.include_x(max_time + padding)
-			// Vertical range is ONLY the lanes we actually needed.
-			.include_y(-0.75)
-			.include_y((lane_count - 1.0).max(0.0) + 0.75)
-			.allow_drag(true)
-			.allow_zoom(true)
-			.allow_scroll(true)
-			// Don't allow independent Y-axis zooming.
-			.allow_axis_zoom_drag(false)
-			.show_x(true)
-			.show_y(false)
-			.legend(egui_plot::Legend::default())
-			.x_axis_formatter(|mark, _range| format_timestamp(mark.value))
-			.show(ui, |plot_ui| {
-				plot_ui.bar_chart(BarChart::new("jobs", bars).horizontal());
-			});
-	}
-}
-impl<R: Runtime> Veable<R> for WaterfallChart {
-	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, R>) {
-		if ctx.state_changed() {
-			ui.ctx().request_repaint();
-		}
-		ui.heading("Job History");
-		let state = ctx.state();
-		self.draw_chart(ui, state.jobs.iter());
-	}
 }
