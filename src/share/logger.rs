@@ -1,21 +1,17 @@
-use crate::prelude::*;
+use std::fs::OpenOptions;
 
-use tracing::{ debug, error, info, info_span, trace, warn };
+use crate::{native::resolver::engine_data_dir, prelude::*};
+
+use tracing::{debug, error, info, info_span, trace, warn};
 use tracing_subscriber::{
-	EnvFilter,
-	Layer,
-	filter::LevelFilter,
-	fmt,
-	layer::SubscriberExt,
-	util::SubscriberInitExt,
+	EnvFilter, Layer, filter::LevelFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt,
 };
 
 pub fn init_logging(config: &LogConfig) -> Result<()> {
 	let terminal_filter = config.terminal_filter()?;
-	let terminal = fmt
-		::layer()
+	let terminal = fmt::layer()
 		.without_time()
-		.with_target(true)
+		.with_target(false)
 		.with_thread_ids(false)
 		.with_ansi(true)
 		// .with_timer(fmt::time::SystemTime)
@@ -28,39 +24,37 @@ pub fn init_logging(config: &LogConfig) -> Result<()> {
 	// let terminal = fmt::layer()
 	// 	.with_target(true)
 	// 	.with_thread_ids(false)
-	// let file = if config.file.enabled {
-	// 	let path = engine_data_dir()?.join("estate.log");
-	// 	let writer = OpenOptions::new().create(true).append(true).open(path)?;
-	// 	Some(
-	// 		fmt::layer()
-	// 			.with_writer(writer)
-	// 			.with_target(true)
-	// 			.with_thread_ids(true)
-	// 			.with_thread_names(true)
-	// 			.with_file(true)
-	// 			.with_line_number(true)
-	// 			.with_ansi(false)
-	// 			.with_filter(LevelFilter::TRACE),
-	// 	)
-	// } else {
-	// 	None
-	// };
+	let file = if config.file.enabled {
+		let path = engine_data_dir()?.join("estate.log");
+		let writer = OpenOptions::new().create(true).append(true).open(path)?;
+		Some(
+			fmt::layer()
+				.with_writer(writer)
+				.with_target(true)
+				.with_thread_ids(true)
+				.with_thread_names(true)
+				.with_file(true)
+				.with_line_number(true)
+				.with_ansi(false)
+				.with_filter(LevelFilter::TRACE),
+		)
+	} else {
+		None
+	};
 	// let subscriber = tracing_subscriber::registry().with(terminal);
 	// if let Some(file) = file {
 	// 	subscriber.with(file).init();
 	// } else {
 	// 	subscriber.init();
 	// }
-	tracing_subscriber
-		::registry()
+	tracing_subscriber::registry()
 		.with(terminal)
-		// .with(file)
+		.with(file)
 		.init();
 	Ok(())
 }
 pub fn init() -> Result<()> {
-	tracing_subscriber
-		::registry()
+	tracing_subscriber::registry()
 		.with(EnvFilter::from_default_env())
 		.with(tracing_subscriber::fmt::layer())
 		.init();
@@ -118,7 +112,7 @@ impl LogConfig {
 		let path = Path::new(env!("CARGO_MANIFEST_DIR"))
 			.ancestors()
 			.find_map(|dir| {
-				let path = dir.join("Estate.toml");
+				let path = dir.join("estate.toml");
 				path.exists().then_some(path)
 			});
 		let Some(path) = path else {
@@ -129,7 +123,7 @@ impl LogConfig {
 		Ok(manifest.logging)
 	}
 	fn workspace_cargo_toml() -> PathBuf {
-		PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../Estate.toml")
+		PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../estate.toml")
 	}
 	fn load_global() -> Result<Option<Self>> {
 		let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -245,6 +239,13 @@ impl TraceFlow {
 	pub fn error(&mut self, message: &str) {
 		self.event(LogLevel::Error, message);
 	}
+
+	// pub fn preview(&mut self, message: &str) {
+	// 	self.debug(message);
+	// 	self.info(message);
+	// 	self.warn(message);
+	// 	self.error(message)
+	// }
 }
 
 #[derive(Debug, Deserialize)]
