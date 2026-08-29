@@ -2,6 +2,7 @@ use crate::{
 	app::{self, App, Runtime, event::*, model::EstateEngine, *},
 	native::{self, runtime::NativeRuntime, screens::*, *},
 	prelude::*,
+	ui::rendermd::MarkdownView,
 };
 
 use signal_hook::{consts::SIGINT, iterator::Signals};
@@ -369,6 +370,12 @@ impl NativeApp {
 			WindowType::TaskManager => ("Task Manager", Ve::new(TaskManager::new())),
 			WindowType::Dashboard => ("Estate Dashboard", Ve::new(Dashboard::new())),
 			WindowType::WaterfallChart => ("Estate Dashboard", Ve::new(WaterfallChart::new())),
+			WindowType::MarkdownView => (
+				"Estate Dashboard",
+				Ve::new(MarkdownView::new(
+					"/Users/future/kb/project/crates/estate/src/data/corpus.md",
+				)),
+			),
 			_ => {
 				todo!("abstraction_of_references_and_pointers")
 			}

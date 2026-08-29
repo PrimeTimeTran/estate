@@ -2,6 +2,7 @@ use crate::theme::palette;
 
 pub(crate) mod chart;
 pub(crate) mod components;
+pub(crate) mod rendermd;
 
 pub const TRAY_ICON: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/estate-tray.png"));
 pub const TRAY_SCROLL_ICON: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/estate-tray.png"));
