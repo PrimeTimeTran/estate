@@ -1,12 +1,12 @@
 use crate::{
 	app::{Runtime, host::AppHost, modules::runtime::RuntimeState, state::StateStore, *},
-	native::state::NativeStateStore,
+	native::{session::Session, state::NativeStateStore},
 	prelude::*,
 };
 
 pub struct NativeAppContext<'a> {
 	pub base: AppContext<'a, NativeRuntime>,
-	pub monitor: &'a mut monitor_native::NativeMonitor,
+	pub monitor: &'a mut NativeMonitor,
 }
 
 impl<'a> NativeAppContext<'a> {
@@ -22,6 +22,7 @@ impl<'a> NativeAppContext<'a> {
 
 #[derive(Clone, Debug)]
 pub struct NativeRuntime {
+	pub session: Session,
 	pub store: NativeStateStore,
 	pub events: EventBus,
 	pub state: Arc<RuntimeState>,
@@ -36,10 +37,15 @@ impl Runtime for NativeRuntime {
 		let runtime = Arc::clone(self);
 		let mut receiver = runtime.events.subscribe();
 		let mut dispatcher = EventDispatcher::new();
+		// Creating, scheduling, executing, completing tasks
 		dispatcher.register(TaskHandler);
+		// Updating persisted/application state
 		dispatcher.register(StateHandler);
+		// User/application commands
 		dispatcher.register(CommandHandler);
+		// Filesystem change events
 		dispatcher.register(FileWatcherHandler);
+		dispatcher.register(AppHandler);
 		tokio::spawn(async move {
 			loop {
 				match receiver.recv().await {
@@ -61,12 +67,14 @@ impl Runtime for NativeRuntime {
 	fn state(&self) -> &RuntimeState {
 		&self.state
 	}
+
 	fn save(&self, state: &EstateState) -> Result<()> {
+		let session = self.session.clone();
 		self.store.save(state)
 	}
-	// fn poll_state(&mut self) -> bool {
-	// 	self.state.revision()
-	// }
+	fn session(&self) -> Session {
+		self.session.clone()
+	}
 }
 
 impl NativeRuntime {
@@ -74,8 +82,9 @@ impl NativeRuntime {
 		let store = NativeStateStore::new()?;
 		let state = store.load()?;
 		let runtime_state = RuntimeState::new(state);
-
+		let session = Session::default();
 		Ok(Self {
+			session,
 			store,
 			events: EventBus::new(),
 			state: Arc::new(runtime_state),

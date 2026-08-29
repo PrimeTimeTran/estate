@@ -1,6 +1,7 @@
-use crate::{ prelude::* };
+use crate::native::session::Session;
+use crate::prelude::*;
 
-use crate::app::{ Runtime };
+use crate::app::Runtime;
 
 mod estate;
 use estate::Estate;
@@ -53,6 +54,9 @@ impl<R: Runtime> EstateEngine<R> {
 			search: SearchService::default(),
 			analysis: AnalysisService::default(),
 		})
+	}
+	pub fn session(&mut self) -> Session {
+		self.runtime.session()
 	}
 }
 

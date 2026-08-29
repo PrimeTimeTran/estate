@@ -1,6 +1,6 @@
 use crate::{
 	app::{self, App, Runtime, event::*, model::EstateEngine, *},
-	native::{runtime::NativeRuntime, screens::*, *},
+	native::{self, runtime::NativeRuntime, screens::*, *},
 	prelude::*,
 };
 
@@ -19,33 +19,34 @@ pub struct NativeApp {
 	pub windows: Vec<AppWindow>,
 	clock_running: Arc<AtomicBool>,
 	daemon_tx: mpsc::Sender<DaemonCommand>,
+	daemon_rx: Option<mpsc::Receiver<DaemonCommand>>,
 	hotkey_manager: GlobalHotkeys,
 	last_state_revision: u64,
 	menu: Option<TrayMenu>,
-	monitor: monitor_native::NativeMonitor,
+	monitor: native::monitor::NativeMonitor,
 	scroll_tray: Option<TrayIcon>,
 	tray: Option<TrayIcon>,
 }
 impl NativeApp {
 	pub fn new() -> Result<Self> {
 		let (daemon_tx, daemon_rx) = mpsc::channel(100);
+
 		let runtime = NativeRuntime::new()?;
 		let engine = EstateEngine::new(runtime)?;
 		let app = App::new(engine)?;
 
-		Self::spawn_daemon(daemon_rx, Arc::clone(&app.engine.runtime));
-
 		Ok(Self {
 			app,
-			monitor: monitor_native::NativeMonitor::new()?,
-			last_state_revision: 0,
+			windows: vec![],
 			clock_running: Arc::new(AtomicBool::new(true)),
 			daemon_tx,
+			daemon_rx: Some(daemon_rx),
 			hotkey_manager: GlobalHotkeys::new().unwrap(),
+			last_state_revision: 0,
 			menu: None,
+			monitor: native::monitor::NativeMonitor::new()?,
 			scroll_tray: None,
 			tray: None,
-			windows: vec![],
 		})
 	}
 	pub fn run(&mut self, cli: Cli) -> Result<()> {
@@ -65,6 +66,10 @@ impl NativeApp {
 	}
 	fn start_runtime(&mut self) -> Result<()> {
 		tracing::info!(">>> NativeApp::start_runtime start");
+		let daemon_rx = self.daemon_rx.take().expect("daemon already started");
+		let (ready_tx, ready_rx) = std::sync::mpsc::sync_channel(1);
+		Self::spawn_daemon(daemon_rx, Arc::clone(&self.app.engine.runtime), ready_tx);
+		ready_rx.recv().expect("daemon failed to initialize");
 		self.spawn_global_hotkey_daemon()?;
 		let event_loop = EventLoop::<AppEvent>::with_user_event()
 			.with_activation_policy(ActivationPolicy::Accessory)
@@ -73,6 +78,15 @@ impl NativeApp {
 		self.spawn_clock(proxy.clone());
 		self.spawn_cursor_daemon(proxy.clone());
 		self.spawn_signal_handler(proxy.clone());
+		// Tell Estate that the application has started.
+		self
+			.app
+			.runtime()
+			.emit(Event::app(app::EventKind::SessionStart));
+		// self
+		// 	.app
+		// 	.runtime()
+		// 	.emit(Event::app(app::EventKind::StopSession { session: () }));
 		event_loop.run_app(self)?;
 		tracing::info!(">>> NativeApp::start_runtime returning");
 		Ok(())
@@ -101,11 +115,16 @@ impl NativeApp {
 		self.hotkey_manager.start();
 		Ok(())
 	}
-	fn spawn_daemon(mut rx: mpsc::Receiver<DaemonCommand>, runtime: Arc<NativeRuntime>) {
+	fn spawn_daemon(
+		mut rx: mpsc::Receiver<DaemonCommand>,
+		runtime: Arc<NativeRuntime>,
+		ready_tx: std::sync::mpsc::SyncSender<()>,
+	) {
 		std::thread::spawn(move || {
 			let tokio_runtime = tokio::runtime::Runtime::new().expect("failed to create Tokio runtime");
 			tokio_runtime.block_on(async move {
 				runtime.start_dispatcher();
+				let _ = ready_tx.send(());
 				let daemon: Daemon<NativeRuntime> = Daemon::new(runtime.clone());
 				let shutdown_token = daemon.shutdown_token.clone();
 				let daemon_task = tokio::spawn(async move {
@@ -116,6 +135,7 @@ impl NativeApp {
 					Some(DaemonCommand::Stop) => {
 						tracing::info!("daemon stop requested");
 						shutdown_token.cancel();
+
 						match daemon_task.await {
 							Ok(Ok(())) => {
 								tracing::info!("daemon stopped cleanly");
@@ -236,7 +256,6 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 					input: VeInputState::default(),
 					app: &mut self.app,
 					last_revision: 0,
-					// monitor: &mut monitor_native::NativeMonitor::new().unwrap(),
 				};
 				if let Err(e) = window.window.draw(&mut ctx) {
 					tracing::error!("DEV >>> draw failed: {e:#}");
@@ -313,8 +332,8 @@ impl NativeApp {
 			return;
 		};
 		let id = event.id();
-		tracing::info!(">>> opening window: {:?}", event.id());
-		tracing::info!(">>> opening window: {:?}", id);
+		// tracing::info!(">>> opening window: {:?}", event.id());
+		// tracing::info!(">>> opening window: {:?}", id);
 
 		if id == menu.quit.id() {
 			tracing::info!(">>> tray quit requested");
@@ -348,7 +367,8 @@ impl NativeApp {
 		let (title, view) = match kind {
 			WindowType::TelemetryInspector => ("Telemetry Inspector", Ve::new(Oracle::new())),
 			WindowType::TaskManager => ("Task Manager", Ve::new(TaskManager::new())),
-			WindowType::Dashboard => ("Estate Dashboard", Ve::new(Graphics::new())),
+			WindowType::Dashboard => ("Estate Dashboard", Ve::new(Dashboard::new())),
+			WindowType::WaterfallChart => ("Estate Dashboard", Ve::new(WaterfallChart::new())),
 			_ => {
 				todo!("abstraction_of_references_and_pointers")
 			}

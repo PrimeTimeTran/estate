@@ -1,4 +1,9 @@
-use crate::{ app::{ *, Runtime, model }, prelude::* };
+use crate::{
+	app::{Runtime, model, *},
+	data::defaults::{self, HOME_DIR, INDEX_PATH, INTRINSIC_FILES, WORKSPACE_SETTINGS},
+	native::resolver::path,
+	prelude::*,
+};
 
 impl<R: Runtime> model::EstateEngine<R> {
 	pub async fn format(self, args: &FormatArgs) -> Result<String, Error> {
@@ -6,7 +11,6 @@ impl<R: Runtime> model::EstateEngine<R> {
 		Ok("Success".to_string())
 	}
 }
-
 #[derive(Clone, Debug)]
 pub struct EstateDiscovery {
 	pub store: DiscoveryStore,
@@ -21,46 +25,89 @@ impl Default for EstateDiscovery {
 	}
 }
 impl EstateDiscovery {
-	// pub fn init(probes: ProbeSet) -> std::io::Result<DiscoveryStore> {
-	// [*] Hard coded until discovery is stabilizes
+	fn discover_files(&mut self, root: &Path) -> std::io::Result<()> {
+		self.walk_files(root)
+	}
+	fn walk_files(&mut self, dir: &Path) -> std::io::Result<()> {
+		for entry in std::fs::read_dir(dir)? {
+			let entry = entry?;
+			let path = entry.path();
+			if path.is_dir() {
+				self.walk_files(&path)?;
+				continue;
+			}
+			if path.is_file() && path.extension().is_some_and(|ext| ext == "md") {
+				self.store.files.push(path);
+			}
+		}
+		Ok(())
+	}
+}
+impl EstateDiscovery {
 	pub fn init() -> std::io::Result<DiscoveryStore> {
 		let cwd = std::env::current_dir()?;
 		let mut discovery = Self::default();
+		discovery.discover_personal(&cwd)?;
+		discovery.discover_files(&cwd)?;
+		discovery.discover_config(&cwd)?;
+		Ok(discovery.store)
+	}
+	fn discover_config(&mut self, cwd: &Path) -> std::io::Result<()> {
+		if let Some(home) = dirs::home_dir() {
+			let config_dir = home.join(HOME_DIR);
+			for name in INTRINSIC_FILES {
+				let path = config_dir.join(name);
+				if path.is_file() {
+					tracing::info!(?path, "discovered Estate config");
+					self.store.items.push(DiscoveryItem::Config(path));
+					// let raw = RawDiscovery { probe, path };
+					// self.handle(DiscoveryEvent::Found(RawDiscovery))
+					// if let Some(path) = Self::probe(dir, probe) {
+					// 	let raw = RawDiscovery { probe, path };
+					// 	self.handle(DiscoveryEvent::Found(raw));
+					// }
+				}
+			}
+		}
 		walk_root_to_path(cwd, |dir| {
-			println!("dir {:?}", dir);
-			// for probe in probes {
+			let path = dir.join(WORKSPACE_SETTINGS);
+			if path.is_file() {
+				tracing::info!(?path, "discovered workspace config");
+				self.store.items.push(DiscoveryItem::Config(path));
+			}
+			WalkControl::Continue
+		})?;
+		Ok(())
+	}
+	fn discover_personal(&mut self, cwd: &Path) -> std::io::Result<()> {
+		walk_root_to_path(cwd, |dir| {
 			for probe in PROBES_PERSONAL {
 				if let Some(path) = Self::probe(dir, probe) {
-					discovery.emit(DiscoveryEvent::Found(RawDiscovery { probe, path }));
+					let raw = RawDiscovery { probe, path };
+					self.handle(DiscoveryEvent::Found(raw));
 				}
 			}
 			WalkControl::Continue
 		})?;
-		Ok(discovery.store)
+		Ok(())
 	}
-	// Creates a background task pipeline.
-	//
-	// Returns the sender side (`tx`) so producers can submit work.
-	// Spawns a worker that owns the receiver side (`rx`) and processes
-	// tasks independently.
-	//
-	// Flow:
-	//
-	//     EstateDiscovery
-	//          |
-	//          |  send(Task)
-	//          v
-	//     mpsc channel (buffer: 100)
-	//          |
-	//          v
-	//     worker(rx)
-	//          |
-	//          +--> index files
-	//          +--> generate configs
-	//          +--> run background jobs
-	//
-	// Multiple producers can clone the sender and enqueue work.
-	// The worker runs concurrently and consumes tasks as they arrive.
+	fn handle(&mut self, event: DiscoveryEvent) {
+		match event {
+			DiscoveryEvent::StartTask(_) => {}
+			DiscoveryEvent::Found(raw) => match raw.probe.id {
+				"cargo" => {
+					self.store.add_directory(FrameworkKind::Cargo, raw.path);
+				}
+				"npm" => {
+					self.store.add_directory(FrameworkKind::Npm, raw.path);
+				}
+				"estate" => {
+					self.store.add_directory(FrameworkKind::Estate, raw.path);
+				}
+				_ => {}
+			},
+		}
+	}
 	pub fn prepare() -> mpsc::Sender<DiscoveryTask> {
 		let (tx, rx) = mpsc::channel::<DiscoveryTask>(100);
 		tokio::spawn(worker(rx));
@@ -80,60 +127,223 @@ impl EstateDiscovery {
 		match raw.probe.id {
 			"estate" => Some(DiscoveryItem::Estate(raw.path)),
 			"git" => Some(DiscoveryItem::GitRepo(raw.path)),
-			"cargo" => Some(DiscoveryItem::CargoProject(raw.path)),
 			"zed" => Some(DiscoveryItem::Editor(EditorKind::Zed)),
+			"cargo" => Some(DiscoveryItem::CargoProject(raw.path)),
+			"npm" => Some(DiscoveryItem::Project(raw.path)),
+			"Cargo.toml" => Some(DiscoveryItem::CargoProject(raw.path)),
+			"package.json" => Some(DiscoveryItem::Project(raw.path)),
+			"zed" => Some(DiscoveryItem::PackageManager(raw.path)),
+			"estate-settings" => Some(DiscoveryItem::Settings(raw.path)),
+			"estate-keymap" => Some(DiscoveryItem::KeyMap(raw.path)),
 			_ => None,
 		}
 	}
 }
-
 #[derive(Debug)]
 pub struct RawDiscovery {
 	pub probe: &'static Probe,
 	pub path: PathBuf,
 }
-
 #[async_trait]
 impl DiscoverySink for EstateDiscovery {
 	async fn emit(&mut self, event: DiscoveryEvent) {
 		match event {
-			DiscoveryEvent::Found(raw) => {
-				if let Some(item) = Self::resolve(raw) {
-					self.store.items.push(item);
+			DiscoveryEvent::StartTask(raw) => {}
+			DiscoveryEvent::Found(raw) => match raw.probe.id {
+				"cargo" => {
+					self.store.add_directory(FrameworkKind::Cargo, raw.path);
 				}
-			}
-			DiscoveryEvent::StartTask(task) => {
-				self.task_tx.send(task).await.unwrap();
-			}
+				"npm" => {
+					self.store.add_directory(FrameworkKind::Npm, raw.path);
+				}
+
+				"git" => {
+					self.store.add_directory(FrameworkKind::Git, raw.path);
+				}
+				_ => {
+					if let Some(item) = Self::resolve(raw) {
+						self.store.items.push(item);
+					}
+				}
+			},
 		}
 	}
 }
-
-/// Entity representing the MCP tools available
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum Tool {}
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct DirectoryDiscovery {
+	pub estate: Vec<PathBuf>,
+	pub git: Vec<PathBuf>,
+	pub cargo: Vec<PathBuf>,
+	pub npm: Vec<PathBuf>,
+}
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum FrameworkKind {
+	Estate,
+	Git,
+	Cargo,
+	Npm,
+}
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct DiscoveryStore {
 	pub items: Vec<DiscoveryItem>,
+	pub files: Vec<PathBuf>,
+	pub directories: HashMap<FrameworkKind, Vec<PathBuf>>,
+	pub configs: Vec<PathBuf>,
+}
+impl DiscoveryStore {
+	pub fn add_directory(&mut self, kind: FrameworkKind, path: PathBuf) {
+		self.directories.entry(kind).or_default().push(path);
+	}
+	pub fn add_file(&mut self, path: PathBuf) {
+		self.files.push(path);
+	}
+	pub fn types(&self) -> Vec<String> {
+		let mut types = std::collections::HashSet::new();
+		for path in &self.files {
+			if let Some(ext) = path.extension().and_then(|ext| ext.to_str()) {
+				types.insert(format!(".{ext}"));
+			}
+		}
+		let mut types: Vec<String> = types.into_iter().collect();
+		types.sort();
+		types
+	}
+	pub fn filtered_resources(&self) -> Vec<String> {
+		self
+			.items
+			.iter()
+			.filter_map(|item| match item {
+				DiscoveryItem::Config(path) => Some(path.to_string_lossy().into_owned()),
+				_ => None,
+			})
+			.collect()
+	}
+	fn get_framework_paths(&self, kind: FrameworkKind) -> &[PathBuf] {
+		self
+			.directories
+			.get(&kind)
+			.map(Vec::as_slice)
+			.unwrap_or(&[])
+	}
+	pub fn write_discovery_result(&mut self) -> Result<()> {
+		let path = dirs::home_dir()
+			.ok_or_else(|| anyhow::anyhow!("could not determine home directory"))?
+			.join(INDEX_PATH);
+		tracing::info!(?path, "writing discovery result");
+		let mut master: serde_json::Value = if path.exists() {
+			tracing::info!("loading existing master.json");
+			let contents = std::fs::read_to_string(&path)
+				.map_err(|error| anyhow::anyhow!("failed to read {:?}: {error}", path))?;
+			if contents.trim().is_empty() {
+				tracing::info!("master.json is empty, creating default");
+				defaults::master()
+			} else {
+				serde_json::from_str::<serde_json::Value>(&contents)
+					.map_err(|error| anyhow::anyhow!("invalid master.json: {error}"))?
+			}
+		} else {
+			tracing::info!("master.json does not exist, creating default");
+			defaults::master()
+		};
+		if !master.is_object() {
+			master = defaults::master();
+		}
+		self.apply_discovery(&mut master)?;
+		let contents = serde_json::to_string_pretty(&master)?;
+		let parent = path
+			.parent()
+			.ok_or_else(|| anyhow::anyhow!("master.json has no parent"))?;
+		std::fs::create_dir_all(parent)?;
+		let tmp = path.with_extension("json.tmp");
+		tracing::info!(?tmp, "writing temporary master.json");
+		std::fs::write(&tmp, &contents)
+			.map_err(|error| anyhow::anyhow!("failed to write {:?}: {error}", tmp))?;
+		std::fs::rename(&tmp, &path)
+			.map_err(|error| anyhow::anyhow!("failed to replace {:?}: {error}", path))?;
+		tracing::info!(
+			files = self.files.len(),
+			items = self.items.len(),
+			"discovery result written"
+		);
+		Ok(())
+	}
+	pub fn apply_discovery(&mut self, master: &mut serde_json::Value) -> Result<()> {
+		let unique_files: std::collections::HashSet<_> = self.files.iter().collect();
+		master["metrics"]["files"] = serde_json::json!(self.files.len());
+		master["metrics"]["files.unique"] = serde_json::json!(unique_files.len());
+		master["estate"]["files"] = serde_json::to_value(self.files.clone())?;
+		let mut counts = std::collections::HashMap::<String, usize>::new();
+		for file in self.files.clone() {
+			if let Some(ext) = file.extension().and_then(|ext| ext.to_str()) {
+				*counts.entry(format!(".{ext}")).or_default() += 1;
+			}
+		}
+		let mut counter: Vec<serde_json::Value> = counts
+			.iter()
+			.map(|(ext, num)| {
+				serde_json::json!({
+					"ext": ext,
+					"num": num,
+				})
+			})
+			.collect();
+		counter.sort_by(|a, b| a["ext"].as_str().cmp(&b["ext"].as_str()));
+		let types = counter
+			.iter()
+			.filter_map(|item| item["ext"].as_str())
+			.collect::<Vec<_>>()
+			.join("|");
+		master["metrics"]["types"] = serde_json::json!(counts.len());
+		master["metrics"]["counter"] = serde_json::Value::Array(counter);
+		master["estate"]["types"] = serde_json::json!(types);
+
+		let cargo_paths = self.get_framework_paths(FrameworkKind::Cargo);
+		let estate_paths = self.get_framework_paths(FrameworkKind::Estate);
+		let npm_paths = self.get_framework_paths(FrameworkKind::Npm);
+
+		master["metrics"]["projects"]["cargo"] = serde_json::json!(cargo_paths);
+		master["metrics"]["projects"]["npm"] = serde_json::json!(npm_paths);
+		master["metrics"]["projects"]["estate"] = serde_json::json!(estate_paths);
+		let has_dotrepo = self
+			.items
+			.iter()
+			.any(|item| matches!(item, DiscoveryItem::GitRepo(_)));
+		master["estate"]["onboarding"]["has.dotrepo"] = serde_json::json!(has_dotrepo);
+		let config_sources: Vec<String> = self
+			.items
+			.iter()
+			.filter_map(|item| match item {
+				DiscoveryItem::Config(path) => Some(path.to_string_lossy().into_owned()),
+				_ => None,
+			})
+			.collect();
+		master["config.active"]["sources"] = serde_json::json!(config_sources);
+		Ok(())
+	}
 }
 #[derive(Debug)]
 pub enum DiscoveryEvent {
 	Found(RawDiscovery),
 	StartTask(DiscoveryTask),
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum EditorKind {
 	Zed,
-	// NeoVim,
-	// Lapce,
-	// VSCode,
 }
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum DiscoveryItem {
 	Estate(PathBuf),
 	GitRepo(PathBuf),
 	CargoProject(PathBuf),
 	Editor(EditorKind),
+	Project(PathBuf),
+	PackageManager(PathBuf),
+	Config(PathBuf),
+	Settings(PathBuf),
+	KeyMap(PathBuf),
 }
 #[async_trait]
 pub trait DiscoverySink {
@@ -144,7 +354,8 @@ pub enum WalkControl {
 	Stop,
 }
 pub fn walk_root_to_path<F>(target: impl AsRef<Path>, mut visit: F) -> std::io::Result<WalkControl>
-	where F: FnMut(&Path) -> WalkControl
+where
+	F: FnMut(&Path) -> WalkControl,
 {
 	let target = target.as_ref().canonicalize()?;
 	let mut current = filesystem_root(&target);
@@ -175,7 +386,7 @@ pub struct Probe {
 }
 pub type ProbeSet = &'static [Probe];
 #[derive(Debug)]
-/// Async tasks triggerable by events
+///      Async tasks triggerable by events
 pub enum DiscoveryTask {
 	Index(PathBuf),
 	GenerateConfig(PathBuf),
@@ -213,7 +424,10 @@ impl FsWalker {
 			target,
 		}
 	}
-	pub fn walk_up_to_target<F>(&self, mut visit: F) -> std::io::Result<()> where F: FnMut(&Path) {
+	pub fn walk_up_to_target<F>(&self, mut visit: F) -> std::io::Result<()>
+	where
+		F: FnMut(&Path),
+	{
 		let mut current = self.root.clone();
 		loop {
 			visit(&current);
@@ -221,7 +435,13 @@ impl FsWalker {
 				break;
 			}
 			let next = current.join(
-				self.target.strip_prefix(&current).unwrap().components().next().unwrap()
+				self
+					.target
+					.strip_prefix(&current)
+					.unwrap()
+					.components()
+					.next()
+					.unwrap(),
 			);
 			current = next;
 		}
@@ -246,14 +466,14 @@ pub enum Location {
 		uri: String,
 	},
 }
-/// Result produced by the discovery process.
+///      Result produced by the discovery process.
 ///
-/// Contains the discovered items and metadata about the scan.
+///      Contains the discovered items and metadata about the scan.
 pub struct DiscoveryResult {
-	workspace: Workspace,
-	packages: Vec<Package>,
-	files: Vec<PathBuf>,
-	ignored: Vec<PathBuf>,
+	pub workspace: Workspace,
+	pub packages: Vec<Package>,
+	pub files: Vec<PathBuf>,
+	pub ignored: Vec<PathBuf>,
 }
 // struct Workspace;
 struct Package;

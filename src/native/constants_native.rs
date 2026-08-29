@@ -2,14 +2,22 @@ use std::sync::{Mutex, OnceLock, atomic::AtomicBool};
 
 use core_graphics::display::{CGPoint, CGRect};
 
-use crate::native::prelude::{ScrollRedirectState, *};
-pub static CURSOR_INSET: f64 = 0.125;
-pub static HOTKEY_INITIALIZED: AtomicBool = AtomicBool::new(false);
+use crate::{
+	native::prelude::{ScrollRedirectState, *},
+	ui::{PanelConfig, VeConfig},
+};
+
+// pub static INITIAL_WINDOW: WindowType = WindowType::TelemetryInspector;
+// pub static INITIAL_WINDOW: WindowType = WindowType::Dashboard;
 pub static INITIAL_WINDOW: WindowType = WindowType::TaskManager;
+// pub static INITIAL_WINDOW: WindowType = WindowType::WaterfallChart;
+
+pub static CURSOR_INSET: f64 = 0.125;
+pub static TELEPORT_RIGHT: AtomicBool = AtomicBool::new(false);
+pub static HOTKEY_INITIALIZED: AtomicBool = AtomicBool::new(false);
 pub static REDIRECTING_SCROLL: AtomicBool = AtomicBool::new(false);
 pub static SCROLL_STATE: OnceLock<Mutex<ScrollRedirectState>> = OnceLock::new();
 pub static SHIFT_HELD: AtomicBool = AtomicBool::new(false);
-pub static TELEPORT_RIGHT: AtomicBool = AtomicBool::new(false);
 
 pub fn target_position(bounds: CGRect, target: ScreenPosition, y: f64) -> CGPoint {
 	let inset = CURSOR_INSET;
@@ -114,6 +122,21 @@ pub const PROBES_PERSONAL: ProbeSet = &[
 		name: "commands",
 		kind: ProbeKind::Directory,
 	},
+	Probe {
+		id: "cargo",
+		name: "Cargo.toml",
+		kind: ProbeKind::File,
+	},
+	Probe {
+		id: "npm",
+		name: "package.json",
+		kind: ProbeKind::File,
+	},
+	Probe {
+		id: "estate",
+		name: "settings.json",
+		kind: ProbeKind::File,
+	},
 ];
 pub const REACT_CONFIGS: ProbeSet = &[
 	Probe {
@@ -173,6 +196,33 @@ pub const PROBES: ProbeSet = &[
 	Probe {
 		id: "zed",
 		name: ".zed",
+		kind: ProbeKind::Directory,
+	},
+	Probe {
+		id: "cargo",
+		name: "Cargo.toml",
+		kind: ProbeKind::File,
+	},
+];
+pub static PROBES_WORKSPACE: &[Probe] = &[
+	Probe {
+		id: "estate",
+		name: ".estate",
+		kind: ProbeKind::Directory,
+	},
+	Probe {
+		id: "estate-settings",
+		name: ".estate/settings.json",
+		kind: ProbeKind::File,
+	},
+	Probe {
+		id: "estate-keymap",
+		name: ".estate/key-map.json",
+		kind: ProbeKind::File,
+	},
+	Probe {
+		id: "git",
+		name: ".git",
 		kind: ProbeKind::Directory,
 	},
 	Probe {

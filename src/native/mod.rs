@@ -1,42 +1,48 @@
 #[cfg(target_os = "linux")]
-pub mod linux;
+pub(crate) mod linux;
 
 #[cfg(target_os = "windows")]
-pub mod windows;
+pub(crate) mod windows;
 
 #[cfg(target_os = "macos")]
-pub mod macos;
+pub(crate) mod macos;
 
-pub mod agent;
-pub mod app;
-pub mod backend;
-pub mod constants_native;
-pub mod core;
-pub mod daemon;
-pub mod job;
-pub mod linux;
-pub mod poc;
-pub mod prelude;
-pub mod resolver;
-pub mod router;
-pub mod runtime;
-pub mod state;
-pub mod ui;
-pub mod ve;
-pub mod window;
-pub use window::*;
-pub mod windows;
-pub mod screens;
-pub use screens::*;
+pub(crate) mod agent;
+pub(crate) mod app;
+pub(crate) mod backend;
+pub(crate) mod constants_native;
+pub(crate) mod core;
+pub(crate) mod daemon;
+pub(crate) mod job;
+pub(crate) mod linux;
+pub(crate) mod poc;
+pub(crate) mod prelude;
+pub(crate) mod resolver;
+pub(crate) mod router;
+pub(crate) mod runtime;
+pub(crate) mod session;
+pub(crate) mod state;
+pub(crate) mod ui;
+pub(crate) mod ve;
+pub(crate) mod window;
+pub(crate) use window::*;
+pub(crate) mod screens;
+pub(crate) mod windows;
+pub(crate) use screens::*;
 
-pub use tokio::{
-	io::{ AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader },
-	net::{ TcpListener, UnixListener, UnixStream },
+pub(crate) mod handler;
+#[path = "../app/modules/mod.rs"]
+pub(crate) mod modules;
+
+pub(crate) mod monitor;
+
+pub(crate) use tokio::{
+	io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
+	net::{TcpListener, UnixListener, UnixStream},
 	runtime::Runtime,
 	sync::{
-		broadcast::{ self, Receiver, Sender },
-		mpsc::{ self, UnboundedSender, channel },
+		broadcast::{self, Receiver, Sender},
+		mpsc::{self, UnboundedSender, channel},
 		oneshot,
 	},
 };
-// pub mod native {}

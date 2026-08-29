@@ -1,13 +1,12 @@
-use crate::{ prelude::{ *, Uuid } };
 use crate::app::*;
+use crate::prelude::{Uuid, *};
 
 #[derive(Debug, Clone, Eq, Deserialize, PartialEq, Serialize)]
 pub struct Job {
 	pub id: Uuid,
 	pub task_id: Uuid,
 	pub kind: TaskKind,
-	pub name: String,
-
+	// pub name: String,
 	pub status: JobStatus,
 
 	pub created_at: u64,

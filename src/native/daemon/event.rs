@@ -1,83 +1,21 @@
 use crate::app::modules::runtime::Runtime;
+use crate::data::defaults::{self, INDEX_PATH};
+use crate::native::session::Session;
 use crate::{
-	app::{event, *},
+	app::{
+		event::{self, EventKind},
+		*,
+	},
 	prelude::*,
 };
-
-// Events = facts that happened
+// Events = n that happened
 // Handlers = reactions to facts
 // Tasks = units of work
 // Commands = requests to do something
-/*
-		Tokio provides multiple channel types because they solve different
-		communication problems.
-		------------------------------------------------------------
-		mpsc = Multi Producer Single Consumer
-		------------------------------------------------------------
-		Many things send work to ONE worker.
-		Example:
-				CLI
-					\
-				Editor ---> Task Queue ---> Index Worker
-					/
-				Watcher
-		Use when:
-				- jobs should be processed once
-				- order matters
-				- you have a worker queue
-		Example:
-				"Please rebuild this index"
-		------------------------------------------------------------
-		broadcast = Multi Producer Multi Consumer
-		------------------------------------------------------------
-		Many things send events.
-		Many listeners receive the same event.
-		Example:
-				File Watcher
-							|
-							v
-					EventBus
-					/   |    \
-				 /    |     \
-			Logger Index UI
-		Use when:
-				- multiple systems need to react
-				- event is a fact that happened
-		Example:
-				"README.md changed"
-		------------------------------------------------------------
-		watch = Single Value State Updates
-		------------------------------------------------------------
-		One value changes.
-		Listeners only care about the latest value.
-		Example:
-				Daemon Status
-							|
-							v
-					watch channel
-							|
-					UI / menu bar
-		Old values do not matter.
-		Example:
-				"Daemon is currently healthy"
-		Estate architecture:
-				Commands
-						|
-						v
-					mpsc
-				(do work)
-				Events
-						|
-						v
-				broadcast
-				(announce facts)
-				State
-						|
-						v
-					watch
-				(latest snapshot)
-*/
-
+#[async_trait::async_trait]
+pub trait EventHandler: Send + Sync {
+	async fn handle(&self, event: &Event, runtime: &NativeRuntime);
+}
 #[derive(Debug, Clone)]
 pub struct EventBus {
 	sender: broadcast::Sender<Event>,
@@ -111,10 +49,7 @@ impl EventBus {
 		self.sender.subscribe()
 	}
 }
-#[async_trait::async_trait]
-pub trait EventHandler: Send + Sync {
-	async fn handle(&self, event: &Event, runtime: &NativeRuntime);
-}
+///
 pub struct LogHandler;
 #[async_trait::async_trait]
 impl EventHandler for LogHandler {
@@ -178,15 +113,32 @@ impl EventHandler for TaskHandler {
 			TaskRequest::Create(kind) => {
 				tracing::info!("TaskRequest::Create {:?}", kind);
 				let mut tasks = runtime.tasks.write().unwrap();
-				let task = tasks.create(kind.clone());
-				// let job_id = tasks.create_job(task);
 				let task_id = tasks.create(kind.clone());
-				// let job_id = tasks.start_job(task_id);
-				runtime.emit(Event::daemon(event::EventKind::TaskCreated {
-					task_id: task,
-					name: kind.name(),
+				runtime.emit(Event::daemon(EventKind::TaskCreated {
+					task_id,
+					kind: kind.clone(),
 				}));
-				task
+				match kind {
+					TaskKind::StartSesssion => {
+						tracing::info!("🔥 StartSesssion");
+						runtime.emit(Event::daemon(EventKind::TaskRequested {
+							request: TaskRequest::Create(TaskKind::LoadMaster),
+						}));
+						runtime.emit(Event::daemon(EventKind::TaskRequested {
+							request: TaskRequest::Create(TaskKind::RebuildIndex),
+						}));
+						runtime.emit(Event::daemon(EventKind::TaskRequested {
+							request: TaskRequest::Create(TaskKind::IndexWorkspace),
+						}));
+					}
+					TaskKind::StopSession => {
+						tracing::info!("🛑 StopSession");
+						// let session = runtime.session.clone();
+						// Master::save(session);
+					}
+					_ => {}
+				}
+				task_id
 			}
 			TaskRequest::Run(task_id) => *task_id,
 			_ => {
@@ -203,10 +155,6 @@ impl EventHandler for TaskHandler {
 		};
 		{
 			let mut tasks = runtime.tasks.write().unwrap();
-			// if let Err(error) = tasks.set_status(task_id, TaskStatus::Running) {
-			// 	tracing::warn!(%task_id, %error, "failed to set task running");
-			// 	return;
-			// }
 		}
 		runtime.emit(Event::daemon(event::EventKind::TaskStarted { task_id }));
 		let runtime = runtime.clone();
@@ -216,7 +164,7 @@ impl EventHandler for TaskHandler {
 				task = %task.name,
 				"task starting"
 			);
-			match TaskRunner::execute(task.clone()).await {
+			match TaskRunner::execute(&runtime, task.clone()).await {
 				Ok(()) => {
 					tracing::info!("TaskHandler match TaskRunner::execute {:?}", task);
 					runtime.emit(Event::daemon(event::EventKind::TaskCompleted { task_id }));
@@ -234,13 +182,12 @@ impl EventHandler for TaskHandler {
 pub struct StateHandler;
 #[async_trait::async_trait]
 impl EventHandler for StateHandler {
-	// async fn handle(&self, event: &Event, runtime: &NativeRuntime) -> Result<()> {
 	async fn handle(&self, event: &Event, runtime: &NativeRuntime) {
 		tracing::info!("🔥 StateHandler received: {:?}", event.kind);
-
 		let snapshot = {
 			let mut state = runtime.state.write();
 			match &event.kind {
+				event::EventKind::DaemonStarted => {}
 				event::EventKind::DaemonStarted => {
 					state.starts += 1;
 					state.status_checks += 1;
@@ -252,13 +199,12 @@ impl EventHandler for StateHandler {
 				event::EventKind::IndexUpdated { files_changed } => {
 					state.files_indexed += files_changed;
 				}
-				event::EventKind::TaskCreated { task_id, name } => {
+				event::EventKind::TaskCreated { task_id, kind } => {
 					state.tasks_created += 1;
 					state.jobs.push_back(Job {
 						id: *task_id,
 						task_id: *task_id,
-						name: name.clone(),
-						kind: TaskKind::BuildEstatePrototype,
+						kind: kind.to_owned(),
 						status: JobStatus::Pending,
 						created_at: event.timestamp,
 						started_at: None,
@@ -278,7 +224,6 @@ impl EventHandler for StateHandler {
 						job.completed_at = Some(event.timestamp);
 					}
 				}
-
 				event::EventKind::TaskFailed { task_id, error } => {
 					if let Some(job) = state.jobs.iter_mut().find(|job| job.id == *task_id) {
 						job.status = JobStatus::Failed;
@@ -304,91 +249,142 @@ pub struct CommandHandler;
 impl EventHandler for CommandHandler {
 	async fn handle(&self, event: &Event, runtime: &NativeRuntime) {
 		tracing::info!("CommandHandler handler {:?}", event);
-		let event::EventKind::CommandExecuted { command } = &event.kind else {
-			tracing::info!("CommandHandler handle {:?}", event);
-			return;
-		};
-		match command.as_str() {
-			"task_create" => {
-				tracing::info!("CommandHandler task_create {:?}", event);
-				runtime.emit(Event::app(event::EventKind::TaskRequested {
-					request: TaskRequest::Create(TaskKind::SyncBookmarks),
-				}));
-			}
-			"task_list" => {
-				let tasks = runtime.tasks.read().unwrap();
-				println!("════════════════════════════════════");
-				println!("             ESTATE TASKS");
-				println!("════════════════════════════════════");
-				if tasks.count() == 0 {
-					println!("No tasks in memory.");
-				} else {
-					for task in tasks.list() {
-						println!("[{}] {} — {:?}", task.id, task.name, task.status);
+
+		match &event.kind {
+			EventKind::StopSession { .. } => {
+				tracing::info!("ABOUT TO SAVE SESSION");
+
+				let session = runtime.session.clone();
+
+				match Master::save(session).await {
+					Ok(()) => {
+						tracing::info!("SESSION SAVED");
+					}
+					Err(err) => {
+						tracing::error!("SESSION SAVE FAILED: {err:#}");
 					}
 				}
-				drop(tasks);
-				let state = EstateState::load_from_disk().unwrap();
-				println!();
-				println!("──────────── persisted state ────────────");
-				println!("starts:           {}", state.starts);
-				println!("status checks:    {}", state.status_checks);
-				println!("tasks completed:  {}", state.tasks_completed);
-				println!("files indexed:    {}", state.files_indexed);
-				println!("events processed: {}", state.events_processed);
-				println!("longest run:      {}", state.longest_run);
-				println!("started at:       {}", state.started_at);
-				runtime.emit(Event::daemon(event::EventKind::StatusRequested));
 			}
-			"task_clear" => {
-				{
-					let mut tasks = runtime.tasks.write().unwrap();
-					tasks.clear();
-				}
-				runtime.emit(Event::daemon(event::EventKind::TasksCleared));
+
+			EventKind::CommandExecuted { command } => {
+				// handle actual commands here
 			}
-			"dev_info" => {
-				runtime.emit(Event::daemon(event::EventKind::TaskRequested {
-					request: TaskRequest::Create(TaskKind::BuildEstatePrototype),
-				}));
-			}
-			"rebuild_index" => {
-				runtime.emit(Event::daemon(event::EventKind::TaskRequested {
-					request: TaskRequest::Create(TaskKind::RebuildIndex),
-				}));
-			}
-			"sync_bookmarks" => {
-				runtime.emit(Event::daemon(event::EventKind::TaskRequested {
-					request: TaskRequest::Create(TaskKind::SyncBookmarks),
-				}));
-			}
-			"generate_dashboard" => {
-				runtime.emit(Event::daemon(event::EventKind::TaskRequested {
-					request: TaskRequest::Create(TaskKind::GenerateView("dashboard".into())),
-				}));
-			}
-			_ => {
-				println!("⚠️ unknown command: {command}");
-			}
+
+			_ => {}
 		}
 	}
 }
-
-/// "Given this task, actually perform it."
+// 			"task_create" => {
+// 				tracing::info!("CommandHandler task_create {:?}", event);
+// 				runtime.emit(Event::app(event::EventKind::TaskRequested {
+// 					request: TaskRequest::Create(TaskKind::SyncBookmarks),
+// 				}));
+// 			}
+// 			"task_list" => {
+// 				let tasks = runtime.tasks.read().unwrap();
+// 				println!("════════════════════════════════════");
+// 				println!("             ESTATE TASKS");
+// 				println!("════════════════════════════════════");
+// 				if tasks.count() == 0 {
+// 					println!("No tasks in memory.");
+// 				} else {
+// 					for task in tasks.list() {
+// 						println!("[{}] {} — {:?}", task.id, task.name, task.status);
+// 					}
+// 				}
+// 				drop(tasks);
+// 				let state = EstateState::load_from_disk().unwrap();
+// 				println!();
+// 				println!("──────────── persisted state ────────────");
+// 				println!("starts:           {}", state.starts);
+// 				println!("status checks:    {}", state.status_checks);
+// 				println!("tasks completed:  {}", state.tasks_completed);
+// 				println!("files indexed:    {}", state.files_indexed);
+// 				println!("events processed: {}", state.events_processed);
+// 				println!("longest run:      {}", state.longest_run);
+// 				println!("started at:       {}", state.started_at);
+// 				runtime.emit(Event::daemon(event::EventKind::StatusRequested));
+// 			}
+// 			"task_clear" => {
+// 				{
+// 					let mut tasks = runtime.tasks.write().unwrap();
+// 					tasks.clear();
+// 				}
+// 				runtime.emit(Event::daemon(event::EventKind::TasksCleared));
+// 			}
+// 			"dev_info" => {
+// 				runtime.emit(Event::daemon(event::EventKind::TaskRequested {
+// 					request: TaskRequest::Create(TaskKind::BuildEstatePrototype),
+// 				}));
+// 			}
+// 			"rebuild_index" => {
+// 				runtime.emit(Event::daemon(event::EventKind::TaskRequested {
+// 					request: TaskRequest::Create(TaskKind::RebuildIndex),
+// 				}));
+// 			}
+// 			"sync_bookmarks" => {
+// 				runtime.emit(Event::daemon(event::EventKind::TaskRequested {
+// 					request: TaskRequest::Create(TaskKind::SyncBookmarks),
+// 				}));
+// 			}
+// 			"generate_dashboard" => {
+// 				runtime.emit(Event::daemon(event::EventKind::TaskRequested {
+// 					request: TaskRequest::Create(TaskKind::GenerateView("dashboard".into())),
+// 				}));
+// 			}
+// 			_ => {
+// 				println!("⚠️ unknown command: {command}");
+// 			}
+// 		}
+// 	}
+// }
 pub struct TaskRunner;
 impl TaskRunner {
-	pub async fn execute(task: Task) -> Result<()> {
+	pub async fn execute(runtime: &NativeRuntime, task: Task) -> Result<()> {
 		tracing::info!("TaskRunner execute {:?}", task);
 		match task.kind {
+			TaskKind::StartSesssion => {
+				tracing::info!("StartSesssion");
+				tracing::info!("✅ LoadMaster complete");
+			}
+			TaskKind::StopSession => {
+				tracing::info!("StopSession");
+				tracing::info!("✅ LoadMaster complete");
+			}
+			TaskKind::LoadMaster => {
+				tracing::info!("LoadMaster");
+				tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+				tracing::info!("✅ LoadMaster complete");
+			}
+			TaskKind::IndexWorkspace => {
+				let started = std::time::Instant::now();
+				tracing::info!("Index Timer Start 🏁 {:?}ms", started);
+
+				let mut discovery = tokio::task::spawn_blocking(EstateDiscovery::init)
+					.await
+					.map_err(|error| anyhow::anyhow!("discovery task panicked: {error}"))??;
+
+				discovery.write_discovery_result()?;
+
+				let duration = started.elapsed().as_millis();
+
+				runtime.emit(Event::daemon(EventKind::WorkspaceIndexed {
+					duration: duration as u64,
+				}));
+
+				tracing::info!("Index Time End ⏰ {}ms", duration);
+				tracing::info!("Files: {}", discovery.files.len());
+				tracing::info!("Types: {}", discovery.types().len());
+			}
 			TaskKind::RebuildIndex => {
-				println!("🔨 rebuilding index");
+				tracing::info!("🔨 rebuilding index");
 				tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-				println!("✅ index rebuild complete");
+				tracing::info!("✅ index rebuild complete");
 			}
 			TaskKind::GenerateView(name) => {
-				println!("👁️ generating view: {name}");
+				tracing::info!("👁️ generating view: {name}");
 				tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-				println!("✅ view generated: {name}");
+				tracing::info!("✅ view generated: {name}");
 			}
 			TaskKind::SyncBookmarks => {
 				tracing::info!("🔖 TaskKind::SyncBookmarks {:?}", task);
@@ -396,16 +392,60 @@ impl TaskRunner {
 				tracing::info!("✅ bookmark sync complete {:?}", task.id);
 			}
 			TaskKind::BuildEstatePrototype => {
-				println!("🚧 starting BuildEstatePrototype");
+				tracing::info!("🚧 starting BuildEstatePrototype");
 				for i in 1..=10 {
 					tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-					println!("🚧 prototype task: {i}/10");
+					tracing::info!("🚧 prototype task: {i}/10");
 				}
-				println!("✅ BuildEstatePrototype complete");
+				tracing::info!("✅ BuildEstatePrototype complete");
 			}
 		}
 		Ok(())
 	}
 }
+#[derive(Debug, Clone)]
+pub struct AppHandler;
+#[async_trait::async_trait]
+impl EventHandler for AppHandler {
+	async fn handle(&self, event: &Event, runtime: &NativeRuntime) {
+		if !matches!(event.kind, EventKind::SessionStart) {
+			return;
+		}
+		match event.kind.clone() {
+			event::EventKind::StopSession { session } => {
+				tracing::info!("🛑 StopSession");
+				let session = runtime.session.clone();
+				Master::save(session);
+			}
+			event::EventKind::SessionStart => {}
+			_ => {
+				println!("not interested")
+			}
+		}
+		tracing::info!("🔥 SessionStart → StartSesssion");
+		runtime.emit(Event::daemon(EventKind::TaskRequested {
+			request: TaskRequest::Create(TaskKind::StartSesssion),
+		}));
+	}
+}
 
-// struct Inode;
+pub struct Master;
+
+impl Master {
+	pub async fn save(session: Session) -> anyhow::Result<()> {
+		let path = dirs::home_dir()
+			.ok_or_else(|| anyhow::anyhow!("could not determine home directory"))?
+			.join(INDEX_PATH);
+		let contents = tokio::fs::read_to_string(&path).await?;
+		let mut master: serde_json::Value = serde_json::from_str(&contents)?;
+		master
+			.pointer_mut("/logs/sessions")
+			.and_then(serde_json::Value::as_array_mut)
+			.ok_or_else(|| anyhow::anyhow!("logs.sessions is not an array"))?
+			.push(serde_json::to_value(session)?);
+
+		tokio::fs::write(&path, serde_json::to_string_pretty(&master)?).await?;
+
+		Ok(())
+	}
+}

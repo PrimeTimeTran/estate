@@ -2,7 +2,7 @@
   "charts": [
     {
       "type": "bar",
-      "title": "Monthly Sales",
+      "title": "Monthly",
       "bars": [
         {
           "label": "Jan",

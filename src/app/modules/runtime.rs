@@ -1,4 +1,4 @@
-use crate::{app::*, prelude::*};
+use crate::{app::*, native::session::Session, prelude::*};
 
 pub trait Runtime: Clone + Send + Sync {
 	/// Services own long-lived responsibilities and their concurrency/lifecycle;
@@ -10,6 +10,7 @@ pub trait Runtime: Clone + Send + Sync {
 	fn start_dispatcher(self: &Arc<Self>);
 	fn state(&self) -> &RuntimeState;
 	fn save(&self, state: &EstateState) -> Result<()>;
+	fn session(&self) -> Session;
 }
 
 #[derive(Debug)]

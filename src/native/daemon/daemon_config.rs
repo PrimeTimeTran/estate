@@ -21,7 +21,6 @@ fn read_cargo_toml() -> CargoToml {
 
 fn write_cargo_toml(cfg: &CargoToml) {
 	let toml_str = toml::to_string(cfg).unwrap();
-
 	fs::write("Cargo.toml", toml_str).expect("failed to write Cargo.toml");
 }
 

@@ -1,4 +1,7 @@
-use crate::app::{Runtime, ve::Veable};
+use crate::{
+	app::{Runtime, event::EventKind, ve::Veable},
+	data::defaults::DEFAULT_CONFIG,
+};
 
 #[cfg(not(target_arch = "wasm32"))]
 use crate::{app::*, prelude::*, ui::*};
@@ -37,7 +40,7 @@ pub struct Ve<R: Runtime> {
 }
 
 impl<R: Runtime> Ve<R> {
-	///! Rust uses ownership,borrowing, and lifetimes to determine when values
+	/// Rust uses ownership,borrowing, and lifetimes to determine when values
 	/// may be safely destroyed, allowing memory to be reclaimed deterministically
 	/// without a garbage collector.
 	pub fn new(view: impl Veable<R> + 'static) -> Self {
@@ -45,7 +48,7 @@ impl<R: Runtime> Ve<R> {
 		Self {
 			activity_bar: Region::fixed(DebugPanel::new("ACTIVITY"), config.activity_bar.size),
 			dock_left: Panel::new(
-				Region::resizable(Sidebar::new(), config.dock_left.size, 0.0, 600.0).with_fill(config.bg),
+				Region::resizable(Sidebar::new(), config.dock_left.size, 50.0, 600.0).with_fill(config.bg),
 			)
 			.with_open(config.dock_left.active),
 			primary_bar: Region::fixed(DebugPanel::new("TABS"), config.primary_bar.size),
@@ -789,6 +792,8 @@ pub fn scroll_state() -> &'static Mutex<ScrollRedirectState> {
 }
 pub fn spawn_global_cursor_daemon(proxy: EventLoopProxy<AppEvent>) {
 	std::thread::spawn(move || {
+		// May need to grant permissions multiple times if the user runs the app from a different tool?
+		// When I run from Zed/VSCode it runs fine. But Ghosty it doesn't The scroll tracker doesn't activate
 		let trusted = macos_accessibility_client::accessibility::application_is_trusted_with_prompt();
 		if !trusted {
 			return;
@@ -963,7 +968,7 @@ pub struct Sidebar {
 impl Sidebar {
 	pub fn new() -> Self {
 		Self {
-			buttons: vec!["New Task", "Show Tasks", "Clear Tasks"],
+			buttons: vec!["New Task", "Show Tasks", "Clear Tasks", "Stop Session"],
 		}
 	}
 }
@@ -977,6 +982,15 @@ impl<R: Runtime> Veable<R> for Sidebar {
 						"New Task" => ctx.app.new_task(),
 						"Show Tasks" => ctx.app.show_tasks(),
 						"Clear Tasks" => ctx.app.clear_tasks(),
+						"Stop Session" => {
+							ctx
+								.app
+								.engine
+								.runtime
+								.emit(Event::app(EventKind::StopSession {
+									session: ctx.app.engine.runtime.session(),
+								}));
+						}
 						_ => {}
 					}
 				}

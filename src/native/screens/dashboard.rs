@@ -1,10 +1,15 @@
 use crate::{
-	app::{monitor_native::StateMonitor, ve::Veable, *}, native::Oracle, prelude::*, ui::{chart::*, *},
+	app::{ve::Veable, *},
+	data::defaults::{DEFAULT_CONFIG, HMR_CHART_JSON},
+	native::{Oracle, monitor::StateMonitor},
+	prelude::*,
+	ui::{chart::*, *},
 };
 
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 
-pub struct Graphics {
+#[derive(Debug, Default)]
+pub struct Dashboard {
 	#[cfg(not(target_arch = "wasm32"))]
 	data_path: PathBuf,
 
@@ -24,16 +29,64 @@ pub struct Graphics {
 	pub active_focus: FocusedPane,
 	pub secondary_scroll_offset: f32,
 }
-impl Graphics {
+impl Dashboard {
 	pub fn new() -> Self {
-		todo!("new");
-		// let path = PathBuf::new();
-		// std::path::absolute("/Users/future/kb/project/crates/estate/src/data/chart.json");
+		let data_path = PathBuf::from(HMR_CHART_JSON);
+
+		let mut dashboard = Self {
+			data_path,
+			..Self::default()
+		};
+
+		dashboard.monitor =
+			StateMonitor::new(&dashboard.data_path).expect("failed to watch dashboard data");
+
+		dashboard.load();
+
+		dashboard
 	}
-	// #[cfg(target_arch = "wasm32")]
-	#[cfg(not(target_arch = "wasm32"))]
+
+	fn load(&mut self) {
+		match fs::read_to_string(&self.data_path) {
+			Ok(contents) => match serde_json::from_str::<ChartsFile>(&contents) {
+				Ok(data) => {
+					self.data = data;
+					self.last_loaded = fs::metadata(&self.data_path)
+						.and_then(|meta| meta.modified())
+						.ok();
+					self.error = None;
+					self.dirty = false;
+
+					tracing::info!(
+						path = %self.data_path.display(),
+						"dashboard data loaded"
+					);
+				}
+				Err(error) => {
+					self.error = Some(error.to_string());
+
+					tracing::error!(
+						%error,
+						path = %self.data_path.display(),
+						"failed to parse dashboard data"
+					);
+				}
+			},
+			Err(error) => {
+				self.error = Some(error.to_string());
+				tracing::error!(
+					%error,
+					path = %self.data_path.display(),
+					"failed to read dashboard data"
+				);
+			}
+		}
+	}
+}
+
+impl Dashboard {
 	fn from_path(path: impl Into<PathBuf>) -> Result<Self> {
-		use crate::app::monitor_native::StateMonitor;
+		use crate::native::monitor::StateMonitor;
 		let data_path = path.into();
 		let monitor = StateMonitor::new(&data_path)?;
 		let mut graphics = Self {
@@ -188,7 +241,7 @@ impl Graphics {
 		}
 	}
 }
-impl Veable<NativeRuntime> for Graphics {
+impl Veable<NativeRuntime> for Dashboard {
 	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, NativeRuntime>) {
 		// 1. Poll the channel for file changes on every frame render tick
 		#[cfg(not(target_arch = "wasm32"))]

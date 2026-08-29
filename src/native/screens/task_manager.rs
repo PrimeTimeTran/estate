@@ -76,9 +76,8 @@ impl TaskManager {
 				for job in jobs {
 					body.row(28.0, |mut row| {
 						row.col(|ui| {
-							ui.label(job.kind.name());
+							ui.label(job.kind.clone().name());
 						});
-
 						row.col(|ui| {
 							ui.label(format!("{} {}", job.status.icon(), job.status.label()));
 						});

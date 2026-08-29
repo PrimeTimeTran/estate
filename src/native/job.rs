@@ -6,7 +6,11 @@
 // | Individual background execution | `Job`          | Has lifecycle/state           |
 // | UI representation               | `Task` / `Job` | Shows pending/running/etc.    |
 
-use crate::{app::{EstateState, *}, native::{agent::AgentContext, task_manager::WaterfallChart}, prelude::*};
+use crate::{
+	app::{EstateState, *},
+	native::{agent::AgentContext, task_manager::WaterfallChart},
+	prelude::*,
+};
 use notify::{Event, EventKind};
 
 #[derive(Debug, Clone, Eq, Deserialize, PartialEq, Serialize)]

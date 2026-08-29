@@ -23,23 +23,23 @@ impl Chart {
 	}
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Default, Debug, Deserialize)]
 pub struct ChartBar {
 	pub label: String,
 	pub value: f64,
 }
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Default, Debug, Deserialize)]
 pub struct ChartSlice {
 	pub label: String,
 	pub value: f64,
 }
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Default, Debug, Deserialize)]
 pub struct ChartPoint {
 	pub x: f64,
 	pub y: f64,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Default, Debug, Deserialize)]
 pub struct ChartsFile {
 	pub charts: Vec<Chart>,
 }
@@ -50,7 +50,7 @@ impl ChartsFile {
 	}
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Default, Debug, Deserialize)]
 pub struct BarData {
 	pub title: String,
 	pub bars: Vec<ChartBar>,
@@ -72,7 +72,7 @@ impl BarData {
 			});
 	}
 }
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Default, Debug, Deserialize)]
 pub struct LineData {
 	pub title: String,
 	pub points: Vec<ChartPoint>,
@@ -93,7 +93,7 @@ impl LineData {
 			});
 	}
 }
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Default, Debug, Deserialize)]
 pub struct ScatterData {
 	pub title: String,
 	pub points: Vec<ChartPoint>,
@@ -114,7 +114,7 @@ impl ScatterData {
 			});
 	}
 }
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Default, Debug, Deserialize)]
 pub struct PieData {
 	pub title: String,
 	pub slices: Vec<ChartSlice>,

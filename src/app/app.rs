@@ -1,6 +1,6 @@
-use crate::app::{model, *};
-
+use crate::app::{model, state::Master, *};
 pub use modules::runtime::{Runtime, RuntimeState};
+
 pub use state::{EstateState, StateStore};
 
 pub struct App<R: Runtime> {
@@ -26,6 +26,12 @@ impl<R: Runtime> App<R> {
 }
 
 impl<R: Runtime> App<R> {
+	pub fn on_start(&mut self) {
+		self
+			.engine
+			.runtime
+			.emit(Event::app(EventKind::SessionStart));
+	}
 	pub fn new_task(&mut self) {
 		self
 			.engine
@@ -49,5 +55,16 @@ impl<R: Runtime> App<R> {
 			.emit(Event::app(EventKind::CommandExecuted {
 				command: "task_clear".into(),
 			}));
+	}
+	pub fn stop_session(&mut self) {
+		println!("stop_session from app");
+
+		// let session = self.engine.runtime.session();
+
+		// tokio::spawn(async move {
+		// 	if let Err(err) = Master::save(session).await {
+		// 		eprintln!("failed to save session: {err}");
+		// 	}
+		// });
 	}
 }
