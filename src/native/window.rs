@@ -303,34 +303,17 @@ fn build_egui(event_loop: &ActiveEventLoop) -> (gui::Context, EguiState) {
 	let gui_ctx = gui::Context::default();
 
 	gui_ctx.global_style_mut(|style| {
+		style.interaction.selectable_labels = true;
+		style.interaction.multi_widget_text_select = true;
+
 		style.visuals.widgets.hovered = style.visuals.widgets.inactive.clone();
 		style.visuals.widgets.active = style.visuals.widgets.inactive.clone();
 	});
 
-	// gui_ctx.global_style_mut(|style| {
-	// 	style.visuals.widgets.hovered = style.visuals.widgets.inactive.clone();
-	// 	style.visuals.widgets.active = style.visuals.widgets.inactive.clone();
+	// gui_ctx.memory_mut(|memory| {
+	// 	memory.surrender_focus();
 	// });
 
-	// WIP Fix weird highlight/select
-	// gui_ctx.global_style_mut(|style| {
-	// 	style.interaction.selectable_labels = false;
-	// 	style.interaction.multi_widget_text_select = false;
-	// });
-	// egui_ctx.global_style_mut(|style| {
-	// 	style.interaction.selectable_labels = allow_text_selection;
-	// 	style.interaction.multi_widget_text_select = allow_text_selection;
-	// });
-	// gui_ctx.global_style_mut(|style| {
-	// 	style.interaction.selectable_labels = true;
-	// 	style.interaction.multi_widget_text_select = true;
-	// });
-	// gui_ctx.global_style_mut(|style| {
-	// 	style.interaction.selectable_labels = true;
-	// 	style.interaction.multi_widget_text_select = true;
-	// 	style.visuals.selection.bg_fill = egui::Color32::from_rgb(80, 100, 180);
-	// 	style.visuals.selection.stroke = egui::Stroke::new(1.0, egui::Color32::WHITE);
-	// });
 	let gui_state = EguiState::new(
 		gui_ctx.clone(),
 		gui::ViewportId::ROOT,

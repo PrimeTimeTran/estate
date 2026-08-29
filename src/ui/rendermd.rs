@@ -23,23 +23,30 @@ impl MarkdownView {
 		}
 	}
 }
-
 impl<R: Runtime> Veable<R> for MarkdownView {
 	fn draw(&mut self, ui: &mut Ui, _ctx: &mut AppContext<'_, R>) {
-		CommonMarkViewer::new().show(ui, &mut self.cache, &self.markdown);
-
-		ui.style_mut().visuals.widgets.hovered = ui.style().visuals.widgets.inactive.clone();
-		CommonMarkViewer::new().show(ui, &mut self.cache, &self.markdown);
-
-		// ui.label("before");
-		// CommonMarkViewer::new().show(ui, &mut self.cache, &self.markdown);
-		// ui.label("after");
-
-		// ui.label("NORMAL LABEL");
-		// ui.add(egui::Label::new("EXPLICIT SELECTABLE").selectable(true));
-		// ui.add(egui::Label::new("SELECT THIS TEXT").selectable(true));
-		// ui.style_mut().interaction.selectable_labels = false;
-		// ui.style_mut().interaction.multi_widget_text_select = false;
-		// CommonMarkViewer::new().show(ui, &mut self.cache, &self.markdown);
+		egui::ScrollArea::vertical()
+			.auto_shrink([false, false])
+			.show(ui, |ui| {
+				CommonMarkViewer::new().show(ui, &mut self.cache, &self.markdown);
+			});
 	}
 }
+// impl<R: Runtime> Veable<R> for MarkdownView {
+// 	fn draw(&mut self, ui: &mut Ui, _ctx: &mut AppContext<'_, R>) {
+// 		ui.ctx().input_mut(|input| input.pointer.any_pressed());
+// 		ui.style_mut().visuals.widgets.hovered = ui.style().visuals.widgets.inactive.clone();
+// 		CommonMarkViewer::new().show(ui, &mut self.cache, &self.markdown);
+
+// 		// ui.label("before");
+// 		// CommonMarkViewer::new().show(ui, &mut self.cache, &self.markdown);
+// 		// ui.label("after");
+
+// 		// ui.label("NORMAL LABEL");
+// 		// ui.add(egui::Label::new("EXPLICIT SELECTABLE").selectable(true));
+// 		// ui.add(egui::Label::new("SELECT THIS TEXT").selectable(true));
+// 		// ui.style_mut().interaction.selectable_labels = false;
+// 		// ui.style_mut().interaction.multi_widget_text_select = false;
+// 		// CommonMarkViewer::new().show(ui, &mut self.cache, &self.markdown);
+// 	}
+// }

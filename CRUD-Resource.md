@@ -1,39 +1,40 @@
-Yeah. I’d treat the **Estate core as a resource registry + resolution engine + access layer**, and make CRUD commands thin clients of that core.
-
-The key is to design the stages around **capabilities**, not around individual CLI commands. Then CLI, LSP, VS Code, Zed, web, and scripts all consume the same capabilities.
-
 ## 1. Resource lifecycle
 
 The fundamental CRUD:
 
-* `resource create`
+- `resource create`
 
-  * Create a new `ResourceId`
-  * Register `ResourceKind`
-  * Optionally attach initial location
-  * Return the canonical `ResourceId`
-* `resource get`
+  - Create a new `ResourceId`
+  - Register `ResourceKind`
+  - Optionally attach initial location
+  - Return the canonical `ResourceId`
 
-  * Fetch resource by `ResourceId`
-  * Return basic metadata
-* `resource update`
+- `resource get`
 
-  * Change mutable metadata
-  * Add/remove locations
-  * Update resource properties
-* `resource delete`
+  - Fetch resource by `ResourceId`
+  - Return basic metadata
 
-  * Remove resource
-  * Decide whether aliases/anchors/edges cascade
-  * Preserve history if desired
-* `resource list`
+- `resource update`
 
-  * Query resources
-  * Filter by kind/location/etc.
-  * Sort/paginate
-* `resource inspect`
+  - Change mutable metadata
+  - Add/remove locations
+  - Update resource properties
 
-  * Return the complete known representation of a resource
+- `resource delete`
+
+  - Remove resource
+  - Decide whether aliases/anchors/edges cascade
+  - Preserve history if desired
+
+- `resource list`
+
+  - Query resources
+  - Filter by kind/location/etc.
+  - Sort/paginate
+
+- `resource inspect`
+
+  - Return the complete known representation of a resource
 
 This is the **Registry/Store foundation**.
 
@@ -51,28 +52,33 @@ Aliases are your:
 
 CRUD:
 
-* `alias create`
+- `alias create`
 
-  * `alias create foo 55`
-  * Validate uniqueness
-  * Bind alias → `ResourceId`
-* `alias get`
+  - `alias create foo 55`
+  - Validate uniqueness
+  - Bind alias → `ResourceId`
 
-  * Resolve exact alias
-* `alias update`
+- `alias get`
 
-  * Rename alias
-  * Rebind alias
-* `alias delete`
+  - Resolve exact alias
 
-  * Remove binding
-* `alias list`
+- `alias update`
 
-  * List aliases for resource
-  * List all aliases
-* `alias resolve`
+  - Rename alias
+  - Rebind alias
 
-  * `@foo → ResourceId(55)`
+- `alias delete`
+
+  - Remove binding
+
+- `alias list`
+
+  - List aliases for resource
+  - List all aliases
+
+- `alias resolve`
+
+  - `@foo → ResourceId(55)`
 
 This becomes one of the first implementations of the **Resolver**.
 
@@ -91,24 +97,28 @@ Think:
 
 Stages:
 
-* `anchor create`
+- `anchor create`
 
-  * Resource + anchor name
-  * Eventually target/position
-* `anchor get`
+  - Resource + anchor name
+  - Eventually target/position
 
-  * Retrieve anchor
-* `anchor update`
+- `anchor get`
 
-  * Rename
-  * Change target
-* `anchor delete`
-* `anchor list`
+  - Retrieve anchor
 
-  * Anchors belonging to resource
-* `anchor resolve`
+- `anchor update`
 
-  * `@foo#build → ResourceId + AnchorTarget`
+  - Rename
+  - Change target
+
+- `anchor delete`
+- `anchor list`
+
+  - Anchors belonging to resource
+
+- `anchor resolve`
+
+  - `@foo#build → ResourceId + AnchorTarget`
 
 Initially your `Anchor` can be simple:
 
@@ -140,16 +150,17 @@ This is the VFS boundary.
 
 CRUD-ish operations:
 
-* `location add`
+- `location add`
 
-  * Resource → File/Git/Remote
-* `location get`
-* `location update`
-* `location remove`
-* `location list`
-* `location resolve`
+  - Resource → File/Git/Remote
 
-  * Resource → best usable location
+- `location get`
+- `location update`
+- `location remove`
+- `location list`
+- `location resolve`
+
+  - Resource → best usable location
 
 Important distinction:
 
@@ -182,26 +193,29 @@ Edge {
 
 needs:
 
-* `edge create`
+- `edge create`
 
-  * Resource A → Resource B
-  * `depends_on`
-  * `contains`
-  * `references`
-  * etc.
-* `edge get`
-* `edge update`
-* `edge delete`
-* `edge list`
+  - Resource A → Resource B
+  - `depends_on`
+  - `contains`
+  - `references`
+  - etc.
 
-  * outgoing
-  * incoming
-* `graph`
+- `edge get`
+- `edge update`
+- `edge delete`
+- `edge list`
 
-  * Show neighborhood
-* `graph ancestors`
-* `graph descendants`
-* `graph path`
+  - outgoing
+  - incoming
+
+- `graph`
+
+  - Show neighborhood
+
+- `graph ancestors`
+- `graph descendants`
+- `graph path`
 
 Eventually:
 
@@ -252,10 +266,10 @@ Input
 
 Commands:
 
-* `resolve <reference>`
-* `resolve --json`
-* `resolve --explain`
-* `resolve --all`
+- `resolve <reference>`
+- `resolve --json`
+- `resolve --explain`
+- `resolve --all`
 
 `--explain` would be particularly useful for debugging:
 
@@ -284,15 +298,15 @@ That will become **extremely valuable** once LSP/IDE integrations exist.
 
 Once resolution works:
 
-* `open`
-* `read`
-* `write`
-* `stat`
-* `exists`
-* `copy`
-* `move`
-* `delete`
-* `watch`
+- `open`
+- `read`
+- `write`
+- `stat`
+- `exists`
+- `copy`
+- `move`
+- `delete`
+- `watch`
 
 But I wouldn't necessarily expose all of these as CLI commands.
 
@@ -328,17 +342,17 @@ estate refresh
 
 Stages:
 
-* Walk filesystem
-* Apply exclusions
-* Identify resources
-* Extract metadata
-* Discover locations
-* Discover aliases
-* Discover anchors
-* Discover relationships
-* Compare against existing registry
-* Insert/update/remove records
-* Record scan metadata
+- Walk filesystem
+- Apply exclusions
+- Identify resources
+- Extract metadata
+- Discover locations
+- Discover aliases
+- Discover anchors
+- Discover relationships
+- Compare against existing registry
+- Insert/update/remove records
+- Record scan metadata
 
 You eventually want **incremental indexing**, not rebuilding everything.
 
@@ -372,23 +386,23 @@ or daemon-internal only.
 
 Stages:
 
-* Watch filesystem
-* Detect create
-* Detect modify
-* Detect delete
-* Detect rename
-* Re-scan affected resource
-* Update registry
-* Update graph
-* Notify subscribers
+- Watch filesystem
+- Detect create
+- Detect modify
+- Detect delete
+- Detect rename
+- Re-scan affected resource
+- Update registry
+- Update graph
+- Notify subscribers
 
 This becomes important for:
 
-* VS Code
-* Zed
-* LSP
-* web UI
-* background daemon
+- VS Code
+- Zed
+- LSP
+- web UI
+- background daemon
 
 ---
 
@@ -447,20 +461,20 @@ estate import
 
 Formats:
 
-* JSON
-* JSONL
-* potentially TOML
-* eventually SQLite database backup
+- JSON
+- JSONL
+- potentially TOML
+- eventually SQLite database backup
 
 Useful for:
 
-* debugging
-* migrations
-* backups
-* scripts
-* web applications
-* moving an Estate
-* inspecting the registry manually
+- debugging
+- migrations
+- backups
+- scripts
+- web applications
+- moving an Estate
+- inspecting the registry manually
 
 And:
 
@@ -596,12 +610,12 @@ That's important for your "general purpose scripts/binaries" goal.
 
 Probably later, but worth leaving room for:
 
-* read resource
-* write resource
-* modify aliases
-* modify graph
-* modify filesystem
-* execute actions
+- read resource
+- write resource
+- modify aliases
+- modify graph
+- modify filesystem
+- execute actions
 
 Especially if the daemon eventually becomes a long-running service.
 
@@ -678,75 +692,75 @@ I'd make the stages:
 
 ### Phase 1 — Identity
 
-* `Resource`
-* `ResourceId`
-* `ResourceKind`
-* `ResourceStore`
-* SQLite persistence
-* `resource create/get/list`
+- `Resource`
+- `ResourceId`
+- `ResourceKind`
+- `ResourceStore`
+- SQLite persistence
+- `resource create/get/list`
 
 ### Phase 2 — References
 
-* `Alias`
-* `Anchor`
-* Resolver
-* `alias create/get/list/resolve`
-* `anchor create/get/list/resolve`
+- `Alias`
+- `Anchor`
+- Resolver
+- `alias create/get/list/resolve`
+- `anchor create/get/list/resolve`
 
 ### Phase 3 — Locations
 
-* `ResourceLocation`
-* Location store
-* `location add/list`
-* Resource → location resolution
+- `ResourceLocation`
+- Location store
+- `location add/list`
+- Resource → location resolution
 
 ### Phase 4 — VFS
 
-* `open`
-* `read`
-* `stat`
-* `watch`
-* ResourceId → accessible resource
+- `open`
+- `read`
+- `stat`
+- `watch`
+- ResourceId → accessible resource
 
 ### Phase 5 — Graph
 
-* `Edge`
-* edge CRUD
-* graph traversal/query
+- `Edge`
+- edge CRUD
+- graph traversal/query
 
 ### Phase 6 — Discovery
 
-* filesystem scanner
-* registry indexing
-* incremental updates
-* reconciliation
+- filesystem scanner
+- registry indexing
+- incremental updates
+- reconciliation
 
 ### Phase 7 — Events
 
-* resource events
-* watcher events
-* subscriptions
-* daemon notifications
+- resource events
+- watcher events
+- subscriptions
+- daemon notifications
 
 ### Phase 8 — External consumers
 
-* CLI
-* JSON API
-* LSP
-* VS Code adapter
-* Zed adapter
-* Rust library/API
-* scripts
+- CLI
+- JSON API
+- LSP
+- VS Code adapter
+- Zed adapter
+- Rust library/API
+- scripts
 
 ### Phase 9 — Advanced
 
-* transactions
-* migrations
-* import/export
-* caching
-* permissions
-* remote resources
-* distributed/sync behavior if you ever need it
+- transactions
+- migrations
+- import/export
+- caching
+- permissions
+- remote resources
+- distributed/sync behavior if you ever need it
 
 ---
 
