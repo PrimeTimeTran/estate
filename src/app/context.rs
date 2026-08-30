@@ -2,7 +2,7 @@ use crate::app::{state::*, *};
 
 // #[cfg(not(target_arch = "wasm32"))]
 #[cfg(feature = "native")]
-use crate::native::ve::VeInputState;
+use crate::native::ui::VeInputState;
 
 pub struct AppContext<'a, R: Runtime> {
 	pub app: &'a mut App<R>,
@@ -10,6 +10,7 @@ pub struct AppContext<'a, R: Runtime> {
 
 	#[cfg(not(target_arch = "wasm32"))]
 	pub input: VeInputState,
+	pub event_rx: broadcast::Receiver<Event>,
 }
 
 impl<'a, R: Runtime> AppContext<'a, R> {
@@ -24,6 +25,14 @@ impl<'a, R: Runtime> AppContext<'a, R> {
 			true
 		} else {
 			false
+		}
+	}
+	pub fn next_event(&mut self) -> Option<Event> {
+		match self.event_rx.try_recv() {
+			Ok(event) => Some(event),
+			Err(broadcast::error::TryRecvError::Empty) => None,
+			Err(broadcast::error::TryRecvError::Lagged(_)) => None,
+			Err(broadcast::error::TryRecvError::Closed) => None,
 		}
 	}
 }

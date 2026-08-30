@@ -14,6 +14,7 @@ pub trait Runtime: Clone + Send + Sync {
 	fn state(&self) -> &RuntimeState;
 	fn save(&self, state: &EstateState) -> Result<()>;
 	fn session(&self) -> Session;
+	fn subscribe(&self) -> broadcast::Receiver<Event>;
 }
 
 #[derive(Debug)]

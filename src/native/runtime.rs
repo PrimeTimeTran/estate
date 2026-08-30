@@ -34,6 +34,9 @@ impl NativeRuntime {
 		let mut state = self.state.write();
 		state.events_processed += 1;
 	}
+	pub fn subscribe(&self) -> broadcast::Receiver<Event> {
+		self.events.subscribe()
+	}
 }
 
 #[derive(Clone, Debug)]
@@ -89,6 +92,9 @@ impl Runtime for NativeRuntime {
 	}
 	fn session(&self) -> Session {
 		self.session.clone()
+	}
+	fn subscribe(&self) -> broadcast::Receiver<Event> {
+		self.events.subscribe()
 	}
 }
 

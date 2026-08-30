@@ -256,7 +256,9 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 				if window.window.occluded {
 					return;
 				}
+				let event_rx = self.app.engine.runtime.subscribe();
 				let mut ctx = AppContext {
+					event_rx,
 					input: VeInputState::default(),
 					app: &mut self.app,
 					last_revision: 0,
@@ -369,6 +371,7 @@ impl NativeApp {
 			WindowType::TaskManager => ("Task Manager", Ve::new(TaskManager::new())),
 			WindowType::Dashboard => ("Estate Dashboard", Ve::new(Dashboard::new())),
 			WindowType::WaterfallChart => ("Estate Dashboard", Ve::new(WaterfallChart::new())),
+			WindowType::EguiVeable => ("EguiVeable", Ve::new(EguiVeable::new())),
 			WindowType::MarkdownView => (
 				"Estate Dashboard",
 				Ve::new(MarkdownView::new(

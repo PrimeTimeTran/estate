@@ -11,27 +11,6 @@ use egui_plot::{Bar, BarChart, Plot};
 use std::time::Duration;
 
 impl TaskManager {
-	fn init_watcher(
-		path: &Path,
-		tx: tokio::sync::mpsc::Sender<()>,
-	) -> Result<notify::RecommendedWatcher, notify::Error> {
-		use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
-		let mut watcher = RecommendedWatcher::new(
-			move |res: Result<Event, notify::Error>| {
-				if let Ok(event) = res {
-					if matches!(event.kind, EventKind::Modify(_) | EventKind::Create(_)) {
-						let _ = tx.blocking_send(());
-					}
-				}
-			},
-			Config::default(),
-		)?;
-		if let Some(parent) = path.parent() {
-			watcher.watch(parent, RecursiveMode::NonRecursive)?;
-		}
-		Ok(watcher)
-	}
-
 	fn draw_jobs(&self, ui: &mut egui::Ui, jobs: &std::collections::VecDeque<Job>) {
 		let now = EstateState::now();
 
@@ -224,7 +203,11 @@ impl TaskManager {
 	}
 }
 impl Veable<NativeRuntime> for TaskManager {
+	fn event(&mut self, event: &Event, _ctx: &mut AppContext<'_, NativeRuntime>) {
+		if let EventKind::TaskCreated { .. } = &event.kind {}
+	}
 	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, NativeRuntime>) {
+		ui.heading("Task Manager draw");
 		if self.poll_changes() {
 			ui.ctx().request_repaint();
 		}

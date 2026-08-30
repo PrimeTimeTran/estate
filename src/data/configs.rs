@@ -26,8 +26,9 @@ pub static WORKSPACE_SETTINGS: &str = ".estate/settings.json";
 
 // pub static INITIAL_WINDOW: WindowType = WindowType::Dashboard;
 // pub static INITIAL_WINDOW: WindowType = WindowType::TelemetryInspector;
-// pub static INITIAL_WINDOW: WindowType = WindowType::TaskManager;
-pub static INITIAL_WINDOW: WindowType = WindowType::WaterfallChart;
+pub static INITIAL_WINDOW: WindowType = WindowType::TaskManager;
+// pub static INITIAL_WINDOW: WindowType = WindowType::EguiVeable;
+// pub static INITIAL_WINDOW: WindowType = WindowType::WaterfallChart;
 // pub static INITIAL_WINDOW: WindowType = WindowType::MarkdownView;
 
 pub(crate) struct VeConfig {
