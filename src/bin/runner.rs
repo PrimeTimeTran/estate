@@ -53,10 +53,10 @@ async fn run() -> anyhow::Result<()> {
 	flow.debug(&format!(
 		"Starting runner: backend={backend}, language={language:?}"
 	));
-
 	let cases = Vec::with_capacity(problem.test_cases.len());
 	let results = run.run_tests(cases, runner, &problem, language).await?;
-	run.report_results(flow, results);
+	run.report_results(&flow, &results).await?;
+	flow.info("Runner completed successfully");
 	Ok(())
 }
 use tokio::{
@@ -65,6 +65,7 @@ use tokio::{
 };
 
 /// Runner/Executors
+#[derive(Debug)]
 pub struct Run {
 	pub id: Uuid,
 	pub language: Language,
@@ -121,9 +122,14 @@ impl Run {
 		}
 		Ok(results)
 	}
-	pub async fn report_results(&mut self, flow: TraceFlow, results: Vec<TestResult>) -> Result<()> {
+
+	pub async fn report_results(
+		&mut self,
+		flow: &TraceFlow,
+		results: &[TestResult],
+	) -> anyhow::Result<()> {
 		flow.debug(&format!("Runner finished: {} test cases", results.len()));
-		for result in &results {
+		for result in results {
 			if result.status == TestStatus::Passed {
 				flow.info(&format!(
 					"Test case {} passed ({} ms)",
@@ -131,8 +137,7 @@ impl Run {
 					result.execution_ms,
 				));
 			} else {
-				flow_warn!(flow, "Test case {} failed", result.index + 1,);
-
+				flow_warn!(flow, "Test case {} failed", result.index + 1);
 				flow.warn(&format!("  Expected: {}", result.expected));
 				flow.warn(&format!("  Actual:   {}", result.actual));
 			}
@@ -140,6 +145,7 @@ impl Run {
 		flow.debug(&format!("Removing Run: {}", self.dir.display()));
 		tokio::fs::remove_dir_all(&self.dir).await?;
 		flow.debug("Cleanup complete");
+
 		Ok(())
 	}
 }
@@ -196,25 +202,98 @@ impl Runner for NativeRunner {
 		&self,
 		run: &Run,
 		language: Language,
-		test_case: &TestCase,
+		test: &TestCase,
 	) -> anyhow::Result<RunTelemetry> {
 		tracing::debug!("NativeRunner::run: language={language:?}");
 		let result = match language {
 			Language::Rust => {
 				tracing::debug!("starting rust runner");
-				run_rust(run, test_case).await
+				Self::run_rust(run, test).await
 			}
 			Language::Python => {
 				tracing::debug!("starting python runner");
-				run_python(run, test_case).await
+				Self::run_python(run, test).await
 			}
 			Language::JavaScript => {
 				tracing::debug!("starting javascript runner");
-				run_javascript(run, test_case).await
+				Self::run_javascript(run, test).await
 			}
 		};
 		tracing::debug!("NativeRunner::run: finished");
 		result
+	}
+}
+
+impl NativeRunner {
+	async fn run_rust(run: &Run, test: &TestCase) -> anyhow::Result<RunTelemetry> {
+		let setup_start = Instant::now();
+
+		let source = run.dir.join(run.language.entry());
+		let binary = run.dir.join("solution");
+
+		let setup_ms = setup_start.elapsed().as_millis();
+
+		let compile_start = Instant::now();
+
+		let output = tokio::process::Command::new("rustc")
+			.arg(&source)
+			.arg("-O")
+			.arg("-o")
+			.arg(&binary)
+			.output()
+			.await?;
+
+		let compile_ms = compile_start.elapsed().as_millis();
+
+		if !output.status.success() {
+			return Ok(RunTelemetry::from_compile(
+				Language::Rust,
+				setup_ms,
+				compile_ms,
+				output.status.code(),
+				String::from_utf8_lossy(&output.stdout).into_owned(),
+				String::from_utf8_lossy(&output.stderr).into_owned(),
+			));
+		}
+
+		let (output, execution_ms) =
+			Executor::execute(&binary.to_string_lossy(), &[], &test.input).await?;
+
+		Ok(RunTelemetry::new(
+			Language::Rust,
+			setup_ms,
+			compile_ms,
+			execution_ms,
+			output.status.code(),
+			String::from_utf8_lossy(&output.stdout).into_owned(),
+			String::from_utf8_lossy(&output.stderr).into_owned(),
+		))
+	}
+	async fn run_python(run: &Run, test: &TestCase) -> anyhow::Result<RunTelemetry> {
+		let source = run.dir.join(run.language.entry());
+		let (output, execution_ms) = Executor::execute("python3", &[&source], &test.input).await?;
+		Ok(RunTelemetry::new(
+			Language::Python,
+			0,
+			0,
+			execution_ms,
+			output.status.code(),
+			String::from_utf8_lossy(&output.stdout).into_owned(),
+			String::from_utf8_lossy(&output.stderr).into_owned(),
+		))
+	}
+	async fn run_javascript(run: &Run, test: &TestCase) -> anyhow::Result<RunTelemetry> {
+		let source = run.dir.join(run.language.entry());
+		let (output, execution_ms) = Executor::execute("node", &[&source], &test.input).await?;
+		Ok(RunTelemetry::new(
+			Language::JavaScript,
+			0,
+			0,
+			execution_ms,
+			output.status.code(),
+			String::from_utf8_lossy(&output.stdout).into_owned(),
+			String::from_utf8_lossy(&output.stderr).into_owned(),
+		))
 	}
 }
 struct DockerRunner;
@@ -224,22 +303,22 @@ impl Runner for DockerRunner {
 		&self,
 		run: &Run,
 		language: Language,
-		test_case: &TestCase,
+		test: &TestCase,
 	) -> anyhow::Result<RunTelemetry> {
 		tracing::debug!("DockerRunner::run: language={language:?}");
-		Self::docker_run(run, language, test_case).await
+		Self::docker_run(run, language, test).await
 	}
 }
 impl DockerRunner {
 	async fn docker_run(
 		run: &Run,
 		language: Language,
-		test_case: &TestCase,
+		test: &TestCase,
 	) -> anyhow::Result<RunTelemetry> {
 		let input_path = run.dir.join("input");
-		tokio::fs::write(&input_path, &test_case.input).await?;
-		tracing::debug!("DOCKER test input: {:?}", test_case.input);
-		let child = Self::run_docker(run, language).await?;
+		tokio::fs::write(&input_path, &test.input).await?;
+		tracing::debug!("DOCKER test input: {:?}", test.input);
+		let child = Self::spawn_instance(run, language).await?;
 		let output = timeout(Duration::from_secs(5), child.wait_with_output())
 			.await
 			.context("Docker execution timed out after 5 seconds")?
@@ -258,6 +337,7 @@ impl DockerRunner {
 				language,
 			);
 		}
+
 		let result_path = run.dir.join("result.json");
 		let raw_result = tokio::fs::read_to_string(&result_path)
 			.await
@@ -287,7 +367,7 @@ impl DockerRunner {
 			stderr,
 		))
 	}
-	async fn run_docker(run: &Run, language: Language) -> Result<Child> {
+	async fn spawn_instance(run: &Run, language: Language) -> Result<Child> {
 		let volume = format!("{}:/run:rw", run.dir.display());
 		tracing::debug!("DOCKER volume: {volume}");
 		tokio::process::Command::new("/usr/local/bin/docker")
@@ -391,7 +471,7 @@ struct ContainerResult {
 	exit_code: Option<i32>,
 }
 
-/// Language Specific
+/// Language
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, Hash, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum Language {
@@ -427,77 +507,7 @@ impl Language {
 		}
 	}
 }
-///      Language
-async fn run_rust(run: &Run, test_case: &TestCase) -> anyhow::Result<RunTelemetry> {
-	let setup_start = Instant::now();
 
-	let source = run.dir.join(run.language.entry());
-	let binary = run.dir.join("solution");
-
-	let setup_ms = setup_start.elapsed().as_millis();
-
-	let compile_start = Instant::now();
-
-	let output = tokio::process::Command::new("rustc")
-		.arg(&source)
-		.arg("-O")
-		.arg("-o")
-		.arg(&binary)
-		.output()
-		.await?;
-
-	let compile_ms = compile_start.elapsed().as_millis();
-
-	if !output.status.success() {
-		return Ok(RunTelemetry::from_compile(
-			Language::Rust,
-			setup_ms,
-			compile_ms,
-			output.status.code(),
-			String::from_utf8_lossy(&output.stdout).into_owned(),
-			String::from_utf8_lossy(&output.stderr).into_owned(),
-		));
-	}
-
-	let (output, execution_ms) =
-		Executor::execute(&binary.to_string_lossy(), &[], &test_case.input).await?;
-
-	Ok(RunTelemetry::new(
-		Language::Rust,
-		setup_ms,
-		compile_ms,
-		execution_ms,
-		output.status.code(),
-		String::from_utf8_lossy(&output.stdout).into_owned(),
-		String::from_utf8_lossy(&output.stderr).into_owned(),
-	))
-}
-async fn run_python(run: &Run, test_case: &TestCase) -> anyhow::Result<RunTelemetry> {
-	let source = run.dir.join(run.language.entry());
-	let (output, execution_ms) = Executor::execute("python3", &[&source], &test_case.input).await?;
-	Ok(RunTelemetry::new(
-		Language::Python,
-		0,
-		0,
-		execution_ms,
-		output.status.code(),
-		String::from_utf8_lossy(&output.stdout).into_owned(),
-		String::from_utf8_lossy(&output.stderr).into_owned(),
-	))
-}
-async fn run_javascript(run: &Run, test_case: &TestCase) -> anyhow::Result<RunTelemetry> {
-	let source = run.dir.join(run.language.entry());
-	let (output, execution_ms) = Executor::execute("node", &[&source], &test_case.input).await?;
-	Ok(RunTelemetry::new(
-		Language::JavaScript,
-		0,
-		0,
-		execution_ms,
-		output.status.code(),
-		String::from_utf8_lossy(&output.stdout).into_owned(),
-		String::from_utf8_lossy(&output.stderr).into_owned(),
-	))
-}
 #[derive(Clone, Debug)]
 pub struct Problem {
 	pub id: Uuid,
@@ -582,6 +592,7 @@ impl RunInput {
 	}
 }
 
+#[derive(Debug)]
 pub struct TestResult {
 	pub index: usize,
 	pub input: String,
@@ -657,7 +668,7 @@ console.log("0");
 	}
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum TestStatus {
 	Passed,
 	WrongAnswer,

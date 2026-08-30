@@ -204,6 +204,8 @@ impl Tracer {
 		FLOW_ID.fetch_add(1, Ordering::Relaxed) + 1
 	}
 }
+
+#[derive(Debug)]
 pub struct TraceFlow {
 	namespace: String,
 	name: String,
