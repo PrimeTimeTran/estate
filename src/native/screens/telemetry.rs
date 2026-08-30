@@ -1,21 +1,5 @@
-use crate::app::Runtime;
-
 #[cfg(not(target_arch = "wasm32"))]
-use crate::{app::*, native::prelude::*, prelude::*, ui::*};
-
-use core_foundation::runloop::{CFRunLoop, kCFRunLoopCommonModes};
-use core_graphics::{
-	display::CGDisplay,
-	event::{
-		CGEvent, CGEventTap, CGEventTapLocation, CGEventTapOptions, CGEventTapPlacement,
-		CGEventTapProxy, CGEventType, CGMouseButton, CallbackResult, *,
-	},
-	event_source::{CGEventSource, CGEventSourceStateID},
-	geometry::CGPoint,
-};
-use egui::Ui;
-use egui_plot::{Bar, BarChart, Plot, PlotBounds, PlotUi, Points};
-use winit::event_loop::EventLoopProxy;
+use crate::{app::*, native::prelude::*};
 
 // -----------------------------------------------------------------------------
 // ORACLE

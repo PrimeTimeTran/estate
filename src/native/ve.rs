@@ -1,7 +1,6 @@
 use crate::{
 	app::{Runtime, event::EventKind, state::EstateState, *},
-	native::{prelude::*, *},
-	prelude::*,
+	native::*,
 	ui::*,
 };
 
@@ -16,8 +15,6 @@ use core_graphics::{
 	event_source::{CGEventSource, CGEventSourceStateID},
 	geometry::CGPoint,
 };
-use egui::Ui;
-use egui_plot::{Bar, BarChart, Plot, PlotBounds, PlotUi, Points};
 use winit::event_loop::EventLoopProxy;
 
 // This won't "get it" if these don't use "crate"

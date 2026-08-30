@@ -1,4 +1,4 @@
-use tokio::sync::mpsc;
+use crate::prelude::*;
 
 pub fn channel<T>(capacity: usize) -> (EventSender<T>, EventReceiver<T>) {
 	let (tx, rx) = tokio::sync::mpsc::channel(capacity);

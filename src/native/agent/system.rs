@@ -1,11 +1,5 @@
-use crate::{
-	native::{
-		agent::{AgentBus, AgentEvent, AgentRegistry, AgentRuntime, RuntimeEvent},
-		job::AgentTask,
-	},
-	prelude::*,
-};
-use tokio::sync::mpsc::{UnboundedReceiver, unbounded_channel};
+use super::{AgentBus, AgentEvent, AgentRegistry, AgentRuntime, RuntimeEvent};
+use crate::{native::job::AgentTask, prelude::*};
 
 #[derive(Debug, Clone)]
 pub enum SystemEvent {

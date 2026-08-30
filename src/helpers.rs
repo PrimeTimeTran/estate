@@ -1,14 +1,11 @@
+use crate::prelude::*;
+
 use owo_colors::OwoColorize;
-use std::path::{ Path, PathBuf };
 
 #[macro_export]
 macro_rules! section {
 	($title:expr) => {
-		$crate::helpers::print_section(
-			$title,
-			file!(),
-			line!(),
-		)
+		$crate::helpers::print_section($title, file!(), line!())
 	};
 }
 
@@ -18,7 +15,10 @@ pub fn print_section(title: &str, file: &str, line: u32) {
 	let file = normalize_file(file);
 	println!("{}", "-".repeat(80).dimmed());
 	println!("{}", title.bold().cyan());
-	println!("See {}", hyperlink(&format!("{file}#{line}"), &source_url(&file, line)).dimmed());
+	println!(
+		"See {}",
+		hyperlink(&format!("{file}#{line}"), &source_url(&file, line)).dimmed()
+	);
 	println!("{}", "-".repeat(80).dimmed());
 }
 
@@ -27,7 +27,11 @@ pub(crate) fn hyperlink(text: &str, url: &str) -> String {
 }
 
 fn normalize_file(file: &str) -> String {
-	Path::new(file).components().collect::<PathBuf>().display().to_string()
+	Path::new(file)
+		.components()
+		.collect::<PathBuf>()
+		.display()
+		.to_string()
 }
 
 fn source_url(file: &str, line: u32) -> String {

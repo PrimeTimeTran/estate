@@ -12,8 +12,6 @@ pub use crate::{prelude::*, ui::palette::*};
 pub const TRAY_ICON: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/estate-tray.png"));
 pub const TRAY_SCROLL_ICON: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/estate-tray.png"));
 
-use crate::app::{AppContext, Runtime};
-
 pub struct PanelConfig {
 	/// Is the panel "open"? Think sidebar.
 	pub active: bool,

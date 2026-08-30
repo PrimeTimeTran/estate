@@ -1,5 +1,3 @@
-use std::sync::{Mutex, OnceLock, atomic::AtomicBool};
-
 use core_graphics::display::{CGPoint, CGRect};
 
 use crate::native::prelude::{ScrollRedirectState, *};

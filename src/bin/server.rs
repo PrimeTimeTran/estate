@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 
-use estate::app::services::problem::ProblemServiceImpl;
 use estate::proto::leetcode::problem_service_server::ProblemServiceServer;
+use estate::services::problem::ProblemServiceImpl;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

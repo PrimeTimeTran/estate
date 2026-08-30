@@ -1,10 +1,12 @@
-use crate::app::*;
 use rmcp::{
 	handler::server::wrapper::Parameters,
 	model::{PromptMessage, PromptMessageContent},
 };
 
-use crate::native::backend::server::{CodeReviewArgs, MyServer};
+use crate::{
+	app::*,
+	native::backend::server::{CodeReviewArgs, MyServer},
+};
 
 #[derive(Default, Debug, Clone)]
 pub struct McpClient {

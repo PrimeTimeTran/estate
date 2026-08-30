@@ -1,8 +1,7 @@
 use crate::{
 	app::*,
 	native::{Oracle, monitor::StateMonitor, runtime::NativeRuntime},
-	prelude::*,
-	ui::{chart::*, *},
+	ui::chart::*,
 };
 
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};

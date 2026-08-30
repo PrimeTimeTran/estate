@@ -1,15 +1,11 @@
 use crate::{
-	AppEvent,
-	DaemonCommand,
-	app::{self, App, Runtime, model::EstateEngine, task::*, *},
-	// data::INITIAL_WINDOW,
-	native::{self, prelude::*, runtime::NativeRuntime, screens::*, *},
+	AppEvent, DaemonCommand,
+	app::{self, App, Runtime, model::EstateEngine},
+	native::{self, runtime::NativeRuntime, screens::*, *},
 	prelude::*,
 	spawn_global_cursor_daemon,
 	ui::rendermd::MarkdownView,
 };
-
-use signal_hook::{consts::SIGINT, iterator::Signals};
 
 use tray_icon::{
 	TrayIcon, TrayIconBuilder,
@@ -194,7 +190,7 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 	fn resumed(&mut self, event_loop: &ActiveEventLoop) {
 		self.menu_bar.init_for_nsapp();
 		if self.windows.is_empty() {
-			self.open_window(event_loop, INITIAL_WINDOW);
+			self.open_window(event_loop, crate::data::INITIAL_WINDOW);
 		}
 		if self.tray.is_none() {
 			let (menu, tray) = match Self::bootstrap() {

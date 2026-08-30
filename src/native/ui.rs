@@ -1,12 +1,10 @@
-use crate::{app::Runtime, native::prelude::*, ui::Veable};
-
+use crate::native::prelude::*;
 use core_graphics::{
 	display::CGDisplay,
 	event::{CGEvent, CGEventTapLocation, CGEventType, CGMouseButton},
 	event_source::{CGEventSource, CGEventSourceStateID},
 	geometry::CGPoint,
 };
-
 use tray_icon::{
 	Icon, TrayIcon, TrayIconBuilder,
 	menu::{Menu, MenuItem, Submenu},
@@ -42,7 +40,6 @@ pub fn bootstrap() -> Result<(TrayMenu, TrayIcon)> {
 		.with_tooltip("Estate Daemon — Running")
 		.build()
 		.map_err(|e| anyhow::anyhow!("failed to create tray icon: {e}"))?;
-
 	Ok((
 		TrayMenu {
 			clear_tasks,
@@ -58,7 +55,6 @@ pub fn bootstrap() -> Result<(TrayMenu, TrayIcon)> {
 		tray,
 	))
 }
-
 pub fn tray_icon() -> Icon {
 	let image = image::load_from_memory(crate::ui::TRAY_ICON)
 		.expect("failed to load generated tray icon")
@@ -66,7 +62,6 @@ pub fn tray_icon() -> Icon {
 	let (width, height) = image.dimensions();
 	Icon::from_rgba(image.into_raw(), width, height).expect("failed to create tray icon")
 }
-
 pub fn scroll_tray_icon() -> tray_icon::Icon {
 	let image = image::load_from_memory(crate::ui::TRAY_SCROLL_ICON)
 		.expect("failed to load scroll tray icon")
@@ -106,19 +101,13 @@ pub enum ScreenPosition {
 }
 pub fn move_cursor_to(pos: ScreenPosition) {
 	let bounds = CGDisplay::main().bounds();
-
 	let x = match pos {
 		ScreenPosition::Left => bounds.origin.x + bounds.size.width * 0.125,
-
 		ScreenPosition::Center => bounds.origin.x + bounds.size.width * 0.5,
-
 		ScreenPosition::Right => bounds.origin.x + bounds.size.width * 0.875,
 	};
-
 	let y = bounds.origin.y + bounds.size.height * 0.5;
-
 	let point = CGPoint { x, y };
-
 	if let Ok(source) = CGEventSource::new(CGEventSourceStateID::CombinedSessionState) {
 		if let Ok(event) =
 			CGEvent::new_mouse_event(source, CGEventType::MouseMoved, point, CGMouseButton::Left)
@@ -127,35 +116,3 @@ pub fn move_cursor_to(pos: ScreenPosition) {
 		}
 	}
 }
-
-// impl<R: Runtime> Panel<R> {
-// 	pub fn new(region: Region<R>) -> Self {
-// 		Self {
-// 			region,
-// 			open: true,
-// 			overlay: false,
-// 			auto_hide: false,
-// 		}
-// 	}
-// 	pub fn with_open(mut self, open: bool) -> Self {
-// 		self.open = open;
-// 		self
-// 	}
-// 	pub fn with_overlay(mut self, overlay: bool) -> Self {
-// 		self.overlay = overlay;
-// 		self
-// 	}
-// 	pub fn with_auto_hide(mut self, auto_hide: bool) -> Self {
-// 		self.auto_hide = auto_hide;
-// 		self
-// 	}
-// 	pub fn open(&mut self) {
-// 		self.open = true;
-// 	}
-// 	pub fn close(&mut self) {
-// 		self.open = false;
-// 	}
-// 	pub fn toggle(&mut self) {
-// 		self.open = !self.open;
-// 	}
-// }

@@ -8,11 +8,10 @@
 
 use crate::{
 	app::{state::EstateState, *},
-	native::{agent::AgentContext, task_manager::WaterfallChart},
-	prelude::*,
+	native::{agent::AgentContext, prelude::*, task_manager::WaterfallChart},
 };
 
-use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode};
+use notify::{Event, EventKind};
 
 #[derive(Debug, Clone, Eq, Deserialize, PartialEq, Serialize)]
 pub struct Task {

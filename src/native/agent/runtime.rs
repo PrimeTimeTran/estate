@@ -1,11 +1,8 @@
-use crate::native::{
-	self,
-	agent::{Agent, AgentEvent, RuntimeEvent, SystemEvent},
-};
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+use super::{Agent, AgentEvent, RuntimeEvent, SystemEvent};
+use crate::native::{job, prelude::*};
 
 #[derive(Debug, Default)]
-pub struct AgentRegistry {}
+pub struct AgentRegistry;
 
 #[derive(Debug)]
 pub struct AgentRuntime {
@@ -15,7 +12,7 @@ pub struct AgentRuntime {
 }
 
 impl AgentRuntime {
-	pub async fn spawn_agent(&self, task: native::job::AgentTask) {
+	pub async fn spawn_agent(&self, task: job::AgentTask) {
 		let event_tx = self.event_tx.clone();
 		tokio::spawn(async move {
 			let agent = Agent::new();

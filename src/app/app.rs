@@ -1,5 +1,9 @@
 use crate::{
-	app::{event::EventKind, model, state::EstateState},
+	app::{
+		event::{Event, EventKind},
+		model,
+		state::EstateState,
+	},
 	prelude::*,
 };
 

@@ -7,8 +7,5 @@ pub mod leetcode {
 pub async fn client()
 -> anyhow::Result<leetcode::problem_service_client::ProblemServiceClient<tonic::transport::Channel>>
 {
-	Ok(
-		leetcode::problem_service_client::ProblemServiceClient::connect("http://localhost:50051")
-			.await?,
-	)
+	Ok(leetcode::problem_service_client::ProblemServiceClient::connect(crate::SERVER_URL).await?)
 }

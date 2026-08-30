@@ -4,6 +4,7 @@ pub mod helpers;
 pub mod prelude;
 pub mod proto;
 pub mod services;
+pub use services::*;
 pub mod share;
 pub mod theme;
 pub mod tool;

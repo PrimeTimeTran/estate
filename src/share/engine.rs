@@ -28,7 +28,7 @@
 //                        ▼          ▼          ▼
 //                      Zed       VS Code      CLI
 
-use crate::{app::model::*, prelude::*};
+use crate::app::model::*;
 
 pub trait Engine {
 	// IDE anchors/bookmarks

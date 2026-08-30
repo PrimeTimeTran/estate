@@ -1,7 +1,4 @@
-use std::path::Path;
-
-use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
-use tokio::sync::mpsc;
+use notify::{Event, EventKind};
 
 use crate::{app::*, event::channel};
 

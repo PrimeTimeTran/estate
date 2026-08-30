@@ -9,6 +9,7 @@ use crate::{
 };
 
 pub static INDEX_PATH: &str = ".config/estate/master.json";
+pub static SERVER_URL: &str = "http://localhost:50051";
 pub static HOME_DIR: &str = ".config/estate";
 pub const WORKSPACE_SETTINGS: &str = ".estate/settings.json";
 pub static HMR_CHART_JSON: &str = "/Users/future/kb/project/crates/estate/src/data/chart.json";

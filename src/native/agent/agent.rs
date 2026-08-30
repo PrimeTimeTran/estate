@@ -1,10 +1,8 @@
-use crate::{
-	app::*,
-	native::agent::{
-		ACTION_PROMPT, AgentEvent, AgentTools, DECIDE_PROMPT, JSON_PROMPT, RuntimeEvent,
-		WorkspaceContext, build_sys_action, build_sys_prompt,
-	},
-	prelude::anyhow::anyhow,
+use crate::{app::*, prelude::anyhow::anyhow};
+
+use super::{
+	ACTION_PROMPT, AgentEvent, AgentTools, DECIDE_PROMPT, JSON_PROMPT, RuntimeEvent,
+	WorkspaceContext, build_sys_action, build_sys_prompt,
 };
 
 #[derive(Debug, Clone)]

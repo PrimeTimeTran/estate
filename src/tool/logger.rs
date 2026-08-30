@@ -2,7 +2,7 @@ use std::fs::OpenOptions;
 
 use crate::{native::resolver::engine_data_dir, prelude::*};
 
-use tracing::{debug, error, info, info_span, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 use tracing_subscriber::{
 	EnvFilter, Layer, filter::LevelFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt,
 };

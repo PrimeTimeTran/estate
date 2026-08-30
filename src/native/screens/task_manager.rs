@@ -3,13 +3,11 @@ use crate::{
 	native::{job::TaskManager, runtime::NativeRuntime},
 	prelude::*,
 	theme::palette,
-	ui::*,
 };
 
 use egui::Ui;
 use egui_extras::{Column, TableBuilder};
 use egui_plot::{Bar, BarChart, Plot};
-use notify::Watcher;
 use std::time::Duration;
 
 impl TaskManager {

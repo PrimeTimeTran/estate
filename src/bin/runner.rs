@@ -1,19 +1,11 @@
 #![allow(warnings)]
+
 use anyhow::Context;
 
-#[cfg(not(target_arch = "wasm32"))]
-use estate::proto::leetcode::{ListProblemsRequest, PageRequest};
 use estate::{
 	// flow_warn,
-	// logger::{TraceFlow, Tracer, setup_logging},
 	prelude::*,
 };
-use std::{
-	env,
-	path::{Path, PathBuf},
-	time::Instant,
-};
-use uuid::Uuid;
 
 // cargo -q run --bin runner -- python
 // RUNNER=native cargo -q run --bin runner -- python
@@ -23,24 +15,6 @@ fn main() {}
 #[cfg(not(target_arch = "wasm32"))]
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-	let mut client = estate::proto::client().await?;
-
-	let response = client
-		.list_problems(ListProblemsRequest {
-			page: Some(PageRequest {
-				page: 1,
-				page_size: 20,
-			}),
-			difficulty: None,
-			tags: vec![],
-			search: String::new(),
-			published_only: Some(true),
-		})
-		.await?;
-
-	println!("{:?}", response);
-
-	let problems = response.into_inner().problems;
 	let _result = setup_logging();
 	match run().await {
 		Ok(()) => {
@@ -704,4 +678,27 @@ pub enum TestStatus {
 	Passed,
 	WrongAnswer,
 	RuntimeError,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+use estate::proto::leetcode::{ListProblemsRequest, PageRequest};
+
+pub async fn connect() -> Result<()> {
+	let mut client = estate::proto::client().await?;
+
+	let response = client
+		.list_problems(ListProblemsRequest {
+			page: Some(PageRequest {
+				page: 1,
+				page_size: 20,
+			}),
+			difficulty: None,
+			tags: vec![],
+			search: String::new(),
+			published_only: Some(true),
+		})
+		.await?;
+	println!("{:?}", response);
+	let problems = response.into_inner().problems;
+	Ok(())
 }
