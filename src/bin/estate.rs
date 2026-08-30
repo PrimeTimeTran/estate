@@ -6,7 +6,7 @@ fn main() -> Result<()> {
 	config.apply_cli(&cli)?;
 	logger::init_logging(&config)?;
 	let trace = Tracer::new("app");
-	let mut flow = trace.flow("init");
+	let flow = trace.flow("init");
 	flow.info("App::new");
 	let mut app = NativeApp::new()?;
 	flow.info(">>> BEFORE app.run()");

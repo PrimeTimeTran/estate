@@ -15,7 +15,7 @@
 // estate fmt path/to/file.rs
 // ```
 
-use estate::{ prelude::{ logger, * } };
+use estate::prelude::{logger, *};
 
 fn main() -> Result<()> {
 	let cli = cli::context::parse();
@@ -25,7 +25,7 @@ fn main() -> Result<()> {
 	logger::init_logging(&config)?;
 
 	let trace = Tracer::new("app");
-	let mut flow = trace.flow("init");
+	let flow = trace.flow("init");
 
 	flow.info("App::new");
 
