@@ -46,7 +46,7 @@ fn find_largest(nums: Vec<i32>) -> i32 {
 
 pub fn dynamic_problem() {
 	let nums1 = vec![1, 2, 3];
-	let nums2 = vec![1.0, 2.0, 3.0];
+	// let nums2 = vec![1.0, 2.0, 3.0];
 	println!("Largest: {}", find_largest(nums1));
 	// Unfortunately this doesn't work.
 	// We could define a float impl but that's annoying
@@ -71,7 +71,7 @@ pub fn generic_param_types() {
 
 pub fn repeated_behavior() {
 	let nums1 = vec![1, 2, 3];
-	let nums2 = vec![1.0, 2.0, 3.0];
+	// let nums2 = vec![1.0, 2.0, 3.0];
 
 	println!("Largest integer: {}", find_largest(nums1));
 
@@ -87,18 +87,18 @@ pub fn repeated_behavior() {
 	// But now we're duplicating behavior.
 }
 pub fn generic_types() {
-	fn find_largest<T>(nums: Vec<T>) -> T {
-		// We can't actually compare T yet.
-		//
-		// The important idea here is:
-		//
-		//     T = "some type"
-		//
-		// The function no longer cares whether T is i32,
-		// f64, String, or something else.
+	// fn find_largest<T>(nums: Vec<T>) -> T {
+	// 	// We can't actually compare T yet.
+	// 	//
+	// 	// The important idea here is:
+	// 	//
+	// 	//     T = "some type"
+	// 	//
+	// 	// The function no longer cares whether T is i32,
+	// 	// f64, String, or something else.
 
-		todo!()
-	}
+	// 	todo!()
+	// }
 
 	println!("A generic T can represent many concrete types.");
 }

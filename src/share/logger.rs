@@ -209,43 +209,45 @@ pub struct TraceFlow {
 	name: String,
 }
 impl TraceFlow {
-	fn event(&self, level: LogLevel, message: &str) {
+	fn event(&self, level: LogLevel, message: impl std::fmt::Display) {
 		let id = Tracer::next_flow_id();
-		let span = info_span!(
-		"flow",
-		flow = %format_args!("{}#{}.{}", self.namespace, id, self.name),
-		);
-		let _enter = span.enter();
+		let prefix = format!("{}#{}:{}", self.name, id, self.namespace);
+
 		match level {
-			LogLevel::Trace => trace!("{}", message),
-			LogLevel::Debug => debug!("{}", message),
-			LogLevel::Info => info!("{}", message),
-			LogLevel::Warn => warn!("{}", message),
-			LogLevel::Error => error!("{}", message),
+			LogLevel::Trace => trace!("{prefix}: {message}"),
+			LogLevel::Debug => debug!("{prefix}: {message}"),
+			LogLevel::Info => info!("{prefix}: {message}"),
+			LogLevel::Warn => warn!("{prefix}: {message}"),
+			LogLevel::Error => error!("{prefix}: {message}"),
 		}
 	}
-	pub fn trace(&mut self, message: &str) {
+
+	pub fn trace(&self, message: impl std::fmt::Display) {
 		self.event(LogLevel::Trace, message);
 	}
-	pub fn debug(&mut self, message: &str) {
+
+	pub fn debug(&self, message: impl std::fmt::Display) {
 		self.event(LogLevel::Debug, message);
 	}
-	pub fn info(&mut self, message: &str) {
+
+	pub fn info(&self, message: impl std::fmt::Display) {
 		self.event(LogLevel::Info, message);
 	}
-	pub fn warn(&mut self, message: &str) {
+
+	pub fn warn(&self, message: impl std::fmt::Display) {
 		self.event(LogLevel::Warn, message);
 	}
-	pub fn error(&mut self, message: &str) {
+
+	pub fn error(&self, message: impl std::fmt::Display) {
 		self.event(LogLevel::Error, message);
 	}
+}
 
-	// pub fn preview(&mut self, message: &str) {
-	// 	self.debug(message);
-	// 	self.info(message);
-	// 	self.warn(message);
-	// 	self.error(message)
-	// }
+#[macro_export]
+macro_rules! flow_warn {
+	($flow:expr, $($arg:tt)*) => {
+		$flow.warn(format!($($arg)*))
+	};
 }
 
 #[derive(Debug, Deserialize)]
@@ -297,4 +299,17 @@ pub struct LogOptions {
 	pub level: Option<LogLevel>,
 	pub targets: Option<HashMap<String, LogLevel>>,
 	pub terminal: Option<OutputOptions>,
+}
+
+pub fn setup_logging() -> anyhow::Result<()> {
+	let cli = cli::context::parse();
+	let mut config = LogConfig::load()?;
+	config.apply_cli(&cli)?;
+	logger::init_logging(&config)?;
+	// tracing::trace!("[dryrun] trace");
+	// tracing::debug!("[dryrun] debug");
+	// tracing::info!("[dryrun] info");
+	// tracing::warn!("[dryrun] warn");
+	// tracing::error!("[dryrun] error");
+	Ok(())
 }

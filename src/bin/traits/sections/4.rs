@@ -1,3 +1,4 @@
+#![allow(warnings)]
 pub fn dispatch() {
 	let p1 = Point::new(1.0, 2.0);
 	let p2 = Point::new(4.0, 6.0);
@@ -37,13 +38,13 @@ trait Distance {
 }
 
 // 1. Cleaning Up Complex Signatures
-// - Instead of putting all constraints inside the < > brackets, 
+// - Instead of putting all constraints inside the < > brackets,
 // you can break them down after the return type.
 // 2. Bounding Associated Types
-// - You can constrain types produced by other traits, 
+// - You can constrain types produced by other traits,
 // like forcing an Iterator's item type to implement a specific trait.
 // 3. Conditional Implementations (impl Blocks)
-// - You can use where to conditionally implement a trait 
+// - You can use where to conditionally implement a trait
 // for a struct only if its underlying data type fulfills certain criteria.
 impl<T> Distance for Point<T>
 where
@@ -57,4 +58,3 @@ where
 		(dx * dx + dy * dy).sqrt()
 	}
 }
-
