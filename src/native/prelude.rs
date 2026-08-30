@@ -1,6 +1,5 @@
 //! # Description
 //! Centralized internal dependency management for native platform targets like MacOS, Windows, Linux.
-
 pub use crate::native::{
 	self,
 	app::*,

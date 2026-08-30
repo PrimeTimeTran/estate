@@ -42,9 +42,8 @@
 /// estate format path/to/file.rs
 /// ```
 use crate::app::{model, modules::runtime::Runtime, *};
+use crate::doc;
 use crate::{native::daemon::projection::command, prelude::*};
-use cli;
-use cli::context::Command;
 
 pub(crate) async fn execute<R: Runtime>(
 	parsed_cli: Cli,
@@ -66,24 +65,29 @@ pub(crate) async fn execute<R: Runtime>(
 			let workspace = AnalyzeDaemon.run(&ctx, &args).await?;
 			AnalyzeLoop::run_cli(workspace).await;
 		}
-		//                        ┌──────────────────┐
-		//                        │      Estate      │
-		//                        │  core services   │
-		//                        └────────┬─────────┘
-		//                                 │
-		//                   ┌─────────────┼─────────────┐
-		//                   │             │             │
-		//                   ▼             ▼             ▼
-		//               CLI command     Daemon         LSP
-		//               (short-lived)   (long-lived)   (long-lived)
-		//                                 │
-		//                                 │
-		//                           ┌─────┴─────┐
-		//                           │           │
-		//                           ▼           ▼
-		//                        Headless     Menu Bar
-		//                        process      application
 		Command::Analyze(args) => {
+			doc!(
+				r#"
+				          ┌──────────────────┐
+				          │      Estate      │
+				          │  core services   │
+				          └────────┬─────────┘
+				                  │
+				    ┌─────────────┼─────────────┐
+				    │             │             │
+				    ▼             ▼             ▼
+				CLI command     Daemon         LSP
+				(short-lived)   (long-lived)   (long-lived)
+				                  │
+				                  │
+				            ┌─────┴─────┐
+				            │           │
+				            ▼           ▼
+				          Headless     Menu Bar
+				          process      application
+			"#
+			);
+
 			let mut stream = match UnixStream::connect(SOCKET_PATH).await {
 				Ok(s) => s,
 				Err(e) => {
@@ -94,7 +98,6 @@ pub(crate) async fn execute<R: Runtime>(
 			};
 			for path in &args.paths {
 				let clean_path = path.canonicalize().unwrap_or_else(|_| path.clone());
-				// Just pass the file path and line/offset directly as raw fields
 				let request = serde_json::json!({
 						"path": clean_path,
 						"line": args.line,
@@ -106,7 +109,6 @@ pub(crate) async fn execute<R: Runtime>(
 					eprintln!("Failed to send request: {}", e);
 					break;
 				}
-				// Read response from socket server
 				let mut buf = Vec::new();
 				match stream.read_to_end(&mut buf).await {
 					Ok(_) => {
