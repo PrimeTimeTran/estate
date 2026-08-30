@@ -55,11 +55,8 @@ async fn run() -> anyhow::Result<()> {
 
 	let mut results = Vec::with_capacity(problem.test_cases.len());
 
-	for (index, test_case) in problem.test_cases.iter().enumerate() {
-		flow.debug(&format!("Running test case {}", index + 1));
-
+	for (_index, test_case) in problem.test_cases.iter().enumerate() {
 		let telemetry = runner.run(&run, language, test_case).await?;
-
 		results.push(telemetry);
 	}
 
@@ -89,7 +86,10 @@ async fn run() -> anyhow::Result<()> {
 
 	Ok(())
 }
-use tokio::time::{Duration, timeout};
+use tokio::{
+	process::Child,
+	time::{Duration, timeout},
+};
 
 /// Runner/Executors
 pub struct Run {
@@ -171,53 +171,25 @@ impl Runner for DockerRunner {
 		language: Language,
 		test_case: &TestCase,
 	) -> anyhow::Result<RunTelemetry> {
-		Self::docker_run(run, language, language.image(), test_case).await
+		tracing::debug!("DockerRunner::run: language={language:?}");
+
+		Self::docker_run(run, language, test_case).await
 	}
 }
 impl DockerRunner {
-	// HOST                              CONTAINER
-	// ─────────────────────────         ─────────────────
-	// /tmp/leetcode/<run-id>/    ───►   /run
-	//       │                              │
-	//       ├── solution.rs                └── /run/solution.rs
-	//       ├── solution.py
-	//       └── ...
 	async fn docker_run(
 		run: &Run,
 		language: Language,
-		image: &str,
 		test_case: &TestCase,
 	) -> anyhow::Result<RunTelemetry> {
-		let volume = format!("{}:/run:rw", run.dir.display());
-
-		tracing::debug!("DOCKER image: {image}");
-		tracing::debug!("DOCKER volume: {volume}");
-
-		let output = timeout(
-			Duration::from_secs(5),
-			tokio::process::Command::new("/usr/local/bin/docker")
-				.args([
-					"run",
-					"--rm",
-					"--network=none",
-					"--read-only",
-					"--cpus=1",
-					"--memory=256m",
-					"--pids-limit=64",
-					"--cap-drop=ALL",
-					"--security-opt=no-new-privileges",
-					"--user=1000:1000",
-					"-e",
-					&format!("RUN_ID={}", run.id),
-					"-v",
-					&volume,
-					image,
-				])
-				.output(),
-		)
-		.await
-		.context("Docker execution timed out after 5 seconds")?
-		.context("failed to start Docker")?;
+		let input_path = run.dir.join("input");
+		tokio::fs::write(&input_path, &test_case.input).await?;
+		tracing::debug!("DOCKER test input: {:?}", test_case.input);
+		let child = Self::run_docker(run, language).await?;
+		let output = timeout(Duration::from_secs(5), child.wait_with_output())
+			.await
+			.context("Docker execution timed out after 5 seconds")?
+			.context("failed waiting for Docker")?;
 
 		let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
 		let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
@@ -226,16 +198,13 @@ impl DockerRunner {
 			anyhow::bail!(
 				"Docker runner failed (exit code {:?})\n\
 				 language: {:?}\n\
-				 image: {image}\n\
 				 stderr:\n{stderr}\n\
 				 stdout:\n{stdout}",
 				output.status.code(),
 				language,
 			);
 		}
-
 		let result_path = run.dir.join("result.json");
-
 		let raw_result = tokio::fs::read_to_string(&result_path)
 			.await
 			.with_context(|| {
@@ -247,7 +216,6 @@ impl DockerRunner {
 
 		let container: ContainerResult =
 			serde_json::from_str(&raw_result).context("Docker runner produced invalid result.json")?;
-
 		anyhow::ensure!(
 			container.run_id == run.id.to_string(),
 			"Docker runner returned mismatched run ID: expected {}, got {}",
@@ -265,7 +233,41 @@ impl DockerRunner {
 			stderr,
 		))
 	}
+
+	async fn run_docker(run: &Run, language: Language) -> Result<Child> {
+		let volume = format!("{}:/run:rw", run.dir.display());
+		tracing::debug!("DOCKER volume: {volume}");
+		tokio::process::Command::new("/usr/local/bin/docker")
+			.args([
+				"run",
+				"--rm",
+				"-i",
+				"--network=none",
+				"--read-only",
+				"--tmpfs",
+				"/tmp:rw,noexec,nosuid,size=64m",
+				"--cpus=1",
+				"--memory=256m",
+				"--pids-limit=64",
+				"--cap-drop=ALL",
+				"--security-opt=no-new-privileges",
+				"--user=1000:1000",
+				"-e",
+				&format!("RUN_ID={}", run.id),
+				"-e",
+				&format!("LANGUAGE={}", language.as_str()),
+				"-v",
+				&volume,
+				"leetcode-runner",
+			])
+			.stdin(std::process::Stdio::piped())
+			.stdout(std::process::Stdio::piped())
+			.stderr(std::process::Stdio::piped())
+			.spawn()
+			.context("failed to start Docker")
+	}
 }
+
 /// Telemetry
 #[derive(Debug, Default)]
 struct RunTelemetry {
@@ -364,11 +366,11 @@ pub enum Language {
 	JavaScript,
 }
 impl Language {
-	fn image(self) -> &'static str {
+	pub fn as_str(&self) -> &'static str {
 		match self {
-			Self::Rust => "leetcode-rust",
-			Self::Python => "leetcode-python",
-			Self::JavaScript => "leetcode-node",
+			Self::Rust => "rust",
+			Self::Python => "python",
+			Self::JavaScript => "javascript",
 		}
 	}
 	fn entry(self) -> &'static str {
@@ -672,9 +674,7 @@ async fn execute(
 
 	if let Some(mut stdin) = child.stdin.take() {
 		use tokio::io::AsyncWriteExt;
-
 		stdin.write_all(input.as_bytes()).await?;
-		// Dropping stdin closes it and gives the program EOF.
 	}
 
 	let output = child.wait_with_output().await?;

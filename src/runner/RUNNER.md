@@ -1,11 +1,16 @@
 # Native & Docker Runner Setup
 
+```sh
+# Single runner for all 3
+docker build -t leetcode-runner -f src/Dockerfile .
+```
+
 ## Full Run
 
 ```sh
-docker build -f src/docker/python/Dockerfile -t leetcode-python .
-RUNNER=docker cargo run --bin runner -- python
-RUNNER=native cargo run --bin runner -- python
+docker build -f src/docker/rust/Dockerfile -t leetcode-rust .
+RUNNER=native cargo run --bin runner -- rust
+RUNNER=docker cargo run --bin runner -- rust
 ```
 
 ## Configs

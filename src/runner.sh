@@ -2,9 +2,27 @@
 
 set -u
 
+setup_ms=0
+
+case "${LANGUAGE:-}" in
+    rust)
+        LANGUAGE_RUNNER="/usr/local/bin/runner.rust.sh"
+        ;;
+    python)
+        LANGUAGE_RUNNER="/usr/local/bin/runner.python.sh"
+        ;;
+    javascript)
+        LANGUAGE_RUNNER="/usr/local/bin/runner.javascript.sh"
+        ;;
+    *)
+        echo "unsupported language: ${LANGUAGE:-<unset>}" >&2
+        exit 2
+        ;;
+esac
+
 compile_start=$(date +%s%N)
 
-if /usr/local/bin/language-runner compile; then
+if "$LANGUAGE_RUNNER" compile; then
     compile_exit=0
 else
     compile_exit=$?
@@ -19,7 +37,7 @@ if [ "$compile_exit" -ne 0 ]; then
 else
     execution_start=$(date +%s%N)
 
-    if /usr/local/bin/language-runner execute; then
+    if "$LANGUAGE_RUNNER" execute; then
         exit_code=0
     else
         exit_code=$?
@@ -32,11 +50,11 @@ fi
 cat > /run/result.json <<EOF
 {
   "run_id": "${RUN_ID}",
+  "setup_ms": ${setup_ms},
   "compile_ms": ${compile_ms},
   "execution_ms": ${execution_ms},
   "exit_code": ${exit_code}
 }
 EOF
 
-# Keep stdout as the user's program output.
 exit "$exit_code"

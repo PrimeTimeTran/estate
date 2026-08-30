@@ -6,7 +6,7 @@ case "$1" in
         ;;
 
     execute)
-        exec node /run/solution.js
+        exec node /run/solution.js < /run/input
         ;;
 
     *)

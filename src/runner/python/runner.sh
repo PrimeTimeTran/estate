@@ -2,11 +2,10 @@
 
 case "$1" in
     compile)
-        python -m py_compile /run/solution.py
         ;;
 
     execute)
-        exec python /run/solution.py
+        exec python3 /run/solution.py < /run/input
         ;;
 
     *)

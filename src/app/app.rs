@@ -58,13 +58,5 @@ impl<R: Runtime> App<R> {
 	}
 	pub fn stop_session(&mut self) {
 		println!("stop_session from app");
-
-		// let session = self.engine.runtime.session();
-
-		// tokio::spawn(async move {
-		// 	if let Err(err) = Master::save(session).await {
-		// 		eprintln!("failed to save session: {err}");
-		// 	}
-		// });
 	}
 }
