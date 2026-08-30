@@ -7,11 +7,33 @@ use std::{
 	time::Instant,
 };
 use uuid::Uuid;
+
+use estate::proto::leetcode::{
+	ListProblemsRequest, PageRequest, problem_service_client::ProblemServiceClient,
+};
+
 // cargo -q run --bin runner -- python
 // RUNNER=native cargo -q run --bin runner -- python
 // RUNNER=docker cargo -q run --bin runner -- python
 #[tokio::main]
-async fn main() {
+async fn main() -> anyhow::Result<()> {
+	let mut client = ProblemServiceClient::connect("http://localhost:50051").await?;
+
+	let response = client
+		.list_problems(ListProblemsRequest {
+			page: Some(PageRequest {
+				page: 1,
+				page_size: 20,
+			}),
+			difficulty: None,
+			tags: vec![],
+			search: String::new(),
+			published_only: Some(true),
+		})
+		.await?;
+	println!("{:?}", response);
+
+	let problems = response.into_inner().problems;
 	let _result = setup_logging();
 	match run().await {
 		Ok(()) => {
@@ -22,6 +44,7 @@ async fn main() {
 			std::process::exit(1);
 		}
 	}
+	Ok(())
 }
 #[tracing::instrument]
 async fn run() -> anyhow::Result<()> {

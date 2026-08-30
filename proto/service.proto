@@ -1,0 +1,278 @@
+syntax = "proto3";
+
+package leetcode;
+
+import "google/protobuf/timestamp.proto";
+
+// ============================================================
+// Common
+// ============================================================
+
+message Empty {}
+
+message PageRequest {
+  int32 page = 1;
+  int32 page_size = 2;
+}
+
+message PageInfo {
+  int32 page = 1;
+  int32 page_size = 2;
+  int64 total = 3;
+}
+
+// ============================================================
+// Problems
+// ============================================================
+
+service ProblemService {
+  rpc CreateProblem(CreateProblemRequest) returns (Problem);
+  rpc GetProblem(GetProblemRequest) returns (Problem);
+  rpc UpdateProblem(UpdateProblemRequest) returns (Problem);
+  rpc DeleteProblem(DeleteProblemRequest) returns (Empty);
+
+  rpc ListProblems(ListProblemsRequest) returns (ListProblemsResponse);
+}
+
+// ============================================================
+// Submissions
+// ============================================================
+
+service SubmissionService {
+  rpc CreateSubmission(CreateSubmissionRequest) returns (Submission);
+  rpc GetSubmission(GetSubmissionRequest) returns (Submission);
+  rpc UpdateSubmission(UpdateSubmissionRequest) returns (Submission);
+  rpc DeleteSubmission(DeleteSubmissionRequest) returns (Empty);
+
+  rpc ListSubmissions(ListSubmissionsRequest) returns (ListSubmissionsResponse);
+
+  // Convenience operations
+  rpc RunSubmission(RunSubmissionRequest) returns (Submission);
+}
+
+// ============================================================
+// Problem Models
+// ============================================================
+
+message Problem {
+  string id = 1;
+
+  // LeetCode-style problem number.
+  int32 number = 2;
+
+  string title = 3;
+  string slug = 4;
+
+  string description = 5;
+
+  Difficulty difficulty = 6;
+
+  repeated string tags = 7;
+
+  // Examples shown in the problem statement.
+  repeated Example examples = 8;
+
+  // Constraints / notes shown to the user.
+  repeated string constraints = 9;
+
+  // Starter code by language.
+  repeated CodeTemplate code_templates = 10;
+
+  bool is_published = 11;
+
+  google.protobuf.Timestamp created_at = 12;
+  google.protobuf.Timestamp updated_at = 13;
+}
+
+enum Difficulty {
+  DIFFICULTY_UNSPECIFIED = 0;
+  EASY = 1;
+  MEDIUM = 2;
+  HARD = 3;
+}
+
+message Example {
+  string input = 1;
+  string output = 2;
+  string explanation = 3;
+}
+
+message CodeTemplate {
+  string language = 1;
+  string source = 2;
+}
+
+// ============================================================
+// Problem Requests
+// ============================================================
+
+message CreateProblemRequest {
+  int32 number = 1;
+  string title = 2;
+  string slug = 3;
+  string description = 4;
+
+  Difficulty difficulty = 5;
+
+  repeated string tags = 6;
+  repeated Example examples = 7;
+  repeated string constraints = 8;
+  repeated CodeTemplate code_templates = 9;
+
+  bool is_published = 10;
+}
+
+message GetProblemRequest {
+  string id = 1;
+}
+
+message UpdateProblemRequest {
+  string id = 1;
+
+  optional int32 number = 2;
+  optional string title = 3;
+  optional string slug = 4;
+  optional string description = 5;
+  optional Difficulty difficulty = 6;
+
+  repeated string tags = 7;
+  repeated Example examples = 8;
+  repeated string constraints = 9;
+  repeated CodeTemplate code_templates = 10;
+
+  optional bool is_published = 11;
+}
+
+message DeleteProblemRequest {
+  string id = 1;
+}
+
+message ListProblemsRequest {
+  PageRequest page = 1;
+
+  optional Difficulty difficulty = 2;
+
+  repeated string tags = 3;
+
+  string search = 4;
+
+  optional bool published_only = 5;
+}
+
+message ListProblemsResponse {
+  repeated Problem problems = 1;
+  PageInfo page = 2;
+}
+
+// ============================================================
+// Submission Models
+// ============================================================
+
+message Submission {
+  string id = 1;
+
+  // User who made the submission.
+  string user_id = 2;
+
+  // Problem being submitted against.
+  string problem_id = 3;
+
+  // The source submitted by the user.
+  string source = 4;
+
+  string language = 5;
+
+  SubmissionStatus status = 6;
+
+  // Runtime information.
+  optional int64 runtime_ms = 7;
+  optional int64 memory_bytes = 8;
+
+  // Useful when a submission fails.
+  optional string error = 9;
+
+  // Number of tests passed.
+  optional int32 tests_passed = 10;
+  optional int32 tests_total = 11;
+
+  google.protobuf.Timestamp created_at = 12;
+  google.protobuf.Timestamp updated_at = 13;
+}
+
+enum SubmissionStatus {
+  SUBMISSION_STATUS_UNSPECIFIED = 0;
+
+  PENDING = 1;
+  RUNNING = 2;
+
+  ACCEPTED = 3;
+  WRONG_ANSWER = 4;
+  TIME_LIMIT_EXCEEDED = 5;
+  MEMORY_LIMIT_EXCEEDED = 6;
+  RUNTIME_ERROR = 7;
+  COMPILATION_ERROR = 8;
+  INTERNAL_ERROR = 9;
+}
+
+// ============================================================
+// Submission Requests
+// ============================================================
+
+message CreateSubmissionRequest {
+  string user_id = 1;
+  string problem_id = 2;
+
+  string source = 3;
+  string language = 4;
+}
+
+message GetSubmissionRequest {
+  string id = 1;
+}
+
+message UpdateSubmissionRequest {
+  string id = 1;
+
+  optional string source = 2;
+  optional string language = 3;
+}
+
+message DeleteSubmissionRequest {
+  string id = 1;
+}
+
+message ListSubmissionsRequest {
+  PageRequest page = 1;
+
+  optional string user_id = 2;
+  optional string problem_id = 3;
+  optional SubmissionStatus status = 4;
+  optional string language = 5;
+}
+
+message ListSubmissionsResponse {
+  repeated Submission submissions = 1;
+  PageInfo page = 2;
+}
+
+// ============================================================
+// Execution
+// ============================================================
+
+message RunSubmissionRequest {
+  string submission_id = 1;
+}
+
+// service FavoriteService {
+//   rpc CreateFavorite(CreateFavoriteRequest) returns (Favorite);
+//   rpc GetFavorite(GetFavoriteRequest) returns (Favorite);
+//   rpc DeleteFavorite(DeleteFavoriteRequest) returns (Empty);
+//   rpc ListFavorites(ListFavoritesRequest) returns (ListFavoritesResponse);
+// }
+
+// message Favorite {
+//   string id = 1;
+//   string user_id = 2;
+//   string problem_id = 3;
+//   google.protobuf.Timestamp created_at = 4;
+// }

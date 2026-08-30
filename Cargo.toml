@@ -57,6 +57,11 @@ name = "settings"
 path = "src/bin/settings.rs"
 required-features = ["native"]
 
+[[bin]]
+name = "server"
+path = "src/bin/server.rs"
+required-features = ["native"]
+
 # cargo nextest run --bin settings --test-threads 1 --no-fail-fast
 [features]
 # This overwrites IDE config causing diagnostics to be wrong given the targetted platform.
@@ -131,6 +136,7 @@ wasm-bindgen-futures.workspace = true
 wasm-bridge.workspace = true
 wgpu.workspace = true
 winit.workspace = true
+
 # Make all these optional so they can be toggled by the native feature
 eframe = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
@@ -150,9 +156,11 @@ objc2-app-kit = { workspace = true, optional = true }
 objc2-foundation = { workspace = true, optional = true }
 rmcp = { workspace = true, optional = true }
 signal-hook = { version = "0.4.4", optional = true }
+
 tokio = { workspace = true, optional = true, features = [
   "rt",
   "macros",
+  "rt-multi-thread"
 ] } # Make sure features don't force 'net' on WASM if compiled
 tokio-util = { workspace = true, optional = true }
 tower-lsp = { workspace = true, optional = true }
@@ -160,6 +168,10 @@ tray-icon = { workspace = true, optional = true }
 jsonc-parser = { version = "0.33.1", features = ["cst"] }
 egui_extras = { version = "0.36.1", features = ["all_loaders"] }
 egui_commonmark = "0.25.0"
+tonic = "0.12"
+prost = "0.13"
+prost-types = "0.13"
 
 [build-dependencies]
 resvg.workspace = true
+tonic-build = "0.12"

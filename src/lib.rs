@@ -5,6 +5,7 @@ pub mod app;
 pub mod data;
 pub mod helpers;
 pub mod prelude;
+pub mod proto;
 pub mod share;
 pub mod theme;
 pub mod tool;
