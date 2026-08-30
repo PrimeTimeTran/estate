@@ -1,4 +1,7 @@
-pub use crate::{ app::{ state::StateStore, app::EstateState }, prelude::{ self, * } };
+pub use crate::{
+	app::{app::EstateState, state::StateStore},
+	prelude::{self, *},
+};
 
 #[derive(Clone, Debug)]
 pub struct NativeStateStore;
@@ -58,7 +61,7 @@ impl EstateState {
 
 	pub fn save_to_disk(&self) -> Result<()> {
 		let path = Self::path()?;
-		tracing::info!("💾 EstateState saving: {:?}", path);
+		tracing::debug!("💾 EstateState saving: {:?}", path);
 		let json = serde_json::to_string_pretty(self)?;
 		fs::write(path, json)?;
 		Ok(())

@@ -1,6 +1,10 @@
 #![allow(warnings)]
 use anyhow::Context;
-use estate::{flow_warn, prelude::*};
+use estate::{
+	flow_warn,
+	// logger::{TraceFlow, Tracer, setup_logging},
+	prelude::*,
+};
 use std::{
 	env,
 	path::{Path, PathBuf},
@@ -37,7 +41,7 @@ async fn main() -> anyhow::Result<()> {
 	let _result = setup_logging();
 	match run().await {
 		Ok(()) => {
-			tracing::info!("Runner completed successfully");
+			tracing::debug!("Runner completed successfully");
 		}
 		Err(error) => {
 			tracing::error!("{error:#}");

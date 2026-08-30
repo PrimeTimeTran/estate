@@ -1,5 +1,6 @@
 use crate::{
-	app::{self, App, Runtime, event::*, model::EstateEngine, *},
+	app::{self, App, Runtime, model::EstateEngine, task::*, *},
+	data::INITIAL_WINDOW,
 	native::{self, runtime::NativeRuntime, screens::*, *},
 	prelude::*,
 	ui::rendermd::MarkdownView,
@@ -31,11 +32,9 @@ pub struct NativeApp {
 impl NativeApp {
 	pub fn new() -> Result<Self> {
 		let (daemon_tx, daemon_rx) = mpsc::channel(100);
-
 		let runtime = NativeRuntime::new()?;
 		let engine = EstateEngine::new(runtime)?;
 		let app = App::new(engine)?;
-
 		Ok(Self {
 			app,
 			windows: vec![],
@@ -51,7 +50,7 @@ impl NativeApp {
 		})
 	}
 	pub fn run(&mut self, cli: Cli) -> Result<()> {
-		tracing::info!(">>> NativeApp::run entered");
+		tracing::debug!(">>> NativeApp::run entered");
 		let result = match cli.command {
 			None | Some(Command::Start { .. }) | Some(Command::Tray) => self.start_runtime(),
 			Some(_) => {
@@ -62,11 +61,11 @@ impl NativeApp {
 				})
 			}
 		};
-		tracing::info!(">>> NativeApp::run returning");
+		tracing::debug!(">>> NativeApp::run returning");
 		result
 	}
 	fn start_runtime(&mut self) -> Result<()> {
-		tracing::info!(">>> NativeApp::start_runtime start");
+		tracing::debug!(">>> NativeApp::start_runtime start");
 		let daemon_rx = self.daemon_rx.take().expect("daemon already started");
 		let (ready_tx, ready_rx) = std::sync::mpsc::sync_channel(1);
 		Self::spawn_daemon(daemon_rx, Arc::clone(&self.app.engine.runtime), ready_tx);
@@ -79,15 +78,10 @@ impl NativeApp {
 		self.spawn_clock(proxy.clone());
 		self.spawn_cursor_daemon(proxy.clone());
 		self.spawn_signal_handler(proxy.clone());
-		// Tell Estate that the application has started.
 		self
 			.app
 			.runtime()
 			.emit(Event::app(app::EventKind::SessionStart));
-		// self
-		// 	.app
-		// 	.runtime()
-		// 	.emit(Event::app(app::EventKind::StopSession { session: () }));
 		event_loop.run_app(self)?;
 		tracing::info!(">>> NativeApp::start_runtime returning");
 		Ok(())
@@ -203,7 +197,7 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 			};
 			self.menu = Some(menu);
 			self.tray = Some(tray);
-			tracing::info!("🔥 main tray initialized");
+			tracing::debug!("🔥 main tray initialized");
 		}
 		if self.scroll_tray.is_none() {
 			match TrayIconBuilder::new()
@@ -213,7 +207,7 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 			{
 				Ok(tray) => {
 					self.scroll_tray = Some(tray);
-					tracing::info!("🔥 scroll tray initialized");
+					tracing::debug!("🔥 scroll tray initialized");
 				}
 				Err(error) => {
 					tracing::error!(%error, "failed to create scroll tray");

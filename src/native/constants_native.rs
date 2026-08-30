@@ -7,12 +7,6 @@ use crate::{
 	ui::{PanelConfig, VeConfig},
 };
 
-// pub static INITIAL_WINDOW: WindowType = WindowType::Dashboard;
-// pub static INITIAL_WINDOW: WindowType = WindowType::TelemetryInspector;
-// pub static INITIAL_WINDOW: WindowType = WindowType::TaskManager;
-// pub static INITIAL_WINDOW: WindowType = WindowType::WaterfallChart;
-pub static INITIAL_WINDOW: WindowType = WindowType::MarkdownView;
-
 pub static CURSOR_INSET: f64 = 0.125;
 pub static TELEPORT_RIGHT: AtomicBool = AtomicBool::new(false);
 pub static HOTKEY_INITIALIZED: AtomicBool = AtomicBool::new(false);

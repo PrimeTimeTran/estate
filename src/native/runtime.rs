@@ -1,22 +1,27 @@
 use crate::{
 	app::{Runtime, host::AppHost, modules::runtime::RuntimeState, state::StateStore, *},
+	event::{handler::*, *},
 	native::{session::Session, state::NativeStateStore},
 	prelude::*,
 };
 
-pub struct NativeAppContext<'a> {
-	pub base: AppContext<'a, NativeRuntime>,
-	pub monitor: &'a mut NativeMonitor,
-}
-
-impl<'a> NativeAppContext<'a> {
-	pub fn state(&self) -> std::sync::RwLockReadGuard<'_, EstateState> {
-		self.base.state()
+impl NativeRuntime {
+	pub fn new() -> Result<Self> {
+		let store = NativeStateStore::new()?;
+		let state = store.load()?;
+		let runtime_state = RuntimeState::new(state);
+		let session = Session::default();
+		Ok(Self {
+			session,
+			store,
+			events: EventBus::new(),
+			state: Arc::new(runtime_state),
+			tasks: Arc::new(RwLock::new(TaskManager::new())),
+		})
 	}
-
-	#[cfg(not(target_arch = "wasm32"))]
-	pub fn poll_state(&mut self) -> bool {
-		todo!("")
+	pub fn event_processed(&self) {
+		let mut state = self.state.write();
+		state.events_processed += 1;
 	}
 }
 
@@ -50,14 +55,14 @@ impl Runtime for NativeRuntime {
 			loop {
 				match receiver.recv().await {
 					Ok(event) => {
-						tracing::info!("🔥 DISPATCHER RECEIVED: {:?}", event.kind);
+						tracing::debug!("🔥 native::runtime::dispatcher {:?}", event.kind);
 						dispatcher.dispatch(event, &runtime).await;
 					}
 					Err(broadcast::error::RecvError::Lagged(count)) => {
-						tracing::warn!(count, "event dispatcher lagged");
+						tracing::warn!(count, "native::runtime::start_disptcher lagged");
 					}
 					Err(broadcast::error::RecvError::Closed) => {
-						println!("🔥 EVENT BUS CLOSED");
+						tracing::warn!("native::runtime::start_disptcher closed");
 						break;
 					}
 				}
@@ -67,7 +72,6 @@ impl Runtime for NativeRuntime {
 	fn state(&self) -> &RuntimeState {
 		&self.state
 	}
-
 	fn save(&self, state: &EstateState) -> Result<()> {
 		let session = self.session.clone();
 		self.store.save(state)
@@ -77,23 +81,19 @@ impl Runtime for NativeRuntime {
 	}
 }
 
-impl NativeRuntime {
-	pub fn new() -> Result<Self> {
-		let store = NativeStateStore::new()?;
-		let state = store.load()?;
-		let runtime_state = RuntimeState::new(state);
-		let session = Session::default();
-		Ok(Self {
-			session,
-			store,
-			events: EventBus::new(),
-			state: Arc::new(runtime_state),
-			tasks: Arc::new(RwLock::new(TaskManager::new())),
-		})
+pub struct NativeAppContext<'a> {
+	pub base: AppContext<'a, NativeRuntime>,
+	pub monitor: &'a mut NativeMonitor,
+}
+
+impl<'a> NativeAppContext<'a> {
+	pub fn state(&self) -> std::sync::RwLockReadGuard<'_, EstateState> {
+		self.base.state()
 	}
-	pub fn event_processed(&self) {
-		let mut state = self.state.write();
-		state.events_processed += 1;
+
+	#[cfg(not(target_arch = "wasm32"))]
+	pub fn poll_state(&mut self) -> bool {
+		todo!("")
 	}
 }
 

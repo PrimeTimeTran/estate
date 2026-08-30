@@ -153,7 +153,7 @@ impl Window {
 			wgpu::CurrentSurfaceTexture::Success(texture)
 			| wgpu::CurrentSurfaceTexture::Suboptimal(texture) => Ok(Some(texture)),
 			wgpu::CurrentSurfaceTexture::Occluded => {
-				tracing::warn!("SURFACE OCCLUDED");
+				// tracing::warn!("SURFACE OCCLUDED");
 				Ok(None)
 			}
 			wgpu::CurrentSurfaceTexture::Timeout => Ok(None),
@@ -299,6 +299,8 @@ fn create_gpu_surface(
 	let surface = { instance.create_surface(window.clone())? };
 	Ok((window, instance, surface))
 }
+
+// WIP: Self Activating Select
 fn build_egui(event_loop: &ActiveEventLoop) -> (gui::Context, EguiState) {
 	let gui_ctx = gui::Context::default();
 

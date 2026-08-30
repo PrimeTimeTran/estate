@@ -58,21 +58,14 @@ impl EstateDiscovery {
 			for name in INTRINSIC_FILES {
 				let path = config_dir.join(name);
 				if path.is_file() {
-					tracing::info!(?path, "discovered Estate config");
 					self.store.items.push(DiscoveryItem::Config(path));
-					// let raw = RawDiscovery { probe, path };
-					// self.handle(DiscoveryEvent::Found(RawDiscovery))
-					// if let Some(path) = Self::probe(dir, probe) {
-					// 	let raw = RawDiscovery { probe, path };
-					// 	self.handle(DiscoveryEvent::Found(raw));
-					// }
 				}
 			}
 		}
 		walk_root_to_path(cwd, |dir| {
 			let path = dir.join(WORKSPACE_SETTINGS);
 			if path.is_file() {
-				tracing::info!(?path, "discovered workspace config");
+				// tracing::info!(?path, "discovered workspace config");
 				self.store.items.push(DiscoveryItem::Config(path));
 			}
 			WalkControl::Continue
@@ -232,20 +225,20 @@ impl DiscoveryStore {
 		let path = dirs::home_dir()
 			.ok_or_else(|| anyhow::anyhow!("could not determine home directory"))?
 			.join(INDEX_PATH);
-		tracing::info!(?path, "writing discovery result");
+		tracing::debug!(?path, "writing discovery result");
 		let mut master: serde_json::Value = if path.exists() {
-			tracing::info!("loading existing master.json");
+			tracing::debug!("loading existing master.json");
 			let contents = std::fs::read_to_string(&path)
 				.map_err(|error| anyhow::anyhow!("failed to read {:?}: {error}", path))?;
 			if contents.trim().is_empty() {
-				tracing::info!("master.json is empty, creating default");
+				tracing::debug!("master.json is empty, creating default");
 				defaults::master()
 			} else {
 				serde_json::from_str::<serde_json::Value>(&contents)
 					.map_err(|error| anyhow::anyhow!("invalid master.json: {error}"))?
 			}
 		} else {
-			tracing::info!("master.json does not exist, creating default");
+			tracing::debug!("master.json does not exist, creating default");
 			defaults::master()
 		};
 		if !master.is_object() {
@@ -258,12 +251,12 @@ impl DiscoveryStore {
 			.ok_or_else(|| anyhow::anyhow!("master.json has no parent"))?;
 		std::fs::create_dir_all(parent)?;
 		let tmp = path.with_extension("json.tmp");
-		tracing::info!(?tmp, "writing temporary master.json");
+		tracing::debug!(?tmp, "writing temporary master.json");
 		std::fs::write(&tmp, &contents)
 			.map_err(|error| anyhow::anyhow!("failed to write {:?}: {error}", tmp))?;
 		std::fs::rename(&tmp, &path)
 			.map_err(|error| anyhow::anyhow!("failed to replace {:?}: {error}", path))?;
-		tracing::info!(
+		tracing::debug!(
 			files = self.files.len(),
 			items = self.items.len(),
 			"discovery result written"
@@ -397,7 +390,7 @@ pub async fn worker(mut rx: mpsc::Receiver<DiscoveryTask>) {
 		match task {
 			DiscoveryTask::Index(path) => {
 				// Create an index of something....
-				println!("Indexing {:?}", path);
+				// println!("Indexing {:?}", path);
 				// simulate work
 				tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 				println!("Finished {:?}", path);

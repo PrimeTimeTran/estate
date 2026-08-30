@@ -1,4 +1,5 @@
 # https://doc.rust-lang.org/cargo/reference/manifest.html
+# https://github.com/dandavison/delta
 [package]
 name = "estate"
 version = "0.1.0"

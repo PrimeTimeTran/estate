@@ -1,8 +1,8 @@
 #![allow(warnings)]
 
 pub mod app;
-
 pub mod data;
+pub mod event;
 pub mod helpers;
 pub mod prelude;
 pub mod proto;

@@ -17,15 +17,16 @@ pub use crate::app::prelude::*;
 
 pub(crate) mod app;
 pub(crate) mod context;
-pub(crate) mod event;
 pub(crate) mod event_channel;
 pub(crate) mod host;
 pub(crate) mod job;
 pub(crate) mod model;
 pub(crate) mod modules;
 pub(crate) mod state;
+pub(crate) mod task;
 pub(crate) mod ve;
 pub use context::*;
+pub use task::*;
 
 #[cfg(feature = "../native/mod.rs")]
 pub(crate) mod native;

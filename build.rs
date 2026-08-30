@@ -1,8 +1,8 @@
 use resvg;
 use std::{env, fs, path::PathBuf};
+
 // Generate:
 // $ cargo build
-
 fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
 	let output = out_dir.join("estate-tray.png");
@@ -22,8 +22,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	);
 	pixmap.save_png(output).unwrap();
 	println!("cargo:rerun-if-changed=proto/service.proto");
-
 	tonic_build::compile_protos("proto/service.proto")?;
-
 	Ok(())
 }

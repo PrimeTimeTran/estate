@@ -12,6 +12,11 @@ pub static HOME_DIR: &str = ".config/estate";
 pub const WORKSPACE_SETTINGS: &str = ".estate/settings.json";
 pub static HMR_CHART_JSON: &str = "/Users/future/kb/project/crates/estate/src/data/chart.json";
 pub const INTRINSIC_FILES: [&str; 3] = ["default.settings.json", "settings.json", "key-map.json"];
+// pub static INITIAL_WINDOW: WindowType = WindowType::Dashboard;
+// pub static INITIAL_WINDOW: WindowType = WindowType::TelemetryInspector;
+// pub static INITIAL_WINDOW: WindowType = WindowType::TaskManager;
+pub static INITIAL_WINDOW: WindowType = WindowType::WaterfallChart;
+// pub static INITIAL_WINDOW: WindowType = WindowType::MarkdownView;
 
 pub const DEFAULT_CONFIG: VeConfig = VeConfig {
 	bg: palette::BG,

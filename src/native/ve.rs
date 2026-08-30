@@ -1,6 +1,7 @@
 use crate::{
-	app::{Runtime, event::EventKind, ve::Veable},
+	app::{Runtime, ve::Veable},
 	data::defaults::DEFAULT_CONFIG,
+	event::EventKind,
 };
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -455,7 +456,7 @@ impl EguiVeable {
 		for &tab in DevSideTab::ALL {
 			let response = ui.selectable_label(self.side_tab == tab, tab.label());
 			if response.clicked() {
-				tracing::info!(">>> TAB CLICKED: {:?}", tab);
+				tracing::debug!(">>> TAB CLICKED: {:?}", tab);
 				self.side_tab = tab;
 			}
 		}
@@ -523,7 +524,7 @@ impl EguiVeable {
 			ui.heading("Overview");
 			ui.label(format!("Pointer: {:?}", ui.ctx().pointer_latest_pos()));
 			let response = ui.button("📋 Copy");
-			tracing::info!(
+			tracing::debug!(
 				target: "estate::app",
 				"Copy button: hovered={} clicked={} enabled={}",
 				response.hovered(),
@@ -531,7 +532,7 @@ impl EguiVeable {
 				response.enabled(),
 			);
 			if response.clicked() {
-				tracing::info!(target: "estate::app", "CLICKED COPY");
+				tracing::debug!(target: "estate::app", "CLICKED COPY");
 				let json =
 					serde_json::to_string_pretty(&self.state).expect("failed to serialize estate state");
 				ui.output_mut(|o| {
@@ -987,7 +988,7 @@ impl<R: Runtime> Veable<R> for Sidebar {
 								.app
 								.engine
 								.runtime
-								.emit(Event::app(EventKind::StopSession {
+								.emit(Event::app(EventKind::SessionStop {
 									session: ctx.app.engine.runtime.session(),
 								}));
 						}

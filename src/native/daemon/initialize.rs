@@ -52,7 +52,7 @@ name = "default"
 		}
 	}
 
-	println!("Initialized estate engine at {}", root.display());
+	// println!("Initialized estate engine at {}", root.display());
 
 	Ok(())
 }

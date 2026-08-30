@@ -45,25 +45,25 @@ impl ProblemService for ProblemServiceImpl {
 	}
 	async fn create_problem(
 		&self,
-		request: Request<CreateProblemRequest>,
+		_request: Request<CreateProblemRequest>,
 	) -> Result<Response<Problem>, Status> {
 		todo!("create")
 	}
 	async fn update_problem(
 		&self,
-		request: Request<UpdateProblemRequest>,
+		_request: Request<UpdateProblemRequest>,
 	) -> Result<Response<Problem>, Status> {
 		todo!("update")
 	}
 	async fn delete_problem(
 		&self,
-		request: Request<DeleteProblemRequest>,
+		_request: Request<DeleteProblemRequest>,
 	) -> Result<Response<Empty>, Status> {
 		todo!("delete_problem")
 	}
 	async fn get_problem(
 		&self,
-		request: Request<GetProblemRequest>,
+		_request: Request<GetProblemRequest>,
 	) -> Result<Response<Problem>, Status> {
 		todo!("get_problem")
 	}

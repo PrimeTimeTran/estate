@@ -57,7 +57,7 @@ impl Dashboard {
 					self.error = None;
 					self.dirty = false;
 
-					tracing::info!(
+					tracing::debug!(
 						path = %self.data_path.display(),
 						"dashboard data loaded"
 					);
@@ -119,7 +119,7 @@ impl Dashboard {
 					.and_then(|metadata| metadata.modified())
 					.ok();
 
-				tracing::info!(
+				tracing::debug!(
 					"Graphics loaded {} charts from {}",
 					self.data.charts.len(),
 					self.data_path.display()
@@ -141,7 +141,7 @@ impl Dashboard {
 	#[cfg(not(target_arch = "wasm32"))]
 	fn check_for_changes(&mut self, ctx: &egui::Context) {
 		if self.monitor.poll() {
-			tracing::info!(
+			tracing::debug!(
 				"File change detected, reloading {}",
 				self.data_path.display()
 			);

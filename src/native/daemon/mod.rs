@@ -86,15 +86,11 @@
 // pub mod daemon;
 pub mod daemon;
 pub mod daemon_config;
-pub mod event;
 pub mod initialize;
 pub mod lint;
 pub mod projection;
-// pub mod resolver;
 pub mod shell;
 
 pub use daemon::*;
-pub use event::*;
 pub use lint::*;
-// pub use resolver::*;
 pub use shell::*;

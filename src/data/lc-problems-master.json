@@ -1,0 +1,69 @@
+[
+  {
+    "number": 2091,
+    "normalized-name": "removing-minimum-and-maximum-from-array",
+    "title": "Removing Minimum and Maximum From Array",
+    "difficulty": "medium",
+    "description": "You are given a 0-indexed array of distinct integers nums.\n\nThere is an element in nums that has the lowest value and an element that has the highest value. We call them the minimum and maximum respectively. Your goal is to remove both these elements from the array.",
+    "url": "https://leetcode.com/problems/removing-minimum-and-maximum-from-array/",
+    "filename": "2091-removing-minimum-and-maximum-from-array.py",
+    "description-raw": "<p>You are given a <strong>0-indexed</strong> array of <strong>distinct</strong> integers <code>nums</code>.</p>\n<p>There is an element in <code>nums</code> that has the <strong>lowest</strong> value and an element that has the <strong>highest</strong> value. We call them the <strong>minimum</strong> and <strong>maximum</strong> respectively. Your goal is to remove <strong>both</strong> these elements from the array.</p>",
+    "test-cases": [
+      {
+        "index": 0,
+        "input": "nums = [2,10,7,5,4,1,8,6]",
+        "output": "5",
+        "explanation": "The minimum element in the array is nums[5], which is 1.\nThe maximum element in the array is nums[1], which is 10.\nWe can remove both the minimum and maximum by removing 2 elements from the front and 3 elements from the back.\nThis results in 2 + 3 = 5 deletions, which is the minimum number possible."
+      },
+      {
+        "index": 1,
+        "input": "nums = [0,-4,19,1,8,-2,-3,5]",
+        "output": "3",
+        "explanation": "The minimum element in the array is nums[1], which is -4.\nThe maximum element in the array is nums[2], which is 19.\nWe can remove both the minimum and maximum by removing 3 elements from the front.\nThis results in only 3 deletions, which is the minimum number possible."
+      },
+      {
+        "index": 2,
+        "input": "nums = [101]",
+        "output": "1",
+        "explanation": "There is only one element in the array, which makes it both the minimum and maximum element.\nWe can remove it with 1 deletion."
+      },
+      {
+        "index": 3,
+        "input": null,
+        "output": null,
+        "explanation": null
+      }
+    ]
+  },
+  {
+    "number": 1,
+    "normalized-name": "two-sum",
+    "title": "Two Sum",
+    "difficulty": "easy",
+    "description": "You are given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.\n\nYou may assume that each input would have exactly one solution, and you may not use the same element twice.",
+    "url": "https://leetcode.com/problems/two-sum/",
+    "filename": "1-two-sum.py",
+    "description-raw": "<p>You are given an array of integers <code>nums</code>&nbsp;and an integer <code>target</code>, return <em>indices of the two numbers such that they add up to <code>target</code></em>.</p>\n<p>You may assume that each input would have <strong><em>exactly</em> one solution</strong>, and you may not use the <em>same</em> element twice.</p>",
+    "test-cases": [
+      {
+        "index": 0,
+        "input": "nums = [2,7,11,15], target = 9",
+        "output": "[0,1]",
+        "explanation": "Because nums[0] + nums[1] == 9, we return [0, 1]."
+      },
+      {
+        "index": 1,
+        "input": "nums = [3,2,4], target = 6",
+        "output": "[1,2]",
+        "explanation": null
+      },
+      {
+        "index": 2,
+        "input": "nums = [3,3], target = 6",
+        "output": "[0,1]",
+        "explanation": null
+      }
+    ]
+  }
+
+]

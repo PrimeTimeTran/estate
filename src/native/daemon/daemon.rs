@@ -1,6 +1,6 @@
 use crate::{
-	app::{Runtime, event, *},
-	// app::{ *, modules::runtime::Runtime },
+	app::{Runtime, task, *},
+	event,
 	native::daemon::{DocCompiler, NativeRuntime},
 	prelude::*,
 };
@@ -69,7 +69,7 @@ impl<R: Runtime> Daemon<R> {
 }
 impl<R: Runtime> Daemon<R> {
 	async fn run_background(&mut self) -> Result<DaemonResponse> {
-		tracing::info!("Run Background");
+		tracing::debug!("Run Background");
 		let exe = std::env::current_exe()?;
 		let child = std::process::Command::new(exe)
 			.arg("tray")
@@ -88,12 +88,12 @@ impl<R: Runtime> Daemon<R> {
 		})
 	}
 	pub async fn run_foreground(&mut self) -> Result<()> {
-		tracing::info!("daemon running in foreground");
+		tracing::debug!("daemon running in foreground");
 		self
 			.runtime
 			.emit(Event::daemon(event::EventKind::DaemonStarted));
 		self.shutdown_token.cancelled().await;
-		tracing::info!("daemon stopped");
+		tracing::debug!("daemon stopped");
 		self
 			.runtime
 			.emit(Event::daemon(event::EventKind::DaemonStopped));
@@ -129,7 +129,7 @@ where
 		Ok(DaemonResponse::default())
 	}
 	async fn shutdown(&mut self) -> Result<DaemonResponse> {
-		tracing::info!("shutdown requested");
+		tracing::debug!("shutdown requested");
 		self.shutdown_token.cancel();
 		Ok(DaemonResponse::default())
 	}

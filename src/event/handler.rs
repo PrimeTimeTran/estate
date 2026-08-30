@@ -3,9 +3,10 @@ use crate::data::defaults::{self, INDEX_PATH};
 use crate::native::session::Session;
 use crate::{
 	app::{
-		event::{self, EventKind},
+		task::{self},
 		*,
 	},
+	event::{self, EventKind},
 	prelude::*,
 };
 // Events = n that happened
@@ -16,102 +17,17 @@ use crate::{
 pub trait EventHandler: Send + Sync {
 	async fn handle(&self, event: &Event, runtime: &NativeRuntime);
 }
-#[derive(Debug, Clone)]
-pub struct EventBus {
-	sender: broadcast::Sender<Event>,
-}
-impl std::hash::Hash for EventBus {
-	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-		self.sender.same_channel(&self.sender).hash(state);
-	}
-}
-impl Default for EventBus {
-	fn default() -> Self {
-		Self::new()
-	}
-}
-impl EventBus {
-	pub fn new() -> Self {
-		let (sender, _) = broadcast::channel(256);
-		Self { sender }
-	}
-	pub fn emit(&self, event: Event) {
-		match self.sender.send(event.clone()) {
-			Ok(count) => {
-				tracing::info!("📡 Event emitted: {:?} → {} receiver(s)", event.kind, count);
-			}
-			Err(_) => {
-				tracing::error!("⚠️ Event emitted with NO receivers: {:?}", event.kind);
-			}
-		}
-	}
-	pub fn subscribe(&self) -> broadcast::Receiver<Event> {
-		self.sender.subscribe()
-	}
-}
-///
-pub struct LogHandler;
-#[async_trait::async_trait]
-impl EventHandler for LogHandler {
-	async fn handle(&self, event: &Event, _runtime: &NativeRuntime) {
-		tracing::info!("📡 received {:?}", event);
-	}
-}
-pub struct EventDispatcher {
-	handlers: Vec<Box<dyn EventHandler>>,
-}
-impl Default for EventDispatcher {
-	fn default() -> Self {
-		Self::new()
-	}
-}
-impl EventDispatcher {
-	pub fn new() -> Self {
-		Self {
-			handlers: Vec::new(),
-		}
-	}
-	pub fn register<H>(&mut self, handler: H)
-	where
-		H: EventHandler + 'static,
-	{
-		self.handlers.push(Box::new(handler));
-	}
-	pub async fn run(self, mut rx: broadcast::Receiver<Event>, runtime: NativeRuntime) {
-		while let Ok(event) = rx.recv().await {
-			self.dispatch(event, &runtime).await;
-		}
-	}
-	pub async fn dispatch(&self, event: Event, runtime: &NativeRuntime) {
-		for handler in &self.handlers {
-			handler.handle(&event, runtime).await;
-		}
-		runtime.event_processed();
-	}
-}
-pub struct FileWatcherHandler;
-#[async_trait::async_trait]
-impl EventHandler for FileWatcherHandler {
-	async fn handle(&self, event: &Event, runtime: &NativeRuntime) {
-		if let event::EventKind::FileModified { inode, path } = &event.kind {
-			tracing::info!("📡 FileWatcherHandler handle {:?} ({:?})", event, inode);
-			runtime.emit(Event::daemon(event::EventKind::IndexUpdated {
-				files_changed: 1,
-			}));
-		}
-	}
-}
 pub struct TaskHandler;
 #[async_trait::async_trait]
 impl EventHandler for TaskHandler {
 	async fn handle(&self, event: &Event, runtime: &NativeRuntime) {
-		tracing::info!("📡 EventHandler.handle {:?}", event);
+		tracing::debug!("📡 EventHandler.handle {:?}", event);
 		let event::EventKind::TaskRequested { request } = &event.kind else {
 			return;
 		};
 		let task_id = match request {
 			TaskRequest::Create(kind) => {
-				tracing::info!("TaskRequest::Create {:?}", kind);
+				tracing::debug!("TaskRequest::Create {:?}", kind);
 				let mut tasks = runtime.tasks.write().unwrap();
 				let task_id = tasks.create(kind.clone());
 				runtime.emit(Event::daemon(EventKind::TaskCreated {
@@ -119,8 +35,8 @@ impl EventHandler for TaskHandler {
 					kind: kind.clone(),
 				}));
 				match kind {
-					TaskKind::StartSesssion => {
-						tracing::info!("🔥 StartSesssion");
+					TaskKind::SessionStart => {
+						tracing::debug!("🔥 SessionStart");
 						runtime.emit(Event::daemon(EventKind::TaskRequested {
 							request: TaskRequest::Create(TaskKind::LoadMaster),
 						}));
@@ -131,8 +47,8 @@ impl EventHandler for TaskHandler {
 							request: TaskRequest::Create(TaskKind::IndexWorkspace),
 						}));
 					}
-					TaskKind::StopSession => {
-						tracing::info!("🛑 StopSession");
+					TaskKind::SessionStop => {
+						tracing::debug!("🛑 SessionStop");
 						// let session = runtime.session.clone();
 						// Master::save(session);
 					}
@@ -159,14 +75,14 @@ impl EventHandler for TaskHandler {
 		runtime.emit(Event::daemon(event::EventKind::TaskStarted { task_id }));
 		let runtime = runtime.clone();
 		tokio::spawn(async move {
-			tracing::info!(
+			tracing::debug!(
 				%task_id,
 				task = %task.name,
 				"task starting"
 			);
 			match TaskRunner::execute(&runtime, task.clone()).await {
 				Ok(()) => {
-					tracing::info!("TaskHandler match TaskRunner::execute {:?}", task);
+					tracing::debug!("TaskHandler match TaskRunner::execute {:?}", task);
 					runtime.emit(Event::daemon(event::EventKind::TaskCompleted { task_id }));
 				}
 				Err(error) => {
@@ -179,11 +95,31 @@ impl EventHandler for TaskHandler {
 		});
 	}
 }
+
+pub struct LogHandler;
+#[async_trait::async_trait]
+impl EventHandler for LogHandler {
+	async fn handle(&self, event: &Event, _runtime: &NativeRuntime) {
+		tracing::debug!("📡 received {:?}", event);
+	}
+}
+pub struct FileWatcherHandler;
+#[async_trait::async_trait]
+impl EventHandler for FileWatcherHandler {
+	async fn handle(&self, event: &Event, runtime: &NativeRuntime) {
+		if let event::EventKind::FileModified { inode, path } = &event.kind {
+			tracing::debug!("📡 FileWatcherHandler handle {:?} ({:?})", event, inode);
+			runtime.emit(Event::daemon(event::EventKind::IndexUpdated {
+				files_changed: 1,
+			}));
+		}
+	}
+}
 pub struct StateHandler;
 #[async_trait::async_trait]
 impl EventHandler for StateHandler {
 	async fn handle(&self, event: &Event, runtime: &NativeRuntime) {
-		tracing::info!("🔥 StateHandler received: {:?}", event.kind);
+		tracing::debug!("🔥 StateHandler received: {:?}", event.kind);
 		let snapshot = {
 			let mut state = runtime.state.write();
 			match &event.kind {
@@ -248,17 +184,17 @@ pub struct CommandHandler;
 #[async_trait::async_trait]
 impl EventHandler for CommandHandler {
 	async fn handle(&self, event: &Event, runtime: &NativeRuntime) {
-		tracing::info!("CommandHandler handler {:?}", event);
+		tracing::debug!("CommandHandler handler {:?}", event);
 
 		match &event.kind {
-			EventKind::StopSession { .. } => {
-				tracing::info!("ABOUT TO SAVE SESSION");
+			EventKind::SessionStop { .. } => {
+				tracing::debug!("ABOUT TO SAVE SESSION");
 
-				let session = runtime.session.clone();
-
-				match Master::save(session).await {
+				let mut session = runtime.session.clone();
+				let serialized = session.end_session();
+				match Master::save(serialized).await {
 					Ok(()) => {
-						tracing::info!("SESSION SAVED");
+						tracing::debug!("SESSION SAVED");
 					}
 					Err(err) => {
 						tracing::error!("SESSION SAVE FAILED: {err:#}");
@@ -343,18 +279,18 @@ impl TaskRunner {
 	pub async fn execute(runtime: &NativeRuntime, task: Task) -> Result<()> {
 		tracing::info!("TaskRunner execute {:?}", task);
 		match task.kind {
-			TaskKind::StartSesssion => {
-				tracing::info!("StartSesssion");
-				tracing::info!("✅ LoadMaster complete");
+			TaskKind::SessionStart => {
+				tracing::debug!("SessionStart");
+				tracing::debug!("✅ LoadMaster complete");
 			}
-			TaskKind::StopSession => {
-				tracing::info!("StopSession");
-				tracing::info!("✅ LoadMaster complete");
+			TaskKind::SessionStop => {
+				tracing::debug!("SessionStop");
+				tracing::debug!("✅ LoadMaster complete");
 			}
 			TaskKind::LoadMaster => {
-				tracing::info!("LoadMaster");
+				tracing::debug!("LoadMaster");
 				tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-				tracing::info!("✅ LoadMaster complete");
+				tracing::debug!("✅ LoadMaster complete");
 			}
 			TaskKind::IndexWorkspace => {
 				let started = std::time::Instant::now();
@@ -412,27 +348,23 @@ impl EventHandler for AppHandler {
 			return;
 		}
 		match event.kind.clone() {
-			event::EventKind::StopSession { session } => {
-				tracing::info!("🛑 StopSession");
-				let session = runtime.session.clone();
-				Master::save(session);
+			event::EventKind::SessionStop { session } => {
+				tracing::info!("🛑 SessionStop");
 			}
 			event::EventKind::SessionStart => {}
 			_ => {
 				println!("not interested")
 			}
 		}
-		tracing::info!("🔥 SessionStart → StartSesssion");
+		tracing::info!("🔥 SessionStart → SessionStart");
 		runtime.emit(Event::daemon(EventKind::TaskRequested {
-			request: TaskRequest::Create(TaskKind::StartSesssion),
+			request: TaskRequest::Create(TaskKind::SessionStart),
 		}));
 	}
 }
-
 pub struct Master;
-
 impl Master {
-	pub async fn save(session: Session) -> anyhow::Result<()> {
+	pub async fn save(session: Value) -> anyhow::Result<()> {
 		let path = dirs::home_dir()
 			.ok_or_else(|| anyhow::anyhow!("could not determine home directory"))?
 			.join(INDEX_PATH);
