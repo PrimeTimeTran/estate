@@ -7,6 +7,7 @@ use crate::{
 		host::AppHost,
 		state::{EstateState, StateStore},
 	},
+	event,
 	native::NativeApp,
 };
 

@@ -6,6 +6,7 @@ pub struct DocCompiler {
 	width: usize,
 	configs: HashMap<String, LanguageConfig>,
 }
+
 impl Default for DocCompiler {
 	fn default() -> Self {
 		Self {
@@ -20,65 +21,53 @@ impl DocCompiler {
 	}
 }
 ///--------------------------------------------------------------------------------
-///      (3) Paths
-// pub fn run<P: AsRef<Path>>(&self, path: P) -> io::Result<()>
-// pub fn remove_blank_lines(path: impl AsRef<Path>) -> io::Result<()>
-// pub fn collapse_empty_lines(file_path: &PathBuf) -> io::Result<()>
-///--------------------------------------------------------------------------------
-///      [1]
-///      Most generic and reusable.
-///      pub fn run<P: AsRef<Path>>(&self, path: P) -> io::Result<()>
+/// # (3) Paths
+/// Three pseudostring type argumnents. When to use each given their different ownership models.
 ///
-///      `P` can be any type that can be viewed as a `Path`.
+/// pub fn run<P: AsRef<Path>>(&self, path: P) -> io::Result<()>
+/// pub fn remove_blank_lines(path: impl AsRef<Path>) -> io::Result<()>
+/// pub fn collapse_empty_lines(file_path: &PathBuf) -> io::Result<()>
 ///
-///      Accepts:
-///      - PathBuf
-///      - &Path
-///      - &PathBuf
-///      - &str
-///      - String
+/// ## [1] pub fn run<P: AsRef<Path>>(&self, path: P) -> io::Result<()>
+///   Most generic and reusable.
+///   `P` can be any type that can be viewed as a `Path`.
+///   Accepts:
+///   - PathBuf
+///   - &Path
+///   - &PathBuf
+///   - &str
+///   - String
+///   This is the idiomatic choice for public APIs because callers don't
+///   have to convert their path into a specific type first.
+/// --------------------------------------------------------------------------------
+/// ## [2] remove_blank_lines(path: impl AsRef<Path>) -> io::Result<()>
+///   Same capability as the generic version above.
+///   `impl AsRef<Path>` is simply shorthand for:
+/// <P: AsRef<Path>>
+///   These compile to essentially the same thing. Use this when the type
+///   parameter doesn't need to be named anywhere else in the signature.
+///   Many people find this version easier to read.
+/// --------------------------------------------------------------------------------
+///   ## [3] pub fn collapse_empty_lines(file_path: &PathBuf) -> io::Result<()>
+///   Least flexible. Only accepts a borrowed `PathBuf`.
+///   Does NOT directly accept:
+///   - &Path
+///   - &str
+///   - String
+///   The caller must already have a `PathBuf`, making this API more
+///   restrictive than necessary.
+///   Prefer `&Path` if you only need a borrowed path.
+///   Why choose one over another?
+///   AsRef<Path>
+///   impl AsRef<Path>
+///   &PathBuf
 ///
-///      This is the idiomatic choice for public APIs because callers don't
-///      have to convert their path into a specific type first.
-///--------------------------------------------------------------------------------
-///      [2]
-///      pub fn remove_blank_lines(path: impl AsRef<Path>) -> io::Result<()>
-///      Same capability as the generic version above.
-///
-///      `impl AsRef<Path>` is simply shorthand for:
-///
-///  <P: AsRef<Path>>
-///
-///      These compile to essentially the same thing. Use this when the type
-///      parameter doesn't need to be named anywhere else in the signature.
-///
-///      Many people find this version easier to read.
-///--------------------------------------------------------------------------------
-///      pub fn collapse_empty_lines(file_path: &PathBuf) -> io::Result<()>
-///      Least flexible.
-///
-///      Only accepts a borrowed `PathBuf`.
-///
-///      Does NOT directly accept:
-///      - &Path
-///      - &str
-///      - String
-///
-///      The caller must already have a `PathBuf`, making this API more
-///      restrictive than necessary.
-///
-///      Prefer `&Path` if you only need a borrowed path.
-///      Why choose one over another?
-///      AsRef<Path>
-///      impl AsRef<Path>
-///      &PathBuf
-///
-// | Signature          | Flexibility | Idiomatic?      | When to use                                      |
-// | ------------------ | ----------- | --------------- | ------------------------------------------------ |
-// | `P: AsRef<Path>`   | ⭐⭐⭐⭐⭐       | ✅               | Public APIs, libraries                           |
-// | `impl AsRef<Path>` | ⭐⭐⭐⭐⭐       | ✅               | Same as above, cleaner syntax                    |
-// | `&Path`            | ⭐⭐⭐⭐        | ✅               | Borrowing only, no ownership needed              |
-// | `&PathBuf`         | ⭐⭐          | ❌ Usually avoid | Only if you specifically need a `PathBuf` (rare) |
+/// | Signature          | Flexibility | Idiomatic?       | When to use                                      |
+/// | ------------------ | ----------- | ---------------- | ------------------------------------------------ |
+/// | `P: AsRef<Path>`   | ⭐⭐⭐⭐⭐  | ✅               | Public APIs, libraries                           |
+/// | `impl AsRef<Path>` | ⭐⭐⭐⭐⭐  | ✅               | Same as above, cleaner syntax                    |
+/// | `&Path`            | ⭐⭐⭐⭐    | ✅               | Borrowing only, no ownership needed              |
+/// | `&PathBuf`         | ⭐⭐        | ❌ Usually avoid | Only if you specifically need a `PathBuf` (rare) |
 impl DocCompiler {
 	pub fn remove_blank_lines<P: AsRef<Path>>(&self, path: P) -> io::Result<()> {
 		// use std::process::Command;
@@ -112,33 +101,17 @@ impl DocCompiler {
 		let file = fs::File::open(file_path)?;
 		let reader = BufReader::new(file);
 		let mut filtered_lines = Vec::new();
-		// Iterate through each line
 		for line_result in reader.lines() {
 			let line = line_result?;
-			// Check if the line is anything other than empty or just spaces/tabs
 			if !line.chars().all(|c| c.is_whitespace()) {
 				filtered_lines.push(line);
 			}
 		}
 		// Join all surviving lines back together with a single newline character
 		let new_content = filtered_lines.join("\n");
-		// Overwrite the original file with the modified content
-		// (You can add a trailing newline if desired: format!("{}\n", new_content))
 		fs::write(file_path, new_content)?;
 		Ok(())
 	}
-	// pub fn new(width: usize) -> Self {
-	//     let mut compiler = Self {
-	//         width,
-	//         configs: HashMap::new(),
-	//     };
-	//     // Register default language profiles
-	//     compiler.register_language("rs", "///", "///-");
-	//     compiler.register_language("lua", "--", "---");
-	//     compiler.register_language("sql", "--", "---");
-	//     compiler
-	// }
-	/// Register a custom language prefix configuration
 	pub fn register_language(&mut self, ext: &str, prefix: &str, rule_prefix: &str) {
 		self.configs.insert(
 			ext.to_lowercase(),
@@ -174,9 +147,9 @@ impl DocCompiler {
 		for (i, line) in lines.iter().enumerate() {
 			let trimmed = line.trim_start();
 			let style = if trimmed.starts_with("///") {
-				Some(CommentStyle::RustDoc)
+				Some(CommentStyle::DocOuter)
 			} else if trimmed.starts_with("//!") {
-				Some(CommentStyle::RustInner)
+				Some(CommentStyle::DocInner)
 			} else {
 				None
 			};
@@ -288,17 +261,29 @@ pub struct LanguageConfig {
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CommentStyle {
-	RustDoc,   // ///
-	RustInner, // //!
+	Line,          // //
+	Block,         // /*
+	DocOuter,      // ///
+	DocInner,      // //!
+	DocBlock,      // /**
+	DocInnerBlock, // /*!
 }
 impl CommentStyle {
 	pub fn prefix(&self) -> &'static str {
 		match self {
-			CommentStyle::RustDoc => "///",
-			CommentStyle::RustInner => "//!",
+			CommentStyle::Line => "//",
+			CommentStyle::Block => "/*",
+			CommentStyle::DocOuter => "///",
+			CommentStyle::DocInner => "//!",
+			CommentStyle::DocBlock => "//**",
+			CommentStyle::DocInnerBlock => "/*!",
+			_ => {
+				todo!("go")
+			}
 		}
 	}
 }
+
 #[derive(Debug, Clone)]
 pub struct CommentBlock {
 	pub line_range: std::ops::Range<usize>,

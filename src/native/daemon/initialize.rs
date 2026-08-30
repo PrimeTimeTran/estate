@@ -51,8 +51,5 @@ name = "default"
 			fs::write(path, contents)?;
 		}
 	}
-
-	// println!("Initialized estate engine at {}", root.display());
-
 	Ok(())
 }

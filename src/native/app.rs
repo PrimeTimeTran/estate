@@ -140,7 +140,6 @@ impl NativeApp {
 					Some(DaemonCommand::Stop) => {
 						tracing::info!("daemon stop requested");
 						shutdown_token.cancel();
-
 						match daemon_task.await {
 							Ok(Ok(())) => {
 								tracing::info!("daemon stopped cleanly");

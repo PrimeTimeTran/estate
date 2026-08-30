@@ -71,26 +71,8 @@ pub trait Resolver {
 	fn resolve(&self, reference: &Reference, context: &ResolveContext) -> Vec<Resolution>;
 }
 
-/// Initialization
-/// - I installed estate engine
-/// - I opened the estate IDE
-// pub trait Discovery {
-// 	fn discover(&self, root: &Path) -> Result<DiscoveryResult, Error>;
-// }
-// #[async_trait]
-// pub trait Daemon {
-//     async fn execute(
-//         &mut self,
-//         action: ActionRequest,
-//     ) -> Result<Response, Error>;
-//     async fn start(
-//         &mut self,
-//         options: Option<DaemonOptions>,
-//     ) -> Result<(), Error>;
-//     async fn stop(&mut self) -> Result<(), Error>;
-// }
-/// Anchor/bookmark store...? FS store...? Asset store?
-/// - "I need a thing, give it to me"
+// Anchor/bookmark store...? FS store...? Asset store?
+// - "I need a thing, give it to me"
 // pub trait Store {
 // 	fn get(&self, id: Uuid) -> Option<Resource>;
 // 	fn insert(&mut self, resource: Resource);

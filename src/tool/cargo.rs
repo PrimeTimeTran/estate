@@ -32,11 +32,8 @@ pub fn sync_project_metadata() {
 
 pub fn derive_runtime_context() {
 	let cargo = read_cargo_toml();
-
 	println!("leviticus running in project:");
 	println!("  name: {}", cargo.package.name);
 	println!("  version: {}", cargo.package.version);
 	println!("  edition: {}", cargo.package.edition);
-
-	// later: drive behavior here
 }
