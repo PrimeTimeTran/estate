@@ -1,4 +1,6 @@
-use crate::native::session::Session;
+#[cfg(feature = "native")]
+use crate::app::session::Session;
+
 use crate::prelude::*;
 
 use crate::app::Runtime;
@@ -55,6 +57,8 @@ impl<R: Runtime> EstateEngine<R> {
 			analysis: AnalysisService::default(),
 		})
 	}
+
+	#[cfg(feature = "native")]
 	pub fn session(&mut self) -> Session {
 		self.runtime.session()
 	}

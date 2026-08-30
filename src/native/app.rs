@@ -1,13 +1,19 @@
 use crate::{
+	AppEvent, DaemonCommand,
 	app::{self, App, Runtime, model::EstateEngine, task::*, *},
 	data::INITIAL_WINDOW,
-	native::{self, runtime::NativeRuntime, screens::*, *},
+	native::{self, prelude::*, runtime::NativeRuntime, screens::*, *},
 	prelude::*,
+	spawn_global_cursor_daemon,
 	ui::rendermd::MarkdownView,
 };
 
 use signal_hook::{consts::SIGINT, iterator::Signals};
-use tray_icon::{TrayIcon, TrayIconBuilder, menu::MenuEvent};
+
+use tray_icon::{
+	TrayIcon, TrayIconBuilder,
+	menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu},
+};
 use winit::{
 	application::ApplicationHandler,
 	event::WindowEvent,
@@ -25,6 +31,7 @@ pub struct NativeApp {
 	hotkey_manager: GlobalHotkeys,
 	last_state_revision: u64,
 	menu: Option<TrayMenu>,
+	menu_bar: Menu,
 	monitor: native::monitor::NativeMonitor,
 	scroll_tray: Option<TrayIcon>,
 	tray: Option<TrayIcon>,
@@ -37,6 +44,7 @@ impl NativeApp {
 		let app = App::new(engine)?;
 		Ok(Self {
 			app,
+			menu_bar: Self::menu_bar(),
 			windows: vec![],
 			clock_running: Arc::new(AtomicBool::new(true)),
 			daemon_tx,
@@ -51,6 +59,7 @@ impl NativeApp {
 	}
 	pub fn run(&mut self, cli: Cli) -> Result<()> {
 		tracing::debug!(">>> NativeApp::run entered");
+		// self.set_menu_bar();
 		let result = match cli.command {
 			None | Some(Command::Start { .. }) | Some(Command::Tray) => self.start_runtime(),
 			Some(_) => {
@@ -72,9 +81,13 @@ impl NativeApp {
 		ready_rx.recv().expect("daemon failed to initialize");
 		self.spawn_global_hotkey_daemon()?;
 		let event_loop = EventLoop::<AppEvent>::with_user_event()
-			.with_activation_policy(ActivationPolicy::Accessory)
+			.with_activation_policy(ActivationPolicy::Regular)
 			.build()?;
+
+		self.menu_bar.init_for_nsapp();
+
 		let proxy = event_loop.create_proxy();
+
 		self.spawn_clock(proxy.clone());
 		self.spawn_cursor_daemon(proxy.clone());
 		self.spawn_signal_handler(proxy.clone());
@@ -176,14 +189,9 @@ impl NativeApp {
 		tracing::info!(">>> runtime shutdown complete");
 	}
 }
-
 impl ApplicationHandler<AppEvent> for NativeApp {
-	fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
-		while let Ok(event) = MenuEvent::receiver().try_recv() {
-			self.handle_event(event, event_loop);
-		}
-	}
 	fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+		self.menu_bar.init_for_nsapp();
 		if self.windows.is_empty() {
 			self.open_window(event_loop, INITIAL_WINDOW);
 		}
@@ -213,6 +221,11 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 					tracing::error!(%error, "failed to create scroll tray");
 				}
 			}
+		}
+	}
+	fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+		while let Ok(event) = MenuEvent::receiver().try_recv() {
+			self.handle_event(event, event_loop);
 		}
 	}
 	fn window_event(
@@ -320,21 +333,17 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 		}
 	}
 }
-
 impl NativeApp {
 	fn handle_event(&mut self, event: MenuEvent, event_loop: &ActiveEventLoop) {
 		let Some(menu) = self.menu.as_ref() else {
 			return;
 		};
 		let id = event.id();
-		// tracing::info!(">>> opening window: {:?}", event.id());
-		// tracing::info!(">>> opening window: {:?}", id);
-
 		if id == menu.quit.id() {
-			tracing::info!(">>> tray quit requested");
+			tracing::debug!(">>> tray quit requested");
 			self.shutdown();
 			event_loop.exit();
-			tracing::info!(">>> event_loop.exit() called");
+			tracing::debug!(">>> event_loop.exit() called");
 		} else if id == menu.dev.id() {
 			self.open_window(event_loop, WindowType::Dashboard);
 		} else if id == menu.telemetry.id() {
@@ -448,4 +457,38 @@ impl NativeApp {
 		tracing::debug!("building semantic graph");
 		Ok(())
 	}
+}
+
+// use muda::{Menu, MenuItem, PredefinedMenuItem, Submenu};
+impl NativeApp {
+	fn menu_bar() -> Menu {
+		let menu = create_menu();
+		menu
+	}
+}
+fn create_menu() -> Menu {
+	let menu = Menu::new();
+	let file = Submenu::new("File", true);
+	file.append_items(&[
+		&MenuItem::new("New", true, None),
+		&MenuItem::new("Open…", true, None),
+		&PredefinedMenuItem::separator(),
+		&MenuItem::new("Close", true, None),
+	]);
+	let edit = Submenu::new("Edit", true);
+	edit.append_items(&[
+		&PredefinedMenuItem::undo(None),
+		&PredefinedMenuItem::redo(None),
+		&PredefinedMenuItem::separator(),
+		&PredefinedMenuItem::cut(None),
+		&PredefinedMenuItem::copy(None),
+		&PredefinedMenuItem::paste(None),
+	]);
+	let view = Submenu::new("View", true);
+	view.append_items(&[
+		&MenuItem::new("Toggle Sidebar", true, None),
+		&MenuItem::new("Fullscreen", true, None),
+	]);
+	menu.append_items(&[&file, &edit, &view]);
+	menu
 }

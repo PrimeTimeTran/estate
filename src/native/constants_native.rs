@@ -2,10 +2,7 @@ use std::sync::{Mutex, OnceLock, atomic::AtomicBool};
 
 use core_graphics::display::{CGPoint, CGRect};
 
-use crate::{
-	native::prelude::{ScrollRedirectState, *},
-	ui::{PanelConfig, VeConfig},
-};
+use crate::native::prelude::{ScrollRedirectState, *};
 
 pub static CURSOR_INSET: f64 = 0.125;
 pub static TELEPORT_RIGHT: AtomicBool = AtomicBool::new(false);

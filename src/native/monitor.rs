@@ -3,7 +3,7 @@ use std::path::Path;
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use tokio::sync::mpsc;
 
-use crate::app::{event_channel, *};
+use crate::{app::*, event::channel};
 
 pub trait Monitor {
 	fn watch(&mut self);
@@ -38,7 +38,7 @@ impl Monitor for WebMonitor {
 /// - Events - Analysis of Ownership, FS indexer, File Downloads
 impl StateMonitor {
 	pub fn with_file() {
-		let (sender, receiver) = event_channel::channel::<i32>(10);
+		let (sender, receiver) = channel::channel::<i32>(10);
 	}
 	// pub fn new(path: &Path) -> Result<Self> {
 	// 	let (tx, rx) = mpsc::channel(1);

@@ -1,7 +1,19 @@
-use crate::{
-	app::{Runtime, host::AppHost, modules::runtime::RuntimeState, state::StateStore, *},
-	event::{handler::*, *},
-	native::{session::Session, state::NativeStateStore},
+use tokio::sync::broadcast;
+
+pub use crate::{
+	NativeApp,
+	app::{
+		Runtime,
+		host::AppHost,
+		modules::runtime::RuntimeState,
+		session::Session,
+		state::{EstateState, StateStore, *},
+	},
+	// event::*,
+	handler::{EventHandler, TaskHandler, *},
+	native::prelude::*,
+
+	native::{job::TaskManager, monitor::NativeMonitor, state::NativeStateStore},
 	prelude::*,
 };
 
@@ -11,6 +23,7 @@ impl NativeRuntime {
 		let state = store.load()?;
 		let runtime_state = RuntimeState::new(state);
 		let session = Session::default();
+
 		Ok(Self {
 			session,
 			store,
@@ -43,14 +56,14 @@ impl Runtime for NativeRuntime {
 		let mut receiver = runtime.events.subscribe();
 		let mut dispatcher = EventDispatcher::new();
 		// Creating, scheduling, executing, completing tasks
-		dispatcher.register(TaskHandler);
+		dispatcher.register(event::handler::TaskHandler);
 		// Updating persisted/application state
-		dispatcher.register(StateHandler);
+		dispatcher.register(event::handler::StateHandler);
 		// User/application commands
-		dispatcher.register(CommandHandler);
+		dispatcher.register(event::handler::CommandHandler);
 		// Filesystem change events
-		dispatcher.register(FileWatcherHandler);
-		dispatcher.register(AppHandler);
+		dispatcher.register(event::handler::FileWatcherHandler);
+		dispatcher.register(event::handler::AppHandler);
 		tokio::spawn(async move {
 			loop {
 				match receiver.recv().await {

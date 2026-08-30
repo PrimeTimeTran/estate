@@ -1,5 +1,6 @@
-pub use crate::{
-	app::{app::EstateState, state::StateStore},
+use crate::{
+	app::state::{EstateState, StateStore},
+	native::resolver,
 	prelude::{self, *},
 };
 
@@ -13,7 +14,7 @@ impl NativeStateStore {
 
 impl StateStore for NativeStateStore {
 	fn load(&self) -> Result<EstateState> {
-		let path = prelude::native::resolver::engine_data_dir()?.join("state.json");
+		let path = resolver::engine_data_dir()?.join("state.json");
 
 		if !path.exists() {
 			tracing::warn!("EstateState does not exist: {:?}", path);

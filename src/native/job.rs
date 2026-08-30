@@ -7,11 +7,11 @@
 // | UI representation               | `Task` / `Job` | Shows pending/running/etc.    |
 
 use crate::{
-	app::{EstateState, *},
+	app::{state::EstateState, *},
 	native::{agent::AgentContext, task_manager::WaterfallChart},
 	prelude::*,
 };
-use notify::{Event, EventKind};
+use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode};
 
 #[derive(Debug, Clone, Eq, Deserialize, PartialEq, Serialize)]
 pub struct Task {

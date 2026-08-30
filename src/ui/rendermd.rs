@@ -1,8 +1,11 @@
-use std::path::PathBuf;
-
-use crate::app::{AppContext, Runtime, ve::Veable};
 use egui::Ui;
 use egui_commonmark::{CommonMarkCache, CommonMarkViewer};
+use std::path::PathBuf;
+
+use crate::{
+	app::{AppContext, Runtime},
+	ui::Veable,
+};
 
 pub struct MarkdownView {
 	path: PathBuf,

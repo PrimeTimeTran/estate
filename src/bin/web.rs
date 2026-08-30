@@ -12,9 +12,9 @@
 // "rust-analyzer.cargo.target": "wasm32-unknown-unknown",
 #[cfg(target_arch = "wasm32")]
 mod wasm {
-	use eframe::{ WebOptions, WebRunner };
-	use estate::{ share::ve::*, web::bridge::* };
-	use wasm_bindgen::{ prelude::*, JsCast };
+	use eframe::{WebOptions, WebRunner};
+	use estate::{ui::ve::*, web::bridge::*};
+	use wasm_bindgen::{JsCast, prelude::*};
 
 	struct WebApp {
 		graphics: Graphics,
@@ -38,7 +38,10 @@ mod wasm {
 			let payload = create_payload().expect("failed to create payload");
 			js_test(payload);
 
-			let document = web_sys::window().expect("no window").document().expect("no document");
+			let document = web_sys::window()
+				.expect("no window")
+				.document()
+				.expect("no document");
 
 			let canvas = document
 				.get_element_by_id("the_canvas_id")
@@ -53,13 +56,12 @@ mod wasm {
 					Box::new(|_cc| {
 						log("🔥 EFRAME APP CREATOR RUNNING");
 
-						Ok(
-							Box::new(WebApp {
-								graphics: Graphics::new(),
-							})
-						)
-					})
-				).await
+						Ok(Box::new(WebApp {
+							graphics: Graphics::new(),
+						}))
+					}),
+				)
+				.await
 				.expect("failed to start eframe");
 
 			log("🔥 EFRAME START RETURNED");

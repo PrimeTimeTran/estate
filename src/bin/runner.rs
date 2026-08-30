@@ -1,7 +1,10 @@
 #![allow(warnings)]
 use anyhow::Context;
+
+#[cfg(not(target_arch = "wasm32"))]
+use estate::proto::leetcode::{ListProblemsRequest, PageRequest};
 use estate::{
-	flow_warn,
+	// flow_warn,
 	// logger::{TraceFlow, Tracer, setup_logging},
 	prelude::*,
 };
@@ -12,16 +15,15 @@ use std::{
 };
 use uuid::Uuid;
 
-use estate::proto::leetcode::{
-	ListProblemsRequest, PageRequest, problem_service_client::ProblemServiceClient,
-};
-
 // cargo -q run --bin runner -- python
 // RUNNER=native cargo -q run --bin runner -- python
 // RUNNER=docker cargo -q run --bin runner -- python
+#[cfg(target_arch = "wasm32")]
+fn main() {}
+#[cfg(not(target_arch = "wasm32"))]
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-	let mut client = ProblemServiceClient::connect("http://localhost:50051").await?;
+	let mut client = estate::proto::client().await?;
 
 	let response = client
 		.list_problems(ListProblemsRequest {
@@ -35,6 +37,7 @@ async fn main() -> anyhow::Result<()> {
 			published_only: Some(true),
 		})
 		.await?;
+
 	println!("{:?}", response);
 
 	let problems = response.into_inner().problems;
@@ -50,6 +53,7 @@ async fn main() -> anyhow::Result<()> {
 	}
 	Ok(())
 }
+
 #[tracing::instrument]
 async fn run() -> anyhow::Result<()> {
 	let trace = Tracer::new("app");
@@ -164,7 +168,7 @@ impl Run {
 					result.execution_ms,
 				));
 			} else {
-				flow_warn!(flow, "Test case {} failed", result.index + 1);
+				// flow_warn!(flow, "Test case {} failed", result.index + 1);
 				flow.warn(&format!("  Expected: {}", result.expected));
 				flow.warn(&format!("  Actual:   {}", result.actual));
 			}

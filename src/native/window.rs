@@ -1,5 +1,6 @@
 use crate::{
 	app::{AppContext, Runtime},
+	native::prelude::*,
 	prelude::{anyhow::anyhow, *},
 };
 
@@ -710,14 +711,6 @@ impl Window {
 pub struct AppWindow {
 	pub kind: WindowType,
 	pub window: Window,
-}
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum WindowType {
-	Dashboard,
-	WaterfallChart,
-	TelemetryInspector,
-	TaskManager,
-	MarkdownView,
 }
 
 pub struct GlobalHotkeys {

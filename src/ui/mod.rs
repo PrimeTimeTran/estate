@@ -1,25 +1,18 @@
-use crate::theme::palette;
-
 pub(crate) mod chart;
 pub(crate) mod components;
 pub(crate) mod rendermd;
-pub(crate) mod ve;
+pub(crate) mod screen;
+
+pub mod ve;
+
+pub use crate::ui::screen::*;
+pub use crate::ui::ve::*;
+pub use crate::{prelude::*, ui::palette::*};
 
 pub const TRAY_ICON: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/estate-tray.png"));
 pub const TRAY_SCROLL_ICON: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/estate-tray.png"));
 
-pub struct VeConfig {
-	pub bg: egui::Color32,
-	pub surface: egui::Color32,
-
-	pub activity_bar: PanelConfig,
-	pub dock_left: PanelConfig,
-	pub primary_bar: PanelConfig,
-	pub secondary_bar: PanelConfig,
-	pub status_bar: PanelConfig,
-	pub dock_right: PanelConfig,
-	pub bottom_panel: PanelConfig,
-}
+use crate::app::{AppContext, Runtime};
 
 pub struct PanelConfig {
 	/// Is the panel "open"? Think sidebar.

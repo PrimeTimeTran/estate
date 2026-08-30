@@ -16,17 +16,19 @@ short_description = "Estate development environment"
 long_description = "Estate development environment"
 icon = ["assets/icon.icns"]
 
-# https://doc.rust-lang.org/cargo/reference/cargo-targets.html#configuring-a-target
-[[bin]]
-name = "estate"
-path = "src/bin/estate.rs"
-required-features = ["native"]
 
 [[bin]]
 name = "web"
 path = "src/bin/web.rs"
 required-features = ["web"]
 # target = "wasm32-unknown-unknown"
+
+# https://doc.rust-lang.org/cargo/reference/cargo-targets.html#configuring-a-target
+[[bin]]
+name = "estate"
+path = "src/bin/estate.rs"
+required-features = ["native"]
+
 
 [[bin]]
 name = "native"
@@ -38,20 +40,9 @@ required-features = ["native"]
 # cargo run --bin native --features=native
 
 [[bin]]
-name = "threads"
-path = "src/bin/threads.rs"
-
-[[bin]]
 name = "runner"
 path = "src/bin/runner.rs"
-
-[[bin]]
-name = "lifetime"
-path = "src/bin/lifetime/main.rs"
-
-[[bin]]
-name = "macros"
-path = "src/bin/macros.rs"
+required-features = ["native"]
 
 [[bin]]
 name = "settings"
@@ -63,6 +54,20 @@ name = "server"
 path = "src/bin/server.rs"
 required-features = ["native"]
 
+[[bin]]
+name = "threads"
+path = "src/bin/threads.rs"
+
+
+[[bin]]
+name = "lifetime"
+path = "src/bin/lifetime/main.rs"
+
+[[bin]]
+name = "macros"
+path = "src/bin/macros.rs"
+
+
 # cargo nextest run --bin settings --test-threads 1 --no-fail-fast
 [features]
 # This overwrites IDE config causing diagnostics to be wrong given the targetted platform.
@@ -73,12 +78,20 @@ required-features = ["native"]
 # default = ["native"]
 # cargo build --bin web --no-default-features --features="web" --target wasm32-unknown-unknown
 # default = ["native"]
-# Default this this
 # default = []
-default = ["native"]
-# default = ["web"]
+# default = ["native"]
+# Default this this
+default = ["web"]
+# default = ["native"]
 mobile = []
-web = ["dep:wasm-bindgen", "dep:web-sys", "dep:eframe"]
+web = [
+  "dep:wasm-bindgen",
+  "dep:web-sys",
+  "dep:eframe",
+  "dep:egui_commonmark",
+  "dep:egui_extras",
+  "dep:jsonc-parser",
+]
 native = [
   "dep:notify",
   "dep:cli",
@@ -98,6 +111,12 @@ native = [
   "dep:tray-icon",
   "dep:egui-winit",
   "dep:macos-accessibility-client",
+  "dep:tonic",
+  "dep:egui_commonmark",
+  "dep:egui_extras",
+  "dep:jsonc-parser",
+  "dep:prost",
+  "dep:prost-types",
 ]
 
 [dependencies]
@@ -107,6 +126,7 @@ macros-decl.workspace = true
 macros-proc.workspace = true
 macros.workspace = true
 revelation.workspace = true
+
 # External
 anyhow.workspace = true
 async-trait.workspace = true
@@ -120,7 +140,7 @@ global-hotkey.workspace = true
 image.workspace = true
 lazy_static.workspace = true
 pollster.workspace = true
-owo-colors = "4.3.0"
+owo-colors.workspace = true
 reqwest.workspace = true
 resvg.workspace = true
 schemars.workspace = true
@@ -137,41 +157,36 @@ wasm-bindgen-futures.workspace = true
 wasm-bridge.workspace = true
 wgpu.workspace = true
 winit.workspace = true
+gloo-timers.workspace = true
 
 # Make all these optional so they can be toggled by the native feature
-eframe = { workspace = true, optional = true }
-wasm-bindgen = { workspace = true, optional = true }
-web-sys = { workspace = true, optional = true }
 cli = { workspace = true, optional = true }
 comfy-table = { workspace = true, optional = true }
 core-foundation = { workspace = true, optional = true }
 core-graphics = { workspace = true, optional = true }
 demand = { workspace = true, optional = true }
+eframe = { workspace = true, optional = true }
 egui-winit = { workspace = true, optional = true }
-gloo-timers = { version = "0.4.0", features = ["futures"] }
+egui_commonmark = { workspace = true, optional = true }
+egui_extras = { workspace = true, optional = true }
+jsonc-parser = { workspace = true, optional = true }
 jsonschema = { workspace = true, optional = true }
 macos-accessibility-client = { workspace = true, optional = true }
 notify = { workspace = true, optional = true }
 objc2 = { workspace = true, optional = true }
 objc2-app-kit = { workspace = true, optional = true }
 objc2-foundation = { workspace = true, optional = true }
+prost = { workspace = true, optional = true }
+prost-types = { workspace = true, optional = true }
 rmcp = { workspace = true, optional = true }
-signal-hook = { version = "0.4.4", optional = true }
-
-tokio = { workspace = true, optional = true, features = [
-  "rt",
-  "macros",
-  "rt-multi-thread"
-] } # Make sure features don't force 'net' on WASM if compiled
+signal-hook = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true, features = ["rt", "macros", "rt-multi-thread"] }
 tokio-util = { workspace = true, optional = true }
+tonic = { workspace = true, optional = true }
 tower-lsp = { workspace = true, optional = true }
 tray-icon = { workspace = true, optional = true }
-jsonc-parser = { version = "0.33.1", features = ["cst"] }
-egui_extras = { version = "0.36.1", features = ["all_loaders"] }
-egui_commonmark = "0.25.0"
-tonic = "0.12"
-prost = "0.13"
-prost-types = "0.13"
+wasm-bindgen = { workspace = true, optional = true }
+web-sys = { workspace = true, optional = true }
 
 [build-dependencies]
 resvg.workspace = true

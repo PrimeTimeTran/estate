@@ -1,7 +1,7 @@
 use crate::{
 	app::{Runtime, model, *},
-	data::defaults::{self, HOME_DIR, INDEX_PATH, INTRINSIC_FILES, WORKSPACE_SETTINGS},
-	native::resolver::path,
+	data::native::*,
+	native::{prelude::*, resolver::path},
 	prelude::*,
 };
 
@@ -263,11 +263,11 @@ impl DiscoveryStore {
 		);
 		Ok(())
 	}
-	pub fn apply_discovery(&mut self, master: &mut serde_json::Value) -> Result<()> {
+	pub fn apply_discovery(&mut self, mas: &mut serde_json::Value) -> Result<()> {
 		let unique_files: std::collections::HashSet<_> = self.files.iter().collect();
-		master["metrics"]["files"] = serde_json::json!(self.files.len());
-		master["metrics"]["files.unique"] = serde_json::json!(unique_files.len());
-		master["estate"]["files"] = serde_json::to_value(self.files.clone())?;
+		mas["metrics"]["files"] = serde_json::json!(self.files.len());
+		mas["metrics"]["files.unique"] = serde_json::json!(unique_files.len());
+		mas["estate"]["files"] = serde_json::to_value(self.files.clone())?;
 		let mut counts = std::collections::HashMap::<String, usize>::new();
 		for file in self.files.clone() {
 			if let Some(ext) = file.extension().and_then(|ext| ext.to_str()) {
@@ -289,22 +289,22 @@ impl DiscoveryStore {
 			.filter_map(|item| item["ext"].as_str())
 			.collect::<Vec<_>>()
 			.join("|");
-		master["metrics"]["types"] = serde_json::json!(counts.len());
-		master["metrics"]["counter"] = serde_json::Value::Array(counter);
-		master["estate"]["types"] = serde_json::json!(types);
+		mas["metrics"]["types"] = serde_json::json!(counts.len());
+		mas["metrics"]["counter"] = serde_json::Value::Array(counter);
+		mas["estate"]["types"] = serde_json::json!(types);
 
 		let cargo_paths = self.get_framework_paths(FrameworkKind::Cargo);
 		let estate_paths = self.get_framework_paths(FrameworkKind::Estate);
 		let npm_paths = self.get_framework_paths(FrameworkKind::Npm);
 
-		master["metrics"]["projects"]["cargo"] = serde_json::json!(cargo_paths);
-		master["metrics"]["projects"]["npm"] = serde_json::json!(npm_paths);
-		master["metrics"]["projects"]["estate"] = serde_json::json!(estate_paths);
+		mas["metrics"]["projects"]["cargo"] = serde_json::json!(cargo_paths);
+		mas["metrics"]["projects"]["npm"] = serde_json::json!(npm_paths);
+		mas["metrics"]["projects"]["estate"] = serde_json::json!(estate_paths);
 		let has_dotrepo = self
 			.items
 			.iter()
 			.any(|item| matches!(item, DiscoveryItem::GitRepo(_)));
-		master["estate"]["onboarding"]["has.dotrepo"] = serde_json::json!(has_dotrepo);
+		mas["estate"]["onboarding"]["has.dotrepo"] = serde_json::json!(has_dotrepo);
 		let config_sources: Vec<String> = self
 			.items
 			.iter()
@@ -313,7 +313,7 @@ impl DiscoveryStore {
 				_ => None,
 			})
 			.collect();
-		master["config.active"]["sources"] = serde_json::json!(config_sources);
+		mas["config.active"]["sources"] = serde_json::json!(config_sources);
 		Ok(())
 	}
 }

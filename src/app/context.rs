@@ -1,7 +1,8 @@
-use crate::app::*;
+use crate::app::{state::*, *};
 
-#[cfg(not(target_arch = "wasm32"))]
-use crate::app::state::VeInputState;
+// #[cfg(not(target_arch = "wasm32"))]
+#[cfg(feature = "native")]
+use crate::native::ve::VeInputState;
 
 pub struct AppContext<'a, R: Runtime> {
 	pub app: &'a mut App<R>,

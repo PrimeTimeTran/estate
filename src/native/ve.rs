@@ -1,12 +1,14 @@
 use crate::{
-	app::{Runtime, ve::Veable},
-	data::defaults::DEFAULT_CONFIG,
-	event::EventKind,
+	// app::Runtime,
+	// app::event::EventKind,
+	app::{Runtime, event::EventKind, *},
+	data::native::DEFAULT_CONFIG,
+	native::{prelude::*, *},
+	prelude::*,
+	ui::*,
 };
 
 #[cfg(not(target_arch = "wasm32"))]
-use crate::{app::*, prelude::*, ui::*};
-
 use core_foundation::runloop::{CFRunLoop, kCFRunLoopCommonModes};
 use core_graphics::{
 	display::CGDisplay,
@@ -21,25 +23,13 @@ use egui::Ui;
 use egui_plot::{Bar, BarChart, Plot, PlotBounds, PlotUi, Points};
 use winit::event_loop::EventLoopProxy;
 
-pub struct Ve<R: Runtime> {
-	///      A type-erased container for any concrete `Veable`.
-	///
-	///      `Box<dyn Veable>` stores the concrete implementation on the heap while
-	///      exposing only the `Veable` interface to callers. This allows different
-	///      concrete implementations to be substituted without changing the code
-	///      which consumes them.
-	// Top left to bottom right ordering for mental model.
-	// Top left to bottom right ordering for mental model.
-	pub activity_bar: Region<R>,
-	pub dock_left: Panel<R>,
-	pub main: Region<R>,
-	pub primary_bar: Region<R>,
-	pub secondary_bar: Region<R>,
-	pub bottom_panel: Panel<R>,
-	pub status_bar: Region<R>,
-	pub dock_right: Panel<R>,
-}
-
+// This won't "get it" if these don't use "crate"
+// .//src/data/mod.rs
+// pub(crate) mod native;
+// pub(crate) use native::*;
+//
+// but it breaks
+// pub use crate::{chart::ChartsFile, data::DEFAULT_CONFIG as CONFIG};
 impl<R: Runtime> Ve<R> {
 	/// Rust uses ownership,borrowing, and lifetimes to determine when values
 	/// may be safely destroyed, allowing memory to be reclaimed deterministically
@@ -700,14 +690,14 @@ impl GestureController {
 		}
 	}
 }
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub enum FocusedPane {
-	#[default]
-	MainEditor,
-	SidePanel,
-	CenterGrid,
-	Unknown,
-}
+// #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+// pub enum FocusedPane {
+// #[default]
+// MainEditor,
+// SidePanel,
+// CenterGrid,
+// Unknown,
+// }
 
 #[derive(Debug, Clone, Copy)]
 pub struct TrackpadState {

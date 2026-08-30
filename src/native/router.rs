@@ -44,6 +44,7 @@
 use crate::app::{model, modules::runtime::Runtime, *};
 use crate::{native::daemon::projection::command, prelude::*};
 use cli;
+use cli::context::Command;
 
 pub(crate) async fn execute<R: Runtime>(
 	parsed_cli: Cli,
@@ -86,7 +87,9 @@ pub(crate) async fn execute<R: Runtime>(
 			let mut stream = match UnixStream::connect(SOCKET_PATH).await {
 				Ok(s) => s,
 				Err(e) => {
-					return Err(anyhow::anyhow!("Daemon is not running. Start it first: {e}"));
+					return Err(anyhow::anyhow!(
+						"Daemon is not running. Start it first: {e}"
+					));
 				}
 			};
 			for path in &args.paths {
@@ -117,7 +120,7 @@ pub(crate) async fn execute<R: Runtime>(
 			}
 		}
 		Command::DaemonServer => {
-			daemon::DaemonServer::run().await;
+			native::daemon::DaemonServer::run().await;
 		}
 		Command::Capabilities(args) => match AnalyzeDaemon.run(&ctx, &args).await {
 			Ok(result) => {

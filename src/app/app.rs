@@ -1,15 +1,20 @@
 use crate::{
-	app::{model, *},
-	{event::*, handler::*},
+	app::{event::EventKind, model, *},
+	prelude::*,
 };
-pub use modules::runtime::{Runtime, RuntimeState};
 
-pub use state::{EstateState, StateStore};
+#[cfg(feature = "native")]
+use crate::event::*;
+
+use crate::app::modules::runtime::{Runtime, RuntimeState};
+
+use crate::app::state::{EstateState, StateStore};
+
+use uuid::Uuid;
 
 pub struct App<R: Runtime> {
 	pub(crate) engine: model::EstateEngine<R>,
 }
-
 impl<R: Runtime> App<R> {
 	pub(crate) fn new(engine: model::EstateEngine<R>) -> Result<Self> {
 		Ok(Self { engine })
@@ -18,7 +23,6 @@ impl<R: Runtime> App<R> {
 		&self.engine.runtime
 	}
 }
-
 impl<R: Runtime> App<R> {
 	pub fn state(&self) -> std::sync::RwLockReadGuard<'_, EstateState> {
 		self.engine.runtime.state().read()

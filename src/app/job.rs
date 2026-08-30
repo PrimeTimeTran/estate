@@ -6,7 +6,6 @@ pub struct Job {
 	pub id: Uuid,
 	pub task_id: Uuid,
 	pub kind: TaskKind,
-	// pub name: String,
 	pub status: JobStatus,
 
 	pub created_at: u64,
