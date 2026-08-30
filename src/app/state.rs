@@ -1,6 +1,4 @@
-#[cfg(not(target_arch = "wasm32"))]
 use crate::app::job::Job;
-
 pub use crate::prelude::*;
 
 pub trait StateStore: Send + Sync {

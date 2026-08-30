@@ -1,5 +1,7 @@
-use crate::app::*;
-use crate::prelude::{Uuid, *};
+use crate::{
+	app::*,
+	prelude::{Uuid, *},
+};
 
 #[derive(Debug, Clone, Eq, Deserialize, PartialEq, Serialize)]
 pub struct Job {

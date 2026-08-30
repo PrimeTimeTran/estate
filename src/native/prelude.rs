@@ -38,7 +38,7 @@ pub use signal_hook::{self, *};
 pub use tokio::{
 	io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
 	net::{TcpListener, UnixListener, UnixStream},
-	runtime::Runtime,
+	runtime::Runtime as TokioRuntime,
 	sync::{
 		broadcast::{self, Receiver, Sender},
 		mpsc::{self, UnboundedSender, channel},

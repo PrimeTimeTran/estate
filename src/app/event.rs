@@ -1,7 +1,6 @@
-use crate::app::state::EVENT_ID;
 pub use crate::{app::runtime::Runtime, app::*, handler::EventHandler, prelude::*};
-use serde::Deserialize;
-use std::sync::atomic::Ordering;
+
+use crate::{app::state::EVENT_ID, prelude::*};
 
 #[derive(Debug, Clone, Deserialize, Hash, Serialize)]
 pub struct Event {

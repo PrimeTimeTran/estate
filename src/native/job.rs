@@ -11,6 +11,7 @@ use crate::{
 	native::{agent::AgentContext, task_manager::WaterfallChart},
 	prelude::*,
 };
+
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode};
 
 #[derive(Debug, Clone, Eq, Deserialize, PartialEq, Serialize)]

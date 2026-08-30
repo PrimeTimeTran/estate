@@ -2,7 +2,6 @@
 
 pub mod app;
 pub mod data;
-
 pub mod helpers;
 pub mod prelude;
 pub mod proto;
@@ -19,7 +18,6 @@ pub mod web;
 pub mod mobile;
 
 #[cfg(not(target_arch = "wasm32"))]
-#[path = "./native/mod.rs"]
 pub mod native;
 pub use native::*;
 
@@ -32,14 +30,5 @@ pub use event::*;
 pub mod handler;
 pub use handler::*;
 
-pub use crate::native::prelude::*;
-
 #[path = "data/native.rs"]
 pub mod native_data;
-
-// // #[cfg(not(target_arch = "wasm32"))]
-// #[cfg(feature = "native")]
-// pub mod lib_native;
-// // #[cfg(not(target_arch = "wasm32"))]
-// #[cfg(feature = "native")]
-// pub use lib_native::*;

@@ -24,13 +24,10 @@ pub use modules::*;
 pub use session::*;
 pub use task::*;
 
-#[cfg(feature = "../native/mod.rs")]
-pub(crate) mod native;
-
-pub use std::{
-	collections::{HashMap, HashSet, VecDeque},
-	// May not work on WASM?
-	// path::Path,
-};
+// #[cfg(not(target_arch = "wasm32"))]
+// #[path = "../native/mod.rs"]
+// pub(crate) mod native;
 
 pub use anyhow::{Error, Result};
+pub use serde::{Deserialize, Serialize};
+pub use std::collections::{HashMap, HashSet, VecDeque};
