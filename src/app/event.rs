@@ -1,14 +1,13 @@
-pub use crate::{app::runtime::Runtime, app::*, handler::EventHandler, prelude::*};
+pub use crate::{app::*, prelude::*};
 
-use crate::{app::state::EVENT_ID, prelude::*};
-
+// Collision on event::* it seems
+// must leave pub prefix or it breaks other places
 #[derive(Debug, Clone, Deserialize, Hash, Serialize)]
 pub struct Event {
 	pub id: u64,
 	pub kind: EventKind,
 	pub source: EventSource,
 	pub timestamp: u64,
-	// pub flow: Tracer,
 }
 
 #[derive(Debug, Clone, Hash, Deserialize, Serialize)]

@@ -1,4 +1,5 @@
 Estate's long-running application and runtime layer.
+
 # Stuff
 
 The daemon coordinates Estate's services, configuration, lifecycle,
@@ -44,6 +45,7 @@ The daemon is organized into several layers of responsibility:
                 │Estate Core│
                 └───────────┘
 ```
+
 ```mermaid
 graph TD
     Bootstrap --> App

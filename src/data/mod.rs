@@ -1,4 +1,5 @@
-pub(crate) mod defaults;
-pub(crate) use defaults::*;
-pub(crate) mod native;
-pub(crate) use native::*;
+pub(crate) mod default;
+pub(crate) use default::*;
+
+pub(crate) mod configs;
+pub(crate) use configs::*;

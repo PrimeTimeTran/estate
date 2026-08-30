@@ -1,6 +1,6 @@
 use crate::{
 	app::{Runtime, model, *},
-	data::native::*,
+	data::{self, *},
 	native::{prelude::*, resolver::path},
 	prelude::*,
 };
@@ -232,17 +232,17 @@ impl DiscoveryStore {
 				.map_err(|error| anyhow::anyhow!("failed to read {:?}: {error}", path))?;
 			if contents.trim().is_empty() {
 				tracing::debug!("master.json is empty, creating default");
-				defaults::master()
+				data::master()
 			} else {
 				serde_json::from_str::<serde_json::Value>(&contents)
 					.map_err(|error| anyhow::anyhow!("invalid master.json: {error}"))?
 			}
 		} else {
 			tracing::debug!("master.json does not exist, creating default");
-			defaults::master()
+			data::master()
 		};
 		if !master.is_object() {
-			master = defaults::master();
+			master = data::master();
 		}
 		self.apply_discovery(&mut master)?;
 		let contents = serde_json::to_string_pretty(&master)?;

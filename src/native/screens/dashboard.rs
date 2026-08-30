@@ -1,6 +1,5 @@
 use crate::{
 	app::*,
-	data::native::{DEFAULT_CONFIG, HMR_CHART_JSON},
 	native::{Oracle, monitor::StateMonitor, runtime::NativeRuntime},
 	prelude::*,
 	ui::{chart::*, *},

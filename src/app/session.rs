@@ -1,4 +1,4 @@
-use crate::{app::*, prelude::*};
+use crate::app::*;
 
 #[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct Session {

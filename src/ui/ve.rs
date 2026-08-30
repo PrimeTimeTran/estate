@@ -1,4 +1,4 @@
-use crate::{chart::ChartsFile, data::DEFAULT_CONFIG as CONFIG};
+use crate::chart::ChartsFile;
 
 pub use crate::{app::runtime::Runtime, native::prelude::*, prelude::*, theme::palette, ui::*};
 

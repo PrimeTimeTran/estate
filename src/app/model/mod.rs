@@ -1,9 +1,6 @@
 #[cfg(feature = "native")]
-use crate::app::session::Session;
-
-use crate::prelude::*;
-
-use crate::app::Runtime;
+pub use crate::app::session::Session;
+pub use crate::prelude::*;
 
 mod estate;
 use estate::Estate;
@@ -88,7 +85,7 @@ pub(crate) struct SearchService;
 pub(crate) struct AnalysisService;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-pub(crate) enum ReferenceKind {
+pub enum ReferenceKind {
 	#[default]
 	File,
 	Link,
@@ -99,19 +96,19 @@ pub(crate) enum ReferenceKind {
 	Asset,
 }
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-pub(crate) struct Reference<'a> {
+pub struct Reference<'a> {
 	pub target: &'a str,
 	pub fragment: Option<&'a str>,
 	pub kind: ReferenceKind,
 }
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-pub(crate) struct ResolveContext {
+pub struct ResolveContext {
 	pub scope: EstateScope,
 	pub from: Uuid,
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, Hash, Serialize, Deserialize)]
-pub(crate) enum EstateScope {
+pub enum EstateScope {
 	System,
 	User,
 	#[default]

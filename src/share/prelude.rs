@@ -4,5 +4,3 @@ pub use crate::share::{
 	graph::{self, *},
 	shared::{self, *},
 };
-
-pub use uuid::Uuid;

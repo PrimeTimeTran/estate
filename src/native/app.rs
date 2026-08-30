@@ -1,7 +1,8 @@
 use crate::{
-	AppEvent, DaemonCommand,
+	AppEvent,
+	DaemonCommand,
 	app::{self, App, Runtime, model::EstateEngine, task::*, *},
-	data::INITIAL_WINDOW,
+	// data::INITIAL_WINDOW,
 	native::{self, prelude::*, runtime::NativeRuntime, screens::*, *},
 	prelude::*,
 	spawn_global_cursor_daemon,
