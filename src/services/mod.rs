@@ -5,13 +5,13 @@ pub use submission::*;
 pub mod repo;
 
 use crate::{
-	leetcode::{
+	prelude::*,
+	proto::leetcode::{
 		problem_service_server::ProblemService,
 		submission_service_server::SubmissionService,
 		types::{Problem, *},
 		*,
 	},
-	prelude::*,
 	repo::{problem::*, submission::*, *},
 };
 

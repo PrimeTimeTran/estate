@@ -2,15 +2,16 @@ use crate::{
 	AppEvent, DaemonCommand,
 	app::{self, App, Runtime, model::EstateEngine},
 	e,
-	leetcode::{
+	native::{self, runtime::NativeRuntime, screens::*, *},
+	prelude::*,
+	proto::leetcode::{
 		problem_service_client::ProblemServiceClient,
 		submission_service_client::SubmissionServiceClient,
 	},
-	native::{self, runtime::NativeRuntime, screens::*, *},
-	prelude::*,
 	spawn_global_cursor_daemon,
 	ui::{View, rendermd::MarkdownView},
 };
+
 use tonic::transport::Channel;
 
 #[derive(Debug, Clone)]
@@ -32,6 +33,7 @@ impl ApiClient {
 }
 
 use crate::services::repo::problem::StoredProblem;
+
 #[derive(Debug, Default)]
 pub struct AppState {
 	pub problems: Vec<StoredProblem>,

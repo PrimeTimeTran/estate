@@ -18,12 +18,6 @@ pub mod ui;
 pub use ui::*;
 pub mod util;
 
-#[cfg(feature = "web")]
-pub mod web;
-
-#[cfg(feature = "mobile")]
-pub mod mobile;
-
 // A 'central' native gate doesn't work.
 // #[cfg(feature = "native")]
 // pub mod lib_native;
@@ -40,15 +34,21 @@ pub mod native;
 #[cfg(feature = "native")]
 use native::*;
 
-#[cfg(feature = "native")]
-pub mod data;
+// #[cfg(feature = "native")]
+// pub mod data;
 
-#[cfg(feature = "web")]
-#[path = "./data/default.rs"]
-pub mod data;
-
-// So thats why we do it individually here.
 #[cfg(feature = "native")]
 pub mod event;
 #[cfg(feature = "native")]
 pub use event::*;
+
+pub mod data;
+#[cfg(feature = "web")]
+pub(crate) use crate::data::default;
+#[cfg(feature = "web")]
+pub(crate) use crate::services::repo;
+#[cfg(feature = "web")]
+pub mod web;
+
+#[cfg(feature = "mobile")]
+pub mod mobile;
