@@ -1,11 +1,5 @@
 use crate::{app::AppContext, doc, native::prelude::*, prelude::anyhow::anyhow, ui};
 
-use egui_wgpu::{
-	Renderer,
-	wgpu::{self},
-};
-use egui_winit::State as EguiState;
-
 use global_hotkey::{
 	GlobalHotKeyEvent, GlobalHotKeyManager,
 	hotkey::{Code, HotKey, Modifiers},
@@ -13,34 +7,28 @@ use global_hotkey::{
 use objc2_app_kit::{NSApplication, NSApplicationActivationPolicy};
 use objc2_foundation::MainThreadMarker;
 use tray_icon::menu::{MenuItem, Submenu};
-use wgpu::{Adapter, Device, SurfaceColorSpace};
 use winit::{
 	dpi::{PhysicalPosition, PhysicalSize},
 	event_loop::ActiveEventLoop,
 };
 
 pub struct Window {
-	pub config: wgpu::SurfaceConfiguration,
+	pub config: gui::wgpu::SurfaceConfiguration,
 	pub device: wgpu::Device,
 	pub gui_ctx: gui::Context,
-	pub gui_state: EguiState,
+	pub gui_state: gui::State,
 	pub instance: Arc<winit::window::Window>,
+	pub kind: WindowType,
 	pub needs_resize: bool,
 	pub occluded: bool,
-	pub surface: wgpu::Surface<'static>,
+	pub surface: gui::wgpu::Surface<'static>,
 	pending_textures: gui::TexturesDelta,
 	queue: wgpu::Queue,
-	renderer: egui_wgpu::Renderer,
-	pub kind: WindowType,
+	renderer: gui::Renderer,
 	view: ui::View,
 }
 impl Window {
-	pub fn new(
-		event_loop: &ActiveEventLoop,
-		view_type: ViewType,
-		api: Arc<ApiClient>,
-		// api: Option<Arc<ApiClient>>,
-	) -> Result<Self> {
+	pub fn new(event_loop: &ActiveEventLoop, view: ViewType, api: Arc<ApiClient>) -> Result<Self> {
 		let (gui_ctx, gui_state) = build_egui(event_loop);
 		let (window, instance, surface) = create_gpu_surface(event_loop)?;
 		let (adapter, device, queue) = initialize_gpu(&instance, &surface)?;
@@ -48,18 +36,18 @@ impl Window {
 		let (config, renderer) = build_renderer(&surface, adapter, &device, size)?;
 		Ok(Self {
 			config,
-			view: ui::View::new(view_type, api),
 			device,
-			kind: WindowType::Markdown,
 			gui_ctx,
 			gui_state,
 			instance: window,
+			kind: WindowType::Markdown,
 			needs_resize: false,
 			occluded: true,
 			pending_textures: gui::TexturesDelta::default(),
 			queue,
 			renderer,
 			surface,
+			view: ui::View::new(view, api),
 		})
 	}
 
@@ -152,7 +140,6 @@ impl Window {
 	fn markdown_view(&mut self, ctx: &egui::Context) {
 		todo!("")
 	}
-
 	pub fn draw(&mut self, ctx: &mut AppContext<'_, NativeRuntime>) -> Result<()> {
 		self.begin_egui();
 		let output = self.build_ui(ctx);
@@ -163,6 +150,7 @@ impl Window {
 		self.render_egui(surface_texture, output)?;
 		Ok(())
 	}
+
 	fn build_ui(&mut self, ctx: &mut AppContext<'_, NativeRuntime>) -> gui::FullOutput {
 		let mut ui = gui::Ui::new(
 			self.gui_ctx.clone(),
@@ -176,7 +164,6 @@ impl Window {
 			});
 		self.gui_ctx.end_pass()
 	}
-
 	fn begin_egui(&mut self) {
 		let input = self.gui_state.take_egui_input(&self.instance);
 		self.gui_ctx.begin_pass(input);
@@ -297,15 +284,10 @@ impl Window {
 }
 
 impl Window {
-	pub fn sync_view(&mut self, view_type: ViewType, api: Arc<ApiClient>) {
-		if self.view.kind != view_type {
-			tracing::info!(
-				"🖼️ Window view change: {:?} → {:?}",
-				self.view.kind,
-				view_type
-			);
-
-			self.view = ui::View::new(view_type, api);
+	pub fn sync_view(&mut self, view: ViewType, api: Arc<ApiClient>) {
+		if self.view.kind != view {
+			tracing::info!("🖼️ Window view change: {:?} → {:?}", self.view.kind, view);
+			self.view = ui::View::new(view, api);
 		}
 	}
 }
@@ -313,7 +295,7 @@ impl Window {
 fn initialize_gpu(
 	instance: &wgpu::Instance,
 	surface: &wgpu::Surface<'_>,
-) -> Result<(Adapter, Device, wgpu::Queue)> {
+) -> Result<(gui::Adapter, gui::Device, wgpu::Queue)> {
 	let adapter = pollster::block_on(instance.request_adapter(
 		&(wgpu::RequestAdapterOptions {
 			apply_limit_buckets: true,
@@ -349,30 +331,26 @@ fn create_gpu_surface(
 }
 
 // WIP: Self Activating Select
-fn build_egui(event_loop: &ActiveEventLoop) -> (gui::Context, EguiState) {
-	let gui_ctx = gui::Context::default();
-
-	gui_ctx.global_style_mut(|style| {
+fn build_egui(event_loop: &ActiveEventLoop) -> (gui::Context, gui::State) {
+	let ctx = gui::Context::default();
+	ctx.global_style_mut(|style| {
 		style.interaction.selectable_labels = true;
 		style.interaction.multi_widget_text_select = true;
-
 		style.visuals.widgets.hovered = style.visuals.widgets.inactive.clone();
 		style.visuals.widgets.active = style.visuals.widgets.inactive.clone();
 	});
-
-	// gui_ctx.memory_mut(|memory| {
+	// ctx.memory_mut(|memory| {
 	// 	memory.surrender_focus();
 	// });
-
-	let gui_state = EguiState::new(
-		gui_ctx.clone(),
+	let state = gui::State::new(
+		ctx.clone(),
 		gui::ViewportId::ROOT,
 		event_loop,
 		None,
 		None,
 		None,
 	);
-	(gui_ctx, gui_state)
+	(ctx, state)
 }
 fn build_window(event_loop: &ActiveEventLoop) -> Result<Arc<winit::window::Window>> {
 	let width = 1920;
@@ -430,7 +408,7 @@ fn build_renderer(
 ) -> Result<
 	(
 		wgpu::wgt::SurfaceConfiguration<Vec<wgpu::TextureFormat>>,
-		Renderer,
+		gui::Renderer,
 	),
 	Error,
 > {
@@ -466,101 +444,104 @@ fn build_renderer(
 		width: size.width.max(1),
 		height: size.height.max(1),
 		desired_maximum_frame_latency: 2,
-		color_space: SurfaceColorSpace::Auto,
+		color_space: gui::SurfaceColorSpace::Auto,
 		usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
 	};
 	surface.configure(device, &config);
-	let renderer = Renderer::new(device, format, egui_wgpu::RendererOptions::default());
+	let renderer = gui::Renderer::new(device, format, gui::RendererOptions::default());
 	Ok((config, renderer))
 }
 impl Window {
 	fn doc_todo() {
-
-		// ### 6. Embedded WebViews
-		// This is the most interesting one because it connects directly to the stuff you've already been experimenting with.
-		// * **Goal:** Render HTML/CSS/JS inside your Estate desktop application.
-		// * **Stage 1 — WebView**
-		//   * Embed a native WebView.
-		//   * Get a static HTML page rendering.
-		// * **Stage 2 — Local content**
-		//   * Load HTML/CSS/JS from disk or memory.
-		// * **Stage 3 — Communication**
-		//   * Rust → JavaScript
-		//   * JavaScript → Rust
-		// * **Stage 4 — Estate bridge**
-		//   * Expose carefully selected operations:
-		//     * `get_status()`
-		//     * `get_resources()`
-		//     * `resolve_node()`
-		//     * etc.
-		// * **Stage 5 — UI integration**
-		//   * Decide whether WebView is:
-		//     * a separate window
-		//     * a panel
-		//     * a tab
-		//     * a full application view
-		// * **Stage 6 — Asset loading**
-		//   * CSS
-		//   * JS
-		//   * images
-		//   * fonts
-		//   * local resources
-		// * **Stage 7 — Security boundary**
-		//   * Decide exactly what JavaScript is allowed to call.
-		//   * Don't expose arbitrary filesystem/process access.
-		// * **Parameters**
-		//   * WebView lifecycle.
-		//   * navigation.
-		//   * IPC.
-		//   * origin/security.
-		//   * local asset resolution.
-		//   * native ↔ JS serialization.
-		// * **Boundary:**
-		//   `egui/native UI ↔ WebView ↔ JS application`
-		//   with a deliberately tiny:
-		//   `Rust ↔ JS API`
-		// ---
-		// ## The order I'd actually do them
-		// I'd slightly reorder your list:
-		// 1. **Tab state**
-		//    * Learn application state → rendering.
-		// 2. **Real engine metrics**
-		//    * Learn backend state → UI state.
-		// 3. **Logs**
-		//    * Learn asynchronous events → UI.
-		// 4. **Hot reload**
-		//    * Learn filesystem events → application state.
-		// 5. **Cmd+Tab / app icon**
-		//    * Learn OS/application packaging.
-		// 6. **WebView**
-		//    * Learn native UI ↔ another rendering runtime.
-		// That gives you a pretty nice progression:
-		// ```text
-		//                 ┌──────────────┐
-		//                 │   Estate     │
-		//                 │    Engine    │
-		//                 └──────┬───────┘
-		//                        │
-		//                  state / events
-		//                        │
-		//                        ▼
-		//               ┌─────────────────┐
-		//               │   App / Model   │
-		//               └───────┬─────────┘
-		//                       │
-		//           ┌───────────┼────────────┐
-		//           ▼           ▼            ▼
-		//        egui UI      logs        WebView
-		//           │
-		//           ▼
-		//        wgpu
-		//           │
-		//           ▼
-		//      native window
-		//           │
-		//           ▼
-		//        macOS
-		// ```
+		doc!(
+			r#"
+	### 6. Embedded WebViews
+	This is the most interesting one because it connects directly to the stuff you've already been experimenting with.
+	* **Goal:** Render HTML/CSS/JS inside your Estate desktop application.
+	* **Stage 1 — WebView**
+	  * Embed a native WebView.
+	  * Get a static HTML page rendering.
+	* **Stage 2 — Local content**
+	  * Load HTML/CSS/JS from disk or memory.
+	* **Stage 3 — Communication**
+	  * Rust → JavaScript
+	  * JavaScript → Rust
+	* **Stage 4 — Estate bridge**
+	  * Expose carefully selected operations:
+	    * `get_status()`
+	    * `get_resources()`
+	    * `resolve_node()`
+	    * etc.
+	* **Stage 5 — UI integration**
+	  * Decide whether WebView is:
+	    * a separate window
+	    * a panel
+	    * a tab
+	    * a full application view
+	* **Stage 6 — Asset loading**
+	  * CSS
+	  * JS
+	  * images
+	  * fonts
+	  * local resources
+	* **Stage 7 — Security boundary**
+	  * Decide exactly what JavaScript is allowed to call.
+	  * Don't expose arbitrary filesystem/process access.
+	* **Parameters**
+	  * WebView lifecycle.
+	  * navigation.
+	  * IPC.
+	  * origin/security.
+	  * local asset resolution.
+	  * native ↔ JS serialization.
+	* **Boundary:**
+	  `egui/native UI ↔ WebView ↔ JS application`
+	  with a deliberately tiny:
+	  `Rust ↔ JS API`
+	---
+	## The order I'd actually do them
+	I'd slightly reorder your list:
+	1. **Tab state**
+	   * Learn application state → rendering.
+	2. **Real engine metrics**
+	   * Learn backend state → UI state.
+	3. **Logs**
+	   * Learn asynchronous events → UI.
+	4. **Hot reload**
+	   * Learn filesystem events → application state.
+	5. **Cmd+Tab / app icon**
+	   * Learn OS/application packaging.
+	6. **WebView**
+	   * Learn native UI ↔ another rendering runtime.
+	That gives you a pretty nice progression:
+	```text
+	                ┌──────────────┐
+	                │   Estate     │
+	                │    Engine    │
+	                └──────┬───────┘
+	                       │
+	                 state / events
+	                       │
+	                       ▼
+	              ┌─────────────────┐
+	              │   App / Model   │
+	              └───────┬─────────┘
+	                      │
+	          ┌───────────┼────────────┐
+	          ▼           ▼            ▼
+	       egui UI      logs        WebView
+	          │
+	          ▼
+	       wgpu
+	          │
+	          ▼
+	     native window
+	          │
+	          ▼
+	       macOS
+	```
+	"#
+		);
 	}
 	fn foo_layout_sidebar_top(&mut self, ui: &mut gui::Ui) {
 		// ┌─────────────────────────────────────────────┐
@@ -815,4 +796,7 @@ pub mod gui {
 		Align, ClippedPrimitive, Context, Direction, Frame, FullOutput, Id, Layout, Margin, ScrollArea,
 		TexturesDelta, Ui, UiBuilder, ViewportId, containers::Panel,
 	};
+	pub use egui_wgpu::{Renderer, RendererOptions, wgpu};
+	pub use egui_winit::State;
+	pub use wgpu::{Adapter, Device, SurfaceColorSpace};
 }

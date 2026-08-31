@@ -12,7 +12,11 @@ pub use crate::native::{
 	monitor::*,
 	poc::*,
 	resolver::*,
-	runtime::{NativeRuntime, *},
+	runtime::{
+		NativeRuntime,
+		runtime::{Runtime, RuntimeState},
+		*,
+	},
 	state::*,
 	ui::*,
 	ve::*,

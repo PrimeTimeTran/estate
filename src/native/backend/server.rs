@@ -1,4 +1,6 @@
-use crate::{native::backend::tool::AddVars, prelude::*};
+use crate::prelude::*;
+
+use tool::AddVars;
 
 use rmcp::{
 	ErrorData as McpError, handler::server::wrapper::Parameters, model::*, prompt, prompt_router,

@@ -186,6 +186,7 @@ tower-lsp = { workspace = true, optional = true }
 tray-icon = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 web-sys = { workspace = true, optional = true }
+sqlx = "0.9.0"
 
 [build-dependencies]
 resvg.workspace = true

@@ -18,12 +18,9 @@
 // lib.rs must have th efollowing for logger import here to use.
 // pub mod tool;
 // pub use tool::*;
-use estate::{
-	// logger::{LogConfig, Tracer},
-	prelude::{
-		logger::{LogConfig, Tracer},
-		*,
-	},
+use estate::prelude::{
+	logger::{LogConfig, Tracer},
+	*,
 };
 
 fn main() -> Result<()> {

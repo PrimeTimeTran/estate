@@ -685,7 +685,6 @@ use estate::proto::leetcode::{ListProblemsRequest, PageRequest};
 
 pub async fn connect() -> Result<()> {
 	let mut client = estate::proto::client().await?;
-
 	let response = client
 		.list_problems(ListProblemsRequest {
 			page: Some(PageRequest {

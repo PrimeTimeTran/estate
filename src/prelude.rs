@@ -3,6 +3,7 @@ pub use crate::{
 		modules::{Runtime, RuntimeState},
 		*,
 	},
+	client::*,
 	proto::*,
 	share::{prelude::*, *},
 	theme::*,

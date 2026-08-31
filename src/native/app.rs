@@ -11,7 +11,6 @@ use crate::{
 	spawn_global_cursor_daemon,
 	ui::{View, rendermd::MarkdownView},
 };
-
 use tonic::transport::Channel;
 use tray_icon::{
 	TrayIcon, TrayIconBuilder,
@@ -28,20 +27,18 @@ use winit::{
 pub struct NativeApp {
 	pub app: Option<App<NativeRuntime>>,
 	pub windows: Vec<AppWindow>,
-	engine: EstateEngine<NativeRuntime>,
 	clock_running: Arc<AtomicBool>,
-	daemon_tx: mpsc::Sender<DaemonCommand>,
 	daemon_rx: Option<mpsc::Receiver<DaemonCommand>>,
+	daemon_tx: mpsc::Sender<DaemonCommand>,
+	engine: EstateEngine<NativeRuntime>,
 	hotkey_manager: GlobalHotkeys,
-	last_state_revision: u64,
 	menu: Option<TrayMenu>,
 	menu_bar: Option<Menu>,
-	monitor: native::monitor::NativeMonitor,
+	monitor: NativeMonitor,
 	scroll_tray: Option<TrayIcon>,
 	tray: Option<TrayIcon>,
 	view_type: ViewType,
 }
-type DaemonReady = (tokio::runtime::Handle, Arc<ApiClient>);
 impl NativeApp {
 	pub fn new() -> Result<Self> {
 		let (daemon_tx, daemon_rx) = mpsc::channel(100);
@@ -49,15 +46,14 @@ impl NativeApp {
 		let engine = EstateEngine::new(runtime)?;
 		Ok(Self {
 			app: None,
-			engine,
 			clock_running: Arc::new(AtomicBool::new(true)),
 			daemon_rx: Some(daemon_rx),
 			daemon_tx,
+			engine,
 			hotkey_manager: GlobalHotkeys::new().unwrap(),
-			last_state_revision: 0,
 			menu: None,
 			menu_bar: None,
-			monitor: native::monitor::NativeMonitor::new()?,
+			monitor: NativeMonitor::new()?,
 			scroll_tray: None,
 			tray: None,
 			view_type: crate::START_VIEW,
@@ -91,16 +87,13 @@ impl NativeApp {
 			.emit(e::Event::app(e::EventKind::SessionStart));
 		self.app = Some(instance);
 		self.spawn_global_hotkey_daemon()?;
-
 		let event_loop = EventLoop::<AppEvent>::with_user_event()
 			.with_activation_policy(ActivationPolicy::Regular)
 			.build()?;
-		// let event_loop = EventLoop::<AppEvent>::with_user_event().build()?;
 		if let Some(menu) = &self.menu_bar {
 			menu.init_for_nsapp();
 		}
 		let proxy = event_loop.create_proxy();
-
 		self.spawn_clock(proxy.clone());
 		self.spawn_cursor_daemon(proxy.clone());
 		self.spawn_signal_handler(proxy.clone());
@@ -108,11 +101,8 @@ impl NativeApp {
 			.engine
 			.runtime
 			.emit(e::Event::app(e::EventKind::SessionStart));
-
 		event_loop.run_app(self)?;
-
 		tracing::info!(">>> NativeApp::start_runtime returning");
-
 		Ok(())
 	}
 	fn spawn_clock(&mut self, proxy: EventLoopProxy<AppEvent>) {
@@ -135,11 +125,8 @@ impl NativeApp {
 				if current_time == 0 {
 					current_time = 5;
 					view_index = (view_index + 1) % views.len();
-
 					let view = views[view_index];
-
 					tracing::info!("⏩ Clock navigation → {:?}", view);
-
 					runtime.emit(e::Event::app(e::EventKind::Navigate(view)));
 					let _ = proxy.send_event(AppEvent::RuntimeEvent);
 				} else {
@@ -183,9 +170,7 @@ impl NativeApp {
 				match rx.recv().await {
 					Some(DaemonCommand::Stop) => {
 						tracing::info!("daemon stop requested");
-
 						shutdown_token.cancel();
-
 						match daemon_task.await {
 							Ok(Ok(())) => {
 								tracing::info!("daemon stopped cleanly");
@@ -468,8 +453,6 @@ impl NativeApp {
 		if self.window_by_type(kind).is_some() {
 			return;
 		}
-		// let api = self.app.api().expect("Failure to connect");
-		// let api = self.app.api();
 		if let Some(app) = self.app.as_mut() {
 			let api = app.api();
 			match Window::new(event_loop, self.view_type.clone(), api) {
@@ -517,17 +500,12 @@ impl NativeApp {
 				command: "task_clear".into(),
 			}));
 	}
-	async fn connect(&mut self, path: &Path) -> Result<ProblemServiceClient<Channel>> {
-		let client = ProblemServiceClient::connect(crate::data::GRPC_SOCKET_CLIENT).await?;
-		Ok(client)
-	}
 	#[tracing::instrument(
 		target = "estate::discovery",
 		name = "scan_workspace",
 		skip(self),
 		fields(flow_id = %Uuid::new_v4())
 	)]
-
 	async fn _scan_workspace(&mut self, path: &Path) -> Result<()> {
 		tracing::info!("starting workspace scan");
 		self._discover(path).await?;
@@ -569,7 +547,6 @@ impl NativeApp {
 	fn set_view(&mut self, view_type: ViewType) {
 		self.view_type = view_type;
 	}
-
 	fn change_view(&self, view_type: ViewType) -> Ve<NativeRuntime> {
 		let app = self
 			.app
@@ -609,201 +586,38 @@ impl NativeApp {
 	}
 	fn edit_menu() -> Submenu {
 		let menu = Submenu::new("Edit", true);
-
 		menu.append(&PredefinedMenuItem::undo(None));
 		menu.append(&PredefinedMenuItem::redo(None));
 		menu.append(&PredefinedMenuItem::separator());
 		menu.append(&PredefinedMenuItem::cut(None));
 		menu.append(&PredefinedMenuItem::copy(None));
 		menu.append(&PredefinedMenuItem::paste(None));
-
 		menu
 	}
-	// fn menu_bar<R: Runtime>(ctx: &AppContext<'_, R>) -> Menu {
-	// 	Self::create_menu(ctx)
-	// }
-	// fn file_menu<R: Runtime>(ctx: &AppContext<'_, R>) -> Submenu {
-	// 	let menu = Submenu::new("File", true);
-	// 	menu.append(&MenuItem::new("New", true, None));
-	// 	menu.append(&MenuItem::new("Open…", true, None));
-	// 	menu.append(&PredefinedMenuItem::separator());
-	// 	menu.append(&MenuItem::new("Close", false, None));
-	// 	menu
-	// }
-	// fn edit_menu<R: Runtime>(ctx: &AppContext<'_, R>) -> Submenu {
-	// 	let menu = Submenu::new("Edit", true);
-	// 	menu.append(&PredefinedMenuItem::undo(None));
-	// 	menu.append(&PredefinedMenuItem::redo(None));
-	// 	menu.append(&PredefinedMenuItem::separator());
-	// 	menu.append(&PredefinedMenuItem::cut(None));
-	// 	menu.append(&PredefinedMenuItem::copy(None));
-	// 	menu.append(&PredefinedMenuItem::paste(None));
-	// 	menu
-	// }
-	// fn create_menu<R: Runtime>(ctx: &AppContext<'_, R>) -> Menu {
-	// 	let menu = Menu::new();
-	// 	menu.append(&Self::file_menu(true)).unwrap();
-	// 	menu.append(&Self::edit_menu(true)).unwrap();
-	// 	// menu.append(&Self::selection_menu(ctx)).unwrap();
-	// 	// menu.append(&Self::view_menu(ctx)).unwrap();
-	// 	// menu.append(&Self::go_menu(ctx)).unwrap();
-	// 	// menu.append(&Self::run_menu(ctx)).unwrap();
-	// 	// menu.append(&Self::window_menu(ctx)).unwrap();
-	// 	// menu.append(&Self::help_menu(ctx)).unwrap();
-	// 	menu
-	// }
-}
-fn create_menu() -> Menu {
-	let menu = Menu::new();
-	let file = Submenu::new("File", true);
-	file.append_items(&[
-		&MenuItem::new("New", true, None),
-		&MenuItem::new("Open…", true, None),
-		&PredefinedMenuItem::separator(),
-		&MenuItem::new("Close", true, None),
-	]);
-	let edit = Submenu::new("Edit", true);
-	edit.append_items(&[
-		&PredefinedMenuItem::undo(None),
-		&PredefinedMenuItem::redo(None),
-		&PredefinedMenuItem::separator(),
-		&PredefinedMenuItem::cut(None),
-		&PredefinedMenuItem::copy(None),
-		&PredefinedMenuItem::paste(None),
-	]);
-	let view = Submenu::new("View", true);
-	view.append_items(&[
-		&MenuItem::new("Toggle Sidebar", true, None),
-		&MenuItem::new("Fullscreen", true, None),
-	]);
-	menu.append_items(&[&file, &edit, &view]);
-	menu
-}
-// fn create_menu() -> Menu {
-// 	let menu = Menu::new();
-
-// 	let menus = [
-// 		MenuEntry::Submenu {
-// 			title: "File",
-// 			items: vec![
-// 				MenuEntry::Item {
-// 					title: "New",
-// 					enabled: true,
-// 				},
-// 				MenuEntry::Item {
-// 					title: "Open…",
-// 					enabled: true,
-// 				},
-// 				MenuEntry::Separator,
-// 				MenuEntry::Item {
-// 					title: "Close",
-// 					enabled: true,
-// 				},
-// 			],
-// 		},
-// 		MenuEntry::Submenu {
-// 			title: "Edit",
-// 			items: vec![
-// 				MenuEntry::Item {
-// 					title: "Undo",
-// 					enabled: true,
-// 				},
-// 				MenuEntry::Item {
-// 					title: "Redo",
-// 					enabled: true,
-// 				},
-// 				MenuEntry::Separator,
-// 				MenuEntry::Item {
-// 					title: "Cut",
-// 					enabled: true,
-// 				},
-// 				MenuEntry::Item {
-// 					title: "Copy",
-// 					enabled: true,
-// 				},
-// 				MenuEntry::Item {
-// 					title: "Paste",
-// 					enabled: true,
-// 				},
-// 			],
-// 		},
-// 		MenuEntry::Submenu {
-// 			title: "View",
-// 			items: vec![
-// 				MenuEntry::Item {
-// 					title: "Toggle Sidebar",
-// 					enabled: true,
-// 				},
-// 				MenuEntry::Item {
-// 					title: "Fullscreen",
-// 					enabled: true,
-// 				},
-// 			],
-// 		},
-// 	];
-
-// 	for entry in menus {
-// 		append_entry(&menu, entry);
-// 	}
-
-// 	menu
-// }
-// fn append_entry(parent: &Menu, entry: MenuEntry) {
-// 	match entry {
-// 		MenuEntry::Item { title, enabled } => {
-// 			parent.append(&MenuItem::new(title, enabled, None)).unwrap();
-// 		}
-
-// 		MenuEntry::Separator => {
-// 			parent.append(&PredefinedMenuItem::separator()).unwrap();
-// 		}
-
-// 		MenuEntry::Submenu { title, items } => {
-// 			let submenu = Submenu::new(title, true);
-
-// 			for item in items {
-// 				append_entry(&submenu, item);
-// 			}
-
-// 			parent.append(&submenu).unwrap();
-// 		}
-// 	}
-// }
-// enum MenuEntry {
-// 	Item {
-// 		title: &'static str,
-// 		enabled: bool,
-// 	},
-// 	Separator,
-// 	Submenu {
-// 		title: &'static str,
-// 		items: Vec<MenuEntry>,
-// 	},
-// }
-
-#[derive(Debug, Clone)]
-pub struct ApiClient {
-	pub problems: ProblemServiceClient<Channel>,
-	pub submissions: SubmissionServiceClient<Channel>,
-}
-impl ApiClient {
-	pub async fn connect() -> anyhow::Result<Self> {
-		let channel = Channel::from_static(crate::data::GRPC_SOCKET_CLIENT)
-			.connect()
-			.await?;
-
-		Ok(Self {
-			problems: ProblemServiceClient::new(channel.clone()),
-			submissions: SubmissionServiceClient::new(channel),
-		})
+	fn create_menu() -> Menu {
+		let menu = Menu::new();
+		let file = Submenu::new("File", true);
+		file.append_items(&[
+			&MenuItem::new("New", true, None),
+			&MenuItem::new("Open…", true, None),
+			&PredefinedMenuItem::separator(),
+			&MenuItem::new("Close", true, None),
+		]);
+		let edit = Submenu::new("Edit", true);
+		edit.append_items(&[
+			&PredefinedMenuItem::undo(None),
+			&PredefinedMenuItem::redo(None),
+			&PredefinedMenuItem::separator(),
+			&PredefinedMenuItem::cut(None),
+			&PredefinedMenuItem::copy(None),
+			&PredefinedMenuItem::paste(None),
+		]);
+		let view = Submenu::new("View", true);
+		view.append_items(&[
+			&MenuItem::new("Toggle Sidebar", true, None),
+			&MenuItem::new("Fullscreen", true, None),
+		]);
+		menu.append_items(&[&file, &edit, &view]);
+		menu
 	}
-}
-
-use crate::services::repo::problem::StoredProblem;
-
-#[derive(Debug, Default)]
-pub struct AppState {
-	pub problems: Vec<StoredProblem>,
-	pub problems_loading: bool,
-	pub problems_error: Option<String>,
 }

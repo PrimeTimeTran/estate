@@ -5,6 +5,8 @@ pub(crate) use crate::app::event as e;
 
 pub use e::*;
 
+pub mod client;
+pub use client::*;
 pub mod helpers;
 pub mod prelude;
 pub mod proto;

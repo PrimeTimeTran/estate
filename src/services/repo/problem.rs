@@ -1,9 +1,6 @@
-use crate::{prelude::*, proto, repo::Page, services::*};
-use async_trait::async_trait;
-use crate::proto::leetcode::{
-	CreateProblemRequest, DeleteProblemRequest, GetProblemRequest, ListProblemsRequest,
-	ListProblemsResponse, Problem as ProtoProblem, UpdateProblemRequest,
-};
+use crate::proto::leetcode::{Problem as ProtoProblem, *};
+use crate::{prelude::*, proto, repo::*, services::*};
+
 #[async_trait]
 pub trait ProblemRepository: Send + Sync {
 	async fn list(&self, query: ProblemQuery) -> Result<Page<ProtoProblem>>;
@@ -13,7 +10,23 @@ pub trait ProblemRepository: Send + Sync {
 	async fn get(&self, id: i64) -> Result<ProtoProblem>;
 	async fn get_by_slug(&self, slug: &str) -> Result<ProtoProblem>;
 }
-impl From<StoredProblem> for Problem {
+#[derive(Debug, Clone, Default, Serialize, Deserialize, Hash)]
+pub struct StoredProblem {
+	pub id: i64,
+	pub number: i32,
+	pub title: String,
+	pub slug: String,
+	pub description: String,
+	pub difficulty: i32,
+	pub tags: Vec<String>,
+	pub examples: Vec<StoredExample>,
+	pub constraints: Vec<String>,
+	pub code_templates: Vec<StoredCodeTemplate>,
+	pub is_published: bool,
+	pub created_at: Option<String>,
+	pub updated_at: Option<String>,
+}
+impl From<StoredProblem> for ProtoProblem {
 	fn from(problem: StoredProblem) -> Self {
 		Self {
 			id: problem.id.to_string(),
@@ -32,24 +45,8 @@ impl From<StoredProblem> for Problem {
 		}
 	}
 }
-#[derive(Debug, Clone, Default, Serialize, Deserialize, Hash)]
-pub struct StoredProblem {
-	pub id: i64,
-	pub number: i32,
-	pub title: String,
-	pub slug: String,
-	pub description: String,
-	pub difficulty: i32,
-	pub tags: Vec<String>,
-	pub examples: Vec<StoredExample>,
-	pub constraints: Vec<String>,
-	pub code_templates: Vec<StoredCodeTemplate>,
-	pub is_published: bool,
-	pub created_at: Option<String>,
-	pub updated_at: Option<String>,
-}
-impl From<Problem> for StoredProblem {
-	fn from(problem: Problem) -> Self {
+impl From<ProtoProblem> for StoredProblem {
+	fn from(problem: ProtoProblem) -> Self {
 		Self {
 			id: problem.id.parse().unwrap_or_default(),
 			number: problem.number,

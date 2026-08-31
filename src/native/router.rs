@@ -41,9 +41,12 @@
 /// estate fmt path/to/file.rs
 /// estate format path/to/file.rs
 /// ```
-use crate::app::{model, modules::runtime::Runtime, *};
-use crate::doc;
-use crate::{native::daemon::projection::command, prelude::*};
+use crate::{
+	app::{model, modules::runtime::Runtime, *},
+	doc,
+	native::daemon::projection::command,
+	prelude::*,
+};
 
 pub(crate) async fn execute<R: Runtime>(
 	parsed_cli: Cli,
@@ -87,7 +90,6 @@ pub(crate) async fn execute<R: Runtime>(
 				          process      application
 			"#
 			);
-
 			let mut stream = match UnixStream::connect(SOCKET_PATH).await {
 				Ok(s) => s,
 				Err(e) => {

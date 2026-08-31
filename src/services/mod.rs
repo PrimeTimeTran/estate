@@ -4,7 +4,8 @@ pub mod submission;
 pub use submission::*;
 pub mod repo;
 
-use crate::leetcode::PageRequest;
+use crate::leetcode::{PageInfo, PageRequest};
+
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -12,8 +13,25 @@ use std::{
 	path::{Path, PathBuf},
 	sync::Arc,
 };
-
 use tonic::{Request, Response, Status};
+
+#[derive(Debug)]
+pub struct Page<T> {
+	pub items: Vec<T>,
+	pub page: u32,
+	pub page_size: u32,
+	pub total: u64,
+}
+
+impl<T> Page<T> {
+	pub fn page_info(&self) -> PageInfo {
+		PageInfo {
+			page: self.page as i32,
+			page_size: self.page_size as i32,
+			total: self.total as i64,
+		}
+	}
+}
 
 pub fn internal_error(error: anyhow::Error) -> Status {
 	tracing::error!("{error:#}");
