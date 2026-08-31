@@ -1,5 +1,6 @@
 pub mod json;
 pub mod problem;
+pub mod submission;
 
 #[derive(Debug)]
 pub struct Page<T> {
