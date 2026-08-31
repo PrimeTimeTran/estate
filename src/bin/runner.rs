@@ -1,11 +1,8 @@
 #![allow(warnings)]
 
 use anyhow::Context;
-
-use estate::{
-	// flow_warn,
-	prelude::*,
-};
+use estate::{NEXT_PROBLEM_ID, prelude::*, problem_source};
+use rand::Rng;
 
 // cargo -q run --bin runner -- python
 // RUNNER=native cargo -q run --bin runner -- python
@@ -515,7 +512,7 @@ impl Language {
 
 #[derive(Clone, Debug)]
 pub struct Problem {
-	pub id: Uuid,
+	pub id: i64,
 	pub slug: String,
 	pub test_cases: Vec<TestCase>,
 }
@@ -547,21 +544,22 @@ impl Problem {
 		);
 
 		Ok(Self {
-			id: file.id.unwrap_or_else(Uuid::new_v4),
+			id: file
+				.id
+				.unwrap_or_else(|| estate::NEXT_PROBLEM_ID.fetch_add(1, Ordering::Relaxed)),
 			slug: file.slug,
 			test_cases,
 		})
 	}
 	pub fn success_source(&self, language: Language) -> anyhow::Result<String> {
-		match self.slug.as_str() {
-			"two-sum" => Ok(match language {
-				Language::Rust => include_str!("../data/problems/two-sum/success.rs").into(),
-				Language::Python => include_str!("../data/problems/two-sum/success.py").into(),
-				Language::JavaScript => include_str!("../data/problems/two-sum/success.js").into(),
-			}),
-
-			other => anyhow::bail!("no success fixture registered for problem `{other}`"),
-		}
+		Ok(
+			match language {
+				Language::Rust => problem_source!("two-sum", Rust),
+				Language::Python => problem_source!("two-sum", Python),
+				Language::JavaScript => problem_source!("two-sum", JavaScript),
+			}
+			.into(),
+		)
 	}
 }
 
@@ -573,7 +571,7 @@ pub struct TestCase {
 
 #[derive(Debug, Deserialize)]
 struct ProblemFile {
-	pub id: Option<Uuid>,
+	pub id: Option<i64>,
 	pub slug: String,
 	pub test_cases: HashMap<Language, Vec<TestCase>>,
 }

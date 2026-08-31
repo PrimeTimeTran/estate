@@ -1,6 +1,5 @@
 pub use crate::{app::*, prelude::*};
 
-// must leave pub prefix or it breaks other places
 #[derive(Debug, Clone, Deserialize, Hash, Serialize)]
 pub(crate) struct Event {
 	pub id: u64,
@@ -38,6 +37,43 @@ impl Event {
 	}
 }
 
+#[derive(Debug, Clone, Hash, Deserialize, Serialize)]
+pub enum EventKind {
+	ApiError(String),
+	CacheInvalidated { reason: String },
+	CommandExecuted { command: String },
+	DaemonStarted,
+	DaemonStopped,
+	EstateDiscovered { inode: Inode, path: String },
+	EstateRemoved { inode: Inode, path: String },
+	FileCreated { inode: Inode, path: String },
+	FileDeleted { inode: Inode, path: String },
+	FileModified { inode: Inode, path: String },
+	IndexUpdated { files_changed: u64 },
+	Navigate(ViewType),
+	ProblemsLoaded(Vec<StoredProblem>),
+	SessionStart,
+	SessionStop { session: Session },
+	StatusRequested,
+	TaskCompleted { task_id: TaskId },
+	TaskCreated { task_id: Uuid, kind: TaskKind },
+	TaskDeleted { task_id: TaskId },
+	TaskFailed { task_id: TaskId, error: String },
+	TaskRequested { request: TaskRequest },
+	TasksCleared,
+	TaskStarted { task_id: TaskId },
+	TaskStopped { task_id: TaskId },
+	WorkspaceIndexed { duration: u64 },
+}
+#[derive(Debug, Clone, Deserialize, Hash, Serialize)]
+pub enum EventSource {
+	App,
+	Cli,
+	Daemon,
+	Editor,
+	Filesystem,
+}
+
 use crate::services::repo::problem::StoredProblem;
 use crate::ui::leetcode::Problem as ProtoProblem;
 
@@ -57,42 +93,4 @@ impl From<ProtoProblem> for ProblemLoaded {
 			slug: problem.slug,
 		}
 	}
-}
-
-#[derive(Debug, Clone, Hash, Deserialize, Serialize)]
-pub enum EventKind {
-	ProblemsLoaded(Vec<StoredProblem>),
-	SessionStart,
-	SessionStop { session: Session },
-	WorkspaceIndexed { duration: u64 },
-	Navigate(ViewType),
-	DaemonStarted,
-	DaemonStopped,
-	StatusRequested,
-	TaskRequested { request: TaskRequest },
-	TaskCreated { task_id: Uuid, kind: TaskKind },
-	TaskStarted { task_id: TaskId },
-	TaskCompleted { task_id: TaskId },
-	TaskFailed { task_id: TaskId, error: String },
-	TaskStopped { task_id: TaskId },
-	TaskDeleted { task_id: TaskId },
-	TasksCleared,
-	CommandExecuted { command: String },
-	FileCreated { inode: Inode, path: String },
-	FileModified { inode: Inode, path: String },
-	FileDeleted { inode: Inode, path: String },
-	EstateDiscovered { inode: Inode, path: String },
-	EstateRemoved { inode: Inode, path: String },
-	IndexUpdated { files_changed: u64 },
-	CacheInvalidated { reason: String },
-
-	ApiError(String),
-}
-#[derive(Debug, Clone, Deserialize, Hash, Serialize)]
-pub enum EventSource {
-	App,
-	Cli,
-	Daemon,
-	Editor,
-	Filesystem,
 }

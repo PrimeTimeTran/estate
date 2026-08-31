@@ -1,5 +1,6 @@
 use crate::{
-	app::{AppContext, Job, JobStatus, Runtime, event as e, state::EstateState},
+	app::{AppContext, Job, JobStatus, Runtime, state::EstateState},
+	e,
 	native::{job::TaskManager, runtime::NativeRuntime},
 	prelude::*,
 	theme::palette,

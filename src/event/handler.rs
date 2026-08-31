@@ -6,10 +6,6 @@ use crate::{
 	session::Session,
 };
 
-// Events = n that happened
-// Handlers = reactions to facts
-// Tasks = units of work
-// Commands = requests to do something
 #[async_trait::async_trait]
 pub trait EventHandler: Send + Sync {
 	async fn handle(&self, event: &e::Event, runtime: &NativeRuntime);
@@ -92,7 +88,6 @@ impl EventHandler for TaskHandler {
 		});
 	}
 }
-
 pub struct LogHandler;
 #[async_trait::async_trait]
 impl EventHandler for LogHandler {
@@ -206,71 +201,71 @@ impl EventHandler for CommandHandler {
 			_ => {}
 		}
 	}
+	// 			"task_create" => {
+	// 				tracing::info!("CommandHandler task_create {:?}", event);
+	// 				runtime.emit(Event::app(event::EventKind::TaskRequested {
+	// 					request: TaskRequest::Create(TaskKind::SyncBookmarks),
+	// 				}));
+	// 			}
+	// 			"task_list" => {
+	// 				let tasks = runtime.tasks.read().unwrap();
+	// 				println!("════════════════════════════════════");
+	// 				println!("             ESTATE TASKS");
+	// 				println!("════════════════════════════════════");
+	// 				if tasks.count() == 0 {
+	// 					println!("No tasks in memory.");
+	// 				} else {
+	// 					for task in tasks.list() {
+	// 						println!("[{}] {} — {:?}", task.id, task.name, task.status);
+	// 					}
+	// 				}
+	// 				drop(tasks);
+	// 				let state = EstateState::load_from_disk().unwrap();
+	// 				println!();
+	// 				println!("──────────── persisted state ────────────");
+	// 				println!("starts:           {}", state.starts);
+	// 				println!("status checks:    {}", state.status_checks);
+	// 				println!("tasks completed:  {}", state.tasks_completed);
+	// 				println!("files indexed:    {}", state.files_indexed);
+	// 				println!("events processed: {}", state.events_processed);
+	// 				println!("longest run:      {}", state.longest_run);
+	// 				println!("started at:       {}", state.started_at);
+	// 				runtime.emit(Event::daemon(event::EventKind::StatusRequested));
+	// 			}
+	// 			"task_clear" => {
+	// 				{
+	// 					let mut tasks = runtime.tasks.write().unwrap();
+	// 					tasks.clear();
+	// 				}
+	// 				runtime.emit(Event::daemon(event::EventKind::TasksCleared));
+	// 			}
+	// 			"dev_info" => {
+	// 				runtime.emit(Event::daemon(event::EventKind::TaskRequested {
+	// 					request: TaskRequest::Create(TaskKind::BuildEstatePrototype),
+	// 				}));
+	// 			}
+	// 			"rebuild_index" => {
+	// 				runtime.emit(Event::daemon(event::EventKind::TaskRequested {
+	// 					request: TaskRequest::Create(TaskKind::RebuildIndex),
+	// 				}));
+	// 			}
+	// 			"sync_bookmarks" => {
+	// 				runtime.emit(Event::daemon(event::EventKind::TaskRequested {
+	// 					request: TaskRequest::Create(TaskKind::SyncBookmarks),
+	// 				}));
+	// 			}
+	// 			"generate_dashboard" => {
+	// 				runtime.emit(Event::daemon(event::EventKind::TaskRequested {
+	// 					request: TaskRequest::Create(TaskKind::GenerateView("dashboard".into())),
+	// 				}));
+	// 			}
+	// 			_ => {
+	// 				println!("⚠️ unknown command: {command}");
+	// 			}
+	// 		}
+	// 	}
+	// }
 }
-// 			"task_create" => {
-// 				tracing::info!("CommandHandler task_create {:?}", event);
-// 				runtime.emit(Event::app(event::EventKind::TaskRequested {
-// 					request: TaskRequest::Create(TaskKind::SyncBookmarks),
-// 				}));
-// 			}
-// 			"task_list" => {
-// 				let tasks = runtime.tasks.read().unwrap();
-// 				println!("════════════════════════════════════");
-// 				println!("             ESTATE TASKS");
-// 				println!("════════════════════════════════════");
-// 				if tasks.count() == 0 {
-// 					println!("No tasks in memory.");
-// 				} else {
-// 					for task in tasks.list() {
-// 						println!("[{}] {} — {:?}", task.id, task.name, task.status);
-// 					}
-// 				}
-// 				drop(tasks);
-// 				let state = EstateState::load_from_disk().unwrap();
-// 				println!();
-// 				println!("──────────── persisted state ────────────");
-// 				println!("starts:           {}", state.starts);
-// 				println!("status checks:    {}", state.status_checks);
-// 				println!("tasks completed:  {}", state.tasks_completed);
-// 				println!("files indexed:    {}", state.files_indexed);
-// 				println!("events processed: {}", state.events_processed);
-// 				println!("longest run:      {}", state.longest_run);
-// 				println!("started at:       {}", state.started_at);
-// 				runtime.emit(Event::daemon(event::EventKind::StatusRequested));
-// 			}
-// 			"task_clear" => {
-// 				{
-// 					let mut tasks = runtime.tasks.write().unwrap();
-// 					tasks.clear();
-// 				}
-// 				runtime.emit(Event::daemon(event::EventKind::TasksCleared));
-// 			}
-// 			"dev_info" => {
-// 				runtime.emit(Event::daemon(event::EventKind::TaskRequested {
-// 					request: TaskRequest::Create(TaskKind::BuildEstatePrototype),
-// 				}));
-// 			}
-// 			"rebuild_index" => {
-// 				runtime.emit(Event::daemon(event::EventKind::TaskRequested {
-// 					request: TaskRequest::Create(TaskKind::RebuildIndex),
-// 				}));
-// 			}
-// 			"sync_bookmarks" => {
-// 				runtime.emit(Event::daemon(event::EventKind::TaskRequested {
-// 					request: TaskRequest::Create(TaskKind::SyncBookmarks),
-// 				}));
-// 			}
-// 			"generate_dashboard" => {
-// 				runtime.emit(Event::daemon(event::EventKind::TaskRequested {
-// 					request: TaskRequest::Create(TaskKind::GenerateView("dashboard".into())),
-// 				}));
-// 			}
-// 			_ => {
-// 				println!("⚠️ unknown command: {command}");
-// 			}
-// 		}
-// 	}
-// }
 pub struct TaskRunner;
 impl TaskRunner {
 	pub async fn execute(runtime: &NativeRuntime, task: Task) -> Result<()> {
@@ -360,7 +355,6 @@ impl EventHandler for AppHandler {
 	}
 }
 pub struct NavigationHandler;
-
 #[async_trait::async_trait]
 impl EventHandler for NavigationHandler {
 	async fn handle(&self, event: &e::Event, _runtime: &NativeRuntime) {
@@ -371,7 +365,6 @@ impl EventHandler for NavigationHandler {
 		tracing::info!("🎯 NavigationHandler received Navigate → {:?}", view_type);
 	}
 }
-
 pub struct Master;
 impl Master {
 	pub async fn save(session: Value) -> anyhow::Result<()> {

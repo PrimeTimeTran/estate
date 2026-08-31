@@ -1,10 +1,14 @@
+use crate::{
+	app,
+	app::{Runtime, state::EstateState},
+	e,
+	native::prelude::*,
+	ui::*,
+};
 use core_foundation::runloop::{CFRunLoop, kCFRunLoopCommonModes};
 use core_graphics::{
 	display::CGDisplay,
-	event::{
-		CGEvent, CGEventTap, CGEventTapLocation, CGEventTapOptions, CGEventTapPlacement,
-		CGEventTapProxy, CGEventType, CGMouseButton, CallbackResult, *,
-	},
+	event::*,
 	event_source::{CGEventSource, CGEventSourceStateID},
 	geometry::CGPoint,
 };
@@ -13,14 +17,6 @@ use tray_icon::{
 	menu::{Menu, MenuItem, Submenu},
 };
 use winit::event_loop::EventLoopProxy;
-
-use crate::{
-	app,
-	app::{Runtime, state::EstateState},
-	e,
-	native::prelude::*,
-	ui::*,
-};
 
 pub fn bootstrap() -> Result<(TrayMenu, TrayIcon)> {
 	let menu = Menu::new();
@@ -130,7 +126,6 @@ pub fn move_cursor_to(pos: ScreenPosition) {
 		}
 	}
 }
-
 impl<R: Runtime> Ve<R> {
 	/// Rust uses ownership,borrowing, and lifetimes to determine when values
 	/// may be safely destroyed, allowing memory to be reclaimed deterministically

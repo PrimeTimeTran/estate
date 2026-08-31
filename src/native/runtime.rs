@@ -1,5 +1,8 @@
 use tokio::sync::broadcast;
 
+pub use crate::native::{
+	job::TaskManager, monitor::NativeMonitor, prelude::*, state::NativeStateStore,
+};
 use crate::{
 	app::{
 		Runtime,
@@ -9,18 +12,12 @@ use crate::{
 	e,
 	native::NativeApp,
 };
-
-pub use crate::native::{
-	job::TaskManager, monitor::NativeMonitor, prelude::*, state::NativeStateStore,
-};
-
 impl NativeRuntime {
 	pub fn new() -> Result<Self> {
 		let store = NativeStateStore::new()?;
 		let state = store.load()?;
 		let runtime_state = RuntimeState::new(state);
 		let session = Session::default();
-
 		Ok(Self {
 			session,
 			store,
@@ -37,7 +34,6 @@ impl NativeRuntime {
 		self.events.subscribe()
 	}
 }
-
 #[derive(Clone, Debug)]
 pub struct NativeRuntime {
 	pub session: Session,
@@ -46,7 +42,6 @@ pub struct NativeRuntime {
 	pub state: Arc<RuntimeState>,
 	pub tasks: Arc<RwLock<TaskManager>>,
 }
-
 impl Runtime for NativeRuntime {
 	fn emit(&self, event: e::Event) {
 		self.events.emit(event);
@@ -93,28 +88,23 @@ impl Runtime for NativeRuntime {
 	fn session(&self) -> Session {
 		self.session.clone()
 	}
-
 	fn subscribe(&self) -> tokio::sync::broadcast::Receiver<e::Event> {
 		self.events.subscribe()
 	}
 }
-
 pub struct NativeAppContext<'a> {
 	pub base: AppContext<'a, NativeRuntime>,
 	pub monitor: &'a mut NativeMonitor,
 }
-
 impl<'a> NativeAppContext<'a> {
 	pub fn state(&self) -> std::sync::RwLockReadGuard<'_, EstateState> {
 		self.base.state()
 	}
-
 	#[cfg(not(target_arch = "wasm32"))]
 	pub fn poll_state(&mut self) -> bool {
 		todo!("")
 	}
 }
-
 // impl AppHost<NativeRuntime> for NativeApp {
 // 	fn app(&mut self) -> &mut App<NativeRuntime> {
 // 		&mut self.app

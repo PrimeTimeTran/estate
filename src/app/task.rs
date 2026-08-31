@@ -1,6 +1,7 @@
 use crate::prelude::*;
 
 pub type TaskId = Uuid;
+
 #[derive(Debug, Clone, Deserialize, Hash, Serialize)]
 pub enum TaskRequest {
 	Create(TaskKind),

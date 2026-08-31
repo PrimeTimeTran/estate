@@ -20,7 +20,7 @@ pub struct ApiClient {
 }
 impl ApiClient {
 	pub async fn connect() -> anyhow::Result<Self> {
-		let channel = Channel::from_static(crate::data::GRPC_SOCKET_CLIENT)
+		let channel = Channel::from_static(crate::GRPC_SOCKET_CLIENT)
 			.connect()
 			.await?;
 
