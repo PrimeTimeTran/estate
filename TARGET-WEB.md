@@ -18,8 +18,9 @@ default = ["native"]
 default = ["web"]
 # For this command to succeed
 cargo check \
-    --target wasm32-unknown-unknown \
-    --features web
+  --no-default-features \
+  --target wasm32-unknown-unknown \
+  --features web
 ```
 
 ```sh
@@ -113,6 +114,7 @@ default = ["web"]
 
 ```sh
 cargo check \
+  --no-default-features \
   --target wasm32-unknown-unknown \
   --features web
 ```

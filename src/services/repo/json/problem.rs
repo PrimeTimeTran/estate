@@ -1,5 +1,6 @@
-use crate::proto::leetcode::*;
-use crate::{repo::problem::*, services::*};
+use crate::proto::leetcode::{types::Problem, *};
+
+use crate::services::*;
 
 pub struct JsonProblemRepository {
 	path: PathBuf,

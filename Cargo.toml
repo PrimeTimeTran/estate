@@ -187,7 +187,6 @@ tray-icon = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 web-sys = { workspace = true, optional = true }
 sqlx = "0.9.0"
-rand.workspace = true
 
 [build-dependencies]
 resvg.workspace = true

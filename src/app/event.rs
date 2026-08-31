@@ -75,7 +75,7 @@ pub enum EventSource {
 }
 
 use crate::services::repo::problem::StoredProblem;
-use crate::ui::leetcode::Problem as ProtoProblem;
+use crate::ui::leetcode::types::Problem as ProtoProblem;
 
 pub type Problem = ProtoProblem;
 

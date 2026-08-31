@@ -1,11 +1,9 @@
-use crate::proto::leetcode::{Submission, SubmissionStatus};
-use crate::{
-	repo::submission::{CreateSubmission, SubmissionQuery, SubmissionRepository, UpdateSubmission},
-	services::*,
-};
+use crate::{repo::submission::*, services::*};
+
 pub struct JsonSubmissionRepository {
 	path: PathBuf,
 }
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct StoredSubmission {
 	pub id: String,

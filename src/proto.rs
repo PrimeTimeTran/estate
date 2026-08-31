@@ -1,5 +1,8 @@
-#[cfg(not(target_arch = "wasm32"))]
 pub mod leetcode {
+	pub mod types {
+		tonic::include_proto!("leetcode.types");
+	}
+	#[cfg(not(target_arch = "wasm32"))]
 	tonic::include_proto!("leetcode");
 }
 

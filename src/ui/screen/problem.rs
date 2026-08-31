@@ -3,9 +3,7 @@ use tonic::transport::Channel;
 
 use crate::{
 	app::state::EstateState,
-	proto::leetcode::{
-		ListProblemsRequest, PageRequest, Problem, problem_service_client::ProblemServiceClient,
-	},
+	proto::leetcode::{problem_service_client::ProblemServiceClient, types::*},
 	repo::problem::StoredProblem,
 	*,
 };

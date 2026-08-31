@@ -2,7 +2,6 @@
 
 use anyhow::Context;
 use estate::{NEXT_PROBLEM_ID, prelude::*, problem_source};
-use rand::Rng;
 
 // cargo -q run --bin runner -- python
 // RUNNER=native cargo -q run --bin runner -- python
@@ -679,7 +678,7 @@ pub enum TestStatus {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-use estate::proto::leetcode::{ListProblemsRequest, PageRequest};
+use estate::proto::leetcode::types::{ListProblemsRequest, PageRequest};
 
 pub async fn connect() -> Result<()> {
 	let mut client = estate::proto::client().await?;

@@ -1,5 +1,4 @@
-use crate::proto::leetcode::{Submission, SubmissionStatus};
-use crate::{prelude::*, proto, services::*};
+use crate::{prelude::*, services::*};
 
 #[async_trait]
 pub trait SubmissionRepository {

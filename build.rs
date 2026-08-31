@@ -22,6 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 	);
 	pixmap.save_png(output).unwrap();
 	println!("cargo:rerun-if-changed=proto/service.proto");
+	println!("cargo:rerun-if-changed=proto/type.proto");
 	tonic_build::compile_protos("proto/service.proto")?;
 	Ok(())
 }

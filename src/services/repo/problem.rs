@@ -1,14 +1,15 @@
-use crate::proto::leetcode::{Problem as ProtoProblem, *};
-use crate::{prelude::*, proto, repo::*, services::*};
+use crate::{prelude::*, services::*};
+
+use leetcode::types::Problem;
 
 #[async_trait]
 pub trait ProblemRepository: Send + Sync {
-	async fn list(&self, query: ProblemQuery) -> Result<Page<ProtoProblem>>;
-	async fn create(&self, problem: CreateProblem) -> Result<ProtoProblem>;
-	async fn update(&self, id: i64, problem: UpdateProblem) -> Result<ProtoProblem>;
+	async fn list(&self, query: ProblemQuery) -> Result<Page<Problem>>;
+	async fn create(&self, problem: CreateProblem) -> Result<Problem>;
+	async fn update(&self, id: i64, problem: UpdateProblem) -> Result<Problem>;
 	async fn delete(&self, id: i64) -> Result<()>;
-	async fn get(&self, id: i64) -> Result<ProtoProblem>;
-	async fn get_by_slug(&self, slug: &str) -> Result<ProtoProblem>;
+	async fn get(&self, id: i64) -> Result<Problem>;
+	async fn get_by_slug(&self, slug: &str) -> Result<Problem>;
 }
 #[derive(Debug, Clone, Default, Serialize, Deserialize, Hash)]
 pub struct StoredProblem {
@@ -26,7 +27,7 @@ pub struct StoredProblem {
 	pub created_at: Option<String>,
 	pub updated_at: Option<String>,
 }
-impl From<StoredProblem> for ProtoProblem {
+impl From<StoredProblem> for Problem {
 	fn from(problem: StoredProblem) -> Self {
 		Self {
 			id: problem.id.to_string(),
@@ -45,8 +46,8 @@ impl From<StoredProblem> for ProtoProblem {
 		}
 	}
 }
-impl From<ProtoProblem> for StoredProblem {
-	fn from(problem: ProtoProblem) -> Self {
+impl From<Problem> for StoredProblem {
+	fn from(problem: Problem) -> Self {
 		Self {
 			id: problem.id.parse().unwrap_or_default(),
 			number: problem.number,
@@ -75,7 +76,7 @@ pub struct StoredExample {
 	pub output: String,
 	pub explanation: String,
 }
-impl From<StoredExample> for proto::leetcode::Example {
+impl From<StoredExample> for Example {
 	fn from(value: StoredExample) -> Self {
 		Self {
 			input: value.input,
@@ -84,7 +85,7 @@ impl From<StoredExample> for proto::leetcode::Example {
 		}
 	}
 }
-impl From<StoredCodeTemplate> for proto::leetcode::CodeTemplate {
+impl From<StoredCodeTemplate> for CodeTemplate {
 	fn from(value: StoredCodeTemplate) -> Self {
 		Self {
 			language: value.language,
@@ -92,8 +93,8 @@ impl From<StoredCodeTemplate> for proto::leetcode::CodeTemplate {
 		}
 	}
 }
-impl From<proto::leetcode::Example> for StoredExample {
-	fn from(value: proto::leetcode::Example) -> Self {
+impl From<Example> for StoredExample {
+	fn from(value: Example) -> Self {
 		Self {
 			input: value.input,
 			output: value.output,
@@ -101,8 +102,8 @@ impl From<proto::leetcode::Example> for StoredExample {
 		}
 	}
 }
-impl From<proto::leetcode::CodeTemplate> for StoredCodeTemplate {
-	fn from(value: proto::leetcode::CodeTemplate) -> Self {
+impl From<CodeTemplate> for StoredCodeTemplate {
+	fn from(value: CodeTemplate) -> Self {
 		Self {
 			language: value.language,
 			source: value.source,

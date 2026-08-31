@@ -2,7 +2,7 @@ use crate::e;
 use crate::repo::problem::StoredProblem;
 use crate::{
 	app::{prelude::*, state::EstateState},
-	leetcode::{ListProblemsRequest, PageRequest},
+	leetcode::types::{ListProblemsRequest, PageRequest},
 	native::OracleView,
 	prelude::*,
 };

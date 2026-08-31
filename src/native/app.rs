@@ -3,8 +3,8 @@ use crate::{
 	app::{self, App, Runtime, model::EstateEngine},
 	e,
 	leetcode::{
-		Problem, problem_service_client::ProblemServiceClient,
-		submission_service_client::SubmissionServiceClient,
+		problem_service_client::ProblemServiceClient,
+		submission_service_client::SubmissionServiceClient, types::Problem,
 	},
 	native::{self, runtime::NativeRuntime, screens::*, *},
 	prelude::*,
