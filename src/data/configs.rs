@@ -8,8 +8,16 @@ use crate::{
 	ui::PanelConfig,
 };
 
+pub static START_VIEW: ViewType = ViewType::ProblemsScreen;
+pub static DEFAULT_VIEW: ViewType = ViewType::Markdown;
+// pub const DEFAULT_VIEWS = ProblemsScreen::new();
 pub static ESTATE_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub static HMR_CHART_JSON: &str = "/Users/future/kb/project/crates/estate/src/data/chart.json";
+// pub static GRPC_SOCKET: &str = "127.0.0.1:50051";
+pub const GRPC_SOCKET_CLIENT: &str = "http://127.0.0.1:50051";
+pub const GRPC_SOCKET: &str = "127.0.0.1:50051";
+pub static GRPC_PROBLEMS_PATH: &str = "src/data/problems";
+pub static GRPC_SUBMISSIONS_PATH: &str = "src/data/submissions";
 pub static MARKDOWN: &str = "/Users/future/kb/project/crates/estate/src/data/corpus.md";
 pub static HOME_DIR: &str = ".config/estate";
 pub static INDEX_PATH: &str = ".config/estate/master.json";
@@ -26,9 +34,9 @@ pub static STATE_PATH: &str = "/Users/future/Library/Application Support/estate/
 pub static TEMPLATE_PATH: &str = "/Users/future/KB/project/crates/estate/template";
 pub static WORKSPACE_SETTINGS: &str = ".estate/settings.json";
 
+pub static INITIAL_WINDOW: WindowType = WindowType::ProblemsScreen;
 // pub static INITIAL_WINDOW: WindowType = WindowType::Dashboard;
 // pub static INITIAL_WINDOW: WindowType = WindowType::TelemetryInspector;
-pub static INITIAL_WINDOW: WindowType = WindowType::TaskManager;
 // pub static INITIAL_WINDOW: WindowType = WindowType::EguiVeable;
 // pub static INITIAL_WINDOW: WindowType = WindowType::WaterfallChart;
 // pub static INITIAL_WINDOW: WindowType = WindowType::MarkdownView;

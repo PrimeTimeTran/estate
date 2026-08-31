@@ -115,8 +115,8 @@ impl<'a> NativeAppContext<'a> {
 	}
 }
 
-impl AppHost<NativeRuntime> for NativeApp {
-	fn app(&mut self) -> &mut App<NativeRuntime> {
-		&mut self.app
-	}
-}
+// impl AppHost<NativeRuntime> for NativeApp {
+// 	fn app(&mut self) -> &mut App<NativeRuntime> {
+// 		&mut self.app
+// 	}
+// }

@@ -13,6 +13,7 @@ pub enum WindowType {
 	TelemetryInspector,
 	TaskManager,
 	Markdown,
+	ProblemsScreen,
 }
 
 #[derive(Debug, Copy, Default, Clone, Hash, Deserialize, Serialize, Eq, PartialEq)]
@@ -24,6 +25,7 @@ pub enum ViewType {
 	MarkdownView,
 	#[default]
 	Markdown,
+	ProblemsScreen,
 }
 
 pub struct View {
@@ -38,19 +40,17 @@ impl fmt::Debug for View {
 }
 
 impl View {
-	pub fn new(kind: ViewType) -> Self {
+	pub fn new(kind: ViewType, api: Arc<ApiClient>) -> Self {
 		let content = match kind {
 			ViewType::Dashboard => Ve::new(Dashboard::new()),
 			ViewType::TaskManager => Ve::new(TaskManager::new()),
-			ViewType::MarkdownView => Ve::new(MarkdownView::new(crate::data::MARKDOWN)),
 			ViewType::WaterfallChart => Ve::new(WaterfallChart::new()),
-			// ViewType::TelemetryInspector => Ve::new(TelemetryInspectorView::new()),
-			_ => Ve::new(MarkdownView::new(crate::data::MARKDOWN)),
+			ViewType::ProblemsScreen => Ve::new(ProblemsScreen::new()),
+			ViewType::MarkdownView => Ve::new(MarkdownView::new(crate::MARKDOWN)),
+			_ => Ve::new(MarkdownView::new(crate::MARKDOWN)),
 		};
-
 		Self { kind, content }
 	}
-
 	pub fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, NativeRuntime>) {
 		self.content.draw(ui, ctx);
 	}

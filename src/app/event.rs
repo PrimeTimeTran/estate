@@ -38,8 +38,30 @@ impl Event {
 	}
 }
 
+use crate::services::repo::problem::StoredProblem;
+use crate::ui::leetcode::Problem as ProtoProblem;
+
+pub type Problem = ProtoProblem;
+
+#[derive(Debug, Clone, Hash, Deserialize, Serialize)]
+pub struct ProblemLoaded {
+	pub id: String,
+	pub title: String,
+	pub slug: String,
+}
+impl From<ProtoProblem> for ProblemLoaded {
+	fn from(problem: ProtoProblem) -> Self {
+		Self {
+			id: problem.id,
+			title: problem.title,
+			slug: problem.slug,
+		}
+	}
+}
+
 #[derive(Debug, Clone, Hash, Deserialize, Serialize)]
 pub enum EventKind {
+	ProblemsLoaded(Vec<StoredProblem>),
 	SessionStart,
 	SessionStop { session: Session },
 	WorkspaceIndexed { duration: u64 },
@@ -63,6 +85,8 @@ pub enum EventKind {
 	EstateRemoved { inode: Inode, path: String },
 	IndexUpdated { files_changed: u64 },
 	CacheInvalidated { reason: String },
+
+	ApiError(String),
 }
 #[derive(Debug, Clone, Deserialize, Hash, Serialize)]
 pub enum EventSource {

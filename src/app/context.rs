@@ -18,6 +18,12 @@ pub struct AppContext<'a, R: Runtime> {
 }
 
 impl<'a, R: Runtime> AppContext<'a, R> {
+	fn load_problems(&self) {
+		tracing::info!("Loading problems")
+	}
+}
+
+impl<'a, R: Runtime> AppContext<'a, R> {
 	pub fn state(&self) -> std::sync::RwLockReadGuard<'_, EstateState> {
 		self.app.state()
 	}

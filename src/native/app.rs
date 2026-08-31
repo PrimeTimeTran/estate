@@ -2,13 +2,17 @@ use crate::{
 	AppEvent, DaemonCommand,
 	app::{self, App, Runtime, model::EstateEngine},
 	e,
+	leetcode::{
+		Problem, problem_service_client::ProblemServiceClient,
+		submission_service_client::SubmissionServiceClient,
+	},
 	native::{self, runtime::NativeRuntime, screens::*, *},
 	prelude::*,
 	spawn_global_cursor_daemon,
-	ui::View,
-	ui::rendermd::MarkdownView,
+	ui::{View, rendermd::MarkdownView},
 };
 
+use tonic::transport::Channel;
 use tray_icon::{
 	TrayIcon, TrayIconBuilder,
 	menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu},
@@ -22,8 +26,9 @@ use winit::{
 };
 
 pub struct NativeApp {
-	pub app: App<NativeRuntime>,
+	pub app: Option<App<NativeRuntime>>,
 	pub windows: Vec<AppWindow>,
+	engine: EstateEngine<NativeRuntime>,
 	clock_running: Arc<AtomicBool>,
 	daemon_tx: mpsc::Sender<DaemonCommand>,
 	daemon_rx: Option<mpsc::Receiver<DaemonCommand>>,
@@ -36,14 +41,15 @@ pub struct NativeApp {
 	tray: Option<TrayIcon>,
 	view_type: ViewType,
 }
+type DaemonReady = (tokio::runtime::Handle, Arc<ApiClient>);
 impl NativeApp {
 	pub fn new() -> Result<Self> {
 		let (daemon_tx, daemon_rx) = mpsc::channel(100);
 		let runtime = NativeRuntime::new()?;
 		let engine = EstateEngine::new(runtime)?;
-		let app = App::new(engine)?;
 		Ok(Self {
-			app,
+			app: None,
+			engine,
 			clock_running: Arc::new(AtomicBool::new(true)),
 			daemon_rx: Some(daemon_rx),
 			daemon_tx,
@@ -54,7 +60,7 @@ impl NativeApp {
 			monitor: native::monitor::NativeMonitor::new()?,
 			scroll_tray: None,
 			tray: None,
-			view_type: ViewType::MarkdownView,
+			view_type: crate::START_VIEW,
 			windows: vec![],
 		})
 	}
@@ -66,7 +72,7 @@ impl NativeApp {
 				let runtime = tokio::runtime::Runtime::new()?;
 				runtime.block_on(async {
 					let ctx = cli::context::Context::new();
-					router::execute(cli, ctx, self.app.engine.clone()).await
+					router::execute(cli, ctx, self.engine.clone()).await
 				})
 			}
 		};
@@ -74,54 +80,68 @@ impl NativeApp {
 		result
 	}
 	fn start_runtime(&mut self) -> Result<()> {
-		tracing::debug!(">>> NativeApp::start_runtime start");
 		let daemon_rx = self.daemon_rx.take().expect("daemon already started");
-		let (ready_tx, ready_rx) = std::sync::mpsc::sync_channel(1);
-		Self::spawn_daemon(daemon_rx, Arc::clone(&self.app.engine.runtime), ready_tx);
-		ready_rx.recv().expect("daemon failed to initialize");
+		let (ready_tx, ready_rx) =
+			std::sync::mpsc::sync_channel::<Result<(tokio::runtime::Handle, Arc<ApiClient>)>>(1);
+		Self::spawn_daemon(daemon_rx, Arc::clone(&self.engine.runtime), ready_tx);
+		let (handle, api) = ready_rx.recv().expect("daemon failed to initialize")?;
+		let instance = App::new(self.engine.clone(), api, handle);
+		instance
+			.runtime()
+			.emit(e::Event::app(e::EventKind::SessionStart));
+		self.app = Some(instance);
 		self.spawn_global_hotkey_daemon()?;
+
 		let event_loop = EventLoop::<AppEvent>::with_user_event()
 			.with_activation_policy(ActivationPolicy::Regular)
 			.build()?;
-
+		// let event_loop = EventLoop::<AppEvent>::with_user_event().build()?;
 		if let Some(menu) = &self.menu_bar {
 			menu.init_for_nsapp();
 		}
-
 		let proxy = event_loop.create_proxy();
 
 		self.spawn_clock(proxy.clone());
 		self.spawn_cursor_daemon(proxy.clone());
 		self.spawn_signal_handler(proxy.clone());
 		self
-			.app
-			.runtime()
-			.emit(e::Event::app(app::EventKind::SessionStart));
+			.engine
+			.runtime
+			.emit(e::Event::app(e::EventKind::SessionStart));
+
 		event_loop.run_app(self)?;
+
 		tracing::info!(">>> NativeApp::start_runtime returning");
+
 		Ok(())
 	}
 	fn spawn_clock(&mut self, proxy: EventLoopProxy<AppEvent>) {
 		let running = Arc::clone(&self.clock_running);
-		let runtime = self.app.runtime();
+		let runtime = self.engine.runtime();
 		std::thread::spawn(move || {
-			let mut current_time = 5;
+			let mut current_time = 3;
 			let mut view_index = 0;
 			while running.load(Ordering::Relaxed) {
 				let views = [
 					ViewType::MarkdownView,
-					ViewType::TaskManager,
+					ViewType::ProblemsScreen,
 					ViewType::WaterfallChart,
+					ViewType::ProblemsScreen,
+					ViewType::TaskManager,
+					ViewType::ProblemsScreen,
 				];
 				let _ = proxy.send_event(AppEvent::TickClock(format!(" {}s", current_time)));
 				tracing::info!("tick {}", current_time);
 				if current_time == 0 {
-					tracing::info!("emit");
 					current_time = 5;
 					view_index = (view_index + 1) % views.len();
+
 					let view = views[view_index];
+
 					tracing::info!("⏩ Clock navigation → {:?}", view);
+
 					runtime.emit(e::Event::app(e::EventKind::Navigate(view)));
+					let _ = proxy.send_event(AppEvent::RuntimeEvent);
 				} else {
 					current_time -= 1;
 				}
@@ -139,13 +159,21 @@ impl NativeApp {
 	fn spawn_daemon(
 		mut rx: mpsc::Receiver<DaemonCommand>,
 		runtime: Arc<NativeRuntime>,
-		ready_tx: std::sync::mpsc::SyncSender<()>,
+		ready_tx: std::sync::mpsc::SyncSender<Result<(tokio::runtime::Handle, Arc<ApiClient>)>>,
 	) {
 		std::thread::spawn(move || {
 			let tokio_runtime = tokio::runtime::Runtime::new().expect("failed to create Tokio runtime");
 			tokio_runtime.block_on(async move {
 				runtime.start_dispatcher();
-				let _ = ready_tx.send(());
+				let api = match ApiClient::connect().await {
+					Ok(api) => Arc::new(api),
+					Err(error) => {
+						let _ = ready_tx.send(Err(error));
+						return;
+					}
+				};
+				let handle = tokio::runtime::Handle::current();
+				let _ = ready_tx.send(Ok((handle, api)));
 				let daemon: Daemon<NativeRuntime> = Daemon::new(runtime.clone());
 				let shutdown_token = daemon.shutdown_token.clone();
 				let daemon_task = tokio::spawn(async move {
@@ -155,7 +183,9 @@ impl NativeApp {
 				match rx.recv().await {
 					Some(DaemonCommand::Stop) => {
 						tracing::info!("daemon stop requested");
+
 						shutdown_token.cancel();
+
 						match daemon_task.await {
 							Ok(Ok(())) => {
 								tracing::info!("daemon stopped cleanly");
@@ -168,8 +198,10 @@ impl NativeApp {
 							}
 						}
 					}
+
 					None => {
 						tracing::info!("daemon command channel closed");
+
 						shutdown_token.cancel();
 						let _ = daemon_task.await;
 					}
@@ -209,7 +241,7 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 			self.menu_bar = Some(menu);
 		}
 		if self.windows.is_empty() {
-			self.open_window(event_loop, crate::data::INITIAL_WINDOW);
+			self.open_window(event_loop, crate::INITIAL_WINDOW);
 		}
 		if self.tray.is_none() {
 			let (menu, tray) = match Self::bootstrap() {
@@ -240,7 +272,14 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 		}
 	}
 	fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
-		self.app.update();
+		if let Some(app) = &mut self.app {
+			app.update();
+			// self
+			// 	.app
+			// 	.as_mut()
+			// 	.expect("app must be initialized before the event loop starts")
+			// 	.update();
+		}
 		while let Ok(event) = MenuEvent::receiver().try_recv() {
 			self.handle_event(event, event_loop);
 		}
@@ -278,19 +317,22 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 					return;
 				}
 				let menu = {
-					let event_rx = self.app.engine.runtime.subscribe();
-					let mut ctx = AppContext {
-						event_rx,
-						input: VeInputState::default(),
-						app: &mut self.app,
-						last_revision: 0,
-					};
-					if let Err(e) = window.window.draw(&mut ctx) {
-						tracing::error!("DEV >>> draw failed: {e:#}");
+					let event_rx = self.engine.runtime.subscribe();
+					if let Some(app) = self.app.as_mut() {
+						let event_rx = self.engine.runtime.subscribe();
+
+						let mut ctx = AppContext {
+							app,
+							input: VeInputState::default(),
+							event_rx,
+							last_revision: 0,
+						};
+
+						if let Err(e) = window.window.draw(&mut ctx) {
+							tracing::error!("DEV >>> draw failed: {e:#}");
+						}
 					}
-					// Self::menu_bar(&mut ctx)
 				};
-				// self.set_menu_bar(menu);
 			}
 			WindowEvent::Focused(true) => {
 				window.window.instance.request_redraw();
@@ -319,14 +361,22 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 	}
 	fn user_event(&mut self, event_loop: &ActiveEventLoop, event: AppEvent) {
 		match event {
+			AppEvent::RuntimeEvent => {
+				tracing::info!("🔄 Runtime event");
+				if let Some(app) = &mut self.app {
+					app.update();
+				}
+			}
+
 			AppEvent::Navigate(view) => {
 				self
-					.app
-					.runtime()
+					.engine
+					.runtime
 					.emit(e::Event::app(e::EventKind::Navigate(view)));
-				self.app.update();
+				if let Some(app) = &mut self.app {
+					app.update();
+				}
 				for window in &mut self.windows {
-					// window.window.set_view(view);
 					window.window.instance.request_redraw();
 				}
 			}
@@ -357,7 +407,11 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 				if let Some(tray) = &self.tray {
 					let _ = tray.set_title(Some(text));
 				}
-				self.app.update();
+				self
+					.app
+					.as_mut()
+					.expect("app must be initialized before the event loop starts")
+					.update();
 				self.sync_views();
 			}
 			AppEvent::ModifiersChanged {
@@ -366,13 +420,6 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 				ctrl,
 				shift,
 			} => {}
-			// AppEvent::AppEvent => {
-			// 	let view = self.app.view();
-			// 	for window in &mut self.windows {
-			// 		window.window.set_view(WindowType::Markdown);
-			// 		window.window.instance.request_redraw();
-			// 	}
-			// }
 			_ => {}
 		}
 	}
@@ -400,6 +447,15 @@ impl NativeApp {
 			self.show_tasks();
 		} else if id == menu.clear_tasks.id() {
 			self.clear_tasks();
+		} else if id == menu.problem_screen.id() {
+			tracing::info!("🧭 Menu → ProblemsScreen");
+			self
+				.engine
+				.runtime
+				.emit(e::Event::app(e::EventKind::Navigate(
+					ViewType::ProblemsScreen,
+				)));
+			self.open_window(event_loop, WindowType::ProblemsScreen);
 		}
 	}
 	fn bootstrap() -> Result<(TrayMenu, TrayIcon)> {
@@ -412,21 +468,26 @@ impl NativeApp {
 		if self.window_by_type(kind).is_some() {
 			return;
 		}
-		match Window::new(event_loop, self.view_type.clone()) {
-			Ok(window) => {
-				window.instance.set_title("Hi there Loi");
-				self.windows.push(AppWindow {
-					kind: WindowType::from(WindowType::Markdown),
-					window,
-				});
-			}
+		// let api = self.app.api().expect("Failure to connect");
+		// let api = self.app.api();
+		if let Some(app) = self.app.as_mut() {
+			let api = app.api();
+			match Window::new(event_loop, self.view_type.clone(), api) {
+				Ok(window) => {
+					window.instance.set_title("Hi there Loi");
+					self.windows.push(AppWindow {
+						kind: WindowType::from(WindowType::Markdown),
+						window,
+					});
+				}
 
-			Err(error) => {
-				tracing::error!(
-						?self.view_type,
-						%error,
-						"failed to create window"
-				);
+				Err(error) => {
+					tracing::error!(
+							?self.view_type,
+							%error,
+							"failed to create window"
+					);
+				}
 			}
 		}
 	}
@@ -434,7 +495,6 @@ impl NativeApp {
 impl NativeApp {
 	fn new_task(&mut self) {
 		self
-			.app
 			.engine
 			.runtime
 			.emit(e::Event::app(e::EventKind::TaskRequested {
@@ -443,7 +503,6 @@ impl NativeApp {
 	}
 	fn show_tasks(&mut self) {
 		self
-			.app
 			.engine
 			.runtime
 			.emit(e::Event::app(e::EventKind::CommandExecuted {
@@ -452,12 +511,15 @@ impl NativeApp {
 	}
 	fn clear_tasks(&mut self) {
 		self
-			.app
 			.engine
 			.runtime
 			.emit(e::Event::app(e::EventKind::CommandExecuted {
 				command: "task_clear".into(),
 			}));
+	}
+	async fn connect(&mut self, path: &Path) -> Result<ProblemServiceClient<Channel>> {
+		let client = ProblemServiceClient::connect(crate::data::GRPC_SOCKET_CLIENT).await?;
+		Ok(client)
 	}
 	#[tracing::instrument(
 		target = "estate::discovery",
@@ -465,6 +527,7 @@ impl NativeApp {
 		skip(self),
 		fields(flow_id = %Uuid::new_v4())
 	)]
+
 	async fn _scan_workspace(&mut self, path: &Path) -> Result<()> {
 		tracing::info!("starting workspace scan");
 		self._discover(path).await?;
@@ -494,21 +557,31 @@ impl NativeApp {
 
 impl NativeApp {
 	fn sync_views(&mut self) {
-		let view_type = self.app.view();
 		for window in &mut self.windows {
-			window.window.sync_view(view_type);
-			window.window.instance.request_redraw();
+			if let Some(app) = self.app.as_mut() {
+				let view_type = app.view();
+				let api = app.api();
+				window.window.sync_view(view_type, api);
+				window.window.instance.request_redraw();
+			}
 		}
 	}
 	fn set_view(&mut self, view_type: ViewType) {
 		self.view_type = view_type;
 	}
+
 	fn change_view(&self, view_type: ViewType) -> Ve<NativeRuntime> {
+		let app = self
+			.app
+			.as_ref()
+			.expect("app must be initialized before changing views");
+
 		match view_type {
-			ViewType::MarkdownView => Ve::new(MarkdownView::new(crate::data::MARKDOWN)),
+			ViewType::MarkdownView => Ve::new(MarkdownView::new(crate::MARKDOWN)),
 			ViewType::TaskManager => Ve::new(TaskManager::new()),
 			ViewType::WaterfallChart => Ve::new(OracleView::new()),
-			_ => Ve::new(MarkdownView::new(crate::data::MARKDOWN)),
+			ViewType::ProblemsScreen => Ve::new(ProblemsScreen::new()),
+			_ => app.default_view(),
 		}
 	}
 	fn set_menu_bar(&mut self, new_menu: Menu) {
@@ -707,3 +780,30 @@ fn create_menu() -> Menu {
 // 		items: Vec<MenuEntry>,
 // 	},
 // }
+
+#[derive(Debug, Clone)]
+pub struct ApiClient {
+	pub problems: ProblemServiceClient<Channel>,
+	pub submissions: SubmissionServiceClient<Channel>,
+}
+impl ApiClient {
+	pub async fn connect() -> anyhow::Result<Self> {
+		let channel = Channel::from_static(crate::data::GRPC_SOCKET_CLIENT)
+			.connect()
+			.await?;
+
+		Ok(Self {
+			problems: ProblemServiceClient::new(channel.clone()),
+			submissions: SubmissionServiceClient::new(channel),
+		})
+	}
+}
+
+use crate::services::repo::problem::StoredProblem;
+
+#[derive(Debug, Default)]
+pub struct AppState {
+	pub problems: Vec<StoredProblem>,
+	pub problems_loading: bool,
+	pub problems_error: Option<String>,
+}

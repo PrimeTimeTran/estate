@@ -1,41 +1,121 @@
+use crate::e;
+use crate::repo::problem::StoredProblem;
 use crate::{
 	app::{prelude::*, state::EstateState},
+	leetcode::{ListProblemsRequest, PageRequest},
+	native::OracleView,
 	prelude::*,
 };
 
-use crate::e;
-
 pub struct App<R: Runtime> {
-	pub(crate) engine: model::EstateEngine<R>,
+	pub(crate) engine: EstateEngine<R>,
 	pub(crate) view: ViewType,
+	pub(crate) api: Arc<ApiClient>,
+	pub(crate) handle: tokio::runtime::Handle,
+	pub(crate) state: AppState,
 	events: tokio::sync::broadcast::Receiver<e::Event>,
 }
 impl<R: Runtime> App<R> {
-	pub(crate) fn new(engine: model::EstateEngine<R>) -> Result<Self> {
+	pub fn new(engine: EstateEngine<R>, api: Arc<ApiClient>, handle: tokio::runtime::Handle) -> Self {
 		let events = engine.runtime.subscribe();
-
-		Ok(Self {
+		Self {
+			api,
 			engine,
 			events,
-			view: ViewType::MarkdownView,
-		})
+			handle,
+			state: AppState::default(),
+			view: crate::START_VIEW,
+		}
+	}
+	pub fn initialize(&mut self, api: Arc<ApiClient>, handle: tokio::runtime::Handle) {
+		self.api = api;
+		self.handle = handle;
+	}
+	pub fn runtime(&self) -> Arc<R> {
+		Arc::clone(&self.engine.runtime)
+	}
+	pub fn set_api(&mut self, api: Arc<ApiClient>) {
+		self.api = api;
+	}
+	pub fn set_tokio(&mut self, handle: tokio::runtime::Handle) {
+		self.handle = handle;
+	}
+	pub fn api(&self) -> Arc<ApiClient> {
+		Arc::clone(&self.api)
 	}
 	pub fn update(&mut self) {
 		while let Ok(event) = self.events.try_recv() {
-			tracing::info!("🧭 App received update");
+			tracing::info!("update;");
 			match event.kind {
-				e::EventKind::Navigate(view_type) => {
-					tracing::info!("🧭 App received Navigate → {:?}", view_type);
-					self.view = view_type;
+				e::EventKind::Navigate(view) => {
+					self.view = view;
+				}
+				e::EventKind::ProblemsLoaded(problems) => {
+					self.state.problems = problems;
+					self.state.problems_loading = false;
+					self.state.problems_error = None;
+				}
+				e::EventKind::ApiError(error) => {
+					self.state.problems_loading = false;
+					self.state.problems_error = Some(error);
 				}
 				_ => {}
 			}
 		}
 	}
-	pub fn runtime(&self) -> Arc<R> {
-		Arc::clone(&self.engine.runtime)
+	pub fn spawn<F>(&self, future: F)
+	where
+		F: Future<Output = ()> + Send + 'static,
+	{
+		self.handle.spawn(future);
 	}
 }
+impl<R: Runtime + 'static> App<R> {
+	pub fn load_problems(&mut self) {
+		if self.state.problems_loading {
+			return;
+		}
+
+		self.state.problems_loading = true;
+		self.state.problems_error = None;
+
+		let api = Arc::clone(&self.api);
+		let events = self.engine.runtime.clone();
+
+		self.handle.spawn(async move {
+			let mut client = api.problems.clone();
+
+			let result = client
+				.list_problems(ListProblemsRequest {
+					tags: vec![],
+					search: String::new(),
+					published_only: None,
+					page: Some(PageRequest {
+						page: 0,
+						page_size: 100,
+					}),
+					difficulty: None,
+				})
+				.await;
+			match result {
+				Ok(response) => {
+					let problems = response
+						.into_inner()
+						.problems
+						.into_iter()
+						.map(StoredProblem::from)
+						.collect();
+					tracing::info!("ProblemsLoaded");
+					events.emit(e::Event::app(e::EventKind::ProblemsLoaded(problems)));
+				}
+				Err(error) => {
+					events.emit(e::Event::app(e::EventKind::ApiError(error.to_string())));
+				}
+			}
+		});
+	}
+}
+
 impl<R: Runtime> App<R> {
 	pub fn state(&self) -> std::sync::RwLockReadGuard<'_, EstateState> {
 		self.engine.runtime.state().read()
@@ -73,6 +153,18 @@ impl<R: Runtime> App<R> {
 }
 
 impl<R: Runtime> App<R> {
+	pub fn app_state(&self) -> &AppState {
+		&self.state
+	}
+	pub fn get_view(&self, view_type: ViewType) -> Ve<R> {
+		match view_type {
+			ViewType::MarkdownView => Ve::new(MarkdownView::new(crate::MARKDOWN)),
+			_ => self.default_view(),
+		}
+	}
+	pub fn default_view(&self) -> Ve<R> {
+		Ve::new(MarkdownView::new(crate::MARKDOWN))
+	}
 	pub fn view(&self) -> ViewType {
 		self.view
 	}

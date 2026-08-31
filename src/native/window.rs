@@ -35,7 +35,42 @@ pub struct Window {
 	view: ui::View,
 }
 impl Window {
-	pub fn new(event_loop: &ActiveEventLoop, view_type: ViewType) -> Result<Self> {
+	pub fn new(
+		event_loop: &ActiveEventLoop,
+		view_type: ViewType,
+		api: Arc<ApiClient>,
+		// api: Option<Arc<ApiClient>>,
+	) -> Result<Self> {
+		let (gui_ctx, gui_state) = build_egui(event_loop);
+		let (window, instance, surface) = create_gpu_surface(event_loop)?;
+		let (adapter, device, queue) = initialize_gpu(&instance, &surface)?;
+		let size = window.inner_size();
+		let (config, renderer) = build_renderer(&surface, adapter, &device, size)?;
+		Ok(Self {
+			config,
+			view: ui::View::new(view_type, api),
+			device,
+			kind: WindowType::Markdown,
+			gui_ctx,
+			gui_state,
+			instance: window,
+			needs_resize: false,
+			occluded: true,
+			pending_textures: gui::TexturesDelta::default(),
+			queue,
+			renderer,
+			surface,
+		})
+	}
+
+	pub fn set_view(&mut self, kind: WindowType)
+	// V: Veable<NativeRuntime> + 'static,
+	{
+		self.kind = kind;
+		// self.view = Ve::new(view);
+	}
+	fn egui_view(&mut self, ctx: &egui::Context) {
+		todo!("");
 		doc!(
 			r#"
      	Estate UI Container
@@ -101,35 +136,6 @@ impl Window {
      	9.output merger
    	"#
 		);
-		let (gui_ctx, gui_state) = build_egui(event_loop);
-		let (window, instance, surface) = create_gpu_surface(event_loop)?;
-		let (adapter, device, queue) = initialize_gpu(&instance, &surface)?;
-		let size = window.inner_size();
-		let (config, renderer) = build_renderer(&surface, adapter, &device, size)?;
-		Ok(Self {
-			config,
-			view: ui::View::new(view_type),
-			device,
-			kind: WindowType::Markdown,
-			gui_ctx,
-			gui_state,
-			instance: window,
-			needs_resize: false,
-			occluded: true,
-			pending_textures: gui::TexturesDelta::default(),
-			queue,
-			renderer,
-			surface,
-		})
-	}
-	pub fn set_view(&mut self, kind: WindowType)
-	// V: Veable<NativeRuntime> + 'static,
-	{
-		self.kind = kind;
-		// self.view = Ve::new(view);
-	}
-	fn egui_view(&mut self, ctx: &egui::Context) {
-		todo!("")
 	}
 	fn dashboard(&mut self, ctx: &egui::Context) {
 		todo!("")
@@ -291,7 +297,7 @@ impl Window {
 }
 
 impl Window {
-	pub fn sync_view(&mut self, view_type: ViewType) {
+	pub fn sync_view(&mut self, view_type: ViewType, api: Arc<ApiClient>) {
 		if self.view.kind != view_type {
 			tracing::info!(
 				"🖼️ Window view change: {:?} → {:?}",
@@ -299,7 +305,7 @@ impl Window {
 				view_type
 			);
 
-			self.view = ui::View::new(view_type);
+			self.view = ui::View::new(view_type, api);
 		}
 	}
 }
@@ -799,6 +805,7 @@ pub struct TrayMenu {
 	pub quit: MenuItem,
 	pub status: MenuItem,
 	pub task_manager: MenuItem,
+	pub problem_screen: MenuItem,
 	pub tasks: Submenu,
 	pub telemetry: MenuItem,
 }

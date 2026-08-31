@@ -59,6 +59,9 @@ impl<R: Runtime> EstateEngine<R> {
 	pub fn session(&mut self) -> Session {
 		self.runtime.session()
 	}
+	pub fn runtime(&self) -> Arc<R> {
+		Arc::clone(&self.runtime)
+	}
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]

@@ -30,6 +30,7 @@ pub fn bootstrap() -> Result<(TrayMenu, TrayIcon)> {
 	let dev = MenuItem::new("Dashboard", true, None);
 	let telemetry = MenuItem::new("Telemetry", true, None);
 	let task_manager = MenuItem::new("Task Manager", true, None);
+	let problem_screen = MenuItem::new("Problems", true, None);
 	let new_task = MenuItem::new("New Task", true, None);
 	let list_tasks = MenuItem::new("List Tasks", true, None);
 	let clear_tasks = MenuItem::new("Clear Tasks", true, None);
@@ -57,6 +58,7 @@ pub fn bootstrap() -> Result<(TrayMenu, TrayIcon)> {
 			clear_tasks,
 			dev,
 			list_tasks,
+			problem_screen,
 			new_task,
 			quit,
 			status,

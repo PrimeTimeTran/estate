@@ -1,20 +1,66 @@
 use std::net::SocketAddr;
 
-use estate::proto::leetcode::problem_service_server::ProblemServiceServer;
-use estate::repo::json::problem::JsonProblemRepository;
-use estate::services::problem::ProblemServiceImpl;
+use estate::{
+	proto::leetcode::{
+		problem_service_server::ProblemServiceServer,
+		submission_service_server::SubmissionServiceServer,
+	},
+	repo::{
+		json::{problem::JsonProblemRepository, submission::JsonSubmissionRepository},
+		problem::{ProblemQuery, ProblemRepository},
+	},
+	services::{problem::ProblemServiceImpl, submission::SubmissionServiceImpl},
+};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-	let addr: SocketAddr = "127.0.0.1:50051".parse()?;
-	// let repository = JsonProblemRepository::new("./problems");
-	let repository = JsonProblemRepository::new("src/data/problems");
-	let problem = repository.load("two-sum").await?;
-	println!("problem {:?}", problem);
-	let service = ProblemServiceImpl::new(repository);
+	tracing_subscriber::fmt::init();
+	let addr: SocketAddr = estate::data::GRPC_SOCKET.parse()?;
+	// Repositories
+	let problem_repository = JsonProblemRepository::new(estate::data::GRPC_PROBLEMS_PATH);
+	let page = problem_repository
+		.list(ProblemQuery {
+			page: Some(0),
+			page_size: Some(1),
+			difficulty: None,
+		})
+		.await?;
+	println!("📚 Problems available: {}", page.total);
+	let submission_repository = JsonSubmissionRepository::new(estate::data::GRPC_SUBMISSIONS_PATH);
+
+	// Services
+	let problem_service = ProblemServiceImpl::new(problem_repository);
+
+	let submission_service = SubmissionServiceImpl::new(submission_repository);
+
+	// Server
+	println!("API listening on {addr}");
+
 	tonic::transport::Server::builder()
-		.add_service(ProblemServiceServer::new(service))
+		.add_service(ProblemServiceServer::new(problem_service))
+		.add_service(SubmissionServiceServer::new(submission_service))
 		.serve(addr)
 		.await?;
+
 	Ok(())
 }
+
+pub struct App {
+	pub problems: JsonProblemRepository,
+	pub submissions: JsonSubmissionRepository,
+}
+
+// let app = App {
+// 	problems: JsonProblemRepository::new("src/data/problems"),
+// 	submissions: JsonSubmissionRepository::new("src/data/submissions"),
+// };
+
+// tonic::transport::Server::builder()
+// 	.add_service(ProblemServiceServer::new(
+// 		ProblemServiceImpl::new(app.problems),
+// 	))
+// 	.add_service(SubmissionServiceServer::new(
+// 		SubmissionServiceImpl::new(app.submissions),
+// 	))
+// 	.serve(addr)
+// 	.await?;
