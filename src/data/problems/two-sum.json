@@ -1,6 +1,14 @@
 {
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "number": 1,
   "title": "Two Sum",
   "slug": "two-sum",
+  "description": "",
+  "difficulty": 0,
+  "tags": [],
+  "examples": [],
+  "constraints": [],
+  "code_templates": [],
   "test_cases": {
     "rust": [
       {
@@ -44,5 +52,8 @@
         "expected": "[0, 1]"
       }
     ]
-  }
+  },
+  "is_published": true,
+  "created_at": null,
+  "updated_at": null
 }
