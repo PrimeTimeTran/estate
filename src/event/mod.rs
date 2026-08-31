@@ -1,4 +1,4 @@
-use crate::native::prelude::*;
+use crate::{app::event as app_event, native::prelude::*};
 
 pub(crate) mod channel;
 pub(crate) mod handler;
@@ -6,7 +6,7 @@ pub(crate) use handler::EventHandler;
 
 #[derive(Debug, Clone)]
 pub struct EventBus {
-	sender: broadcast::Sender<Event>,
+	sender: broadcast::Sender<app_event::Event>,
 }
 impl std::hash::Hash for EventBus {
 	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
@@ -23,7 +23,7 @@ impl EventBus {
 		let (sender, _) = broadcast::channel(256);
 		Self { sender }
 	}
-	pub fn emit(&self, event: Event) {
+	pub fn emit(&self, event: app_event::Event) {
 		match self.sender.send(event.clone()) {
 			Ok(count) => {
 				tracing::debug!("📡 Event emitted: {:?} → {} receiver(s)", event.kind, count);
@@ -33,7 +33,7 @@ impl EventBus {
 			}
 		}
 	}
-	pub fn subscribe(&self) -> broadcast::Receiver<Event> {
+	pub fn subscribe(&self) -> broadcast::Receiver<app_event::Event> {
 		self.sender.subscribe()
 	}
 }
@@ -57,12 +57,12 @@ impl EventDispatcher {
 	{
 		self.handlers.push(Box::new(handler));
 	}
-	pub async fn run(self, mut rx: broadcast::Receiver<Event>, runtime: NativeRuntime) {
+	pub async fn run(self, mut rx: broadcast::Receiver<app_event::Event>, runtime: NativeRuntime) {
 		while let Ok(event) = rx.recv().await {
 			self.dispatch(event, &runtime).await;
 		}
 	}
-	pub async fn dispatch(&self, event: Event, runtime: &NativeRuntime) {
+	pub async fn dispatch(&self, event: app_event::Event, runtime: &NativeRuntime) {
 		for handler in &self.handlers {
 			handler.handle(&event, runtime).await;
 		}

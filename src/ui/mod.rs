@@ -5,6 +5,7 @@ pub(crate) mod screen;
 
 pub mod ve;
 
+pub use crate::ui::rendermd::*;
 pub use crate::ui::screen::*;
 pub use crate::ui::ve::*;
 pub use crate::{prelude::*, ui::palette::*};

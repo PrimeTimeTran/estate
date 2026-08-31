@@ -93,6 +93,7 @@ impl Runtime for NativeRuntime {
 	fn session(&self) -> Session {
 		self.session.clone()
 	}
+
 	fn subscribe(&self) -> broadcast::Receiver<Event> {
 		self.events.subscribe()
 	}

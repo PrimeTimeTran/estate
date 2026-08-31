@@ -1,6 +1,6 @@
 use crate::{
 	AppEvent, DaemonCommand,
-	app::{self, App, Runtime, model::EstateEngine},
+	app::{self, App, Runtime, event as app_event, model::EstateEngine},
 	native::{self, runtime::NativeRuntime, screens::*, *},
 	prelude::*,
 	spawn_global_cursor_daemon,
@@ -91,7 +91,7 @@ impl NativeApp {
 		self
 			.app
 			.runtime()
-			.emit(Event::app(app::EventKind::SessionStart));
+			.emit(app_event::Event::app(app::EventKind::SessionStart));
 		event_loop.run_app(self)?;
 		tracing::info!(">>> NativeApp::start_runtime returning");
 		Ok(())
@@ -403,7 +403,7 @@ impl NativeApp {
 			.app
 			.engine
 			.runtime
-			.emit(Event::app(app::EventKind::TaskRequested {
+			.emit(app_event::Event::app(app::EventKind::TaskRequested {
 				request: TaskRequest::Create(TaskKind::SyncBookmarks),
 			}));
 	}
@@ -412,7 +412,7 @@ impl NativeApp {
 			.app
 			.engine
 			.runtime
-			.emit(Event::app(app::EventKind::CommandExecuted {
+			.emit(app_event::Event::app(app::EventKind::CommandExecuted {
 				command: "task_list".into(),
 			}));
 	}
@@ -421,7 +421,7 @@ impl NativeApp {
 			.app
 			.engine
 			.runtime
-			.emit(Event::app(app::EventKind::CommandExecuted {
+			.emit(app_event::Event::app(app::EventKind::CommandExecuted {
 				command: "task_clear".into(),
 			}));
 	}

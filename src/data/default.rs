@@ -1,3 +1,7 @@
+use std::sync::atomic::AtomicU64;
+
+pub static EVENT_ID: AtomicU64 = AtomicU64::new(1);
+
 pub fn master() -> serde_json::Value {
 	serde_json::json!({
 		"cache": {

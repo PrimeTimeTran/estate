@@ -10,6 +10,7 @@ pub struct AppContext<'a, R: Runtime> {
 
 	#[cfg(not(target_arch = "wasm32"))]
 	pub input: VeInputState,
+	#[cfg(not(target_arch = "wasm32"))]
 	pub event_rx: broadcast::Receiver<Event>,
 }
 
@@ -27,6 +28,7 @@ impl<'a, R: Runtime> AppContext<'a, R> {
 			false
 		}
 	}
+	#[cfg(not(target_arch = "wasm32"))]
 	pub fn next_event(&mut self) -> Option<Event> {
 		match self.event_rx.try_recv() {
 			Ok(event) => Some(event),

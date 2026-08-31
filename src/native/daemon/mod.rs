@@ -93,7 +93,7 @@ pub use lint::*;
 pub use shell::*;
 
 use crate::{
-	app::{Runtime, event, state::EstateState, task, *},
+	app::{Runtime, event as app_event, state::EstateState, task, *},
 	native::{daemon::DocCompiler, prelude::*, runtime::NativeRuntime},
 	prelude::*,
 };
@@ -189,14 +189,14 @@ impl<R: Runtime> Daemon<R> {
 		let pid = std::process::id();
 		Self::write_pid(pid)?;
 		tracing::info!(pid, "[Daemon] Foreground run");
-		self
-			.runtime
-			.emit(Event::daemon(event::EventKind::DaemonStarted));
+		self.runtime.emit(app_event::Event::daemon(
+			app_event::EventKind::DaemonStarted,
+		));
 		self.shutdown_token.cancelled().await;
 		tracing::info!(pid, "[Daemon] Foreground stop");
-		self
-			.runtime
-			.emit(Event::daemon(event::EventKind::DaemonStopped));
+		self.runtime.emit(app_event::Event::daemon(
+			app_event::EventKind::DaemonStopped,
+		));
 		Ok(())
 	}
 
@@ -402,7 +402,7 @@ pub struct DaemonHandle {
 	runtime: NativeRuntime,
 }
 impl DaemonHandle {
-	pub fn emit(&self, event: Event) {
+	pub fn emit(&self, event: app_event::Event) {
 		self.runtime.emit(event);
 	}
 }

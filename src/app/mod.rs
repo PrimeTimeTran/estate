@@ -6,12 +6,12 @@
 
 pub(crate) mod app;
 pub(crate) mod context;
-pub(crate) mod event;
+pub mod event;
 pub(crate) mod host;
 pub(crate) mod job;
 pub(crate) mod model;
 pub(crate) mod modules;
-// pub mod servicesx;
+pub mod prelude;
 pub(crate) mod session;
 pub(crate) mod state;
 pub(crate) mod task;

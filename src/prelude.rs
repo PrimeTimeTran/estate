@@ -4,14 +4,21 @@ pub use crate::{
 		modules::{Runtime, RuntimeState},
 		*,
 	},
-	data::*,
-	event::*,
+	// data::*,
+	// event::*,
 	proto::*,
 	share::{prelude::*, *},
 	theme::*,
 	tool::{time::*, *},
 	ui::{ve::*, *},
 };
+
+#[path = "./app/event.rs"]
+pub mod event;
+use event::*;
+
+#[cfg(not(target_arch = "wasm32"))]
+pub use crate::{data::*, event::*};
 
 // #[cfg(not(target_arch = "wasm32"))]
 // use crate::event::*;
@@ -36,5 +43,3 @@ pub use std::{
 	time::{Instant, SystemTime},
 };
 pub use uuid::Uuid;
-// use std::path::Path;
-// use tokio::sync::mpsc;

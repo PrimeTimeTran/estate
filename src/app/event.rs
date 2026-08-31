@@ -3,7 +3,7 @@ pub use crate::{app::*, prelude::*};
 // Collision on event::* it seems
 // must leave pub prefix or it breaks other places
 #[derive(Debug, Clone, Deserialize, Hash, Serialize)]
-pub struct Event {
+pub(crate) struct Event {
 	pub id: u64,
 	pub kind: EventKind,
 	pub source: EventSource,
@@ -51,7 +51,7 @@ impl Event {
 		// let mut flow = trace.flow("new");
 		// let flow = flow.info("Event::new").unwrap();
 		Self {
-			id: EVENT_ID.fetch_add(1, Ordering::Relaxed),
+			id: crate::data::EVENT_ID.fetch_add(1, Ordering::Relaxed),
 			kind,
 			source,
 			timestamp: crate::util::now(),

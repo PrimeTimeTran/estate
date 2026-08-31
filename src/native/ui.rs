@@ -15,7 +15,7 @@ use tray_icon::{
 use winit::event_loop::EventLoopProxy;
 
 use crate::{
-	app::{Runtime, event::EventKind, state::EstateState, *},
+	app::{Runtime, event as app_event, event::EventKind, state::EstateState, *},
 	native::{prelude::*, *},
 	ui::*,
 };
@@ -933,7 +933,7 @@ impl<R: Runtime> Veable<R> for Sidebar {
 								.app
 								.engine
 								.runtime
-								.emit(Event::app(EventKind::SessionStop {
+								.emit(app_event::Event::app(EventKind::SessionStop {
 									session: ctx.app.engine.runtime.session(),
 								}));
 						}

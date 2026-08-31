@@ -1,14 +1,18 @@
 #![allow(warnings)]
 pub mod app;
+#[path = "./app/event.rs"]
+pub mod app_event;
+use app_event::*;
+
 pub mod helpers;
 pub mod prelude;
 pub mod proto;
-pub mod services;
-pub use services::*;
+
 pub mod share;
 pub mod theme;
 pub mod tool;
 pub mod ui;
+use ui::*;
 pub mod util;
 
 #[cfg(feature = "web")]
@@ -22,6 +26,11 @@ pub mod mobile;
 // pub mod lib_native;
 // #[cfg(feature = "native")]
 // pub use lib_native::*;
+//
+#[cfg(feature = "native")]
+pub mod services;
+#[cfg(feature = "native")]
+pub use services::*;
 
 #[cfg(feature = "native")]
 pub mod native;
@@ -29,6 +38,10 @@ pub mod native;
 use native::*;
 
 #[cfg(feature = "native")]
+pub mod data;
+
+#[cfg(feature = "web")]
+#[path = "./data/default.rs"]
 pub mod data;
 
 // So thats why we do it individually here.

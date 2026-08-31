@@ -1,11 +1,14 @@
-pub use crate::{app::*, native::prelude::*};
+pub use crate::app::{event as app_event, *};
+
+#[cfg(not(target_arch = "wasm32"))]
+pub use crate::native::prelude::*;
 
 use crate::theme::palette;
 
 pub trait Veable<R: Runtime> {
 	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>);
 	fn update(&mut self, _ctx: &mut AppContext<'_, R>) {}
-	fn event(&mut self, _event: &Event, _ctx: &mut AppContext<'_, R>) {}
+	fn event(&mut self, _event: &app_event::Event, _ctx: &mut AppContext<'_, R>) {}
 }
 
 pub struct Ve<R: Runtime> {

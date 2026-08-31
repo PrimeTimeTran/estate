@@ -13,18 +13,21 @@
 #[cfg(target_arch = "wasm32")]
 mod wasm {
 	use eframe::{WebOptions, WebRunner};
-	use estate::{ui::ve::*, web::bridge::*};
+	use estate::{
+		ui::{ve::*, *},
+		web::bridge::*,
+	};
 	use wasm_bindgen::{JsCast, prelude::*};
 
 	struct WebApp {
-		graphics: Graphics,
+		graphics: MarkdownView,
 	}
 
 	impl eframe::App for WebApp {
 		fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-			egui::CentralPanel::default().show(ui, |ui| {
-				self.graphics.draw(ui);
-			});
+			// egui::CentralPanel::default().show(ui, |ui| {
+			// 	self.graphics.draw(ui);
+			// });
 		}
 	}
 
@@ -57,7 +60,11 @@ mod wasm {
 						log("🔥 EFRAME APP CREATOR RUNNING");
 
 						Ok(Box::new(WebApp {
-							graphics: Graphics::new(),
+							graphics: MarkdownView::new(
+								"/Users/future/kb/project/crates/estate/src/data/corpus.md",
+							), // graphics: Ve::new(MarkdownView::new(
+							   // 	"/Users/future/kb/project/crates/estate/src/data/corpus.md",
+							   // )),
 						}))
 					}),
 				)
