@@ -93,7 +93,8 @@ pub use lint::*;
 pub use shell::*;
 
 use crate::{
-	app::{Runtime, event as app_event, state::EstateState, task, *},
+	app::{Runtime, state::EstateState, task, *},
+	e,
 	native::{daemon::DocCompiler, prelude::*, runtime::NativeRuntime},
 	prelude::*,
 };
@@ -189,14 +190,14 @@ impl<R: Runtime> Daemon<R> {
 		let pid = std::process::id();
 		Self::write_pid(pid)?;
 		tracing::info!(pid, "[Daemon] Foreground run");
-		self.runtime.emit(app_event::Event::daemon(
-			app_event::EventKind::DaemonStarted,
-		));
+		self
+			.runtime
+			.emit(e::Event::daemon(e::EventKind::DaemonStarted));
 		self.shutdown_token.cancelled().await;
 		tracing::info!(pid, "[Daemon] Foreground stop");
-		self.runtime.emit(app_event::Event::daemon(
-			app_event::EventKind::DaemonStopped,
-		));
+		self
+			.runtime
+			.emit(e::Event::daemon(e::EventKind::DaemonStopped));
 		Ok(())
 	}
 
@@ -402,7 +403,7 @@ pub struct DaemonHandle {
 	runtime: NativeRuntime,
 }
 impl DaemonHandle {
-	pub fn emit(&self, event: app_event::Event) {
+	pub fn emit(&self, event: e::Event) {
 		self.runtime.emit(event);
 	}
 }
@@ -464,6 +465,8 @@ impl AnalyzeDaemon {
 		Ok(workspace)
 	}
 }
+
+#[derive(Clone, Copy)]
 pub enum AnalysisRequest {
 	AnalyzeWorkspace,
 }

@@ -1,6 +1,5 @@
 pub use crate::{app::*, prelude::*};
 
-// Collision on event::* it seems
 // must leave pub prefix or it breaks other places
 #[derive(Debug, Clone, Deserialize, Hash, Serialize)]
 pub(crate) struct Event {
@@ -9,41 +8,6 @@ pub(crate) struct Event {
 	pub source: EventSource,
 	pub timestamp: u64,
 }
-
-#[derive(Debug, Clone, Hash, Deserialize, Serialize)]
-pub enum EventKind {
-	SessionStart,
-	SessionStop { session: Session },
-	WorkspaceIndexed { duration: u64 },
-	DaemonStarted,
-	DaemonStopped,
-	StatusRequested,
-	TaskRequested { request: TaskRequest },
-	TaskCreated { task_id: Uuid, kind: TaskKind },
-	TaskStarted { task_id: TaskId },
-	TaskCompleted { task_id: TaskId },
-	TaskFailed { task_id: TaskId, error: String },
-	TaskStopped { task_id: TaskId },
-	TaskDeleted { task_id: TaskId },
-	TasksCleared,
-	CommandExecuted { command: String },
-	FileCreated { inode: Inode, path: String },
-	FileModified { inode: Inode, path: String },
-	FileDeleted { inode: Inode, path: String },
-	EstateDiscovered { inode: Inode, path: String },
-	EstateRemoved { inode: Inode, path: String },
-	IndexUpdated { files_changed: u64 },
-	CacheInvalidated { reason: String },
-}
-#[derive(Debug, Clone, Deserialize, Hash, Serialize)]
-pub enum EventSource {
-	App,
-	Cli,
-	Daemon,
-	Editor,
-	Filesystem,
-}
-
 impl Event {
 	pub fn new(source: EventSource, kind: EventKind) -> Self {
 		tracing::debug!("new Event {:?}", source);
@@ -72,4 +36,39 @@ impl Event {
 	pub fn app(kind: EventKind) -> Self {
 		Self::new(EventSource::App, kind)
 	}
+}
+
+#[derive(Debug, Clone, Hash, Deserialize, Serialize)]
+pub enum EventKind {
+	SessionStart,
+	SessionStop { session: Session },
+	WorkspaceIndexed { duration: u64 },
+	Navigate(ViewType),
+	DaemonStarted,
+	DaemonStopped,
+	StatusRequested,
+	TaskRequested { request: TaskRequest },
+	TaskCreated { task_id: Uuid, kind: TaskKind },
+	TaskStarted { task_id: TaskId },
+	TaskCompleted { task_id: TaskId },
+	TaskFailed { task_id: TaskId, error: String },
+	TaskStopped { task_id: TaskId },
+	TaskDeleted { task_id: TaskId },
+	TasksCleared,
+	CommandExecuted { command: String },
+	FileCreated { inode: Inode, path: String },
+	FileModified { inode: Inode, path: String },
+	FileDeleted { inode: Inode, path: String },
+	EstateDiscovered { inode: Inode, path: String },
+	EstateRemoved { inode: Inode, path: String },
+	IndexUpdated { files_changed: u64 },
+	CacheInvalidated { reason: String },
+}
+#[derive(Debug, Clone, Deserialize, Hash, Serialize)]
+pub enum EventSource {
+	App,
+	Cli,
+	Daemon,
+	Editor,
+	Filesystem,
 }

@@ -1,5 +1,6 @@
 use crate::{
-	app::{event as app_event, state::EstateState, *},
+	app::{state::EstateState, *},
+	e,
 	prelude::*,
 };
 
@@ -9,13 +10,13 @@ pub trait Runtime: Clone + Send + Sync {
 	/// Events are the standardized mechanism by which those services expose meaningful
 	/// changes to the rest of the application; the Runtime owns the services and EventBus,
 	/// while the Dispatcher routes those events to consumers.
-	fn emit(&self, event: app_event::Event);
+	fn emit(&self, event: e::Event);
+	fn subscribe(&self) -> tokio::sync::broadcast::Receiver<e::Event>;
+
 	fn start_dispatcher(self: &Arc<Self>);
 	fn state(&self) -> &RuntimeState;
 	fn save(&self, state: &EstateState) -> Result<()>;
 	fn session(&self) -> Session;
-	#[cfg(feature = "native")]
-	fn subscribe(&self) -> broadcast::Receiver<app_event::Event>;
 }
 
 #[derive(Debug)]

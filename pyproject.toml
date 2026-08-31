@@ -1,0 +1,15 @@
+[tool.pyright]
+typeCheckingMode = "off"
+
+[tool.ruff]
+indent-width = 2
+
+[tool.ruff.format]
+indent-style = "space"
+
+[tool.ruff.lint]
+ignore = [
+  "F821", # undefined names
+  "ANN201", # missing return type on public function
+  "ANN202", # missing return type on private function
+]

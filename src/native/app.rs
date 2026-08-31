@@ -1,9 +1,11 @@
 use crate::{
 	AppEvent, DaemonCommand,
-	app::{self, App, Runtime, event as app_event, model::EstateEngine},
+	app::{self, App, Runtime, model::EstateEngine},
+	e,
 	native::{self, runtime::NativeRuntime, screens::*, *},
 	prelude::*,
 	spawn_global_cursor_daemon,
+	ui::View,
 	ui::rendermd::MarkdownView,
 };
 
@@ -32,6 +34,7 @@ pub struct NativeApp {
 	monitor: native::monitor::NativeMonitor,
 	scroll_tray: Option<TrayIcon>,
 	tray: Option<TrayIcon>,
+	view_type: ViewType,
 }
 impl NativeApp {
 	pub fn new() -> Result<Self> {
@@ -39,26 +42,24 @@ impl NativeApp {
 		let runtime = NativeRuntime::new()?;
 		let engine = EstateEngine::new(runtime)?;
 		let app = App::new(engine)?;
-
 		Ok(Self {
 			app,
-			menu_bar: None,
-			// menu_bar: Some(menu),
-			windows: vec![],
 			clock_running: Arc::new(AtomicBool::new(true)),
-			daemon_tx,
 			daemon_rx: Some(daemon_rx),
+			daemon_tx,
 			hotkey_manager: GlobalHotkeys::new().unwrap(),
 			last_state_revision: 0,
 			menu: None,
+			menu_bar: None,
 			monitor: native::monitor::NativeMonitor::new()?,
 			scroll_tray: None,
 			tray: None,
+			view_type: ViewType::MarkdownView,
+			windows: vec![],
 		})
 	}
 	pub fn run(&mut self, cli: Cli) -> Result<()> {
 		tracing::debug!(">>> NativeApp::run entered");
-		// self.set_menu_bar();
 		let result = match cli.command {
 			None | Some(Command::Start { .. }) | Some(Command::Tray) => self.start_runtime(),
 			Some(_) => {
@@ -95,26 +96,37 @@ impl NativeApp {
 		self
 			.app
 			.runtime()
-			.emit(app_event::Event::app(app::EventKind::SessionStart));
+			.emit(e::Event::app(app::EventKind::SessionStart));
 		event_loop.run_app(self)?;
 		tracing::info!(">>> NativeApp::start_runtime returning");
 		Ok(())
 	}
 	fn spawn_clock(&mut self, proxy: EventLoopProxy<AppEvent>) {
 		let running = Arc::clone(&self.clock_running);
+		let runtime = self.app.runtime();
 		std::thread::spawn(move || {
-			let mut current_time = 30;
+			let mut current_time = 5;
+			let mut view_index = 0;
 			while running.load(Ordering::Relaxed) {
-				let text = format!(" {}s", current_time);
-				let _ = proxy.send_event(AppEvent::TickClock(text));
+				let views = [
+					ViewType::MarkdownView,
+					ViewType::TaskManager,
+					ViewType::WaterfallChart,
+				];
+				let _ = proxy.send_event(AppEvent::TickClock(format!(" {}s", current_time)));
+				tracing::info!("tick {}", current_time);
 				if current_time == 0 {
-					current_time = 30;
+					tracing::info!("emit");
+					current_time = 5;
+					view_index = (view_index + 1) % views.len();
+					let view = views[view_index];
+					tracing::info!("⏩ Clock navigation → {:?}", view);
+					runtime.emit(e::Event::app(e::EventKind::Navigate(view)));
 				} else {
 					current_time -= 1;
 				}
 				std::thread::sleep(std::time::Duration::from_secs(1));
 			}
-			tracing::info!("clock thread exiting");
 		});
 	}
 	fn spawn_cursor_daemon(&mut self, proxy: EventLoopProxy<AppEvent>) {
@@ -228,6 +240,7 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 		}
 	}
 	fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+		self.app.update();
 		while let Ok(event) = MenuEvent::receiver().try_recv() {
 			self.handle_event(event, event_loop);
 		}
@@ -306,6 +319,17 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 	}
 	fn user_event(&mut self, event_loop: &ActiveEventLoop, event: AppEvent) {
 		match event {
+			AppEvent::Navigate(view) => {
+				self
+					.app
+					.runtime()
+					.emit(e::Event::app(e::EventKind::Navigate(view)));
+				self.app.update();
+				for window in &mut self.windows {
+					// window.window.set_view(view);
+					window.window.instance.request_redraw();
+				}
+			}
 			AppEvent::Shutdown => {
 				tracing::info!(">>> shutdown event received");
 				self.shutdown();
@@ -333,6 +357,8 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 				if let Some(tray) = &self.tray {
 					let _ = tray.set_title(Some(text));
 				}
+				self.app.update();
+				self.sync_views();
 			}
 			AppEvent::ModifiersChanged {
 				alt,
@@ -340,6 +366,14 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 				ctrl,
 				shift,
 			} => {}
+			// AppEvent::AppEvent => {
+			// 	let view = self.app.view();
+			// 	for window in &mut self.windows {
+			// 		window.window.set_view(WindowType::Markdown);
+			// 		window.window.instance.request_redraw();
+			// 	}
+			// }
+			_ => {}
 		}
 	}
 }
@@ -378,30 +412,18 @@ impl NativeApp {
 		if self.window_by_type(kind).is_some() {
 			return;
 		}
-		let (title, view) = match kind {
-			WindowType::TelemetryInspector => ("Telemetry Inspector", Ve::new(Oracle::new())),
-			WindowType::TaskManager => ("Task Manager", Ve::new(TaskManager::new())),
-			WindowType::Dashboard => ("Estate Dashboard", Ve::new(Dashboard::new())),
-			WindowType::WaterfallChart => ("Estate Dashboard", Ve::new(WaterfallChart::new())),
-			WindowType::EguiVeable => ("EguiVeable", Ve::new(EguiVeable::new())),
-			WindowType::MarkdownView => (
-				"Estate Dashboard",
-				Ve::new(MarkdownView::new(
-					"/Users/future/kb/project/crates/estate/src/data/corpus.md",
-				)),
-			),
-			_ => {
-				todo!("abstraction_of_references_and_pointers")
-			}
-		};
-		match Window::new(event_loop, view) {
+		match Window::new(event_loop, self.view_type.clone()) {
 			Ok(window) => {
-				window.instance.set_title(title);
-				self.windows.push(AppWindow { kind, window });
+				window.instance.set_title("Hi there Loi");
+				self.windows.push(AppWindow {
+					kind: WindowType::from(WindowType::Markdown),
+					window,
+				});
 			}
+
 			Err(error) => {
 				tracing::error!(
-						?kind,
+						?self.view_type,
 						%error,
 						"failed to create window"
 				);
@@ -415,7 +437,7 @@ impl NativeApp {
 			.app
 			.engine
 			.runtime
-			.emit(app_event::Event::app(app::EventKind::TaskRequested {
+			.emit(e::Event::app(e::EventKind::TaskRequested {
 				request: TaskRequest::Create(TaskKind::SyncBookmarks),
 			}));
 	}
@@ -424,7 +446,7 @@ impl NativeApp {
 			.app
 			.engine
 			.runtime
-			.emit(app_event::Event::app(app::EventKind::CommandExecuted {
+			.emit(e::Event::app(e::EventKind::CommandExecuted {
 				command: "task_list".into(),
 			}));
 	}
@@ -433,7 +455,7 @@ impl NativeApp {
 			.app
 			.engine
 			.runtime
-			.emit(app_event::Event::app(app::EventKind::CommandExecuted {
+			.emit(e::Event::app(e::EventKind::CommandExecuted {
 				command: "task_clear".into(),
 			}));
 	}
@@ -471,6 +493,24 @@ impl NativeApp {
 }
 
 impl NativeApp {
+	fn sync_views(&mut self) {
+		let view_type = self.app.view();
+		for window in &mut self.windows {
+			window.window.sync_view(view_type);
+			window.window.instance.request_redraw();
+		}
+	}
+	fn set_view(&mut self, view_type: ViewType) {
+		self.view_type = view_type;
+	}
+	fn change_view(&self, view_type: ViewType) -> Ve<NativeRuntime> {
+		match view_type {
+			ViewType::MarkdownView => Ve::new(MarkdownView::new(crate::data::MARKDOWN)),
+			ViewType::TaskManager => Ve::new(TaskManager::new()),
+			ViewType::WaterfallChart => Ve::new(OracleView::new()),
+			_ => Ve::new(MarkdownView::new(crate::data::MARKDOWN)),
+		}
+	}
 	fn set_menu_bar(&mut self, new_menu: Menu) {
 		self.menu_bar = Some(new_menu);
 		tracing::info!("setting menu bar");
@@ -485,7 +525,6 @@ impl NativeApp {
 
 		menu
 	}
-
 	fn file_menu(has_document: bool) -> Submenu {
 		let menu = Submenu::new("File", true);
 		menu.append(&MenuItem::new("New", true, None));
@@ -495,7 +534,6 @@ impl NativeApp {
 
 		menu
 	}
-
 	fn edit_menu() -> Submenu {
 		let menu = Submenu::new("Edit", true);
 

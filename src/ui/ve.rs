@@ -1,14 +1,14 @@
-pub use crate::app::{event as app_event, *};
+pub use crate::app::*;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub use crate::native::prelude::*;
 
-use crate::theme::palette;
+use crate::{e, theme::palette};
 
 pub trait Veable<R: Runtime> {
 	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>);
 	fn update(&mut self, _ctx: &mut AppContext<'_, R>) {}
-	fn event(&mut self, _event: &app_event::Event, _ctx: &mut AppContext<'_, R>) {}
+	fn event(&mut self, _event: &e::Event, _ctx: &mut AppContext<'_, R>) {}
 }
 
 pub struct Ve<R: Runtime> {
@@ -57,11 +57,9 @@ impl<R: Runtime> Region<R> {
 			top_border: false,
 		}
 	}
-
 	pub fn fixed(view: impl Veable<R> + 'static, size: f32) -> Self {
 		Self::new(view, size)
 	}
-
 	pub fn resizable(
 		view: impl Veable<R> + 'static,
 		size: f32,
@@ -69,17 +67,13 @@ impl<R: Runtime> Region<R> {
 		max_size: f32,
 	) -> Self {
 		let mut region = Self::new(view, size);
-
-		region.size = size.clamp(min_size, max_size);
 		region.min_size = min_size;
 		region.max_size = max_size;
 		region.resizable = true;
 		region.fill = Some(palette::SURFACE);
 		region.is_docked = true;
-
 		region
 	}
-
 	pub fn content(view: impl Veable<R> + 'static) -> Self {
 		Self {
 			content: Box::new(view),
@@ -93,7 +87,6 @@ impl<R: Runtime> Region<R> {
 			top_border: false,
 		}
 	}
-
 	pub fn with_fill(mut self, fill: egui::Color32) -> Self {
 		self.fill = Some(fill);
 		self
@@ -152,30 +145,24 @@ impl<R: Runtime> Panel<R> {
 			auto_hide: false,
 		}
 	}
-
 	pub fn with_open(mut self, open: bool) -> Self {
 		self.open = open;
 		self
 	}
-
 	pub fn with_overlay(mut self, overlay: bool) -> Self {
 		self.overlay = overlay;
 		self
 	}
-
 	pub fn with_auto_hide(mut self, auto_hide: bool) -> Self {
 		self.auto_hide = auto_hide;
 		self
 	}
-
 	pub fn open(&mut self) {
 		self.open = true;
 	}
-
 	pub fn close(&mut self) {
 		self.open = false;
 	}
-
 	pub fn toggle(&mut self) {
 		self.open = !self.open;
 	}

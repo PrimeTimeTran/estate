@@ -1,4 +1,7 @@
-use crate::app::{state::*, *};
+use crate::{
+	app::{state::*, *},
+	e,
+};
 
 // #[cfg(not(target_arch = "wasm32"))]
 #[cfg(feature = "native")]
@@ -11,7 +14,7 @@ pub struct AppContext<'a, R: Runtime> {
 	#[cfg(not(target_arch = "wasm32"))]
 	pub input: VeInputState,
 	#[cfg(not(target_arch = "wasm32"))]
-	pub event_rx: broadcast::Receiver<Event>,
+	pub event_rx: tokio::sync::broadcast::Receiver<e::Event>,
 }
 
 impl<'a, R: Runtime> AppContext<'a, R> {
@@ -29,12 +32,12 @@ impl<'a, R: Runtime> AppContext<'a, R> {
 		}
 	}
 	#[cfg(not(target_arch = "wasm32"))]
-	pub fn next_event(&mut self) -> Option<Event> {
+	pub fn next_event(&mut self) -> Option<e::Event> {
 		match self.event_rx.try_recv() {
 			Ok(event) => Some(event),
-			Err(broadcast::error::TryRecvError::Empty) => None,
-			Err(broadcast::error::TryRecvError::Lagged(_)) => None,
-			Err(broadcast::error::TryRecvError::Closed) => None,
+			Err(tokio::sync::broadcast::error::TryRecvError::Empty) => None,
+			Err(tokio::sync::broadcast::error::TryRecvError::Lagged(_)) => None,
+			Err(tokio::sync::broadcast::error::TryRecvError::Closed) => None,
 		}
 	}
 }

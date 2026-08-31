@@ -1,4 +1,4 @@
-use crate::{app::AppContext, native::prelude::*, prelude::anyhow::anyhow};
+use crate::{app::AppContext, doc, native::prelude::*, prelude::anyhow::anyhow, ui};
 
 use egui_wgpu::{
 	Renderer,
@@ -31,72 +31,76 @@ pub struct Window {
 	pending_textures: gui::TexturesDelta,
 	queue: wgpu::Queue,
 	renderer: egui_wgpu::Renderer,
-	view: Ve<NativeRuntime>,
-	// Estate UI Container
-
-	// Owns the native window, egui state, wgpu rendering resources, and the
-	// application state required to render and interact with the development UI.
-	// CPU / Rust
-	//   │
-	//   │ create resources + record commands
-	//   ▼
-	// wgpu::Device
-	//   │
-	//   │ command encoder
-	//   ▼
-	// wgpu::Queue
-	//   │
-	//   │ submit
-	//   ▼
-	// ┌─────────────────────────────────────────────┐
-	// │                 GPU PIPELINE                │
-	// │                                             │
-	// │ Vertex Input                                │
-	// │      ↓                                      │
-	// │ Vertex Shader                                │
-	// │      ↓                                      │
-	// │ Primitive Assembly                          │
-	// │      ↓                                      │
-	// │ Rasterization                               │
-	// │      ↓                                      │
-	// │ Fragment Shader                              │
-	// │      ↓                                      │
-	// │ Depth / Stencil / Blending                  │
-	// │      ↓                                      │
-	// │ Render Target                               │
-	// └─────────────────────────────────────────────┘
-	//   │
-	//   ▼
-	// Surface Texture
-	//   │
-	//   ▼
-	// Window
-	// Vertex data
-	//    ↓
-	// Vertex Shader
-	//    ↓
-	// Primitive assembly
-	//    ↓
-	// Rasterization
-	//    ↓
-	// Fragment Shader
-	//    ↓
-	// Depth / Stencil / Blending
-	//    ↓
-	// Color attachment
-
-	// 1. input assembler
-	// 2.vertex shader
-	// 3.hull shader
-	//4. tesselator
-	// 5.domain shader
-	// 6.geometry shader
-	// 7.rasterizer
-	// 8.pixel shader
-	// 9.output merger
+	pub kind: WindowType,
+	view: ui::View,
 }
 impl Window {
-	pub fn new(event_loop: &ActiveEventLoop, view: Ve<NativeRuntime>) -> Result<Self> {
+	pub fn new(event_loop: &ActiveEventLoop, view_type: ViewType) -> Result<Self> {
+		doc!(
+			r#"
+     	Estate UI Container
+     	Owns the native window, egui state, wgpu rendering resources, and the
+     	application state required to render and interact with the development UI.
+     	CPU / Rust
+     	  │
+     	  │ create resources + record commands
+     	  ▼
+     	wgpu::Device
+     	  │
+     	  │ command encoder
+     	  ▼
+     	wgpu::Queue
+     	  │
+     	  │ submit
+     	  ▼
+     	┌─────────────────────────────────────────────┐
+     	│                 GPU PIPELINE                │
+     	│                                             │
+     	│ Vertex Input                                │
+     	│      ↓                                      │
+     	│ Vertex Shader                                │
+     	│      ↓                                      │
+     	│ Primitive Assembly                          │
+     	│      ↓                                      │
+     	│ Rasterization                               │
+     	│      ↓                                      │
+     	│ Fragment Shader                              │
+     	│      ↓                                      │
+     	│ Depth / Stencil / Blending                  │
+     	│      ↓                                      │
+     	│ Render Target                               │
+     	└─────────────────────────────────────────────┘
+     	  │
+     	  ▼
+     	Surface Texture
+     	  │
+     	  ▼
+     	Window
+     	Vertex data
+      	   ↓
+     	Vertex Shader
+      	   ↓
+     	Primitive assembly
+      	   ↓
+     	Rasterization
+      	   ↓
+     	Fragment Shader
+      	   ↓
+     	Depth / Stencil / Blending
+      	   ↓
+     	Color attachment
+
+     	1. input assembler
+     	2.vertex shader
+     	3.hull shader
+     	4. tesselator
+     	5.domain shader
+     	6.geometry shader
+     	7.rasterizer
+     	8.pixel shader
+     	9.output merger
+   	"#
+		);
 		let (gui_ctx, gui_state) = build_egui(event_loop);
 		let (window, instance, surface) = create_gpu_surface(event_loop)?;
 		let (adapter, device, queue) = initialize_gpu(&instance, &surface)?;
@@ -104,7 +108,9 @@ impl Window {
 		let (config, renderer) = build_renderer(&surface, adapter, &device, size)?;
 		Ok(Self {
 			config,
+			view: ui::View::new(view_type),
 			device,
+			kind: WindowType::Markdown,
 			gui_ctx,
 			gui_state,
 			instance: window,
@@ -114,9 +120,33 @@ impl Window {
 			queue,
 			renderer,
 			surface,
-			view,
 		})
 	}
+	pub fn set_view(&mut self, kind: WindowType)
+	// V: Veable<NativeRuntime> + 'static,
+	{
+		self.kind = kind;
+		// self.view = Ve::new(view);
+	}
+	fn egui_view(&mut self, ctx: &egui::Context) {
+		todo!("")
+	}
+	fn dashboard(&mut self, ctx: &egui::Context) {
+		todo!("")
+	}
+	fn waterfall_chart(&mut self, ctx: &egui::Context) {
+		todo!("")
+	}
+	fn telemetry_inspector(&mut self, ctx: &egui::Context) {
+		todo!("")
+	}
+	fn task_manager(&mut self, ctx: &egui::Context) {
+		todo!("")
+	}
+	fn markdown_view(&mut self, ctx: &egui::Context) {
+		todo!("")
+	}
+
 	pub fn draw(&mut self, ctx: &mut AppContext<'_, NativeRuntime>) -> Result<()> {
 		self.begin_egui();
 		let output = self.build_ui(ctx);
@@ -259,6 +289,21 @@ impl Window {
 			.render(&mut render_pass, primitives, screen_descriptor);
 	}
 }
+
+impl Window {
+	pub fn sync_view(&mut self, view_type: ViewType) {
+		if self.view.kind != view_type {
+			tracing::info!(
+				"🖼️ Window view change: {:?} → {:?}",
+				self.view.kind,
+				view_type
+			);
+
+			self.view = ui::View::new(view_type);
+		}
+	}
+}
+
 fn initialize_gpu(
 	instance: &wgpu::Instance,
 	surface: &wgpu::Surface<'_>,
@@ -707,6 +752,7 @@ impl Window {
 pub struct AppWindow {
 	pub kind: WindowType,
 	pub window: Window,
+	// pub runtime: Arc<NativeRuntime>,
 }
 
 pub struct GlobalHotkeys {

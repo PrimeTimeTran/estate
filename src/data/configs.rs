@@ -7,8 +7,10 @@ use crate::{
 	native::prelude::{ScrollRedirectState, *},
 	ui::PanelConfig,
 };
+
 pub static ESTATE_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub static HMR_CHART_JSON: &str = "/Users/future/kb/project/crates/estate/src/data/chart.json";
+pub static MARKDOWN: &str = "/Users/future/kb/project/crates/estate/src/data/corpus.md";
 pub static HOME_DIR: &str = ".config/estate";
 pub static INDEX_PATH: &str = ".config/estate/master.json";
 pub static INTRINSIC_FILES: [&str; 3] = ["default.settings.json", "settings.json", "key-map.json"];

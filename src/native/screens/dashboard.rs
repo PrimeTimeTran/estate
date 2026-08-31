@@ -1,6 +1,6 @@
 use crate::{
 	app::*,
-	native::{Oracle, monitor::StateMonitor, runtime::NativeRuntime},
+	native::{OracleView, monitor::StateMonitor, runtime::NativeRuntime},
 	ui::chart::*,
 };
 
@@ -27,6 +27,7 @@ pub struct Dashboard {
 	pub active_focus: FocusedPane,
 	pub secondary_scroll_offset: f32,
 }
+
 impl Dashboard {
 	pub fn new() -> Self {
 		let data_path = PathBuf::from(HMR_CHART_JSON);
@@ -81,7 +82,6 @@ impl Dashboard {
 		}
 	}
 }
-
 impl Dashboard {
 	fn from_path(path: impl Into<PathBuf>) -> Result<Self> {
 		use crate::native::monitor::StateMonitor;
@@ -170,7 +170,7 @@ impl Dashboard {
 		Ok(watcher)
 	}
 	fn setup_watcher(
-		oracle: Arc<Mutex<Oracle>>,
+		oracle: Arc<Mutex<OracleView>>,
 		path: &Path,
 	) -> Result<RecommendedWatcher, notify::Error> {
 		// Watcher closure/event handler

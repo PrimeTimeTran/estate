@@ -2,9 +2,9 @@
 use crate::{app::*, native::prelude::*};
 
 // -----------------------------------------------------------------------------
-// ORACLE
+//OracleView
 // -----------------------------------------------------------------------------
-pub struct Oracle {
+pub struct OracleView {
 	active_focus: FocusedPane,
 	dirty: bool,
 	error: Option<String>,
@@ -14,7 +14,7 @@ pub struct Oracle {
 	scroll_y: f32,
 	gesture: GestureController,
 }
-impl Oracle {
+impl OracleView {
 	pub fn new() -> Self {
 		Self {
 			active_focus: FocusedPane::MainEditor,
@@ -241,7 +241,7 @@ impl Oracle {
 // VEABLE
 // -----------------------------------------------------------------------------
 
-impl Veable<NativeRuntime> for Oracle {
+impl Veable<NativeRuntime> for OracleView {
 	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, NativeRuntime>) {
 		self.draw_ui(ui, ctx);
 		self.draw_status_bar(ui);

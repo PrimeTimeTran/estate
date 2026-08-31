@@ -1,13 +1,13 @@
 pub(crate) mod chart;
 pub(crate) mod components;
 pub(crate) mod rendermd;
-pub(crate) mod screen;
+pub(crate) mod view;
 
 pub mod ve;
 
 pub use crate::ui::rendermd::*;
-pub use crate::ui::screen::*;
 pub use crate::ui::ve::*;
+pub use crate::ui::view::*;
 pub use crate::{prelude::*, ui::palette::*};
 
 pub const TRAY_ICON: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/estate-tray.png"));

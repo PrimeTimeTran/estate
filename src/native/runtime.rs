@@ -3,11 +3,10 @@ use tokio::sync::broadcast;
 use crate::{
 	app::{
 		Runtime,
-		event::Event,
 		host::AppHost,
 		state::{EstateState, StateStore},
 	},
-	event,
+	e,
 	native::NativeApp,
 };
 
@@ -34,7 +33,7 @@ impl NativeRuntime {
 		let mut state = self.state.write();
 		state.events_processed += 1;
 	}
-	pub fn subscribe(&self) -> broadcast::Receiver<Event> {
+	pub fn subscribe(&self) -> tokio::sync::broadcast::Receiver<e::Event> {
 		self.events.subscribe()
 	}
 }
@@ -49,7 +48,7 @@ pub struct NativeRuntime {
 }
 
 impl Runtime for NativeRuntime {
-	fn emit(&self, event: Event) {
+	fn emit(&self, event: e::Event) {
 		self.events.emit(event);
 	}
 	fn start_dispatcher(self: &Arc<Self>) {
@@ -65,6 +64,7 @@ impl Runtime for NativeRuntime {
 		// Filesystem change events
 		dispatcher.register(event::handler::FileWatcherHandler);
 		dispatcher.register(event::handler::AppHandler);
+		dispatcher.register(event::handler::NavigationHandler);
 		tokio::spawn(async move {
 			loop {
 				match receiver.recv().await {
@@ -94,7 +94,7 @@ impl Runtime for NativeRuntime {
 		self.session.clone()
 	}
 
-	fn subscribe(&self) -> broadcast::Receiver<Event> {
+	fn subscribe(&self) -> tokio::sync::broadcast::Receiver<e::Event> {
 		self.events.subscribe()
 	}
 }

@@ -1,5 +1,5 @@
 use crate::{
-	app::{AppContext, Job, JobStatus, Runtime, event as app_event, state::EstateState},
+	app::{AppContext, Job, JobStatus, Runtime, event as e, state::EstateState},
 	native::{job::TaskManager, runtime::NativeRuntime},
 	prelude::*,
 	theme::palette,
@@ -203,8 +203,8 @@ impl TaskManager {
 	}
 }
 impl Veable<NativeRuntime> for TaskManager {
-	fn event(&mut self, event: &app_event::Event, _ctx: &mut AppContext<'_, NativeRuntime>) {
-		if let app_event::EventKind::TaskCreated { .. } = &event.kind {}
+	fn event(&mut self, event: &e::Event, _ctx: &mut AppContext<'_, NativeRuntime>) {
+		if let e::EventKind::TaskCreated { .. } = event.kind {}
 	}
 	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, NativeRuntime>) {
 		ui.heading("Task Manager draw");

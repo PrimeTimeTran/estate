@@ -1,9 +1,8 @@
 #![allow(warnings)]
 pub mod app;
 
-#[path = "./app/event.rs"]
-pub(crate) mod app_event;
-pub use app_event::*;
+pub(crate) use crate::app::event as e;
+pub use e::*;
 
 pub mod helpers;
 pub mod prelude;
@@ -13,7 +12,7 @@ pub mod share;
 pub mod theme;
 pub mod tool;
 pub mod ui;
-use ui::*;
+pub use ui::*;
 pub mod util;
 
 #[cfg(feature = "web")]

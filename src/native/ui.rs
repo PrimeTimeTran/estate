@@ -15,8 +15,10 @@ use tray_icon::{
 use winit::event_loop::EventLoopProxy;
 
 use crate::{
-	app::{Runtime, event as app_event, event::EventKind, state::EstateState, *},
-	native::{prelude::*, *},
+	app,
+	app::{Runtime, state::EstateState},
+	e,
+	native::prelude::*,
 	ui::*,
 };
 
@@ -127,13 +129,6 @@ pub fn move_cursor_to(pos: ScreenPosition) {
 	}
 }
 
-// This won't "get it" if these don't use "crate"
-// .//src/data/mod.rs
-// pub(crate) mod native;
-// pub(crate) use native::*;
-//
-// but it breaks
-// pub use crate::{chart::ChartsFile, data::DEFAULT_CONFIG as CONFIG};
 impl<R: Runtime> Ve<R> {
 	/// Rust uses ownership,borrowing, and lifetimes to determine when values
 	/// may be safely destroyed, allowing memory to be reclaimed deterministically
@@ -762,19 +757,15 @@ pub fn spawn_global_cursor_daemon(proxy: EventLoopProxy<AppEvent>) {
 				}
 				CGEventType::FlagsChanged => {
 					let flags = event.get_flags();
-
 					let shift = flags.contains(CGEventFlags::CGEventFlagShift);
 					let ctrl = flags.contains(CGEventFlags::CGEventFlagControl);
 					let alt = flags.contains(CGEventFlags::CGEventFlagAlternate);
 					let command = flags.contains(CGEventFlags::CGEventFlagCommand);
-
 					// Get the previous state BEFORE updating it.
 					let was_shift_down = SHIFT_HELD.swap(shift, Ordering::Relaxed);
-
 					// -------------------------------------------------------------
 					// Tell the application immediately about modifier state.
 					// -------------------------------------------------------------
-
 					let _ = proxy.send_event(AppEvent::ModifiersChanged {
 						shift,
 						ctrl,
@@ -933,7 +924,7 @@ impl<R: Runtime> Veable<R> for Sidebar {
 								.app
 								.engine
 								.runtime
-								.emit(app_event::Event::app(EventKind::SessionStop {
+								.emit(e::Event::app(e::EventKind::SessionStop {
 									session: ctx.app.engine.runtime.session(),
 								}));
 						}

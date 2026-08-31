@@ -1,6 +1,5 @@
 pub use crate::{
 	app::{
-		event::*,
 		modules::{Runtime, RuntimeState},
 		*,
 	},
@@ -10,10 +9,6 @@ pub use crate::{
 	tool::{time::*, *},
 	ui::{ve::*, *},
 };
-
-#[path = "./app/event.rs"]
-pub mod app_event;
-use app_event::*;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub use crate::{data::*, event::*};
