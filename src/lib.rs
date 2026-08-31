@@ -1,8 +1,9 @@
 #![allow(warnings)]
 pub mod app;
+
 #[path = "./app/event.rs"]
-pub mod app_event;
-use app_event::*;
+pub(crate) mod app_event;
+pub use app_event::*;
 
 pub mod helpers;
 pub mod prelude;

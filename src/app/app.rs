@@ -1,8 +1,10 @@
 use crate::{
-	app::{event as app_event, prelude::*, state::EstateState},
-	// event::{Event, EventKind},
+	app::{prelude::*, state::EstateState},
 	prelude::*,
 };
+
+// ./src/app/app.rs
+use crate::app_event;
 
 pub struct App<R: Runtime> {
 	pub(crate) engine: model::EstateEngine<R>,

@@ -4,8 +4,6 @@ pub use crate::{
 		modules::{Runtime, RuntimeState},
 		*,
 	},
-	// data::*,
-	// event::*,
 	proto::*,
 	share::{prelude::*, *},
 	theme::*,
@@ -14,14 +12,11 @@ pub use crate::{
 };
 
 #[path = "./app/event.rs"]
-pub mod event;
-use event::*;
+pub mod app_event;
+use app_event::*;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub use crate::{data::*, event::*};
-
-// #[cfg(not(target_arch = "wasm32"))]
-// use crate::event::*;
 
 pub use ::serde::{Deserialize, Serialize, de::DeserializeOwned};
 pub use anyhow::{self, Error, Result};

@@ -90,3 +90,35 @@ default = ["native"]
 ```
 
 ## Review
+
+## Zed Web build
+
+```toml
+default = ["web"]
+```
+
+```json
+"lsp": {
+		"rust-analyzer": {
+			"initialization_options": {
+				"cargo": {
+					"target": "wasm32-unknown-unknown",
+					"features": ["web"],
+					"targetDir": true
+				}
+			}
+		},
+}
+```
+
+```sh
+cargo check \
+  --target wasm32-unknown-unknown \
+  --features web
+```
+
+```sh
+cargo build --bin web --no-default-features --features="web" --target wasm32-unknown-unknown
+trunk build --release
+trunk serve src/web/public/index.html --features web
+```
