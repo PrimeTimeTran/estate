@@ -24,7 +24,7 @@ pub use crate::native::{
 ///
 pub use cli::prelude::*;
 pub use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
-pub use signal_hook::{consts::SIGINT, iterator::Signals, *};
+pub use signal_hook::{consts::SIGINT, iterator::Signals};
 pub use tokio::{
 	io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
 	net::{TcpListener, UnixListener, UnixStream},

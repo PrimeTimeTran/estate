@@ -28,7 +28,7 @@ pub struct NativeApp {
 	hotkey_manager: GlobalHotkeys,
 	last_state_revision: u64,
 	menu: Option<TrayMenu>,
-	menu_bar: Menu,
+	menu_bar: Option<Menu>,
 	monitor: native::monitor::NativeMonitor,
 	scroll_tray: Option<TrayIcon>,
 	tray: Option<TrayIcon>,
@@ -39,9 +39,11 @@ impl NativeApp {
 		let runtime = NativeRuntime::new()?;
 		let engine = EstateEngine::new(runtime)?;
 		let app = App::new(engine)?;
+
 		Ok(Self {
 			app,
-			menu_bar: Self::menu_bar(),
+			menu_bar: None,
+			// menu_bar: Some(menu),
 			windows: vec![],
 			clock_running: Arc::new(AtomicBool::new(true)),
 			daemon_tx,
@@ -81,7 +83,9 @@ impl NativeApp {
 			.with_activation_policy(ActivationPolicy::Regular)
 			.build()?;
 
-		self.menu_bar.init_for_nsapp();
+		if let Some(menu) = &self.menu_bar {
+			menu.init_for_nsapp();
+		}
 
 		let proxy = event_loop.create_proxy();
 
@@ -187,7 +191,11 @@ impl NativeApp {
 }
 impl ApplicationHandler<AppEvent> for NativeApp {
 	fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-		self.menu_bar.init_for_nsapp();
+		if self.menu_bar.is_none() {
+			let menu = Self::menu_bar(true);
+			menu.init_for_nsapp();
+			self.menu_bar = Some(menu);
+		}
 		if self.windows.is_empty() {
 			self.open_window(event_loop, crate::data::INITIAL_WINDOW);
 		}
@@ -256,16 +264,20 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 				if window.window.occluded {
 					return;
 				}
-				let event_rx = self.app.engine.runtime.subscribe();
-				let mut ctx = AppContext {
-					event_rx,
-					input: VeInputState::default(),
-					app: &mut self.app,
-					last_revision: 0,
+				let menu = {
+					let event_rx = self.app.engine.runtime.subscribe();
+					let mut ctx = AppContext {
+						event_rx,
+						input: VeInputState::default(),
+						app: &mut self.app,
+						last_revision: 0,
+					};
+					if let Err(e) = window.window.draw(&mut ctx) {
+						tracing::error!("DEV >>> draw failed: {e:#}");
+					}
+					// Self::menu_bar(&mut ctx)
 				};
-				if let Err(e) = window.window.draw(&mut ctx) {
-					tracing::error!("DEV >>> draw failed: {e:#}");
-				}
+				// self.set_menu_bar(menu);
 			}
 			WindowEvent::Focused(true) => {
 				window.window.instance.request_redraw();
@@ -458,12 +470,77 @@ impl NativeApp {
 	}
 }
 
-// use muda::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 impl NativeApp {
-	fn menu_bar() -> Menu {
-		let menu = create_menu();
+	fn set_menu_bar(&mut self, new_menu: Menu) {
+		self.menu_bar = Some(new_menu);
+		tracing::info!("setting menu bar");
+		if let Some(menu) = &self.menu_bar {
+			menu.init_for_nsapp();
+		}
+	}
+	fn menu_bar(has_document: bool) -> Menu {
+		let menu = Menu::new();
+		menu.append(&Self::file_menu(has_document)).unwrap();
+		menu.append(&Self::edit_menu()).unwrap();
+
 		menu
 	}
+
+	fn file_menu(has_document: bool) -> Submenu {
+		let menu = Submenu::new("File", true);
+		menu.append(&MenuItem::new("New", true, None));
+		menu.append(&MenuItem::new("Open…", true, None));
+		menu.append(&PredefinedMenuItem::separator());
+		menu.append(&MenuItem::new("Close", has_document, None));
+
+		menu
+	}
+
+	fn edit_menu() -> Submenu {
+		let menu = Submenu::new("Edit", true);
+
+		menu.append(&PredefinedMenuItem::undo(None));
+		menu.append(&PredefinedMenuItem::redo(None));
+		menu.append(&PredefinedMenuItem::separator());
+		menu.append(&PredefinedMenuItem::cut(None));
+		menu.append(&PredefinedMenuItem::copy(None));
+		menu.append(&PredefinedMenuItem::paste(None));
+
+		menu
+	}
+	// fn menu_bar<R: Runtime>(ctx: &AppContext<'_, R>) -> Menu {
+	// 	Self::create_menu(ctx)
+	// }
+	// fn file_menu<R: Runtime>(ctx: &AppContext<'_, R>) -> Submenu {
+	// 	let menu = Submenu::new("File", true);
+	// 	menu.append(&MenuItem::new("New", true, None));
+	// 	menu.append(&MenuItem::new("Open…", true, None));
+	// 	menu.append(&PredefinedMenuItem::separator());
+	// 	menu.append(&MenuItem::new("Close", false, None));
+	// 	menu
+	// }
+	// fn edit_menu<R: Runtime>(ctx: &AppContext<'_, R>) -> Submenu {
+	// 	let menu = Submenu::new("Edit", true);
+	// 	menu.append(&PredefinedMenuItem::undo(None));
+	// 	menu.append(&PredefinedMenuItem::redo(None));
+	// 	menu.append(&PredefinedMenuItem::separator());
+	// 	menu.append(&PredefinedMenuItem::cut(None));
+	// 	menu.append(&PredefinedMenuItem::copy(None));
+	// 	menu.append(&PredefinedMenuItem::paste(None));
+	// 	menu
+	// }
+	// fn create_menu<R: Runtime>(ctx: &AppContext<'_, R>) -> Menu {
+	// 	let menu = Menu::new();
+	// 	menu.append(&Self::file_menu(true)).unwrap();
+	// 	menu.append(&Self::edit_menu(true)).unwrap();
+	// 	// menu.append(&Self::selection_menu(ctx)).unwrap();
+	// 	// menu.append(&Self::view_menu(ctx)).unwrap();
+	// 	// menu.append(&Self::go_menu(ctx)).unwrap();
+	// 	// menu.append(&Self::run_menu(ctx)).unwrap();
+	// 	// menu.append(&Self::window_menu(ctx)).unwrap();
+	// 	// menu.append(&Self::help_menu(ctx)).unwrap();
+	// 	menu
+	// }
 }
 fn create_menu() -> Menu {
 	let menu = Menu::new();
@@ -491,3 +568,104 @@ fn create_menu() -> Menu {
 	menu.append_items(&[&file, &edit, &view]);
 	menu
 }
+// fn create_menu() -> Menu {
+// 	let menu = Menu::new();
+
+// 	let menus = [
+// 		MenuEntry::Submenu {
+// 			title: "File",
+// 			items: vec![
+// 				MenuEntry::Item {
+// 					title: "New",
+// 					enabled: true,
+// 				},
+// 				MenuEntry::Item {
+// 					title: "Open…",
+// 					enabled: true,
+// 				},
+// 				MenuEntry::Separator,
+// 				MenuEntry::Item {
+// 					title: "Close",
+// 					enabled: true,
+// 				},
+// 			],
+// 		},
+// 		MenuEntry::Submenu {
+// 			title: "Edit",
+// 			items: vec![
+// 				MenuEntry::Item {
+// 					title: "Undo",
+// 					enabled: true,
+// 				},
+// 				MenuEntry::Item {
+// 					title: "Redo",
+// 					enabled: true,
+// 				},
+// 				MenuEntry::Separator,
+// 				MenuEntry::Item {
+// 					title: "Cut",
+// 					enabled: true,
+// 				},
+// 				MenuEntry::Item {
+// 					title: "Copy",
+// 					enabled: true,
+// 				},
+// 				MenuEntry::Item {
+// 					title: "Paste",
+// 					enabled: true,
+// 				},
+// 			],
+// 		},
+// 		MenuEntry::Submenu {
+// 			title: "View",
+// 			items: vec![
+// 				MenuEntry::Item {
+// 					title: "Toggle Sidebar",
+// 					enabled: true,
+// 				},
+// 				MenuEntry::Item {
+// 					title: "Fullscreen",
+// 					enabled: true,
+// 				},
+// 			],
+// 		},
+// 	];
+
+// 	for entry in menus {
+// 		append_entry(&menu, entry);
+// 	}
+
+// 	menu
+// }
+// fn append_entry(parent: &Menu, entry: MenuEntry) {
+// 	match entry {
+// 		MenuEntry::Item { title, enabled } => {
+// 			parent.append(&MenuItem::new(title, enabled, None)).unwrap();
+// 		}
+
+// 		MenuEntry::Separator => {
+// 			parent.append(&PredefinedMenuItem::separator()).unwrap();
+// 		}
+
+// 		MenuEntry::Submenu { title, items } => {
+// 			let submenu = Submenu::new(title, true);
+
+// 			for item in items {
+// 				append_entry(&submenu, item);
+// 			}
+
+// 			parent.append(&submenu).unwrap();
+// 		}
+// 	}
+// }
+// enum MenuEntry {
+// 	Item {
+// 		title: &'static str,
+// 		enabled: bool,
+// 	},
+// 	Separator,
+// 	Submenu {
+// 		title: &'static str,
+// 		items: Vec<MenuEntry>,
+// 	},
+// }
