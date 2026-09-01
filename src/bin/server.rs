@@ -5,11 +5,12 @@ use estate::{
 		problem_service_server::ProblemServiceServer,
 		submission_service_server::SubmissionServiceServer,
 	},
-	repo::{
+	services::{
 		json::{problem::JsonProblemRepository, submission::JsonSubmissionRepository},
-		problem::ProblemRepository,
+		problem::ProblemServiceImpl,
+		problem::{ProblemQuery, ProblemRepository},
+		submission::SubmissionServiceImpl,
 	},
-	services::{problem::ProblemServiceImpl, repo::problem::*, submission::SubmissionServiceImpl},
 };
 
 #[tokio::main]

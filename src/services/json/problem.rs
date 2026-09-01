@@ -3,6 +3,7 @@ use crate::{model::ProtoProblem, services::*};
 pub struct JsonProblemRepository {
 	path: PathBuf,
 }
+
 impl JsonProblemRepository {
 	pub fn new(path: impl Into<PathBuf>) -> Self {
 		Self { path: path.into() }
@@ -68,9 +69,10 @@ impl JsonProblemRepository {
 		Ok(())
 	}
 }
+
 #[async_trait]
 impl ProblemRepository for JsonProblemRepository {
-	async fn list(&self, query: ProblemQuery) -> Result<Page<Problem>> {
+	async fn list(&self, query: ProblemQuery) -> Result<Page<ProtoProblem>> {
 		let page = query.page.unwrap_or(0).max(0) as u32;
 		let page_size = query.page_size.unwrap_or(20).max(1) as u32;
 		let mut problems = Vec::new();
@@ -106,7 +108,7 @@ impl ProblemRepository for JsonProblemRepository {
 			total,
 		})
 	}
-	async fn create(&self, problem: CreateProblem) -> Result<Problem> {
+	async fn create(&self, problem: CreateProblem) -> Result<ProtoProblem> {
 		let stored = StoredProblem {
 			id: self.next_id().await?,
 			title: problem.title,
@@ -116,7 +118,7 @@ impl ProblemRepository for JsonProblemRepository {
 		self.save(&stored).await?;
 		Ok(stored.into())
 	}
-	async fn update(&self, id: i64, update: UpdateProblem) -> Result<Problem> {
+	async fn update(&self, id: i64, update: UpdateProblem) -> Result<ProtoProblem> {
 		let mut problem = self.find_by_id(id).await?;
 		let old_slug = problem.slug.clone();
 		if let Some(title) = update.title {
@@ -142,14 +144,14 @@ impl ProblemRepository for JsonProblemRepository {
 			.with_context(|| format!("failed to delete {}", path.display()))?;
 		Ok(())
 	}
-	async fn get(&self, id: i64) -> Result<Problem> {
+	async fn get(&self, id: i64) -> Result<ProtoProblem> {
 		Ok(self.find_by_id(id).await?.into())
 	}
-	async fn get_by_slug(&self, slug: &str) -> Result<Problem> {
+	async fn get_by_slug(&self, slug: &str) -> Result<ProtoProblem> {
 		Ok(self.load(slug).await?.into())
 	}
 
-	async fn sample_problem(&self, query: ProblemQuery) -> Result<Problem> {
+	async fn sample_problem(&self, query: ProblemQuery) -> Result<ProtoProblem> {
 		use rand::seq::IndexedRandom;
 
 		let mut problems = Vec::new();
@@ -179,7 +181,7 @@ impl ProblemRepository for JsonProblemRepository {
 				continue;
 			}
 
-			problems.push(Problem::from(stored));
+			problems.push(ProtoProblem::from(stored));
 		}
 
 		let problem = problems

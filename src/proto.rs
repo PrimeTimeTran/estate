@@ -12,12 +12,3 @@ pub async fn client()
 {
 	Ok(leetcode::problem_service_client::ProblemServiceClient::connect(crate::SERVER_URL).await?)
 }
-
-// #[cfg(not(target_arch = "wasm32"))]
-// pub async fn client() -> anyhow::Result<NativeClient> {
-//     // tonic
-// }
-// #[cfg(target_arch = "wasm32")]
-// pub async fn client() -> anyhow::Result<WebClient> {
-//     // gRPC-Web/browser transport
-// }

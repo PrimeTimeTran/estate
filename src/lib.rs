@@ -20,7 +20,6 @@ pub use ui::*;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod client;
 
-// #[cfg(feature = "native")]
 pub use services::*;
 
 #[cfg(feature = "native")]

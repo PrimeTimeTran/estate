@@ -1,4 +1,35 @@
-use crate::{model::Difficulty, services::*};
+use crate::services::*;
+
+use crate::{
+	model::{Difficulty, ProtoProblem},
+	prelude::*,
+	services::*,
+};
+
+#[async_trait]
+pub trait ProblemRepository: Send + Sync {
+	async fn list(&self, query: ProblemQuery) -> Result<Page<ProtoProblem>>;
+	async fn create(&self, problem: CreateProblem) -> Result<ProtoProblem>;
+	async fn update(&self, id: i64, problem: UpdateProblem) -> Result<ProtoProblem>;
+	async fn delete(&self, id: i64) -> Result<()>;
+	async fn get(&self, id: i64) -> Result<ProtoProblem>;
+	async fn get_by_slug(&self, slug: &str) -> Result<ProtoProblem>;
+	async fn sample_problem(&self, query: ProblemQuery) -> Result<ProtoProblem>;
+}
+
+pub struct ProblemQuery {
+	pub page: Option<i32>,
+	pub page_size: Option<i32>,
+	pub difficulty: Option<Difficulty>,
+}
+pub struct CreateProblem {
+	pub title: String,
+	pub slug: String,
+}
+pub struct UpdateProblem {
+	pub title: Option<String>,
+	pub slug: Option<String>,
+}
 
 #[derive(Default)]
 pub struct ProblemServiceImpl<R> {
@@ -45,7 +76,7 @@ where
 	async fn create_problem(
 		&self,
 		request: Request<CreateProblemRequest>,
-	) -> Result<Response<Problem>, Status> {
+	) -> Result<Response<ProtoProblem>, Status> {
 		let request = request.into_inner();
 		let problem = self
 			.repository
@@ -60,7 +91,7 @@ where
 	async fn update_problem(
 		&self,
 		request: Request<UpdateProblemRequest>,
-	) -> Result<Response<Problem>, Status> {
+	) -> Result<Response<ProtoProblem>, Status> {
 		let request = request.into_inner();
 		let problem = UpdateProblem {
 			title: request.title,
@@ -86,7 +117,7 @@ where
 	async fn get_problem(
 		&self,
 		request: Request<GetProblemRequest>,
-	) -> Result<Response<Problem>, Status> {
+	) -> Result<Response<ProtoProblem>, Status> {
 		let request = request.into_inner();
 		let id = problem_id(&request.id)?;
 		let problem = self.repository.get(id).await.map_err(internal_error)?;
@@ -95,23 +126,13 @@ where
 	async fn sample_problem(
 		&self,
 		request: Request<SampleProblemRequest>,
-	) -> Result<Response<Problem>, Status> {
+	) -> Result<Response<ProtoProblem>, Status> {
 		let request = request.into_inner();
 		let difficulty = request
 			.difficulty
 			.map(Difficulty::try_from)
 			.transpose()
 			.map_err(internal_error)?;
-
-		// let result = self
-		// 	.repository
-		// 	.list(ProblemQuery {
-		// 		page: Some(page.page),
-		// 		page_size: Some(page.page_size),
-		// 		difficulty,
-		// 	})
-		// 	.await
-		// 	.map_err(internal_error)?;
 
 		let problem = self
 			.repository

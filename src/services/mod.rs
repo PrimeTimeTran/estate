@@ -1,17 +1,18 @@
+pub mod db;
+pub mod json;
 pub mod problem;
-pub use problem::*;
 pub mod submission;
+pub use db::*;
+pub use json::*;
+pub use problem::*;
 pub use submission::*;
-pub mod repo;
 
 use crate::{
 	model::{submission::*, *},
 	prelude::*,
 	proto::leetcode::{
 		problem_service_server::ProblemService, submission_service_server::SubmissionService,
-		types::Problem,
 	},
-	repo::{problem::*, submission::*},
 };
 
 use anyhow::{Context, Result};
@@ -42,6 +43,7 @@ pub fn internal_error(error: anyhow::Error) -> Status {
 	tracing::error!("{error:#}");
 	Status::internal(error.to_string())
 }
+
 pub fn page_request(request: Option<PageRequest>) -> Result<PageRequest, Status> {
 	request.ok_or_else(|| Status::invalid_argument("page is required"))
 }
