@@ -1,4 +1,4 @@
-use estate::prelude::{logger, *};
+use estate::prelude::{logger::*, *};
 
 fn main() -> Result<()> {
 	let cli = cli::context::parse();

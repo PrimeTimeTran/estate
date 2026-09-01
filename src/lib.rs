@@ -2,55 +2,32 @@
 pub mod app;
 pub(crate) use crate::app::event as e;
 
-pub use e::*;
-
-#[cfg(not(target_arch = "wasm32"))]
-pub mod client;
-#[cfg(not(target_arch = "wasm32"))]
-pub(crate) use crate::client::*;
-
+pub mod data;
 pub mod helpers;
+pub mod model;
 pub mod prelude;
-
+pub mod proto;
+pub mod services;
 pub mod share;
 pub mod theme;
 pub mod tool;
-pub mod ui;
-pub use ui::*;
+pub use tool::*;
 pub mod util;
 
-pub mod data;
-pub(crate) use crate::data::default;
+pub mod ui;
+pub use ui::*;
 
-// A 'central' native gate doesn't work.
-// #[cfg(feature = "native")]
-// pub mod lib_native;
-// #[cfg(feature = "native")]
-// pub use lib_native::*;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod client;
 
-pub mod model;
-pub use model::*;
-
-pub mod proto;
-pub use proto::{leetcode::types::*, *};
-
-// #[cfg(feature = "native")]
-pub mod services;
 // #[cfg(feature = "native")]
 pub use services::*;
 
 #[cfg(feature = "native")]
 pub mod native;
-#[cfg(feature = "native")]
-use native::*;
-
-// #[cfg(feature = "native")]
-// pub mod data;
 
 #[cfg(feature = "native")]
 pub mod event;
-#[cfg(feature = "native")]
-pub use event::*;
 
 #[cfg(feature = "web")]
 pub mod web;

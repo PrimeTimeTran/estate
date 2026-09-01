@@ -3,6 +3,7 @@ pub use crate::{
 		modules::{Runtime, RuntimeState},
 		*,
 	},
+	native::{app::*, *},
 	proto::{
 		leetcode::types::{self, *},
 		*,
@@ -10,8 +11,11 @@ pub use crate::{
 	share::{prelude::*, *},
 	theme::*,
 	tool::{time::*, *},
-	ui::{ve::*, *},
+	ui::*,
 };
+
+#[cfg(not(target_arch = "wasm32"))]
+pub use crate::native::{prelude::*, *};
 
 #[cfg(not(target_arch = "wasm32"))]
 pub use crate::client::*;
@@ -23,6 +27,7 @@ pub use ::serde::{Deserialize, Serialize, de::DeserializeOwned};
 pub use anyhow::{self, Error, Result};
 pub use async_trait::async_trait;
 pub use chrono::{DateTime, Duration, Utc};
+pub use cli::context::*;
 pub use futures::FutureExt;
 pub use revelation::analyzer::{Workspace, *};
 pub use serde_json::Value;
@@ -37,4 +42,5 @@ pub use std::{
 	},
 	time::{Instant, SystemTime},
 };
+pub use tokio::sync::mpsc;
 pub use uuid::Uuid;

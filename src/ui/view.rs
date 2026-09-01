@@ -1,10 +1,10 @@
+use std::fmt;
 use strum::IntoStaticStr;
 
 use crate::prelude::*;
-use std::fmt;
 
 #[cfg(feature = "native")]
-use crate::native::{Dashboard, WaterfallChart};
+use crate::native::{Dashboard, WaterfallChart, prelude::*};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, IntoStaticStr)]
 pub enum WindowType {

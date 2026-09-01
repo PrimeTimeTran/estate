@@ -1,31 +1,16 @@
 //! # Description
 //! Centralized internal dependency management for native platform targets like MacOS, Windows, Linux.
+//!
+//! 'pub use' enables external users of this crate to access the public dependencies.
 pub use crate::native::{
-	self,
-	app::*,
-	backend::*,
-	constants_native::*,
-	core::*,
-	daemon::*,
-	job::*,
-	logger::*,
-	monitor::*,
-	poc::*,
-	resolver::*,
-	runtime::{
-		NativeRuntime,
-		runtime::{Runtime, RuntimeState},
-		*,
-	},
-	state::*,
-	ui::*,
-	ve::*,
+	self, constants_native::*, core::*, daemon::*, job::*, monitor::*, runtime::NativeRuntime, ui::*,
 	window::*,
 };
 
 /// # Description
 /// Centralized external dependency management for native platform targets like MacOS, Windows, Linux.
 ///
+/// pub enables downstream deps, "crate::native::*", to access the deps without importing again.
 pub use cli::prelude::*;
 pub use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 pub use signal_hook::{consts::SIGINT, iterator::Signals};

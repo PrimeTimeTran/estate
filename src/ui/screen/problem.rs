@@ -1,9 +1,4 @@
-use crate::{
-	app::state::EstateState,
-	leetcode::{types::*, *},
-	model::problem::StoredProblem,
-	*,
-};
+use crate::{model::problem::StoredProblem, *};
 use egui::Ui;
 
 #[derive(Debug, Default)]
@@ -13,7 +8,6 @@ impl ProblemsScreen {
 	pub fn new() -> Self {
 		Self
 	}
-
 	fn draw_problem(&self, ui: &mut egui::Ui, problem: &StoredProblem) {
 		egui::Frame::group(ui.style()).show(ui, |ui| {
 			ui.horizontal(|ui| {

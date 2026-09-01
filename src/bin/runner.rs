@@ -1,7 +1,11 @@
 #![allow(warnings)]
 
 use anyhow::Context;
-use estate::{NEXT_PROBLEM_ID, prelude::*, problem_source};
+use estate::{
+	NEXT_PROBLEM_ID,
+	prelude::{logger::*, *},
+	problem_source,
+};
 
 // cargo -q run --bin runner -- python
 // RUNNER=native cargo -q run --bin runner -- python

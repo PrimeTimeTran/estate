@@ -1,15 +1,12 @@
-// use tokio::sync::broadcast;
 pub use crate::native::{
 	job::TaskManager, monitor::NativeMonitor, prelude::*, state::NativeStateStore,
 };
 use crate::{
 	app::{
 		Runtime,
-		host::AppHost,
 		state::{EstateState, StateStore},
 	},
 	e,
-	native::NativeApp,
 };
 use std::sync::Mutex;
 
@@ -20,9 +17,6 @@ pub struct NativeRuntime {
 	pub events: EventBus,
 	pub state: Arc<RuntimeState>,
 	pub tasks: Arc<RwLock<TaskManager>>,
-	// handle: tokio::runtime::Handle,
-	// handle: Mutex<Option<tokio::runtime::Handle>>,
-	// handle: Arc<Mutex<Option<tokio::runtime::Handle>>>,
 	handle: tokio::runtime::Handle,
 	event_rx: Arc<Mutex<broadcast::Receiver<e::Event>>>,
 }
@@ -34,21 +28,15 @@ impl NativeRuntime {
 		let events = EventBus::new();
 		let event_rx = Arc::new(Mutex::new(events.subscribe()));
 		Ok(Self {
-			session: Session::default(),
-			store,
-			events,
-			state: Arc::new(runtime_state),
-			tasks: Arc::new(RwLock::new(TaskManager::new())),
-			// handle: Arc::new(Mutex::new(None)),
-			handle,
-
 			event_rx,
+			events,
+			handle,
+			session: Session::default(),
+			state: Arc::new(runtime_state),
+			store,
+			tasks: Arc::new(RwLock::new(TaskManager::new())),
 		})
 	}
-
-	// pub fn set_handle(&self, handle: tokio::runtime::Handle) {
-	// 	*self.handle = handle
-	// }
 }
 impl Runtime for NativeRuntime {
 	fn emit(&self, event: e::Event) {
@@ -64,7 +52,6 @@ impl Runtime for NativeRuntime {
 	fn session(&self) -> Session {
 		self.session.clone()
 	}
-
 	type EventReceiver = NativeEventReceiver;
 	fn subscribe(&self) -> Self::EventReceiver {
 		NativeEventReceiver {
@@ -78,29 +65,23 @@ impl Runtime for NativeRuntime {
 	where
 		F: Future<Output = ()> + Send + 'static,
 	{
-		let handle = self
-			.handle
-			// .lock()
-			// .unwrap()
-			.clone();
-		// .expect("NativeRuntime Tokio runtime not initialized");
+		let handle = self.handle.clone();
 		handle.spawn(future);
 	}
-
 	fn start_dispatcher(self: &Arc<Self>) {
 		let runtime = Arc::clone(self);
 		let mut receiver = runtime.events.subscribe();
 		let mut dispatcher = EventDispatcher::new();
 		// Creating, scheduling, executing, completing tasks
-		dispatcher.register(event::handler::TaskHandler);
+		dispatcher.register(crate::event::handler::TaskHandler);
 		// Updating persisted/application state
-		dispatcher.register(event::handler::StateHandler);
+		dispatcher.register(crate::event::handler::StateHandler);
 		// User/application commands
-		dispatcher.register(event::handler::CommandHandler);
+		dispatcher.register(crate::event::handler::CommandHandler);
 		// Filesystem change events
-		dispatcher.register(event::handler::FileWatcherHandler);
-		dispatcher.register(event::handler::AppHandler);
-		dispatcher.register(event::handler::NavigationHandler);
+		dispatcher.register(crate::event::handler::FileWatcherHandler);
+		dispatcher.register(crate::event::handler::AppHandler);
+		dispatcher.register(crate::event::handler::NavigationHandler);
 		tokio::spawn(async move {
 			loop {
 				match receiver.recv().await {
@@ -126,7 +107,7 @@ impl NativeRuntime {
 
 		state.events_processed += 1;
 	}
-	pub fn subscribe(&self) -> tokio::sync::broadcast::Receiver<e::Event> {
+	pub fn subscribe(&self) -> broadcast::Receiver<e::Event> {
 		self.events.subscribe()
 	}
 }
@@ -143,22 +124,16 @@ impl<'a> NativeAppContext<'a> {
 		todo!("")
 	}
 }
-// impl AppHost<NativeRuntime> for NativeApp {
-// 	fn app(&mut self) -> &mut App<NativeRuntime> {
-// 		&mut self.app
-// 	}
-// }
 pub struct NativeEventReceiver {
-	pub rx: tokio::sync::broadcast::Receiver<e::Event>,
+	pub rx: broadcast::Receiver<e::Event>,
 }
 impl EventReceiver for NativeEventReceiver {
 	fn try_recv(&mut self) -> Option<e::Event> {
 		self.rx.try_recv().ok()
 	}
 }
-
-// impl NativeEventReceiver {
-// 	pub fn try_recv(&mut self) -> Option<e::Event> {
-// 		self.rx.try_recv().ok()
+// impl AppHost<NativeRuntime> for NativeApp {
+// 	fn app(&mut self) -> &mut App<NativeRuntime> {
+// 		&mut self.app
 // 	}
 // }

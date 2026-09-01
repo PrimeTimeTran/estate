@@ -1,6 +1,4 @@
-use crate::prelude::*;
-
-use tool::AddVars;
+use crate::{native::backend::*, prelude::*};
 
 use rmcp::{
 	ErrorData as McpError, handler::server::wrapper::Parameters, model::*, prompt, prompt_router,
@@ -32,7 +30,7 @@ impl MyServer {
 			.build();
 		handler
 	}
-	pub fn add(&self, Parameters(args): Parameters<AddVars>) -> String {
+	pub fn add(&self, Parameters(args): Parameters<tool::AddVars>) -> String {
 		(args.a + args.b).to_string()
 	}
 }

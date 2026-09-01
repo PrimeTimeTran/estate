@@ -45,7 +45,6 @@ use crate::{
 	app::{model, modules::runtime::Runtime, *},
 	doc,
 	native::daemon::projection::command,
-	prelude::*,
 };
 
 pub(crate) async fn execute<R: Runtime>(

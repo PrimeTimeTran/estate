@@ -2,7 +2,7 @@ use egui::Ui;
 use egui_commonmark::{CommonMarkCache, CommonMarkViewer};
 use std::path::PathBuf;
 
-use crate::{app::*, prelude::*};
+use crate::app::*;
 
 pub struct MarkdownView {
 	path: PathBuf,

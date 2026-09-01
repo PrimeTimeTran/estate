@@ -1,6 +1,6 @@
 use notify::{Event, EventKind};
 
-use crate::{app::*, event::channel};
+use crate::app::*;
 
 pub trait Monitor {
 	fn watch(&mut self);
