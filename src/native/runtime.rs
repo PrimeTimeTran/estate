@@ -27,6 +27,10 @@ impl NativeRuntime {
 		let runtime_state = RuntimeState::new(state);
 		let events = EventBus::new();
 		let event_rx = Arc::new(Mutex::new(events.subscribe()));
+		let runtime = tokio::runtime::Builder::new_multi_thread()
+			.enable_all()
+			.build()
+			.expect("failed to create Tokio runtime");
 		Ok(Self {
 			event_rx,
 			events,
@@ -38,7 +42,17 @@ impl NativeRuntime {
 		})
 	}
 }
+
 impl Runtime for NativeRuntime {
+	fn spawn<F>(&self, future: F)
+	where
+		F: std::future::Future<Output = ()> + std::marker::Send + 'static,
+	{
+		self.handle.spawn(future);
+	}
+	async fn sleep(&self, duration: std::time::Duration) {
+		tokio::time::sleep(duration).await;
+	}
 	fn emit(&self, event: e::Event) {
 		self.events.emit(event);
 	}
@@ -61,13 +75,13 @@ impl Runtime for NativeRuntime {
 	fn try_recv(&self) -> Option<e::Event> {
 		self.event_rx.lock().unwrap().try_recv().ok()
 	}
-	fn spawn<F>(&self, future: F)
-	where
-		F: Future<Output = ()> + Send + 'static,
-	{
-		let handle = self.handle.clone();
-		handle.spawn(future);
-	}
+	// fn spawn<F>(&self, future: F)
+	// where
+	// 	F: Future<Output = ()> + Send + 'static,
+	// {
+	// 	let handle = self.handle.clone();
+	// 	handle.spawn(future);
+	// }
 	fn start_dispatcher(self: &Arc<Self>) {
 		let runtime = Arc::clone(self);
 		let mut receiver = runtime.events.subscribe();
@@ -137,3 +151,9 @@ impl EventReceiver for NativeEventReceiver {
 // 		&mut self.app
 // 	}
 // }
+
+impl Drop for NativeRuntime {
+	fn drop(&mut self) {
+		tracing::info!("💀 NativeRuntime DROPPED");
+	}
+}

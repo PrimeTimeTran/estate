@@ -8,7 +8,7 @@ use tokio::sync::broadcast::error::TryRecvError;
 
 // #[cfg(not(target_arch = "wasm32"))]
 #[cfg(feature = "native")]
-use crate::native::ui::VeInputState;
+use crate::native::ui::IOState;
 
 pub struct AppContext<'a, R: Runtime> {
 	pub app: &'a mut App<R>,
@@ -16,7 +16,7 @@ pub struct AppContext<'a, R: Runtime> {
 
 	#[cfg(feature = "native")]
 	#[cfg(not(target_arch = "wasm32"))]
-	pub input: VeInputState,
+	pub input: IOState,
 	#[cfg(feature = "native")]
 	#[cfg(not(target_arch = "wasm32"))]
 	pub event_rx: tokio::sync::broadcast::Receiver<e::Event>,

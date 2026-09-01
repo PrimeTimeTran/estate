@@ -23,8 +23,32 @@ impl<R: Runtime> App<R> {
 			view: crate::START_VIEW,
 		}
 	}
+}
+impl<R: Runtime> App<R> {
 	pub fn runtime(&self) -> Arc<R> {
 		Arc::clone(&self.engine.runtime)
+	}
+	pub fn start(&self) {
+		if !crate::START_APP_CLOCK {
+			return;
+		}
+		let mut count = 0;
+		println!("⏰ App<T> START CLOCK: {}", count);
+		tracing::info!("⏰ App<T> START CLOCK: {}", count);
+
+		let runtime = self.engine.runtime.clone();
+
+		self.spawn(async move {
+			println!("⏰ App<T> CLOCK TASK STARTED: {}", count);
+			tracing::info!("⏰ App<T> CLOCK TASK STARTED: {}", count);
+
+			loop {
+				count += 1;
+				runtime.sleep(std::time::Duration::from_secs(1)).await;
+				println!("⏰ App<T> CLOCK TICK: {}", count);
+				tracing::info!("⏰ App<T> CLOCK TICK: {}", count);
+			}
+		});
 	}
 	pub fn api(&self) -> Arc<ApiClient> {
 		Arc::clone(&self.api)
@@ -57,6 +81,71 @@ impl<R: Runtime> App<R> {
 		self.engine.runtime.spawn(future);
 	}
 }
+
+impl<R: Runtime> App<R> {
+	pub fn state(&self) -> std::sync::RwLockReadGuard<'_, EstateState> {
+		self.engine.runtime.state().read()
+	}
+	pub fn jobs(&self) -> std::sync::RwLockReadGuard<'_, EstateState> {
+		self.state()
+	}
+}
+impl<R: Runtime> App<R> {
+	pub fn on_start(&mut self) {
+		self
+			.engine
+			.runtime
+			.emit(e::Event::app(e::Klass::SessionStart));
+	}
+	pub fn new_task(&mut self) {
+		self
+			.engine
+			.runtime
+			.emit(e::Event::app(e::Klass::TaskRequested {
+				request: TaskRequest::Create(TaskKind::SyncBookmarks),
+			}));
+	}
+	pub fn clear_tasks(&mut self) {
+		self
+			.engine
+			.runtime
+			.emit(e::Event::app(e::Klass::CommandExecuted {
+				command: "task_clear".into(),
+			}));
+	}
+	pub fn stop_session(&mut self) {
+		println!("stop_session from app");
+	}
+}
+impl<R: Runtime> App<R> {
+	pub fn default_view(&self) -> Ve<R> {
+		Ve::new(MarkdownView::new(crate::MARKDOWN))
+	}
+	pub fn view(&self) -> ViewType {
+		self.view
+	}
+	pub fn show_view(&mut self, view: ViewType) {
+		self.view = view;
+	}
+}
+impl<R: Runtime> App<R> {
+	pub fn app_state(&self) -> &AppState {
+		&self.state
+	}
+	pub fn show_dashboard(&mut self) {
+		self.show_view(ViewType::Dashboard);
+	}
+	pub fn show_tasks(&mut self) {
+		self.show_view(ViewType::TaskManager);
+		self
+			.engine
+			.runtime
+			.emit(e::Event::app(e::Klass::CommandExecuted {
+				command: "task_list".into(),
+			}));
+	}
+}
+
 impl<R: Runtime + 'static> App<R> {
 	pub fn load_problems(&mut self) {
 		// tracing::info!("🔥 ACTUAL App<R>::load_problems");
@@ -104,68 +193,4 @@ impl<R: Runtime + 'static> App<R> {
 			}
 		});
 	}
-}
-impl<R: Runtime> App<R> {
-	pub fn state(&self) -> std::sync::RwLockReadGuard<'_, EstateState> {
-		self.engine.runtime.state().read()
-	}
-	pub fn jobs(&self) -> std::sync::RwLockReadGuard<'_, EstateState> {
-		self.state()
-	}
-}
-impl<R: Runtime> App<R> {
-	pub fn on_start(&mut self) {
-		self
-			.engine
-			.runtime
-			.emit(e::Event::app(e::Klass::SessionStart));
-	}
-	pub fn new_task(&mut self) {
-		self
-			.engine
-			.runtime
-			.emit(e::Event::app(e::Klass::TaskRequested {
-				request: TaskRequest::Create(TaskKind::SyncBookmarks),
-			}));
-	}
-	pub fn clear_tasks(&mut self) {
-		self
-			.engine
-			.runtime
-			.emit(e::Event::app(e::Klass::CommandExecuted {
-				command: "task_clear".into(),
-			}));
-	}
-	pub fn stop_session(&mut self) {
-		println!("stop_session from app");
-	}
-}
-impl<R: Runtime> App<R> {
-	pub fn app_state(&self) -> &AppState {
-		&self.state
-	}
-	pub fn default_view(&self) -> Ve<R> {
-		Ve::new(MarkdownView::new(crate::MARKDOWN))
-	}
-	pub fn view(&self) -> ViewType {
-		self.view
-	}
-	pub fn show_view(&mut self, view: ViewType) {
-		self.view = view;
-	}
-	pub fn show_dashboard(&mut self) {
-		self.show_view(ViewType::Dashboard);
-	}
-	pub fn show_tasks(&mut self) {
-		self.show_view(ViewType::TaskManager);
-		self
-			.engine
-			.runtime
-			.emit(e::Event::app(e::Klass::CommandExecuted {
-				command: "task_list".into(),
-			}));
-	}
-}
-pub trait EventReceiver {
-	fn try_recv(&mut self) -> Option<e::Event>;
 }

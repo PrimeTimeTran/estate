@@ -242,7 +242,7 @@ impl Veable<NativeRuntime> for Dashboard {
 		self.check_for_changes(ui.ctx());
 		// 2. Split the available space to reserve room for the bottom status bar
 		let available_size = ui.available_size();
-		let status_bar_height = DEFAULT_CONFIG.status_bar.size;
+		let status_bar_height = LAYOUT.status_bar.size;
 		let main_size = egui::vec2(available_size.x, available_size.y - status_bar_height);
 		// Main Content Area
 		ui.allocate_ui(main_size, |ui| {

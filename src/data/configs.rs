@@ -1,9 +1,13 @@
-use crate::ui::{PanelConfig, *};
+use crate::ui::{PanelState, *};
 
 use egui::Color32;
 use std::sync::atomic::AtomicI64;
 
+pub static START_APP_CLOCK: bool = false;
+pub static START_WINDOW: WindowType = WindowType::ProblemsScreen;
 pub static START_VIEW: ViewType = ViewType::ProblemsScreen;
+// Unsafe territory
+// pub static mut START_VIEW: ViewType = ...;
 pub static DEFAULT_VIEW: ViewType = ViewType::Markdown;
 pub static ESTATE_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub static HMR_CHART_JSON: &str = "/Users/future/kb/project/crates/estate/src/data/chart.json";
@@ -29,36 +33,75 @@ pub static STATE_PATH: &str = "/Users/future/Library/Application Support/estate/
 pub static TEMPLATE_PATH: &str = "/Users/future/KB/project/crates/estate/template";
 pub static WORKSPACE_SETTINGS: &str = ".estate/settings.json";
 
-pub static INITIAL_WINDOW: WindowType = WindowType::ProblemsScreen;
-// pub static INITIAL_WINDOW: WindowType = WindowType::Dashboard;
-// pub static INITIAL_WINDOW: WindowType = WindowType::TelemetryInspector;
-// pub static INITIAL_WINDOW: WindowType = WindowType::EguiVeable;
-// pub static INITIAL_WINDOW: WindowType = WindowType::WaterfallChart;
-// pub static INITIAL_WINDOW: WindowType = WindowType::MarkdownView;
+// pub static START_WINDOW: WindowType = WindowType::Dashboard;
+// pub static START_WINDOW: WindowType = WindowType::TelemetryInspector;
+// pub static START_WINDOW: WindowType = WindowType::EguiVeable;
+// pub static START_WINDOW: WindowType = WindowType::WaterfallChart;
+// pub static START_WINDOW: WindowType = WindowType::MarkdownView;
 
 pub(crate) struct VeConfig {
 	pub bg: Color32,
 	pub surface: Color32,
-	pub activity_bar: PanelConfig,
-	pub primary_bar: PanelConfig,
-	pub secondary_bar: PanelConfig,
-	pub bottom_panel: PanelConfig,
-	pub status_bar: PanelConfig,
-	pub dock_left: PanelConfig,
-	pub dock_right: PanelConfig,
+	pub activity_bar: PanelState,
+	pub primary_bar: PanelState,
+	pub secondary_bar: PanelState,
+	pub bottom_panel: PanelState,
+	pub status_bar: PanelState,
+	pub dock_left: PanelState,
+	pub dock_right: PanelState,
 }
+impl VeConfig {
+	pub const fn default() -> Self {
+		Self {
+			bg: palette::BG,
+			surface: palette::SURFACE,
+			activity_bar: PanelState::new(true, 48.0),
+			primary_bar: PanelState::new(true, 40.0),
+			secondary_bar: PanelState::new(true, 48.0),
+			bottom_panel: PanelState::new(false, 240.0),
+			status_bar: PanelState::new(true, 24.0),
+			dock_left: PanelState::new(true, 280.0),
+			dock_right: PanelState::new(true, 320.0),
+		}
+	}
+	pub const fn zen() -> Self {
+		Self {
+			activity_bar: PanelState::new(false, 48.0),
+			primary_bar: PanelState::new(false, 40.0),
+			secondary_bar: PanelState::new(false, 48.0),
+			bottom_panel: PanelState::new(false, 240.0),
+			status_bar: PanelState::new(false, 24.0),
+			dock_left: PanelState::new(false, 280.0),
+			dock_right: PanelState::new(false, 320.0),
+			..Self::default()
+		}
+	}
+}
+impl VeConfig {
+	pub const fn new(
+		activity_bar: bool,
+		primary_bar: bool,
+		secondary_bar: bool,
+		bottom_panel: bool,
+		status_bar: bool,
+		dock_left: bool,
+		dock_right: bool,
+	) -> Self {
+		Self {
+			bg: palette::BG,
+			surface: palette::SURFACE,
+			activity_bar: PanelState::new(activity_bar, 48.0),
+			primary_bar: PanelState::new(primary_bar, 40.0),
+			secondary_bar: PanelState::new(secondary_bar, 48.0),
+			bottom_panel: PanelState::new(bottom_panel, 240.0),
+			status_bar: PanelState::new(status_bar, 24.0),
+			dock_left: PanelState::new(dock_left, 280.0),
+			dock_right: PanelState::new(dock_right, 320.0),
+		}
+	}
+}
+pub(crate) const LAYOUT: VeConfig = VeConfig::default();
 
-pub(crate) const DEFAULT_CONFIG: VeConfig = VeConfig {
-	bg: palette::BG,
-	surface: palette::SURFACE,
-	activity_bar: PanelConfig::new(true, 48.0),
-	primary_bar: PanelConfig::new(true, 40.0),
-	secondary_bar: PanelConfig::new(true, 48.0),
-	bottom_panel: PanelConfig::new(true, 0.0),
-	status_bar: PanelConfig::new(true, 24.0),
-	dock_left: PanelConfig::new(true, 280.0),
-	dock_right: PanelConfig::new(true, 320.0),
-};
 use std::sync::atomic::AtomicU64;
 
 // pub static EVENT_ID: AtomicU64 = AtomicU64::new(1);

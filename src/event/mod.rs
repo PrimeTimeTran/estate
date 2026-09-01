@@ -4,38 +4,8 @@ pub(crate) mod channel;
 pub(crate) mod handler;
 pub(crate) use handler::EventHandler;
 
-#[derive(Debug, Clone)]
-pub struct EventBus {
-	sender: broadcast::Sender<e::Event>,
-}
-impl std::hash::Hash for EventBus {
-	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-		self.sender.same_channel(&self.sender).hash(state);
-	}
-}
-impl Default for EventBus {
-	fn default() -> Self {
-		Self::new()
-	}
-}
-impl EventBus {
-	pub fn new() -> Self {
-		let (sender, _) = broadcast::channel(256);
-		Self { sender }
-	}
-	pub fn emit(&self, event: e::Event) {
-		match self.sender.send(event.clone()) {
-			Ok(count) => {
-				tracing::debug!("📡 Event emitted: {:?} → {} receiver(s)", event.kind, count);
-			}
-			Err(_) => {
-				tracing::debug!("⚠️ Event emitted with NO receivers: {:?}", event.kind);
-			}
-		}
-	}
-	pub fn subscribe(&self) -> broadcast::Receiver<e::Event> {
-		self.sender.subscribe()
-	}
+pub trait EventReceiver {
+	fn try_recv(&mut self) -> Option<e::Event>;
 }
 pub struct EventDispatcher {
 	handlers: Vec<Box<dyn EventHandler>>,
@@ -71,6 +41,40 @@ impl EventDispatcher {
 			handler.handle(&event, runtime).await;
 		}
 		runtime.event_processed();
+	}
+}
+
+#[derive(Debug, Clone)]
+pub struct EventBus {
+	sender: broadcast::Sender<e::Event>,
+}
+impl std::hash::Hash for EventBus {
+	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+		self.sender.same_channel(&self.sender).hash(state);
+	}
+}
+impl Default for EventBus {
+	fn default() -> Self {
+		Self::new()
+	}
+}
+impl EventBus {
+	pub fn new() -> Self {
+		let (sender, _) = broadcast::channel(256);
+		Self { sender }
+	}
+	pub fn emit(&self, event: e::Event) {
+		match self.sender.send(event.clone()) {
+			Ok(count) => {
+				tracing::debug!("📡 Event emitted: {:?} → {} receiver(s)", event.kind, count);
+			}
+			Err(_) => {
+				tracing::debug!("⚠️ Event emitted with NO receivers: {:?}", event.kind);
+			}
+		}
+	}
+	pub fn subscribe(&self) -> broadcast::Receiver<e::Event> {
+		self.sender.subscribe()
 	}
 }
 

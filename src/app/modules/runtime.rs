@@ -4,7 +4,15 @@ use crate::{
 	prelude::*,
 };
 
-pub trait Runtime: Clone + Send + Sync {
+pub trait Runtime: Clone + Sync + std::marker::Send + 'static {
+	fn spawn<F>(&self, future: F)
+	where
+		F: std::future::Future<Output = ()> + Send + 'static;
+	fn sleep(
+		&self,
+		duration: std::time::Duration,
+	) -> impl std::future::Future<Output = ()> + Send + '_;
+
 	/// Services own long-lived responsibilities and their concurrency/lifecycle;
 	///
 	/// Events are the standardized mechanism by which those services expose meaningful
@@ -13,17 +21,15 @@ pub trait Runtime: Clone + Send + Sync {
 	type EventReceiver: EventReceiver;
 	fn subscribe(&self) -> Self::EventReceiver;
 	fn emit(&self, event: e::Event);
+	fn try_recv(&self) -> Option<e::Event>;
+	// fn spawn<F>(&self, future: F)
+	// where
+	// 	F: Future<Output = ()> + Send + 'static;
+
 	fn start_dispatcher(self: &Arc<Self>);
 	fn state(&self) -> &RuntimeState;
 	fn save(&self, state: &EstateState) -> Result<()>;
 	fn session(&self) -> Session;
-	// #[cfg(feature = "native")]
-	// #[cfg(not(target_arch = "wasm32"))]
-	fn try_recv(&self) -> Option<e::Event>;
-
-	fn spawn<F>(&self, future: F)
-	where
-		F: Future<Output = ()> + Send + 'static;
 }
 
 #[derive(Debug)]

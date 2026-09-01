@@ -28,9 +28,11 @@ pub struct NativeApp {
 	menu: Option<TrayMenu>,
 	menu_bar: Option<Menu>,
 	monitor: NativeMonitor,
-	scroll_tray: Option<TrayIcon>,
-	tray: Option<TrayIcon>,
-	view_type: ViewType,
+	tray_cursor: Option<TrayIcon>,
+	tray_clock: Option<TrayIcon>,
+	active_view: ViewType,
+	// Would store a reference
+	// active_view: &'static ViewType,
 	tokio: tokio::runtime::Runtime,
 }
 impl NativeApp {
@@ -67,9 +69,10 @@ impl NativeApp {
 			menu: None,
 			menu_bar: None,
 			monitor: NativeMonitor::new()?,
-			scroll_tray: None,
-			tray: None,
-			view_type: crate::START_VIEW,
+			tray_cursor: None,
+			tray_clock: None,
+			active_view: crate::START_VIEW,
+			// active_view: &START_VIEW,
 			windows: vec![],
 		})
 	}
@@ -100,6 +103,7 @@ impl NativeApp {
 		);
 		let api = ready_rx.recv().expect("daemon failed to initialize")?;
 		let instance = App::new(self.engine.clone(), api);
+		instance.start();
 		self.app = Some(instance);
 		self.spawn_global_hotkey_daemon()?;
 		let event_loop = EventLoop::<AppEvent>::with_user_event()
@@ -112,6 +116,7 @@ impl NativeApp {
 		self.spawn_clock(proxy.clone());
 		self.spawn_cursor_daemon(proxy.clone());
 		self.spawn_signal_handler(proxy.clone());
+
 		self
 			.engine
 			.runtime
@@ -275,7 +280,7 @@ impl NativeApp {
 		}
 		if let Some(app) = self.app.as_mut() {
 			let api = app.api();
-			let view = self.view_type;
+			let view = self.active_view;
 			match Window::new(event_loop, view, api) {
 				Ok(window) => {
 					window.instance.set_title(view.name().into());
@@ -350,15 +355,15 @@ impl NativeApp {
 		for window in &mut self.windows {
 			if let Some(app) = self.app.as_mut() {
 				let api = app.api();
-				self.view_type = app.view();
+				self.active_view = app.view();
 				window.window.sync_view(app.view(), api);
 				window.window.instance.request_redraw();
-				window.window.instance.set_title(self.view_type.name());
+				window.window.instance.set_title(self.active_view.name());
 			}
 		}
 	}
-	fn set_view(&mut self, view_type: ViewType) {
-		self.view_type = view_type;
+	fn set_view(&mut self, active_view: ViewType) {
+		self.active_view = active_view;
 	}
 	fn set_menu_bar(&mut self, new_menu: Menu) {
 		self.menu_bar = Some(new_menu);
@@ -426,9 +431,9 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 			self.menu_bar = Some(menu);
 		}
 		if self.windows.is_empty() {
-			self.open_window(event_loop, crate::INITIAL_WINDOW);
+			self.open_window(event_loop, crate::START_WINDOW);
 		}
-		if self.tray.is_none() {
+		if self.tray_clock.is_none() {
 			let (menu, tray) = match Self::bootstrap() {
 				Ok(value) => value,
 				Err(error) => {
@@ -437,17 +442,17 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 				}
 			};
 			self.menu = Some(menu);
-			self.tray = Some(tray);
+			self.tray_clock = Some(tray);
 			tracing::debug!("🔥 main tray initialized");
 		}
-		if self.scroll_tray.is_none() {
+		if self.tray_cursor.is_none() {
 			match TrayIconBuilder::new()
 				.with_icon(scroll_tray_icon())
 				.with_tooltip("Estate Scroll Controller")
 				.build()
 			{
 				Ok(tray) => {
-					self.scroll_tray = Some(tray);
+					self.tray_cursor = Some(tray);
 					tracing::debug!("🔥 scroll tray initialized");
 				}
 				Err(error) => {
@@ -502,7 +507,7 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 						let event_rx = self.engine.runtime.subscribe();
 						let mut ctx = AppContext {
 							app,
-							input: VeInputState::default(),
+							input: IOState::default(),
 							event_rx,
 							last_revision: 0,
 						};
@@ -573,12 +578,12 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 				// let text = format!("🟡 {:.0}, {:.0}", x, y);
 				// let text = format!("🔴 {:.0}, {:.0}", x, y);
 				// let region = if x < 960.0 { "← LEFT" } else { "RIGHT →" };
-				if let Some(tray) = &self.scroll_tray {
+				if let Some(tray) = &self.tray_cursor {
 					let _ = tray.set_title(Some(text));
 				}
 			}
 			AppEvent::TickClock(text) => {
-				if let Some(tray) = &self.tray {
+				if let Some(tray) = &self.tray_clock {
 					let _ = tray.set_title(Some(text));
 				}
 				self.sync_views();
@@ -591,5 +596,11 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 			} => {}
 			_ => {}
 		}
+	}
+}
+
+impl Drop for NativeApp {
+	fn drop(&mut self) {
+		tracing::info!("💀 NativeApp DROPPED");
 	}
 }

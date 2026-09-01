@@ -1,17 +1,167 @@
 pub(crate) mod chart;
 pub(crate) mod components;
-pub(crate) mod screen;
+pub mod ve;
 pub(crate) mod view;
 
-pub mod ve;
-
-pub use crate::ui::{screen::*, ve::*, view::*};
+pub use crate::ui::{components::*, ve::*, view::*};
 pub use crate::{palette::*, prelude::*};
 
 pub const TRAY_ICON: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/estate-tray.png"));
 pub const TRAY_SCROLL_ICON: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/estate-tray.png"));
 
-pub struct PanelConfig {
+pub struct Region {
+	// Layout
+	pub size: f32,
+	pub min_size: f32,
+	pub max_size: f32,
+	pub resizable: bool,
+
+	// Positioning
+	pub docked: bool,
+
+	// Presentation
+	pub padding: egui::Margin,
+	pub fill: Option<egui::Color32>,
+	pub top_border: bool,
+}
+impl Region {
+	pub fn new(size: f32) -> Self {
+		Self {
+			docked: true,
+			fill: None,
+			max_size: size,
+			min_size: size,
+			padding: egui::Margin::ZERO,
+			resizable: false,
+			size,
+			top_border: false,
+		}
+	}
+	pub fn fixed(size: f32) -> Self {
+		Self {
+			size,
+			min_size: size,
+			max_size: size,
+			resizable: false,
+			docked: true,
+			fill: None,
+			padding: egui::Margin::ZERO,
+			top_border: false,
+		}
+	}
+	pub fn resizable(size: f32, min_size: f32, max_size: f32) -> Self {
+		Self {
+			size: size.clamp(min_size, max_size),
+			min_size,
+			max_size,
+			resizable: true,
+			docked: true,
+			fill: Some(palette::SURFACE),
+			padding: egui::Margin::ZERO,
+			top_border: false,
+		}
+	}
+	pub fn content() -> Self {
+		Self {
+			size: 0.0,
+			min_size: 0.0,
+			max_size: f32::MAX,
+			resizable: false,
+			docked: false,
+			fill: None,
+			padding: egui::Margin::ZERO,
+			top_border: false,
+		}
+	}
+	pub fn with_fill(mut self, fill: egui::Color32) -> Self {
+		self.fill = Some(fill);
+		self
+	}
+	pub fn set_size(&mut self, size: f32) {
+		self.size = size.clamp(self.min_size, self.max_size);
+	}
+	pub fn resize(&mut self, delta: f32) {
+		self.set_size(self.size + delta);
+	}
+	pub fn with_padding(mut self, padding: i32) -> Self {
+		self.padding = egui::Margin::same(padding as i8);
+		self
+	}
+	pub fn with_top_border(mut self, enabled: bool) -> Self {
+		self.top_border = enabled;
+		self
+	}
+	pub fn content_rect(&self, rect: egui::Rect) -> egui::Rect {
+		egui::Rect::from_min_max(
+			egui::pos2(
+				rect.left() + (self.padding.left as f32),
+				rect.top() + (self.padding.top as f32),
+			),
+			egui::pos2(
+				rect.right() - (self.padding.right as f32),
+				rect.bottom() - (self.padding.bottom as f32),
+			),
+		)
+	}
+}
+
+pub struct Panel<R: Runtime> {
+	pub region: Region,
+	pub content: Box<dyn Veable<R>>,
+	pub open: bool,
+	pub overlay: bool,
+	pub auto_hide: bool,
+}
+impl<R: Runtime> Veable<R> for Panel<R> {
+	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>) {
+		self.content.draw(ui, ctx);
+	}
+}
+impl<R: Runtime> Panel<R> {
+	pub fn new(content: impl Veable<R> + 'static, region: Region) -> Self {
+		Self {
+			region,
+			content: Box::new(content),
+			open: true,
+			overlay: false,
+			auto_hide: false,
+		}
+	}
+	pub fn from_config(
+		content: impl Veable<R> + 'static,
+		region: Region,
+		config: &PanelState,
+	) -> Self {
+		Self::new(content, region).with_open(config.active)
+	}
+	pub fn with_open(mut self, open: bool) -> Self {
+		self.open = open;
+		self
+	}
+	pub fn with_overlay(mut self, overlay: bool) -> Self {
+		self.overlay = overlay;
+		self
+	}
+	pub fn with_auto_hide(mut self, auto_hide: bool) -> Self {
+		self.auto_hide = auto_hide;
+		self
+	}
+	pub fn open(&mut self) {
+		self.open = true;
+	}
+	pub fn close(&mut self) {
+		self.open = false;
+	}
+	pub fn toggle(&mut self) {
+		self.open = !self.open;
+	}
+	pub fn is_open(self) -> bool {
+		self.open
+	}
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct PanelState {
 	/// Is the panel "open"? Think sidebar.
 	pub active: bool,
 	pub size: f32,
@@ -19,8 +169,7 @@ pub struct PanelConfig {
 	pub resizable: bool,
 	pub docked: bool,
 }
-impl PanelConfig {
-	/// New Panel
+impl PanelState {
 	pub const fn new(active: bool, size: f32) -> Self {
 		Self {
 			active,
@@ -29,8 +178,42 @@ impl PanelConfig {
 			docked: true,
 		}
 	}
+	pub const fn size(&self) -> f32 {
+		if self.active { self.size } else { 0.0 }
+	}
+	pub const fn is_active(&self) -> bool {
+		self.active
+	}
+	pub const fn effective_size(&self) -> f32 {
+		if self.active { self.size } else { 0.0 }
+	}
+	pub fn region(&self, min_size: f32, max_size: f32) -> Region {
+		Region::resizable(self.size, min_size, max_size)
+	}
 }
-
+impl PanelState {
+	pub const fn activity_bar() -> Self {
+		Self::new(true, 48.0)
+	}
+	pub const fn primary_bar() -> Self {
+		Self::new(true, 40.0)
+	}
+	pub const fn secondary_bar() -> Self {
+		Self::new(true, 48.0)
+	}
+	pub const fn bottom_panel() -> Self {
+		Self::new(false, 240.0)
+	}
+	pub const fn status_bar() -> Self {
+		Self::new(true, 24.0)
+	}
+	pub const fn dock_left() -> Self {
+		Self::new(true, 280.0)
+	}
+	pub const fn dock_right() -> Self {
+		Self::new(true, 320.0)
+	}
+}
 #[derive(Clone, Copy)]
 pub enum ResizeEdge {
 	Left,

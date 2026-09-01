@@ -3,6 +3,47 @@ function getDifficulty() {
 		document.querySelector(`.text-difficulty-${level}`),
 	)
 }
+getDifficulty()
+function grabTestCases2() {
+	return [...document.querySelectorAll('div.example-block')].map(
+		(pre, index) => {
+			const strongs = [...pre.querySelectorAll('strong')]
+
+			const getSection = (label) => {
+				const strong = strongs.find(
+					(el) => el.textContent.trim() === `${label}:`,
+				)
+
+				if (!strong) return null
+
+				const parts = []
+				let node = strong.nextSibling
+
+				while (node) {
+					if (
+						node.nodeType === Node.ELEMENT_NODE &&
+						node.tagName === 'STRONG'
+					) {
+						break
+					}
+
+					parts.push(node.textContent)
+					node = node.nextSibling
+				}
+
+				return parts.join('').trim()
+			}
+
+			return {
+				index,
+				input: getSection('Input'),
+				output: getSection('Output'),
+				explanation: getSection('Explanation'),
+			}
+		},
+	)
+}
+grabTestCases2()
 function grabTestCases() {
 	return [...document.querySelectorAll('pre')].map((pre, index) => {
 		const strongs = [...pre.querySelectorAll('strong')]
@@ -35,6 +76,7 @@ function grabTestCases() {
 		}
 	})
 }
+grabTestCases()
 function copyProblemWithDesc() {
 	const normalize = (s) => s.replace(/\s+/g, ' ').trim()
 	const link = [...document.querySelectorAll('a[href]')].find((a) =>
@@ -67,6 +109,8 @@ function copyProblemWithDesc() {
 
 	const testCases = grabTestCases()
 
+	const finalTestCases = testCases?.length > 0 ? testCases : grabTestCases2()
+
 	const result = {
 		number,
 		'normalized-name': normalizedName,
@@ -76,7 +120,7 @@ function copyProblemWithDesc() {
 		url,
 		filename: `${number}-${normalizedName}.py`,
 		'description-raw': descriptionHtml,
-		'test-cases': testCases,
+		'test-cases': finalTestCases,
 	}
 
 	const text = JSON.stringify(result, null, 2)
