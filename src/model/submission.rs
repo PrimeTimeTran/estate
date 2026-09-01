@@ -37,34 +37,19 @@ pub enum SubmissionResult {
 	InternalError,
 }
 
-// #[derive(Debug, Clone, Default)]
-// pub enum SubmissionStatus {
-// 	#[default]
-// 	Idle,
-// 	Submitting,
-// 	Running {
-// 		id: String,
-// 	},
-// 	Completed {
-// 		id: String,
-// 		result: SubmissionResult,
-// 	},
-// 	Failed {
-// 		error: String,
-// 	},
-// }
-// impl TryFrom<i32> for SubmissionResult {
-// 	type Error = anyhow::Error;
-// 	fn try_from(value: i32) -> Result<Self, Self::Error> {
-// 		match value {
-// 			0 => Ok(Self::Accepted),
-// 			1 => Ok(Self::WrongAnswer),
-// 			2 => Ok(Self::CompilationError),
-// 			3 => Ok(Self::RuntimeError),
-// 			4 => Ok(Self::TimeLimitExceeded),
-// 			5 => Ok(Self::MemoryLimitExceeded),
-// 			6 => Ok(Self::InternalError),
-// 			other => anyhow::bail!("unknown submission result: {other}"),
-// 		}
-// 	}
-// }
+impl TryFrom<i32> for SubmissionResult {
+	type Error = anyhow::Error;
+
+	fn try_from(value: i32) -> Result<Self, Self::Error> {
+		match value {
+			3 => Ok(Self::Accepted),
+			4 => Ok(Self::WrongAnswer),
+			8 => Ok(Self::CompilationError),
+			7 => Ok(Self::RuntimeError),
+			5 => Ok(Self::TimeLimitExceeded),
+			6 => Ok(Self::MemoryLimitExceeded),
+			9 => Ok(Self::InternalError),
+			other => anyhow::bail!("unknown submission result: {other}"),
+		}
+	}
+}

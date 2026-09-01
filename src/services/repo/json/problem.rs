@@ -41,7 +41,10 @@ impl JsonProblemRepository {
 			let stored: StoredProblem = serde_json::from_str(&contents)
 				.with_context(|| format!("failed to parse {}", path.display()))?;
 
-			if query.difficulty.is_some_and(|d| stored.difficulty != d) {
+			if query
+				.difficulty
+				.is_some_and(|d| stored.difficulty != d as i32)
+			{
 				continue;
 			}
 
@@ -86,7 +89,10 @@ impl ProblemRepository for JsonProblemRepository {
 				.with_context(|| format!("failed to read {}", path.display()))?;
 			let stored: StoredProblem = serde_json::from_str(&contents)
 				.with_context(|| format!("failed to parse {}", path.display()))?;
-			if query.difficulty.is_some_and(|d| stored.difficulty != d) {
+			if query
+				.difficulty
+				.is_some_and(|d| stored.difficulty != d as i32)
+			{
 				continue;
 			}
 			problems.push(stored.into());
@@ -144,6 +150,7 @@ impl ProblemRepository for JsonProblemRepository {
 	async fn get_by_slug(&self, slug: &str) -> Result<Problem> {
 		Ok(self.load(slug).await?.into())
 	}
+
 	async fn sample_problem(&self, query: ProblemQuery) -> Result<Problem> {
 		use rand::seq::IndexedRandom;
 
@@ -166,10 +173,10 @@ impl ProblemRepository for JsonProblemRepository {
 
 			let stored: StoredProblem = serde_json::from_str(&contents)
 				.with_context(|| format!("failed to parse {}", path.display()))?;
-
+			// stored.difficulty
 			if query
 				.difficulty
-				.is_some_and(|difficulty| stored.difficulty != difficulty)
+				.is_some_and(|difficulty| stored.difficulty != difficulty as i32)
 			{
 				continue;
 			}

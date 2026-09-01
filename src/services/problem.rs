@@ -1,4 +1,4 @@
-use crate::services::*;
+use crate::{model::Difficulty, services::*};
 
 #[derive(Default)]
 pub struct ProblemServiceImpl<R> {
@@ -20,15 +20,23 @@ where
 	) -> Result<Response<ListProblemsResponse>, Status> {
 		let request = request.into_inner();
 		let page = page_request(request.page)?;
+
+		let difficulty = request
+			.difficulty
+			.map(Difficulty::try_from)
+			.transpose()
+			.map_err(internal_error)?;
+
 		let result = self
 			.repository
 			.list(ProblemQuery {
 				page: Some(page.page),
 				page_size: Some(page.page_size),
-				difficulty: request.difficulty,
+				difficulty,
 			})
 			.await
 			.map_err(internal_error)?;
+
 		Ok(Response::new(ListProblemsResponse {
 			problems: result.items.clone(),
 			page: Some(result.page_info()),
@@ -89,11 +97,26 @@ where
 		request: Request<SampleProblemRequest>,
 	) -> Result<Response<Problem>, Status> {
 		let request = request.into_inner();
+		let difficulty = request
+			.difficulty
+			.map(Difficulty::try_from)
+			.transpose()
+			.map_err(internal_error)?;
+
+		// let result = self
+		// 	.repository
+		// 	.list(ProblemQuery {
+		// 		page: Some(page.page),
+		// 		page_size: Some(page.page_size),
+		// 		difficulty,
+		// 	})
+		// 	.await
+		// 	.map_err(internal_error)?;
 
 		let problem = self
 			.repository
 			.sample_problem(ProblemQuery {
-				difficulty: request.difficulty,
+				difficulty,
 				page_size: Some(1),
 				page: Some(0),
 			})

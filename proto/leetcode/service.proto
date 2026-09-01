@@ -11,22 +11,15 @@ service ProblemService {
   rpc GetProblem(leetcode.types.GetProblemRequest) returns (leetcode.types.Problem);
   rpc UpdateProblem(leetcode.types.UpdateProblemRequest) returns (leetcode.types.Problem);
   rpc DeleteProblem(leetcode.types.DeleteProblemRequest) returns (leetcode.types.Empty);
-
   rpc ListProblems(leetcode.types.ListProblemsRequest) returns (leetcode.types.ListProblemsResponse);
   rpc sampleProblem(leetcode.types.SampleProblemRequest) returns (leetcode.types.Problem);
 }
 
 service SubmissionService {
   rpc CreateSubmission(leetcode.types.CreateSubmissionRequest) returns (leetcode.types.Submission);
-
   rpc GetSubmission(leetcode.types.GetSubmissionRequest) returns (leetcode.types.Submission);
-
   rpc UpdateSubmission(leetcode.types.UpdateSubmissionRequest) returns (leetcode.types.Submission);
-
   rpc DeleteSubmission(leetcode.types.DeleteSubmissionRequest) returns (leetcode.types.Empty);
-
   rpc ListSubmissions(leetcode.types.ListSubmissionsRequest) returns (leetcode.types.ListSubmissionsResponse);
-
-  // Convenience operations
   rpc RunSubmission(leetcode.types.RunSubmissionRequest) returns (leetcode.types.Submission);
 }

@@ -1,4 +1,4 @@
-use crate::{prelude::*, services::*};
+use crate::{model::Difficulty, prelude::*, services::*};
 
 use leetcode::types::Problem;
 
@@ -16,7 +16,7 @@ pub trait ProblemRepository: Send + Sync {
 pub struct ProblemQuery {
 	pub page: Option<i32>,
 	pub page_size: Option<i32>,
-	pub difficulty: Option<i32>,
+	pub difficulty: Option<Difficulty>,
 }
 pub struct CreateProblem {
 	pub title: String,

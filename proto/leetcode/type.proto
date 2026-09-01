@@ -152,10 +152,8 @@ message Submission {
 }
 enum SubmissionStatus {
   SUBMISSION_STATUS_UNSPECIFIED = 0;
-
   SUBMISSION_STATUS_PENDING = 1;
   SUBMISSION_STATUS_RUNNING = 2;
-
   SUBMISSION_STATUS_ACCEPTED = 3;
   SUBMISSION_STATUS_WRONG_ANSWER = 4;
   SUBMISSION_STATUS_TIME_LIMIT_EXCEEDED = 5;
@@ -167,7 +165,6 @@ enum SubmissionStatus {
 message CreateSubmissionRequest {
   string user_id = 1;
   string problem_id = 2;
-
   string source = 3;
   string language = 4;
 }
@@ -176,7 +173,6 @@ message GetSubmissionRequest {
 }
 message UpdateSubmissionRequest {
   string id = 1;
-
   optional string source = 2;
   optional string language = 3;
 }
@@ -185,7 +181,6 @@ message DeleteSubmissionRequest {
 }
 message ListSubmissionsRequest {
   PageRequest page = 1;
-
   optional string user_id = 2;
   optional string problem_id = 3;
   optional SubmissionStatus status = 4;
