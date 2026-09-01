@@ -117,7 +117,7 @@ impl TaskManager {
 		let id = Uuid::new_v4();
 		let task = Task {
 			id,
-			name: kind.name(),
+			name: kind.name().into(),
 			kind,
 			status: TaskStatus::Pending,
 		};

@@ -1,30 +1,46 @@
+use strum::IntoStaticStr;
+
 use crate::prelude::*;
 use std::fmt;
 
 #[cfg(feature = "native")]
 use crate::native::{Dashboard, WaterfallChart};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, IntoStaticStr)]
 pub enum WindowType {
 	EguiVeable,
 	Dashboard,
 	WaterfallChart,
-	TelemetryInspector,
+	OracleView,
 	TaskManager,
 	Markdown,
 	ProblemsScreen,
 }
 
-#[derive(Debug, Copy, Default, Clone, Hash, Deserialize, Serialize, Eq, PartialEq)]
+impl WindowType {
+	pub fn name(&self) -> &'static str {
+		self.into()
+	}
+}
+
+#[derive(
+	Debug, Copy, Default, Clone, Hash, Deserialize, Serialize, Eq, PartialEq, IntoStaticStr,
+)]
 pub enum ViewType {
 	Dashboard,
 	WaterfallChart,
-	TelemetryInspector,
+	OracleView,
 	TaskManager,
 	MarkdownView,
 	#[default]
 	Markdown,
 	ProblemsScreen,
+}
+
+impl ViewType {
+	pub fn name(&self) -> &'static str {
+		self.into()
+	}
 }
 
 pub struct View {

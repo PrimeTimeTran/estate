@@ -1,3 +1,5 @@
+use strum::IntoStaticStr;
+
 use crate::prelude::*;
 
 pub type TaskId = Uuid;
@@ -9,7 +11,7 @@ pub enum TaskRequest {
 	Stop(TaskId),
 	Delete(TaskId),
 }
-#[derive(Debug, Clone, Eq, PartialEq, Deserialize, Hash, Serialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Deserialize, Hash, Serialize, IntoStaticStr)]
 pub enum TaskKind {
 	SessionStart,
 	SessionStop,
@@ -21,17 +23,8 @@ pub enum TaskKind {
 	SyncBookmarks,
 }
 impl TaskKind {
-	pub fn name(&self) -> String {
-		match self {
-			TaskKind::SessionStart => "SessionStart".into(),
-			TaskKind::SessionStop => "SessionStop".into(),
-			TaskKind::LoadMaster => "LoadMaster".into(),
-			TaskKind::IndexWorkspace => "IndexWorkspace".into(),
-			TaskKind::RebuildIndex => "RebuildIndex".into(),
-			TaskKind::GenerateView(_) => "GenerateView".into(),
-			TaskKind::SyncBookmarks => "SyncBookmarks".into(),
-			TaskKind::BuildEstatePrototype => "Build Estate Prototype".into(),
-		}
+	pub fn name(&self) -> &'static str {
+		self.into()
 	}
 }
 

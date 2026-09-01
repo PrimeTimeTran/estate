@@ -23,7 +23,6 @@ use winit::{
 	platform::macos::{ActivationPolicy, EventLoopBuilderExtMacOS},
 	window::WindowId,
 };
-
 pub struct NativeApp {
 	pub app: Option<App<NativeRuntime>>,
 	pub windows: Vec<AppWindow>,
@@ -42,18 +41,27 @@ pub struct NativeApp {
 }
 impl NativeApp {
 	pub fn new() -> Result<Self> {
-		let (daemon_tx, daemon_rx) = mpsc::channel(100);
+		// // App
+		// self.engine.runtime.spawn(future);       // ✅
+		// // NativeRuntime
+		// self.handle.spawn(future);               // ✅
+		// // NativeApp
+		// self.tokio = Runtime::new()?;             // ✅
+		// // App
+		// tokio::spawn(future);                     // ❌
+		// // App
+		// tokio::runtime::Handle::current();        // ❌
+		// // AppContext
+		// tokio::runtime::Handle;                   // ❌
 
+		let (daemon_tx, daemon_rx) = mpsc::channel(100);
 		// 1. Create Tokio first.
 		let tokio = tokio::runtime::Runtime::new()?;
 		let handle = tokio.handle().clone();
-
 		// 2. Give the handle to NativeRuntime.
 		let runtime = NativeRuntime::new(handle)?;
-
 		// 3. Then construct the engine.
 		let engine = EstateEngine::new(runtime)?;
-
 		Ok(Self {
 			app: None,
 			clock_running: Arc::new(AtomicBool::new(true)),
@@ -61,7 +69,6 @@ impl NativeApp {
 			daemon_tx,
 			engine,
 			tokio,
-
 			hotkey_manager: GlobalHotkeys::new().unwrap(),
 			menu: None,
 			menu_bar: None,
@@ -89,11 +96,8 @@ impl NativeApp {
 	}
 	fn start_runtime(&mut self) -> Result<()> {
 		let daemon_rx = self.daemon_rx.take().expect("daemon already started");
-
 		let (ready_tx, ready_rx) = std::sync::mpsc::sync_channel::<Result<Arc<ApiClient>>>(1);
-
 		let handle = self.tokio.handle().clone();
-
 		Self::spawn_daemon(
 			daemon_rx,
 			Arc::clone(&self.engine.runtime),
@@ -101,19 +105,8 @@ impl NativeApp {
 			ready_tx,
 		);
 		let api = ready_rx.recv().expect("daemon failed to initialize")?;
-
 		let instance = App::new(self.engine.clone(), api);
 		self.app = Some(instance);
-		// let daemon_rx = self.daemon_rx.take().expect("daemon already started");
-		// let (ready_tx, ready_rx) =
-		// 	std::sync::mpsc::sync_channel::<Result<(tokio::runtime::Handle, Arc<ApiClient>)>>(1);
-		// Self::spawn_daemon(daemon_rx, Arc::clone(&self.engine.runtime), ready_tx);
-		// let (handle, api) = ready_rx.recv().expect("daemon failed to initialize")?;
-		// let instance = App::new(self.engine.clone(), api);
-		// instance
-		// 	.runtime()
-		// 	.emit(e::Event::app(e::EventKind::SessionStart));
-		// self.app = Some(instance);
 		self.spawn_global_hotkey_daemon()?;
 		let event_loop = EventLoop::<AppEvent>::with_user_event()
 			.with_activation_policy(ActivationPolicy::Regular)
@@ -210,10 +203,8 @@ impl NativeApp {
 						}
 					}
 				}
-
 				None => {
 					tracing::info!("daemon command channel closed");
-
 					shutdown_token.cancel();
 					let _ = daemon_task.await;
 				}
@@ -244,198 +235,13 @@ impl NativeApp {
 		tracing::info!(">>> runtime shutdown complete");
 	}
 }
-impl ApplicationHandler<AppEvent> for NativeApp {
-	fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-		if self.menu_bar.is_none() {
-			let menu = Self::menu_bar(true);
-			menu.init_for_nsapp();
-			self.menu_bar = Some(menu);
-		}
-		if self.windows.is_empty() {
-			self.open_window(event_loop, crate::INITIAL_WINDOW);
-		}
-		if self.tray.is_none() {
-			let (menu, tray) = match Self::bootstrap() {
-				Ok(value) => value,
-				Err(error) => {
-					tracing::error!(%error, "failed to bootstrap tray");
-					return;
-				}
-			};
-			self.menu = Some(menu);
-			self.tray = Some(tray);
-			tracing::debug!("🔥 main tray initialized");
-		}
-		if self.scroll_tray.is_none() {
-			match TrayIconBuilder::new()
-				.with_icon(scroll_tray_icon())
-				.with_tooltip("Estate Scroll Controller")
-				.build()
-			{
-				Ok(tray) => {
-					self.scroll_tray = Some(tray);
-					tracing::debug!("🔥 scroll tray initialized");
-				}
-				Err(error) => {
-					tracing::error!(%error, "failed to create scroll tray");
-				}
-			}
-		}
-	}
-	fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
-		if let Some(app) = &mut self.app {
-			app.update();
-			// self
-			// 	.app
-			// 	.as_mut()
-			// 	.expect("app must be initialized before the event loop starts")
-			// 	.update();
-		}
-		while let Ok(event) = MenuEvent::receiver().try_recv() {
-			self.handle_event(event, event_loop);
-		}
-	}
-	fn window_event(
-		&mut self,
-		event_loop: &ActiveEventLoop,
-		window_id: WindowId,
-		event: WindowEvent,
-	) {
-		let Some(window) = self
-			.windows
-			.iter_mut()
-			.find(|window| window.window.instance.id() == window_id)
-		else {
-			return;
-		};
-		let response = window
-			.window
-			.gui_state
-			.on_window_event(&window.window.instance, &event);
-		if response.repaint {
-			window.window.instance.request_redraw();
-		}
-		match event {
-			WindowEvent::CloseRequested => {
-				tracing::info!("🛑 Window close requested for id: {:?}", window_id);
-				self
-					.windows
-					.retain(|window| window.window.instance.id() != window_id);
-				return;
-			}
-			WindowEvent::RedrawRequested => {
-				if window.window.occluded {
-					return;
-				}
-				let menu = {
-					let event_rx = self.engine.runtime.subscribe();
-					if let Some(app) = self.app.as_mut() {
-						let event_rx = self.engine.runtime.subscribe();
-
-						let mut ctx = AppContext {
-							app,
-							input: VeInputState::default(),
-							event_rx,
-							last_revision: 0,
-						};
-
-						if let Err(e) = window.window.draw(&mut ctx) {
-							tracing::error!("DEV >>> draw failed: {e:#}");
-						}
-					}
-				};
-			}
-			WindowEvent::Focused(true) => {
-				window.window.instance.request_redraw();
-			}
-			WindowEvent::Occluded(occluded) => {
-				window.window.occluded = occluded;
-				if !occluded {
-					window.window.instance.request_redraw();
-				}
-			}
-			WindowEvent::Resized(size) => {
-				if size.width == 0 || size.height == 0 {
-					return;
-				}
-				window.window.config.width = size.width;
-				window.window.config.height = size.height;
-				window
-					.window
-					.surface
-					.configure(&window.window.device, &window.window.config);
-				window.window.needs_resize = false;
-				window.window.instance.request_redraw();
-			}
-			_ => {}
-		}
-	}
-	fn user_event(&mut self, event_loop: &ActiveEventLoop, event: AppEvent) {
-		match event {
-			AppEvent::RuntimeEvent => {
-				tracing::info!("🔄 Runtime event");
-				if let Some(app) = &mut self.app {
-					app.update();
-				}
-			}
-
-			AppEvent::Navigate(view) => {
-				self
-					.engine
-					.runtime
-					.emit(e::Event::app(e::EventKind::Navigate(view)));
-				if let Some(app) = &mut self.app {
-					app.update();
-				}
-				for window in &mut self.windows {
-					window.window.instance.request_redraw();
-				}
-			}
-			AppEvent::Shutdown => {
-				tracing::info!(">>> shutdown event received");
-				self.shutdown();
-				event_loop.exit();
-				tracing::info!(">>> event_loop.exit() called");
-			}
-			AppEvent::CursorPosition { x, y } => {
-				// let text = format!("↖ {:.0}  {:.0}", x, y);
-				// let text = format!("← {:.0}  {:.0}", x, y);
-				// let text = format!("→ {:.0}  {:.0}", x, y);
-				// let text = format!("↑ {:.0}  {:.0}", x, y);
-				// let text = format!("● {:.0}, {:.0}", x, y);
-				// let text = format!("◉ {:.0}, {:.0}", x, y);
-				let text = format!("⌖ {:.0}, {:.0}", x, y);
-				// let text = format!("🟢 {:.0}, {:.0}", x, y);
-				// let text = format!("🔵 {:.0}, {:.0}", x, y);
-				// let text = format!("🟡 {:.0}, {:.0}", x, y);
-				// let text = format!("🔴 {:.0}, {:.0}", x, y);
-				// let region = if x < 960.0 { "← LEFT" } else { "RIGHT →" };
-				if let Some(tray) = &self.scroll_tray {
-					let _ = tray.set_title(Some(text));
-				}
-			}
-			AppEvent::TickClock(text) => {
-				if let Some(tray) = &self.tray {
-					let _ = tray.set_title(Some(text));
-				}
-				self
-					.app
-					.as_mut()
-					.expect("app must be initialized before the event loop starts")
-					.update();
-				self.sync_views();
-			}
-			AppEvent::ModifiersChanged {
-				alt,
-				command,
-				ctrl,
-				shift,
-			} => {}
-			_ => {}
-		}
-	}
-}
 impl NativeApp {
+	fn bootstrap() -> Result<(TrayMenu, TrayIcon)> {
+		bootstrap()
+	}
+	fn window_by_type(&mut self, kind: WindowType) -> Option<&mut AppWindow> {
+		self.windows.iter_mut().find(|window| window.kind == kind)
+	}
 	fn handle_event(&mut self, event: MenuEvent, event_loop: &ActiveEventLoop) {
 		let Some(menu) = self.menu.as_ref() else {
 			return;
@@ -448,8 +254,8 @@ impl NativeApp {
 			tracing::debug!(">>> event_loop.exit() called");
 		} else if id == menu.dev.id() {
 			self.open_window(event_loop, WindowType::Dashboard);
-		} else if id == menu.telemetry.id() {
-			self.open_window(event_loop, WindowType::TelemetryInspector);
+		} else if id == menu.oracle.id() {
+			self.open_window(event_loop, WindowType::OracleView);
 		} else if id == menu.task_manager.id() {
 			self.open_window(event_loop, WindowType::TaskManager);
 		} else if id == menu.new_task.id() {
@@ -469,33 +275,20 @@ impl NativeApp {
 			self.open_window(event_loop, WindowType::ProblemsScreen);
 		}
 	}
-	fn bootstrap() -> Result<(TrayMenu, TrayIcon)> {
-		bootstrap()
-	}
-	fn window_by_type(&mut self, kind: WindowType) -> Option<&mut AppWindow> {
-		self.windows.iter_mut().find(|window| window.kind == kind)
-	}
 	fn open_window(&mut self, event_loop: &ActiveEventLoop, kind: WindowType) {
 		if self.window_by_type(kind).is_some() {
 			return;
 		}
 		if let Some(app) = self.app.as_mut() {
 			let api = app.api();
-			match Window::new(event_loop, self.view_type.clone(), api) {
+			let view = self.view_type;
+			match Window::new(event_loop, view, api) {
 				Ok(window) => {
-					window.instance.set_title("Hi there Loi");
-					self.windows.push(AppWindow {
-						kind: WindowType::from(WindowType::Markdown),
-						window,
-					});
+					window.instance.set_title(view.name().into());
+					self.windows.push(AppWindow { kind, view, window });
 				}
-
 				Err(error) => {
-					tracing::error!(
-							?self.view_type,
-							%error,
-							"failed to create window"
-					);
+					tracing::error!("failed to create window: {error}");
 				}
 			}
 		}
@@ -562,10 +355,11 @@ impl NativeApp {
 	fn sync_views(&mut self) {
 		for window in &mut self.windows {
 			if let Some(app) = self.app.as_mut() {
-				let view_type = app.view();
 				let api = app.api();
-				window.window.sync_view(view_type, api);
+				self.view_type = app.view();
+				window.window.sync_view(app.view(), api);
 				window.window.instance.request_redraw();
+				window.window.instance.set_title(self.view_type.name());
 			}
 		}
 	}
@@ -580,7 +374,8 @@ impl NativeApp {
 		match view_type {
 			ViewType::MarkdownView => Ve::new(MarkdownView::new(crate::MARKDOWN)),
 			ViewType::TaskManager => Ve::new(TaskManager::new()),
-			ViewType::WaterfallChart => Ve::new(OracleView::new()),
+			ViewType::OracleView => Ve::new(OracleView::new()),
+			ViewType::WaterfallChart => Ve::new(WaterfallChart::new()),
 			ViewType::ProblemsScreen => Ve::new(ProblemsScreen::new()),
 			_ => app.default_view(),
 		}
@@ -596,7 +391,6 @@ impl NativeApp {
 		let menu = Menu::new();
 		menu.append(&Self::file_menu(has_document)).unwrap();
 		menu.append(&Self::edit_menu()).unwrap();
-
 		menu
 	}
 	fn file_menu(has_document: bool) -> Submenu {
@@ -605,7 +399,6 @@ impl NativeApp {
 		menu.append(&MenuItem::new("Open…", true, None));
 		menu.append(&PredefinedMenuItem::separator());
 		menu.append(&MenuItem::new("Close", has_document, None));
-
 		menu
 	}
 	fn edit_menu() -> Submenu {
@@ -643,5 +436,180 @@ impl NativeApp {
 		]);
 		menu.append_items(&[&file, &edit, &view]);
 		menu
+	}
+}
+impl ApplicationHandler<AppEvent> for NativeApp {
+	fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+		if self.menu_bar.is_none() {
+			let menu = Self::menu_bar(true);
+			menu.init_for_nsapp();
+			self.menu_bar = Some(menu);
+		}
+		if self.windows.is_empty() {
+			self.open_window(event_loop, crate::INITIAL_WINDOW);
+		}
+		if self.tray.is_none() {
+			let (menu, tray) = match Self::bootstrap() {
+				Ok(value) => value,
+				Err(error) => {
+					tracing::error!(%error, "failed to bootstrap tray");
+					return;
+				}
+			};
+			self.menu = Some(menu);
+			self.tray = Some(tray);
+			tracing::debug!("🔥 main tray initialized");
+		}
+		if self.scroll_tray.is_none() {
+			match TrayIconBuilder::new()
+				.with_icon(scroll_tray_icon())
+				.with_tooltip("Estate Scroll Controller")
+				.build()
+			{
+				Ok(tray) => {
+					self.scroll_tray = Some(tray);
+					tracing::debug!("🔥 scroll tray initialized");
+				}
+				Err(error) => {
+					tracing::error!(%error, "failed to create scroll tray");
+				}
+			}
+		}
+	}
+	fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+		if let Some(app) = &mut self.app {
+			app.update();
+		}
+		while let Ok(event) = MenuEvent::receiver().try_recv() {
+			self.handle_event(event, event_loop);
+		}
+	}
+	fn window_event(
+		&mut self,
+		event_loop: &ActiveEventLoop,
+		window_id: WindowId,
+		event: WindowEvent,
+	) {
+		let Some(window) = self
+			.windows
+			.iter_mut()
+			.find(|window| window.window.instance.id() == window_id)
+		else {
+			return;
+		};
+		let response = window
+			.window
+			.gui_state
+			.on_window_event(&window.window.instance, &event);
+		if response.repaint {
+			window.window.instance.request_redraw();
+		}
+		match event {
+			WindowEvent::CloseRequested => {
+				tracing::info!("🛑 Window close requested for id: {:?}", window_id);
+				self
+					.windows
+					.retain(|window| window.window.instance.id() != window_id);
+				return;
+			}
+			WindowEvent::RedrawRequested => {
+				if window.window.occluded {
+					return;
+				}
+				let menu = {
+					let event_rx = self.engine.runtime.subscribe();
+					if let Some(app) = self.app.as_mut() {
+						let event_rx = self.engine.runtime.subscribe();
+						let mut ctx = AppContext {
+							app,
+							input: VeInputState::default(),
+							event_rx,
+							last_revision: 0,
+						};
+						if let Err(e) = window.window.draw(&mut ctx) {
+							tracing::error!("DEV >>> draw failed: {e:#}");
+						}
+					}
+				};
+			}
+			WindowEvent::Focused(true) => {
+				window.window.instance.request_redraw();
+			}
+			WindowEvent::Occluded(occluded) => {
+				window.window.occluded = occluded;
+				if !occluded {
+					window.window.instance.request_redraw();
+				}
+			}
+			WindowEvent::Resized(size) => {
+				if size.width == 0 || size.height == 0 {
+					return;
+				}
+				window.window.config.width = size.width;
+				window.window.config.height = size.height;
+				window
+					.window
+					.surface
+					.configure(&window.window.device, &window.window.config);
+				window.window.needs_resize = false;
+				window.window.instance.request_redraw();
+			}
+			_ => {}
+		}
+	}
+	fn user_event(&mut self, event_loop: &ActiveEventLoop, event: AppEvent) {
+		match event {
+			AppEvent::RuntimeEvent => {
+				tracing::info!("🔄 Runtime event");
+				if let Some(app) = &mut self.app {
+					app.update();
+				}
+			}
+			AppEvent::Navigate(view) => {
+				self
+					.engine
+					.runtime
+					.emit(e::Event::app(e::EventKind::Navigate(view)));
+				if let Some(app) = &mut self.app {
+					app.update();
+				}
+			}
+			AppEvent::Shutdown => {
+				tracing::info!(">>> shutdown event received");
+				self.shutdown();
+				event_loop.exit();
+				tracing::info!(">>> event_loop.exit() called");
+			}
+			AppEvent::CursorPosition { x, y } => {
+				// let text = format!("↖ {:.0}  {:.0}", x, y);
+				// let text = format!("← {:.0}  {:.0}", x, y);
+				// let text = format!("→ {:.0}  {:.0}", x, y);
+				// let text = format!("↑ {:.0}  {:.0}", x, y);
+				// let text = format!("● {:.0}, {:.0}", x, y);
+				// let text = format!("◉ {:.0}, {:.0}", x, y);
+				let text = format!("⌖ {:.0}, {:.0}", x, y);
+				// let text = format!("🟢 {:.0}, {:.0}", x, y);
+				// let text = format!("🔵 {:.0}, {:.0}", x, y);
+				// let text = format!("🟡 {:.0}, {:.0}", x, y);
+				// let text = format!("🔴 {:.0}, {:.0}", x, y);
+				// let region = if x < 960.0 { "← LEFT" } else { "RIGHT →" };
+				if let Some(tray) = &self.scroll_tray {
+					let _ = tray.set_title(Some(text));
+				}
+			}
+			AppEvent::TickClock(text) => {
+				if let Some(tray) = &self.tray {
+					let _ = tray.set_title(Some(text));
+				}
+				self.sync_views();
+			}
+			AppEvent::ModifiersChanged {
+				alt,
+				command,
+				ctrl,
+				shift,
+			} => {}
+			_ => {}
+		}
 	}
 }

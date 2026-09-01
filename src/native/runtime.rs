@@ -64,6 +64,7 @@ impl Runtime for NativeRuntime {
 	fn session(&self) -> Session {
 		self.session.clone()
 	}
+
 	type EventReceiver = NativeEventReceiver;
 	fn subscribe(&self) -> Self::EventReceiver {
 		NativeEventReceiver {
@@ -150,8 +151,14 @@ impl<'a> NativeAppContext<'a> {
 pub struct NativeEventReceiver {
 	pub rx: tokio::sync::broadcast::Receiver<e::Event>,
 }
-impl NativeEventReceiver {
-	pub fn try_recv(&mut self) -> Option<e::Event> {
+impl EventReceiver for NativeEventReceiver {
+	fn try_recv(&mut self) -> Option<e::Event> {
 		self.rx.try_recv().ok()
 	}
 }
+
+// impl NativeEventReceiver {
+// 	pub fn try_recv(&mut self) -> Option<e::Event> {
+// 		self.rx.try_recv().ok()
+// 	}
+// }

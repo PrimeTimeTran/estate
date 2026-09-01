@@ -282,7 +282,6 @@ impl Window {
 			.render(&mut render_pass, primitives, screen_descriptor);
 	}
 }
-
 impl Window {
 	pub fn sync_view(&mut self, view: ViewType, api: Arc<ApiClient>) {
 		if self.view.kind != view {
@@ -738,10 +737,9 @@ impl Window {
 }
 pub struct AppWindow {
 	pub kind: WindowType,
+	pub view: ViewType,
 	pub window: Window,
-	// pub runtime: Arc<NativeRuntime>,
 }
-
 pub struct GlobalHotkeys {
 	hotkey_id: u32,
 	manager: GlobalHotKeyManager,
@@ -777,7 +775,6 @@ impl GlobalHotkeys {
 		self.shutdown.store(true, Ordering::Relaxed);
 	}
 }
-
 pub struct TrayMenu {
 	pub clear_tasks: MenuItem,
 	pub dev: MenuItem,
@@ -788,7 +785,7 @@ pub struct TrayMenu {
 	pub task_manager: MenuItem,
 	pub problem_screen: MenuItem,
 	pub tasks: Submenu,
-	pub telemetry: MenuItem,
+	pub oracle: MenuItem,
 }
 
 pub mod gui {

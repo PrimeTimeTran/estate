@@ -24,7 +24,7 @@ pub fn bootstrap() -> Result<(TrayMenu, TrayIcon)> {
 	let scroll_item = MenuItem::new("Scroll: Idle", true, None);
 	let status = MenuItem::new("● Estate Daemon Running", false, None);
 	let dev = MenuItem::new("Dashboard", true, None);
-	let telemetry = MenuItem::new("Telemetry", true, None);
+	let oracle = MenuItem::new("Oracle", true, None);
 	let task_manager = MenuItem::new("Task Manager", true, None);
 	let problem_screen = MenuItem::new("Problems", true, None);
 	let new_task = MenuItem::new("New Task", true, None);
@@ -39,7 +39,7 @@ pub fn bootstrap() -> Result<(TrayMenu, TrayIcon)> {
 	menu.append(&scroll_item)?;
 	menu.append(&status)?;
 	menu.append(&dev)?;
-	menu.append(&telemetry)?;
+	menu.append(&oracle)?;
 	menu.append(&task_manager)?;
 	menu.append(&tasks)?;
 	menu.append(&quit)?;
@@ -59,7 +59,7 @@ pub fn bootstrap() -> Result<(TrayMenu, TrayIcon)> {
 			quit,
 			status,
 			tasks,
-			telemetry,
+			oracle,
 			task_manager,
 		},
 		tray,
