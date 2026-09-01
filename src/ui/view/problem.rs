@@ -15,52 +15,152 @@ impl ProblemScreen {
 				ui.separator();
 				ui.monospace(&problem.slug);
 			});
+
 			ui.label(format!("ID: {}", problem.id));
 		});
 	}
 }
-
-// "R must not contain any references that are shorter-lived than 'static."
 impl<R: Runtime + 'static> Veable<R> for ProblemScreen {
-	//   ^^^^^^^ lifetime bound
-	// "I can implement Veable<R> for any R that implements Runtime, provided that R doesn't contain non-'static references."
 	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, R>) {
-		let should_load = {
+		let (loading, error, problem) = {
 			let state = ctx.app.app_state();
-			!state.problems_loading && state.problems.is_empty() && state.problems_error.is_none()
+
+			(
+				state.problem.loading,
+				state.problem.error.clone(),
+				state.problem.value.clone(),
+			)
 		};
-		if should_load {
-			tracing::info!("🔥 BEFORE load_problems");
 
-			ctx.app.load_problems();
-			ctx.load_problems();
+		// ui.horizontal(|ui| {
+		// 	if ui.button("← Back").clicked() {
+		// 		ctx.app.navigate(ViewType::ProblemsScreen);
+		// 	}
 
-			tracing::info!("🔥 AFTER load_problems");
-		}
-		ui.heading("Problems");
+		// 	ui.heading("Problem");
+		// });
+
 		ui.add_space(8.0);
 
-		let state = ctx.app.app_state();
-
-		if state.problems_loading {
-			ui.spinner();
+		if loading {
+			ui.horizontal(|ui| {
+				ui.spinner();
+				ui.label("Loading problem...");
+			});
 			return;
 		}
 
-		if let Some(error) = &state.problems_error {
-			ui.colored_label(egui::Color32::RED, error);
-			return;
-		}
+		if let Some(error) = error {
+			ui.colored_label(
+				egui::Color32::RED,
+				format!("Failed to load problem: {error}"),
+			);
 
-		if state.problems.is_empty() {
-			ui.label("No problems found.");
-			return;
-		}
-
-		egui::ScrollArea::vertical().show(ui, |ui| {
-			for problem in &state.problems {
-				self.draw_problem(ui, problem);
+			if ui.button("Retry").clicked() {
+				ctx.app.sample_problem();
 			}
-		});
+
+			return;
+		}
+
+		if let Some(problem) = problem {
+			self.draw_problem(ui, &problem);
+
+			ui.add_space(12.0);
+
+			if ui.button("Sample Another Problem").clicked() {
+				ctx.app.sample_problem();
+			}
+		} else {
+			ui.label("No problem loaded.");
+
+			if ui.button("Sample Problem").clicked() {
+				ctx.app.sample_problem();
+			}
+		}
 	}
 }
+// impl<R: Runtime + 'static> Veable<R> for ProblemScreen {
+// 	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, R>) {
+// 		let (loading, error, problem) = {
+// 			let state = ctx.app.app_state();
+
+// 			(
+// 				state.problem.loading,
+// 				state.problem.error.clone(),
+// 				state.problem.value.clone(),
+// 			)
+// 		};
+
+// 		ui.horizontal(|ui| {
+// 			if ui.button("← Back").clicked() {
+// 				ctx.app.navigate(ViewType::ProblemsScreen);
+// 			}
+
+// 			ui.heading("Problem");
+// 		});
+
+// 		ui.add_space(8.0);
+
+// 		if loading {
+// 			ui.horizontal(|ui| {
+// 				ui.spinner();
+// 				ui.label("Loading problem...");
+// 			});
+// 			return;
+// 		}
+
+// 		if let Some(error) = error {
+// 			ui.colored_label(
+// 				egui::Color32::RED,
+// 				format!("Failed to load problem: {error}"),
+// 			);
+
+// 			if ui.button("Retry").clicked() {
+// 				if let Some(problem) = &problem {
+// 					ctx.app.get_problem(problem.id);
+// 				}
+// 			}
+
+// 			return;
+// 		}
+
+// 		let Some(problem) = problem else {
+// 			ui.label("No problem selected.");
+// 			return;
+// 		};
+
+// 		ui.horizontal(|ui| {
+// 			ui.strong(&problem.title);
+// 			ui.separator();
+// 			ui.monospace(&problem.slug);
+
+// 			if ui.button("Reload").clicked() {
+// 				ctx.app.get_problem(problem.id);
+// 			}
+// 		});
+
+// 		ui.add_space(12.0);
+
+// 		self.draw_problem(ui, &problem);
+// 	}
+// }
+
+// #[derive(Debug, Clone)]
+// enum RequestState {
+// 	Idle,
+// 	Loading,
+// 	Success,
+// 	Error(String),
+// }
+
+// impl Default for RequestState {
+// 	fn default() -> Self {
+// 		Self::Idle
+// 	}
+// }
+
+// #[derive(Debug, Default)]
+// pub struct ProblemScreen {
+// 	request: RequestState,
+// }

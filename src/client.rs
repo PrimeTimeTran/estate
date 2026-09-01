@@ -32,7 +32,20 @@ impl ApiClient {
 
 #[derive(Debug, Default)]
 pub struct AppState {
-	pub problems: Vec<StoredProblem>,
-	pub problems_loading: bool,
-	pub problems_error: Option<String>,
+	pub problems: ProblemListState,
+	pub problem: ProblemState,
+}
+
+#[derive(Debug, Default)]
+pub struct ProblemListState {
+	pub items: Vec<StoredProblem>,
+	pub loading: bool,
+	pub error: Option<String>,
+}
+
+#[derive(Debug, Default)]
+pub struct ProblemState {
+	pub value: Option<StoredProblem>,
+	pub loading: bool,
+	pub error: Option<String>,
 }

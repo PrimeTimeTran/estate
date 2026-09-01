@@ -4,8 +4,8 @@ use egui::Color32;
 use std::sync::atomic::AtomicI64;
 
 pub static START_APP_CLOCK: bool = false;
-pub static START_WINDOW: WindowType = WindowType::ProblemsScreen;
-pub static START_VIEW: ViewType = ViewType::ProblemsScreen;
+pub static START_WINDOW: WindowType = WindowType::ProblemScreen;
+pub static START_VIEW: ViewType = ViewType::ProblemScreen;
 // Unsafe territory
 // pub static mut START_VIEW: ViewType = ...;
 pub static DEFAULT_VIEW: ViewType = ViewType::Markdown;
@@ -56,8 +56,8 @@ impl VeConfig {
 			bg: palette::BG,
 			surface: palette::SURFACE,
 			activity_bar: PanelState::new(true, 48.0),
-			primary_bar: PanelState::new(true, 40.0),
-			secondary_bar: PanelState::new(true, 48.0),
+			primary_bar: PanelState::new(false, 40.0),
+			secondary_bar: PanelState::new(false, 48.0),
 			bottom_panel: PanelState::new(false, 240.0),
 			status_bar: PanelState::new(true, 24.0),
 			dock_left: PanelState::new(true, 280.0),

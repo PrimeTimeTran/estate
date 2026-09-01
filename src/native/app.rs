@@ -129,16 +129,16 @@ impl NativeApp {
 		let running = Arc::clone(&self.clock_running);
 		let runtime = self.engine.runtime();
 		std::thread::spawn(move || {
-			let mut current_time = 3;
+			let mut current_time = 60;
 			let mut view_index = 0;
 			while running.load(Ordering::Relaxed) {
 				let views = [
 					ViewType::Dashboard,
-					ViewType::ProblemsScreen,
+					ViewType::ProblemScreen,
 					ViewType::MarkdownView,
-					ViewType::ProblemsScreen,
+					ViewType::ProblemScreen,
 					ViewType::WaterfallChart,
-					ViewType::ProblemsScreen,
+					ViewType::ProblemScreen,
 					ViewType::TaskManager,
 					ViewType::ProblemsScreen,
 				];

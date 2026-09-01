@@ -3,7 +3,7 @@ use crate::{
 	e,
 	model::problem::StoredProblem,
 	prelude::*,
-	proto::leetcode::types::{ListProblemsRequest, PageRequest},
+	proto::leetcode::types::{ListProblemsRequest, PageRequest, SampleProblemRequest},
 };
 pub struct App<R: Runtime> {
 	pub(crate) engine: EstateEngine<R>,
@@ -54,22 +54,36 @@ impl<R: Runtime> App<R> {
 		Arc::clone(&self.api)
 	}
 	pub fn update(&mut self) {
-		// tracing::info!("🔥🔥🔥 App::update called");
 		while let Some(event) = self.events.try_recv() {
-			// tracing::info!("🔥 App received: {:?}", event.kind);
 			match event.kind {
+				e::Klass::ProblemsLoaded(problems) => {
+					self.state.problems.items = problems;
+					self.state.problems.loading = false;
+					self.state.problems.error = None;
+				}
+				e::Klass::ProblemsLoadFailed(error) => {
+					self.state.problems.loading = false;
+					self.state.problems.error = Some(error);
+				}
+				e::Klass::ProblemLoaded(problem) | e::Klass::ProblemSampled(problem) => {
+					self.state.problem.value = Some(problem);
+					self.state.problem.loading = false;
+					self.state.problem.error = None;
+				}
+				e::Klass::ProblemLoadFailed(error) | e::Klass::ProblemSampleFailed(error) => {
+					self.state.problem.loading = false;
+					self.state.problem.error = Some(error);
+				}
 				e::Klass::Navigate(view) => {
 					self.view = view;
 				}
-				e::Klass::ProblemsLoaded(problems) => {
-					self.state.problems = problems;
-					self.state.problems_loading = false;
-					self.state.problems_error = None;
-				}
 				e::Klass::ApiError(error) => {
-					self.state.problems_loading = false;
-					self.state.problems_error = Some(error);
+					// If you have separate error events for different
+					// requests, handle them separately here.
+					self.state.problems.loading = false;
+					self.state.problems.error = Some(error);
 				}
+
 				_ => {}
 			}
 		}
@@ -147,22 +161,93 @@ impl<R: Runtime> App<R> {
 }
 
 impl<R: Runtime + 'static> App<R> {
-	pub fn load_problems(&mut self) {
-		// tracing::info!("🔥 ACTUAL App<R>::load_problems");
-		if self.state.problems_loading {
-			tracing::info!("⚠️ already loading");
+	fn spawn_request<F, T, E>(&self, future: F, on_success: impl FnOnce(T) + Send + 'static)
+	where
+		F: Future<Output = Result<T, E>> + Send + 'static,
+		E: std::fmt::Display + Send + 'static,
+		T: Send + 'static,
+	{
+		let runtime = self.engine.runtime.clone();
+
+		self.engine.runtime.spawn(async move {
+			match future.await {
+				Ok(value) => on_success(value),
+				Err(error) => {
+					runtime.emit(e::Event::app(e::Klass::ApiError(error.to_string())));
+				}
+			}
+		});
+	}
+	fn start_problems_request(&mut self) -> bool {
+		if self.state.problems.loading {
+			tracing::info!("⚠️ problems already loading");
+			return false;
+		}
+
+		self.state.problems.loading = true;
+		self.state.problems.error = None;
+
+		true
+	}
+	fn start_problem_request(&mut self) -> bool {
+		if self.state.problem.loading {
+			tracing::info!("⚠️ problem already loading");
+			return false;
+		}
+
+		self.state.problem.loading = true;
+		self.state.problem.error = None;
+
+		true
+	}
+}
+
+impl<R: Runtime + 'static> App<R> {
+	pub fn sample_problem(&mut self) {
+		if !self.start_problems_request() {
 			return;
 		}
-		self.state.problems_loading = true;
-		self.state.problems_error = None;
+
 		let api = Arc::clone(&self.api);
-		let events = self.engine.runtime.clone();
-		// tracing::info!("🚀 spawning load_problems task");
+		let runtime = self.engine.runtime.clone();
+
 		self.engine.runtime.spawn(async move {
-			// tracing::info!("🏃 load_problems task STARTED");
 			let mut client = api.problems.clone();
-			// tracing::info!("📡 calling list_problems");
-			let result = client
+
+			match client
+				.sample_problem(SampleProblemRequest {
+					page: None,
+					difficulty: None,
+					tags: vec![],
+					search: String::new(),
+					published_only: None,
+				})
+				.await
+			{
+				Ok(response) => {
+					let problem = StoredProblem::from(response.into_inner());
+
+					runtime.emit(e::Event::app(e::Klass::ProblemSampled(problem)));
+				}
+
+				Err(error) => {
+					runtime.emit(e::Event::app(e::Klass::ApiError(error.to_string())));
+				}
+			}
+		});
+	}
+	pub fn load_problems(&mut self) {
+		if !self.start_problems_request() {
+			return;
+		}
+
+		let api = Arc::clone(&self.api);
+		let runtime = self.engine.runtime.clone();
+
+		self.engine.runtime.spawn(async move {
+			let mut client = api.problems.clone();
+
+			match client
 				.list_problems(ListProblemsRequest {
 					tags: vec![],
 					search: String::new(),
@@ -173,9 +258,8 @@ impl<R: Runtime + 'static> App<R> {
 					}),
 					difficulty: None,
 				})
-				.await;
-			// tracing::info!("📡 list_problems returned");
-			match result {
+				.await
+			{
 				Ok(response) => {
 					let problems = response
 						.into_inner()
@@ -183,12 +267,12 @@ impl<R: Runtime + 'static> App<R> {
 						.into_iter()
 						.map(StoredProblem::from)
 						.collect();
-					// tracing::info!("📦 emitting ProblemsLoaded");
-					events.emit(e::Event::app(e::Klass::ProblemsLoaded(problems)));
+
+					runtime.emit(e::Event::app(e::Klass::ProblemsLoaded(problems)));
 				}
+
 				Err(error) => {
-					tracing::error!("❌ list_problems failed: {error}");
-					events.emit(e::Event::app(e::Klass::ApiError(error.to_string())));
+					runtime.emit(e::Event::app(e::Klass::ApiError(error.to_string())));
 				}
 			}
 		});

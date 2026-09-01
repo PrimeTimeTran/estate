@@ -183,6 +183,7 @@ wasm-bindgen = { workspace = true, optional = true }
 web-sys = { workspace = true, optional = true }
 sqlx = "0.9.0"
 strum = { version = "0.27", features = ["derive"] }
+rand.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tonic = { workspace = true, features = ["transport"] }

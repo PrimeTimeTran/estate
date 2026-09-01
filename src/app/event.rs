@@ -65,6 +65,14 @@ pub enum EventKind {
 	TaskStarted { task_id: TaskId },
 	TaskStopped { task_id: TaskId },
 	WorkspaceIndexed { duration: u64 },
+	ProblemsLoadFailed(String),
+	ProblemLoaded(StoredProblem),
+	ProblemSampled(StoredProblem),
+	ProblemLoadFailed(String),
+	ProblemSampleFailed(String),
+	SampleProblemsLoading,
+	SampleProblemsLoaded(Vec<StoredProblem>),
+	SampleProblemsError(String),
 }
 pub type Klass = EventKind;
 #[derive(Debug, Clone, Deserialize, Hash, Serialize)]

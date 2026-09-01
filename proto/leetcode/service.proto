@@ -13,6 +13,7 @@ service ProblemService {
   rpc DeleteProblem(leetcode.types.DeleteProblemRequest) returns (leetcode.types.Empty);
 
   rpc ListProblems(leetcode.types.ListProblemsRequest) returns (leetcode.types.ListProblemsResponse);
+  rpc sampleProblem(leetcode.types.SampleProblemRequest) returns (leetcode.types.Problem);
 }
 
 service SubmissionService {

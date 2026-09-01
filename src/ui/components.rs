@@ -15,6 +15,7 @@ pub enum WindowType {
 	TaskManager,
 	Markdown,
 	ProblemsScreen,
+	ProblemScreen,
 }
 
 impl WindowType {
@@ -35,6 +36,7 @@ pub enum ViewType {
 	#[default]
 	Markdown,
 	ProblemsScreen,
+	ProblemScreen,
 }
 
 impl ViewType {
@@ -61,6 +63,7 @@ impl View {
 			ViewType::TaskManager => Ve::new(TaskManager::new()),
 			ViewType::WaterfallChart => Ve::new(WaterfallChart::new()),
 			ViewType::ProblemsScreen => Ve::new(ProblemsScreen::new()),
+			ViewType::ProblemScreen => Ve::new(ProblemScreen::new()),
 			ViewType::MarkdownView => Ve::new(MarkdownView::new(crate::MARKDOWN)),
 			_ => Ve::new(MarkdownView::new(crate::MARKDOWN)),
 		};

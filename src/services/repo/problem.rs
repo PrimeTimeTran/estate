@@ -10,6 +10,7 @@ pub trait ProblemRepository: Send + Sync {
 	async fn delete(&self, id: i64) -> Result<()>;
 	async fn get(&self, id: i64) -> Result<Problem>;
 	async fn get_by_slug(&self, slug: &str) -> Result<Problem>;
+	async fn sample_problem(&self, query: ProblemQuery) -> Result<Problem>;
 }
 
 pub struct ProblemQuery {

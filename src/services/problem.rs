@@ -84,6 +84,24 @@ where
 		let problem = self.repository.get(id).await.map_err(internal_error)?;
 		Ok(Response::new(problem))
 	}
+	async fn sample_problem(
+		&self,
+		request: Request<SampleProblemRequest>,
+	) -> Result<Response<Problem>, Status> {
+		let request = request.into_inner();
+
+		let problem = self
+			.repository
+			.sample_problem(ProblemQuery {
+				difficulty: request.difficulty,
+				page_size: Some(1),
+				page: Some(0),
+			})
+			.await
+			.map_err(internal_error)?;
+
+		Ok(Response::new(problem))
+	}
 }
 fn problem_id(id: &str) -> Result<i64, Status> {
 	id.parse()

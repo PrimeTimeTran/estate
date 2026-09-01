@@ -20,6 +20,36 @@ impl JsonProblemRepository {
 		serde_json::from_str(&contents)
 			.with_context(|| format!("failed to parse problem: {}", path.display()))
 	}
+	async fn load_matching(&self, query: &ProblemQuery) -> Result<Vec<Problem>> {
+		let mut problems = Vec::new();
+
+		let mut entries = tokio::fs::read_dir(&self.path)
+			.await
+			.with_context(|| format!("failed to read {}", self.path.display()))?;
+
+		while let Some(entry) = entries.next_entry().await? {
+			let path = entry.path();
+
+			if path.extension().and_then(|x| x.to_str()) != Some("json") {
+				continue;
+			}
+
+			let contents = tokio::fs::read_to_string(&path)
+				.await
+				.with_context(|| format!("failed to read {}", path.display()))?;
+
+			let stored: StoredProblem = serde_json::from_str(&contents)
+				.with_context(|| format!("failed to parse {}", path.display()))?;
+
+			if query.difficulty.is_some_and(|d| stored.difficulty != d) {
+				continue;
+			}
+
+			problems.push(stored.into());
+		}
+
+		Ok(problems)
+	}
 	pub async fn save(&self, problem: &StoredProblem) -> Result<()> {
 		tokio::fs::create_dir_all(&self.path)
 			.await
@@ -113,6 +143,46 @@ impl ProblemRepository for JsonProblemRepository {
 	}
 	async fn get_by_slug(&self, slug: &str) -> Result<Problem> {
 		Ok(self.load(slug).await?.into())
+	}
+	async fn sample_problem(&self, query: ProblemQuery) -> Result<Problem> {
+		use rand::seq::IndexedRandom;
+
+		let mut problems = Vec::new();
+
+		let mut entries = tokio::fs::read_dir(&self.path)
+			.await
+			.with_context(|| format!("failed to read {}", self.path.display()))?;
+
+		while let Some(entry) = entries.next_entry().await? {
+			let path = entry.path();
+
+			if path.extension().and_then(|x| x.to_str()) != Some("json") {
+				continue;
+			}
+
+			let contents = tokio::fs::read_to_string(&path)
+				.await
+				.with_context(|| format!("failed to read {}", path.display()))?;
+
+			let stored: StoredProblem = serde_json::from_str(&contents)
+				.with_context(|| format!("failed to parse {}", path.display()))?;
+
+			if query
+				.difficulty
+				.is_some_and(|difficulty| stored.difficulty != difficulty)
+			{
+				continue;
+			}
+
+			problems.push(Problem::from(stored));
+		}
+
+		let problem = problems
+			.choose(&mut rand::rng())
+			.cloned()
+			.ok_or_else(|| anyhow::anyhow!("no problems matched the query"))?;
+
+		Ok(problem)
 	}
 }
 impl JsonProblemRepository {
