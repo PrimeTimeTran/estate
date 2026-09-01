@@ -7,9 +7,9 @@ use estate::{
 	},
 	repo::{
 		json::{problem::JsonProblemRepository, submission::JsonSubmissionRepository},
-		problem::{ProblemQuery, ProblemRepository},
+		problem::ProblemRepository,
 	},
-	services::{problem::ProblemServiceImpl, submission::SubmissionServiceImpl},
+	services::{problem::ProblemServiceImpl, repo::problem::*, submission::SubmissionServiceImpl},
 };
 
 #[tokio::main]

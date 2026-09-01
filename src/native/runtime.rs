@@ -1,5 +1,4 @@
-use tokio::sync::broadcast;
-
+// use tokio::sync::broadcast;
 pub use crate::native::{
 	job::TaskManager, monitor::NativeMonitor, prelude::*, state::NativeStateStore,
 };
@@ -12,28 +11,8 @@ use crate::{
 	e,
 	native::NativeApp,
 };
-impl NativeRuntime {
-	pub fn new() -> Result<Self> {
-		let store = NativeStateStore::new()?;
-		let state = store.load()?;
-		let runtime_state = RuntimeState::new(state);
-		let session = Session::default();
-		Ok(Self {
-			session,
-			store,
-			events: EventBus::new(),
-			state: Arc::new(runtime_state),
-			tasks: Arc::new(RwLock::new(TaskManager::new())),
-		})
-	}
-	pub fn event_processed(&self) {
-		let mut state = self.state.write();
-		state.events_processed += 1;
-	}
-	pub fn subscribe(&self) -> tokio::sync::broadcast::Receiver<e::Event> {
-		self.events.subscribe()
-	}
-}
+use std::sync::Mutex;
+
 #[derive(Clone, Debug)]
 pub struct NativeRuntime {
 	pub session: Session,
@@ -41,11 +20,51 @@ pub struct NativeRuntime {
 	pub events: EventBus,
 	pub state: Arc<RuntimeState>,
 	pub tasks: Arc<RwLock<TaskManager>>,
+	handle: tokio::runtime::Handle,
+	event_rx: Arc<Mutex<broadcast::Receiver<e::Event>>>,
+}
+impl NativeRuntime {
+	pub fn new(handle: tokio::runtime::Handle) -> Result<Self> {
+		let store = NativeStateStore::new()?;
+		let state = store.load()?;
+		let runtime_state = RuntimeState::new(state);
+		let events = EventBus::new();
+		let event_rx = Arc::new(Mutex::new(events.subscribe()));
+		Ok(Self {
+			session: Session::default(),
+			store,
+			events,
+			state: Arc::new(runtime_state),
+			tasks: Arc::new(RwLock::new(TaskManager::new())),
+			handle,
+			event_rx,
+		})
+	}
 }
 impl Runtime for NativeRuntime {
 	fn emit(&self, event: e::Event) {
 		self.events.emit(event);
 	}
+	fn state(&self) -> &RuntimeState {
+		&self.state
+	}
+	fn save(&self, state: &EstateState) -> Result<()> {
+		let session = self.session.clone();
+		self.store.save(state)
+	}
+	fn session(&self) -> Session {
+		self.session.clone()
+	}
+	fn try_recv(&self) -> Option<e::Event> {
+		self.event_rx.lock().unwrap().try_recv().ok()
+	}
+	fn spawn<F>(&self, future: F)
+	where
+		F: Future<Output = ()> + Send + 'static,
+	{
+		self.handle.spawn(future);
+	}
+
 	fn start_dispatcher(self: &Arc<Self>) {
 		let runtime = Arc::clone(self);
 		let mut receiver = runtime.events.subscribe();
@@ -78,17 +97,14 @@ impl Runtime for NativeRuntime {
 			}
 		});
 	}
-	fn state(&self) -> &RuntimeState {
-		&self.state
+}
+impl NativeRuntime {
+	pub fn event_processed(&self) {
+		let mut state = self.state.write();
+
+		state.events_processed += 1;
 	}
-	fn save(&self, state: &EstateState) -> Result<()> {
-		let session = self.session.clone();
-		self.store.save(state)
-	}
-	fn session(&self) -> Session {
-		self.session.clone()
-	}
-	fn subscribe(&self) -> tokio::sync::broadcast::Receiver<e::Event> {
+	pub fn subscribe(&self) -> tokio::sync::broadcast::Receiver<e::Event> {
 		self.events.subscribe()
 	}
 }

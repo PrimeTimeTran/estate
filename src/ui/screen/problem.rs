@@ -1,12 +1,10 @@
-use egui::Ui;
-use tonic::transport::Channel;
-
 use crate::{
 	app::state::EstateState,
 	leetcode::{types::*, *},
-	repo::problem::StoredProblem,
+	model::problem::StoredProblem,
 	*,
 };
+use egui::Ui;
 
 #[derive(Debug, Default)]
 pub struct ProblemsScreen;

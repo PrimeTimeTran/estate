@@ -19,3 +19,25 @@ pub fn format_duration_ms(ms: u64) -> String {
 		format!("{seconds}.{millis:03}s")
 	}
 }
+
+pub fn parse_timestamp(value: Option<String>) -> Option<prost_types::Timestamp> {
+	value.and_then(|value| {
+		value
+			.parse::<chrono::DateTime<chrono::Utc>>()
+			.ok()
+			.map(|dt| prost_types::Timestamp {
+				seconds: dt.timestamp(),
+				nanos: dt.timestamp_subsec_nanos() as i32,
+			})
+	})
+}
+pub fn timestamp(value: Option<String>) -> Option<prost_types::Timestamp> {
+	value.and_then(|value| {
+		chrono::DateTime::parse_from_rfc3339(&value)
+			.ok()
+			.map(|dt| prost_types::Timestamp {
+				seconds: dt.timestamp(),
+				nanos: dt.timestamp_subsec_nanos() as i32,
+			})
+	})
+}

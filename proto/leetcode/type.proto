@@ -1,6 +1,9 @@
+// leetcode/type.proto
+
 syntax = "proto3";
 
 package leetcode.types;
+
 import "google/protobuf/timestamp.proto";
 
 message Empty {}

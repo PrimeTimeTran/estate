@@ -1,17 +1,15 @@
+#![cfg(not(target_arch = "wasm32"))]
 use crate::{
-	AppEvent, DaemonCommand,
 	app::{self, App, Runtime, model::EstateEngine},
 	e,
-	native::{self, runtime::NativeRuntime, screens::*, *},
+	model::problem::StoredProblem,
 	prelude::*,
-	proto::leetcode::{
-		problem_service_client::ProblemServiceClient,
-		submission_service_client::SubmissionServiceClient,
-	},
-	spawn_global_cursor_daemon,
 	ui::{View, rendermd::MarkdownView},
 };
 
+use crate::proto::leetcode::{
+	problem_service_client::ProblemServiceClient, submission_service_client::SubmissionServiceClient,
+};
 use tonic::transport::Channel;
 
 #[derive(Debug, Clone)]
@@ -31,8 +29,6 @@ impl ApiClient {
 		})
 	}
 }
-
-use crate::services::repo::problem::StoredProblem;
 
 #[derive(Debug, Default)]
 pub struct AppState {

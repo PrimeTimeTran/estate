@@ -10,13 +10,22 @@ pub trait Runtime: Clone + Send + Sync {
 	/// Events are the standardized mechanism by which those services expose meaningful
 	/// changes to the rest of the application; the Runtime owns the services and EventBus,
 	/// while the Dispatcher routes those events to consumers.
-	fn emit(&self, event: e::Event);
-	fn subscribe(&self) -> tokio::sync::broadcast::Receiver<e::Event>;
 
+	fn emit(&self, event: e::Event);
 	fn start_dispatcher(self: &Arc<Self>);
 	fn state(&self) -> &RuntimeState;
 	fn save(&self, state: &EstateState) -> Result<()>;
 	fn session(&self) -> Session;
+	// #[cfg(feature = "native")]
+	// #[cfg(not(target_arch = "wasm32"))]
+	fn try_recv(&self) -> Option<e::Event>;
+
+	// type EventReceiver;
+	// fn subscribe(&self) -> Self::EventReceiver;
+	// fn subscribe(&self) -> tokio::sync::broadcast::Receiver<e::Event>;
+	fn spawn<F>(&self, future: F)
+	where
+		F: Future<Output = ()> + Send + 'static;
 }
 
 #[derive(Debug)]

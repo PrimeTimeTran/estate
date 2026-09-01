@@ -1,0 +1,5 @@
+// proto/main.proto
+syntax = "proto3";
+
+import "leetcode/service.proto";
+import "leetcode/type.proto";

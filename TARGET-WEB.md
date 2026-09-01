@@ -112,15 +112,30 @@ default = ["web"]
 }
 ```
 
+## Native
+
+```sh
+cargo check \
+  --no-default-features \
+  --features native
+cargo build --bin native --features native
+```
+
+## Web
+
 ```sh
 cargo check \
   --no-default-features \
   --target wasm32-unknown-unknown \
   --features web
-```
-
-```sh
 cargo build --bin web --no-default-features --features="web" --target wasm32-unknown-unknown
 trunk build --release
 trunk serve src/web/public/index.html --features web
+```
+
+```
+protoc \
+  -I proto \
+  --descriptor_set_out=/tmp/test.pb \
+  proto/main.proto
 ```

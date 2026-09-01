@@ -3,6 +3,7 @@ use crate::{
 	e,
 };
 
+#[cfg(feature = "native")]
 use tokio::sync::broadcast::error::TryRecvError;
 
 // #[cfg(not(target_arch = "wasm32"))]
@@ -13,8 +14,10 @@ pub struct AppContext<'a, R: Runtime> {
 	pub app: &'a mut App<R>,
 	pub last_revision: u64,
 
+	#[cfg(feature = "native")]
 	#[cfg(not(target_arch = "wasm32"))]
 	pub input: VeInputState,
+	#[cfg(feature = "native")]
 	#[cfg(not(target_arch = "wasm32"))]
 	pub event_rx: tokio::sync::broadcast::Receiver<e::Event>,
 }
@@ -39,6 +42,7 @@ impl<'a, R: Runtime> AppContext<'a, R> {
 			false
 		}
 	}
+	#[cfg(feature = "native")]
 	#[cfg(not(target_arch = "wasm32"))]
 	pub fn next_event(&mut self) -> Option<e::Event> {
 		match self.event_rx.try_recv() {

@@ -42,7 +42,9 @@ pub struct NativeApp {
 impl NativeApp {
 	pub fn new() -> Result<Self> {
 		let (daemon_tx, daemon_rx) = mpsc::channel(100);
-		let runtime = NativeRuntime::new()?;
+		let tokio = tokio::runtime::Runtime::new()?;
+		let handle = tokio.handle().clone();
+		let runtime = NativeRuntime::new(handle)?;
 		let engine = EstateEngine::new(runtime)?;
 		Ok(Self {
 			app: None,
@@ -81,7 +83,7 @@ impl NativeApp {
 			std::sync::mpsc::sync_channel::<Result<(tokio::runtime::Handle, Arc<ApiClient>)>>(1);
 		Self::spawn_daemon(daemon_rx, Arc::clone(&self.engine.runtime), ready_tx);
 		let (handle, api) = ready_rx.recv().expect("daemon failed to initialize")?;
-		let instance = App::new(self.engine.clone(), api, handle);
+		let instance = App::new(self.engine.clone(), api);
 		instance
 			.runtime()
 			.emit(e::Event::app(e::EventKind::SessionStart));
@@ -552,7 +554,6 @@ impl NativeApp {
 			.app
 			.as_ref()
 			.expect("app must be initialized before changing views");
-
 		match view_type {
 			ViewType::MarkdownView => Ve::new(MarkdownView::new(crate::MARKDOWN)),
 			ViewType::TaskManager => Ve::new(TaskManager::new()),

@@ -78,10 +78,10 @@ path = "src/bin/macros.rs"
 # default = ["native"]
 # cargo build --bin web --no-default-features --features="web" --target wasm32-unknown-unknown
 # default = []
-default = ["native"]
+# default = ["web"]
 # default = ["web"]
 # Default this this
-# default = ["native"]
+default = ["native"]
 mobile = []
 web = [
   "dep:wasm-bindgen",
@@ -110,12 +110,9 @@ native = [
   "dep:tray-icon",
   "dep:egui-winit",
   "dep:macos-accessibility-client",
-  "dep:tonic",
   "dep:egui_commonmark",
   "dep:egui_extras",
   "dep:jsonc-parser",
-  "dep:prost",
-  "dep:prost-types",
 ]
 
 [dependencies]
@@ -157,7 +154,8 @@ wasm-bridge.workspace = true
 wgpu.workspace = true
 winit.workspace = true
 gloo-timers.workspace = true
-
+prost.workspace = true
+prost-types.workspace = true
 # Make all these optional so they can be toggled by the native feature
 cli = { workspace = true, optional = true }
 comfy-table = { workspace = true, optional = true }
@@ -175,19 +173,20 @@ notify = { workspace = true, optional = true }
 objc2 = { workspace = true, optional = true }
 objc2-app-kit = { workspace = true, optional = true }
 objc2-foundation = { workspace = true, optional = true }
-prost = { workspace = true, optional = true }
-prost-types = { workspace = true, optional = true }
 rmcp = { workspace = true, optional = true }
 signal-hook = { workspace = true, optional = true }
 tokio = { workspace = true, optional = true, features = ["rt", "macros", "rt-multi-thread"] }
 tokio-util = { workspace = true, optional = true }
-tonic = { workspace = true, optional = true }
 tower-lsp = { workspace = true, optional = true }
 tray-icon = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 web-sys = { workspace = true, optional = true }
 sqlx = "0.9.0"
 
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tonic = { workspace = true, features = ["transport"] }
+
 [build-dependencies]
+prost-build = "0.14.4"
 resvg.workspace = true
-tonic-build = "0.12"
+tonic-build = "0.13.1"

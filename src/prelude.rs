@@ -3,13 +3,18 @@ pub use crate::{
 		modules::{Runtime, RuntimeState},
 		*,
 	},
-	client::*,
-	proto::*,
+	proto::{
+		leetcode::types::{self, *},
+		*,
+	},
 	share::{prelude::*, *},
 	theme::*,
 	tool::{time::*, *},
 	ui::{ve::*, *},
 };
+
+#[cfg(not(target_arch = "wasm32"))]
+pub use crate::client::*;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub use crate::{data::*, event::*};

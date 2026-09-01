@@ -1,15 +1,7 @@
-use std::sync::{
-	Mutex, OnceLock,
-	atomic::{AtomicBool, AtomicI64},
-};
+use crate::ui::{PanelConfig, *};
 
-use core_graphics::display::{CGPoint, CGRect};
 use egui::Color32;
-
-use crate::{
-	native::prelude::{ScrollRedirectState, *},
-	ui::PanelConfig,
-};
+use std::sync::atomic::AtomicI64;
 
 pub static START_VIEW: ViewType = ViewType::ProblemsScreen;
 pub static DEFAULT_VIEW: ViewType = ViewType::Markdown;

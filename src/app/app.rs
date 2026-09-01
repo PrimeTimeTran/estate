@@ -1,35 +1,29 @@
-use crate::e;
-use crate::repo::problem::StoredProblem;
 use crate::{
 	app::{prelude::*, state::EstateState},
-	leetcode::types::{ListProblemsRequest, PageRequest},
-	native::OracleView,
+	e,
+	model::problem::StoredProblem,
 	prelude::*,
+	proto::leetcode::types::{ListProblemsRequest, PageRequest},
 };
 
 pub struct App<R: Runtime> {
 	pub(crate) engine: EstateEngine<R>,
 	pub(crate) view: ViewType,
 	pub(crate) api: Arc<ApiClient>,
-	pub(crate) handle: tokio::runtime::Handle,
 	pub(crate) state: AppState,
-	events: tokio::sync::broadcast::Receiver<e::Event>,
 }
 impl<R: Runtime> App<R> {
-	pub fn new(engine: EstateEngine<R>, api: Arc<ApiClient>, handle: tokio::runtime::Handle) -> Self {
-		let events = engine.runtime.subscribe();
+	pub fn new(engine: EstateEngine<R>, api: Arc<ApiClient>) -> Self {
 		Self {
 			api,
 			engine,
-			events,
-			handle,
 			state: AppState::default(),
 			view: crate::START_VIEW,
 		}
 	}
-	pub fn initialize(&mut self, api: Arc<ApiClient>, handle: tokio::runtime::Handle) {
+	pub fn initialize(&mut self, api: Arc<ApiClient>) {
 		self.api = api;
-		self.handle = handle;
+		// self.handle = handle;
 	}
 	pub fn runtime(&self) -> Arc<R> {
 		Arc::clone(&self.engine.runtime)
@@ -37,15 +31,13 @@ impl<R: Runtime> App<R> {
 	pub fn set_api(&mut self, api: Arc<ApiClient>) {
 		self.api = api;
 	}
-	pub fn set_tokio(&mut self, handle: tokio::runtime::Handle) {
-		self.handle = handle;
-	}
 	pub fn api(&self) -> Arc<ApiClient> {
 		Arc::clone(&self.api)
 	}
 	pub fn update(&mut self) {
-		while let Ok(event) = self.events.try_recv() {
+		while let Some(event) = self.engine.runtime.try_recv() {
 			tracing::info!("update;");
+
 			match event.kind {
 				e::EventKind::Navigate(view) => {
 					self.view = view;
@@ -67,7 +59,7 @@ impl<R: Runtime> App<R> {
 	where
 		F: Future<Output = ()> + Send + 'static,
 	{
-		self.handle.spawn(future);
+		self.engine.runtime.spawn(future);
 	}
 }
 impl<R: Runtime + 'static> App<R> {
@@ -82,7 +74,7 @@ impl<R: Runtime + 'static> App<R> {
 		let api = Arc::clone(&self.api);
 		let events = self.engine.runtime.clone();
 
-		self.handle.spawn(async move {
+		self.engine.runtime.spawn(async move {
 			let mut client = api.problems.clone();
 
 			let result = client
@@ -151,17 +143,16 @@ impl<R: Runtime> App<R> {
 		println!("stop_session from app");
 	}
 }
-
 impl<R: Runtime> App<R> {
 	pub fn app_state(&self) -> &AppState {
 		&self.state
 	}
-	pub fn get_view(&self, view_type: ViewType) -> Ve<R> {
-		match view_type {
-			ViewType::MarkdownView => Ve::new(MarkdownView::new(crate::MARKDOWN)),
-			_ => self.default_view(),
-		}
-	}
+	// pub fn get_view(&self, view_type: ViewType) -> Ve<R> {
+	// 	match view_type {
+	// 		ViewType::MarkdownView => Ve::new(MarkdownView::new(crate::MARKDOWN)),
+	// 		_ => self.default_view(),
+	// 	}
+	// }
 	pub fn default_view(&self) -> Ve<R> {
 		Ve::new(MarkdownView::new(crate::MARKDOWN))
 	}

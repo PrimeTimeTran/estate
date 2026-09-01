@@ -21,8 +21,35 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		&mut pixmap.as_mut(),
 	);
 	pixmap.save_png(output).unwrap();
-	println!("cargo:rerun-if-changed=proto/service.proto");
-	println!("cargo:rerun-if-changed=proto/type.proto");
-	tonic_build::compile_protos("proto/service.proto")?;
+	// println!("cargo:rerun-if-changed=proto/main.proto");
+	// println!("cargo:rerun-if-changed=proto/leetcode/type.proto");
+	// println!("cargo:rerun-if-changed=proto/leetcode/service.proto");
+
+	// // Shared protobuf types — WASM + native.
+	// prost_build::compile_protos(&["proto/leetcode/type.proto"], &["proto"])?;
+
+	// // Native gRPC services only.
+	// #[cfg(not(target_arch = "wasm32"))]
+	// {
+	// 	let config = tonic_build::configure();
+
+	// 	config
+	// 		.build_client(true)
+	// 		.build_server(true)
+	// 		.compile_protos(&["proto/leetcode/service.proto"], &["proto"])?;
+	// }
+	println!("cargo:rerun-if-changed=proto/main.proto");
+	println!("cargo:rerun-if-changed=proto/leetcode/type.proto");
+	println!("cargo:rerun-if-changed=proto/leetcode/service.proto");
+
+	// Shared types: native + WASM
+	prost_build::compile_protos(&["proto/leetcode/type.proto"], &["proto"])?;
+
+	// gRPC services: native only
+	#[cfg(not(target_arch = "wasm32"))]
+	{
+		tonic_build::configure().compile_protos(&["proto/leetcode/service.proto"], &["proto"])?;
+	}
+
 	Ok(())
 }
