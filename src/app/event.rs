@@ -38,6 +38,7 @@ impl Event {
 }
 
 #[derive(Debug, Clone, Hash, Deserialize, Serialize)]
+
 pub enum EventKind {
 	ApiError(String),
 	CacheInvalidated { reason: String },
@@ -65,6 +66,7 @@ pub enum EventKind {
 	TaskStopped { task_id: TaskId },
 	WorkspaceIndexed { duration: u64 },
 }
+pub type Klass = EventKind;
 #[derive(Debug, Clone, Deserialize, Hash, Serialize)]
 pub enum EventSource {
 	App,

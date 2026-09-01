@@ -34,15 +34,15 @@ impl<R: Runtime> App<R> {
 		while let Some(event) = self.events.try_recv() {
 			// tracing::info!("🔥 App received: {:?}", event.kind);
 			match event.kind {
-				e::EventKind::Navigate(view) => {
+				e::Klass::Navigate(view) => {
 					self.view = view;
 				}
-				e::EventKind::ProblemsLoaded(problems) => {
+				e::Klass::ProblemsLoaded(problems) => {
 					self.state.problems = problems;
 					self.state.problems_loading = false;
 					self.state.problems_error = None;
 				}
-				e::EventKind::ApiError(error) => {
+				e::Klass::ApiError(error) => {
 					self.state.problems_loading = false;
 					self.state.problems_error = Some(error);
 				}
@@ -95,11 +95,11 @@ impl<R: Runtime + 'static> App<R> {
 						.map(StoredProblem::from)
 						.collect();
 					// tracing::info!("📦 emitting ProblemsLoaded");
-					events.emit(e::Event::app(e::EventKind::ProblemsLoaded(problems)));
+					events.emit(e::Event::app(e::Klass::ProblemsLoaded(problems)));
 				}
 				Err(error) => {
 					tracing::error!("❌ list_problems failed: {error}");
-					events.emit(e::Event::app(e::EventKind::ApiError(error.to_string())));
+					events.emit(e::Event::app(e::Klass::ApiError(error.to_string())));
 				}
 			}
 		});
@@ -118,13 +118,13 @@ impl<R: Runtime> App<R> {
 		self
 			.engine
 			.runtime
-			.emit(e::Event::app(e::EventKind::SessionStart));
+			.emit(e::Event::app(e::Klass::SessionStart));
 	}
 	pub fn new_task(&mut self) {
 		self
 			.engine
 			.runtime
-			.emit(e::Event::app(e::EventKind::TaskRequested {
+			.emit(e::Event::app(e::Klass::TaskRequested {
 				request: TaskRequest::Create(TaskKind::SyncBookmarks),
 			}));
 	}
@@ -132,7 +132,7 @@ impl<R: Runtime> App<R> {
 		self
 			.engine
 			.runtime
-			.emit(e::Event::app(e::EventKind::CommandExecuted {
+			.emit(e::Event::app(e::Klass::CommandExecuted {
 				command: "task_clear".into(),
 			}));
 	}
@@ -161,7 +161,7 @@ impl<R: Runtime> App<R> {
 		self
 			.engine
 			.runtime
-			.emit(e::Event::app(e::EventKind::CommandExecuted {
+			.emit(e::Event::app(e::Klass::CommandExecuted {
 				command: "task_list".into(),
 			}));
 	}

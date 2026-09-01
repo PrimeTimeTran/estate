@@ -1,6 +1,6 @@
 use crate::{
 	e,
-	e::{Event, EventKind},
+	e::{Event, Klass},
 	native::{core::EstateDiscovery, job::Task, prelude::*, runtime::NativeRuntime},
 	prelude::*,
 	session::Session,
@@ -15,7 +15,7 @@ pub struct TaskHandler;
 impl EventHandler for TaskHandler {
 	async fn handle(&self, event: &e::Event, runtime: &NativeRuntime) {
 		tracing::debug!("📡 EventHandler.handle {:?}", event);
-		let EventKind::TaskRequested { request } = &event.kind else {
+		let e::Klass::TaskRequested { request } = &event.kind else {
 			return;
 		};
 		let task_id = match request {
@@ -23,20 +23,20 @@ impl EventHandler for TaskHandler {
 				tracing::debug!("TaskRequest::Create {:?}", kind);
 				let mut tasks = runtime.tasks.write().unwrap();
 				let task_id = tasks.create(kind.clone());
-				runtime.emit(Event::daemon(EventKind::TaskCreated {
+				runtime.emit(e::Event::daemon(e::Klass::TaskCreated {
 					task_id,
 					kind: kind.clone(),
 				}));
 				match kind {
 					TaskKind::SessionStart => {
 						tracing::debug!("🔥 SessionStart");
-						runtime.emit(Event::daemon(EventKind::TaskRequested {
+						runtime.emit(Event::daemon(Klass::TaskRequested {
 							request: TaskRequest::Create(TaskKind::LoadMaster),
 						}));
-						runtime.emit(Event::daemon(EventKind::TaskRequested {
+						runtime.emit(Event::daemon(Klass::TaskRequested {
 							request: TaskRequest::Create(TaskKind::RebuildIndex),
 						}));
-						runtime.emit(Event::daemon(EventKind::TaskRequested {
+						runtime.emit(Event::daemon(Klass::TaskRequested {
 							request: TaskRequest::Create(TaskKind::IndexWorkspace),
 						}));
 					}
@@ -65,7 +65,7 @@ impl EventHandler for TaskHandler {
 		{
 			let mut tasks = runtime.tasks.write().unwrap();
 		}
-		runtime.emit(Event::daemon(e::EventKind::TaskStarted { task_id }));
+		runtime.emit(Event::daemon(e::Klass::TaskStarted { task_id }));
 		let runtime = runtime.clone();
 		tokio::spawn(async move {
 			tracing::debug!(
@@ -76,10 +76,10 @@ impl EventHandler for TaskHandler {
 			match TaskRunner::execute(&runtime, task.clone()).await {
 				Ok(()) => {
 					tracing::debug!("TaskHandler match TaskRunner::execute {:?}", task);
-					runtime.emit(e::Event::daemon(e::EventKind::TaskCompleted { task_id }));
+					runtime.emit(e::Event::daemon(e::Klass::TaskCompleted { task_id }));
 				}
 				Err(error) => {
-					runtime.emit(e::Event::daemon(e::EventKind::TaskFailed {
+					runtime.emit(e::Event::daemon(e::Klass::TaskFailed {
 						task_id,
 						error: error.to_string(),
 					}));
@@ -99,11 +99,9 @@ pub struct FileWatcherHandler;
 #[async_trait::async_trait]
 impl EventHandler for FileWatcherHandler {
 	async fn handle(&self, event: &e::Event, runtime: &NativeRuntime) {
-		if let e::EventKind::FileModified { inode, path } = &event.kind {
+		if let e::Klass::FileModified { inode, path } = &event.kind {
 			tracing::debug!("📡 FileWatcherHandler handle {:?} ({:?})", event, inode);
-			runtime.emit(Event::daemon(e::EventKind::IndexUpdated {
-				files_changed: 1,
-			}));
+			runtime.emit(Event::daemon(e::Klass::IndexUpdated { files_changed: 1 }));
 		}
 	}
 }
@@ -115,19 +113,19 @@ impl EventHandler for StateHandler {
 		let snapshot = {
 			let mut state = runtime.state.write();
 			match &event.kind {
-				e::EventKind::DaemonStarted => {}
-				e::EventKind::DaemonStarted => {
+				e::Klass::DaemonStarted => {}
+				e::Klass::DaemonStarted => {
 					state.starts += 1;
 					state.status_checks += 1;
 					state.started_at = event.timestamp;
 				}
-				e::EventKind::StatusRequested => {
+				e::Klass::StatusRequested => {
 					state.status_checks += 1;
 				}
-				e::EventKind::IndexUpdated { files_changed } => {
+				e::Klass::IndexUpdated { files_changed } => {
 					state.files_indexed += files_changed;
 				}
-				e::EventKind::TaskCreated { task_id, kind } => {
+				e::Klass::TaskCreated { task_id, kind } => {
 					state.tasks_created += 1;
 					state.jobs.push_back(Job {
 						id: task_id.clone(),
@@ -139,26 +137,26 @@ impl EventHandler for StateHandler {
 						completed_at: None,
 					});
 				}
-				e::EventKind::TaskStarted { task_id } => {
+				e::Klass::TaskStarted { task_id } => {
 					if let Some(job) = state.jobs.iter_mut().find(|job| &job.id == task_id) {
 						job.status = JobStatus::Running;
 						job.started_at = Some(event.timestamp);
 					}
 				}
-				e::EventKind::TaskCompleted { task_id } => {
+				e::Klass::TaskCompleted { task_id } => {
 					state.tasks_completed += 1;
 					if let Some(job) = state.jobs.iter_mut().find(|job| &job.id == task_id) {
 						job.status = JobStatus::Completed;
 						job.completed_at = Some(event.timestamp);
 					}
 				}
-				e::EventKind::TaskFailed { task_id, error } => {
+				e::Klass::TaskFailed { task_id, error } => {
 					if let Some(job) = state.jobs.iter_mut().find(|job| &job.id == task_id) {
 						job.status = JobStatus::Failed;
 						job.completed_at = Some(event.timestamp);
 					}
 				}
-				e::EventKind::DaemonStopped => {
+				e::Klass::DaemonStopped => {
 					let run_duration = event.timestamp.saturating_sub(state.started_at);
 					state.longest_run = state.longest_run.max(run_duration);
 				}
@@ -179,7 +177,7 @@ impl EventHandler for CommandHandler {
 		tracing::debug!("CommandHandler handler {:?}", event);
 
 		match &event.kind {
-			EventKind::SessionStop { .. } => {
+			e::Klass::SessionStop { .. } => {
 				tracing::debug!("ABOUT TO SAVE SESSION");
 
 				let mut session = runtime.session.clone();
@@ -194,7 +192,7 @@ impl EventHandler for CommandHandler {
 				}
 			}
 
-			EventKind::CommandExecuted { command } => {
+			e::Klass::CommandExecuted { command } => {
 				// handle actual commands here
 			}
 
@@ -203,7 +201,7 @@ impl EventHandler for CommandHandler {
 	}
 	// 			"task_create" => {
 	// 				tracing::info!("CommandHandler task_create {:?}", event);
-	// 				runtime.emit(Event::app(event::EventKind::TaskRequested {
+	// 				runtime.emit(Event::app(event::Klass::TaskRequested {
 	// 					request: TaskRequest::Create(TaskKind::SyncBookmarks),
 	// 				}));
 	// 			}
@@ -296,7 +294,7 @@ impl TaskRunner {
 
 				let duration = started.elapsed().as_millis();
 
-				runtime.emit(Event::daemon(EventKind::WorkspaceIndexed {
+				runtime.emit(Event::daemon(e::Klass::WorkspaceIndexed {
 					duration: duration as u64,
 				}));
 
@@ -336,20 +334,20 @@ pub struct AppHandler;
 #[async_trait::async_trait]
 impl EventHandler for AppHandler {
 	async fn handle(&self, event: &e::Event, runtime: &NativeRuntime) {
-		if !matches!(event.kind, EventKind::SessionStart) {
+		if !matches!(event.kind, e::Klass::SessionStart) {
 			return;
 		}
 		match event.kind.clone() {
-			e::EventKind::SessionStop { session } => {
+			e::Klass::SessionStop { session } => {
 				tracing::info!("🛑 SessionStop");
 			}
-			e::EventKind::SessionStart => {}
+			e::Klass::SessionStart => {}
 			_ => {
 				println!("not interested")
 			}
 		}
 		tracing::info!("🔥 SessionStart → SessionStart");
-		runtime.emit(Event::daemon(EventKind::TaskRequested {
+		runtime.emit(e::Event::daemon(e::Klass::TaskRequested {
 			request: TaskRequest::Create(TaskKind::SessionStart),
 		}));
 	}
@@ -358,7 +356,7 @@ pub struct NavigationHandler;
 #[async_trait::async_trait]
 impl EventHandler for NavigationHandler {
 	async fn handle(&self, event: &e::Event, _runtime: &NativeRuntime) {
-		let e::EventKind::Navigate(view_type) = event.kind else {
+		let e::Klass::Navigate(view_type) = event.kind else {
 			return;
 		};
 

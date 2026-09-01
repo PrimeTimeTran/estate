@@ -31,17 +31,13 @@ pub struct Dashboard {
 impl Dashboard {
 	pub fn new() -> Self {
 		let data_path = PathBuf::from(HMR_CHART_JSON);
-
 		let mut dashboard = Self {
 			data_path,
 			..Self::default()
 		};
-
 		dashboard.monitor =
 			StateMonitor::new(&dashboard.data_path).expect("failed to watch dashboard data");
-
 		dashboard.load();
-
 		dashboard
 	}
 

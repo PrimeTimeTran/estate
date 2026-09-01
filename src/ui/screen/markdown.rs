@@ -9,7 +9,6 @@ pub struct MarkdownView {
 	markdown: String,
 	cache: CommonMarkCache,
 }
-
 impl MarkdownView {
 	pub fn new(path: impl Into<PathBuf>) -> Self {
 		let path = path.into();

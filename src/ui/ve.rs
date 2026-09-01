@@ -1,9 +1,6 @@
-pub use crate::app::*;
-use crate::{e, theme::palette};
-
-// #[cfg(not(target_arch = "wasm32"))]
 #[cfg(feature = "native")]
 pub use crate::native::prelude::*;
+use crate::{app::*, e, prelude::*, theme::palette};
 
 pub trait Veable<R: Runtime> {
 	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>);

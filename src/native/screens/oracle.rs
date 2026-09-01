@@ -1,18 +1,20 @@
-#[cfg(not(target_arch = "wasm32"))]
 use crate::{app::*, native::prelude::*};
 
-// -----------------------------------------------------------------------------
-//OracleView
-// -----------------------------------------------------------------------------
 pub struct OracleView {
 	active_focus: FocusedPane,
 	dirty: bool,
 	error: Option<String>,
+	gesture: GestureController,
 	last_direction: String,
 	last_loaded: Option<SystemTime>,
 	scroll_x: f32,
 	scroll_y: f32,
-	gesture: GestureController,
+}
+impl Veable<NativeRuntime> for OracleView {
+	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, NativeRuntime>) {
+		self.draw_ui(ui, ctx);
+		self.draw_status_bar(ui);
+	}
 }
 impl OracleView {
 	pub fn new() -> Self {
@@ -235,15 +237,5 @@ impl OracleView {
 				ui.label("PoC V1.0 - Ready for OS Daemon translation");
 			});
 		});
-	}
-}
-// -----------------------------------------------------------------------------
-// VEABLE
-// -----------------------------------------------------------------------------
-
-impl Veable<NativeRuntime> for OracleView {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, NativeRuntime>) {
-		self.draw_ui(ui, ctx);
-		self.draw_status_bar(ui);
 	}
 }

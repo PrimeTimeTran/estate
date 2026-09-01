@@ -9,7 +9,7 @@ use crate::{
 	native::{self, runtime::NativeRuntime, screens::*, *},
 	prelude::*,
 	spawn_global_cursor_daemon,
-	ui::{View, rendermd::MarkdownView},
+	ui::{MarkdownView, View},
 };
 use tonic::transport::Channel;
 use tray_icon::{
@@ -121,7 +121,7 @@ impl NativeApp {
 		self
 			.engine
 			.runtime
-			.emit(e::Event::app(e::EventKind::SessionStart));
+			.emit(e::Event::app(e::Klass::SessionStart));
 		event_loop.run_app(self)?;
 		tracing::info!(">>> NativeApp::start_runtime returning");
 		Ok(())
@@ -134,6 +134,8 @@ impl NativeApp {
 			let mut view_index = 0;
 			while running.load(Ordering::Relaxed) {
 				let views = [
+					ViewType::Dashboard,
+					ViewType::ProblemsScreen,
 					ViewType::MarkdownView,
 					ViewType::ProblemsScreen,
 					ViewType::WaterfallChart,
@@ -144,11 +146,11 @@ impl NativeApp {
 				let _ = proxy.send_event(AppEvent::TickClock(format!(" {}s", current_time)));
 				tracing::info!("tick {}", current_time);
 				if current_time == 0 {
-					current_time = 5;
+					current_time = 3;
 					view_index = (view_index + 1) % views.len();
 					let view = views[view_index];
 					tracing::info!("⏩ Clock navigation → {:?}", view);
-					runtime.emit(e::Event::app(e::EventKind::Navigate(view)));
+					runtime.emit(e::Event::app(e::Klass::Navigate(view)));
 					let _ = proxy.send_event(AppEvent::RuntimeEvent);
 				} else {
 					current_time -= 1;
@@ -269,9 +271,7 @@ impl NativeApp {
 			self
 				.engine
 				.runtime
-				.emit(e::Event::app(e::EventKind::Navigate(
-					ViewType::ProblemsScreen,
-				)));
+				.emit(e::Event::app(e::Klass::Navigate(ViewType::ProblemsScreen)));
 			self.open_window(event_loop, WindowType::ProblemsScreen);
 		}
 	}
@@ -299,7 +299,7 @@ impl NativeApp {
 		self
 			.engine
 			.runtime
-			.emit(e::Event::app(e::EventKind::TaskRequested {
+			.emit(e::Event::app(e::Klass::TaskRequested {
 				request: TaskRequest::Create(TaskKind::SyncBookmarks),
 			}));
 	}
@@ -307,7 +307,7 @@ impl NativeApp {
 		self
 			.engine
 			.runtime
-			.emit(e::Event::app(e::EventKind::CommandExecuted {
+			.emit(e::Event::app(e::Klass::CommandExecuted {
 				command: "task_list".into(),
 			}));
 	}
@@ -315,7 +315,7 @@ impl NativeApp {
 		self
 			.engine
 			.runtime
-			.emit(e::Event::app(e::EventKind::CommandExecuted {
+			.emit(e::Event::app(e::Klass::CommandExecuted {
 				command: "task_clear".into(),
 			}));
 	}
@@ -365,20 +365,6 @@ impl NativeApp {
 	}
 	fn set_view(&mut self, view_type: ViewType) {
 		self.view_type = view_type;
-	}
-	fn change_view(&self, view_type: ViewType) -> Ve<NativeRuntime> {
-		let app = self
-			.app
-			.as_ref()
-			.expect("app must be initialized before changing views");
-		match view_type {
-			ViewType::MarkdownView => Ve::new(MarkdownView::new(crate::MARKDOWN)),
-			ViewType::TaskManager => Ve::new(TaskManager::new()),
-			ViewType::OracleView => Ve::new(OracleView::new()),
-			ViewType::WaterfallChart => Ve::new(WaterfallChart::new()),
-			ViewType::ProblemsScreen => Ve::new(ProblemsScreen::new()),
-			_ => app.default_view(),
-		}
 	}
 	fn set_menu_bar(&mut self, new_menu: Menu) {
 		self.menu_bar = Some(new_menu);
@@ -569,7 +555,7 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 				self
 					.engine
 					.runtime
-					.emit(e::Event::app(e::EventKind::Navigate(view)));
+					.emit(e::Event::app(e::Klass::Navigate(view)));
 				if let Some(app) = &mut self.app {
 					app.update();
 				}

@@ -1,11 +1,10 @@
 use crate::{
-	app::{AppContext, Job, JobStatus, Runtime, state::EstateState},
+	app::{state::EstateState, *},
 	e,
 	native::{job::TaskManager, runtime::NativeRuntime},
 	prelude::*,
 	theme::palette,
 };
-
 use egui::Ui;
 use egui_extras::{Column, TableBuilder};
 use egui_plot::{Bar, BarChart, Plot};
@@ -14,20 +13,17 @@ use std::time::Duration;
 impl TaskManager {
 	fn draw_jobs(&self, ui: &mut egui::Ui, jobs: &std::collections::VecDeque<Job>) {
 		let now = EstateState::now();
-
 		let timeline_start = jobs
 			.iter()
 			.filter_map(|job| job.started_at)
 			.min()
 			.unwrap_or(now);
-
 		let timeline_end = jobs
 			.iter()
 			.filter_map(|job| job.completed_at)
 			.max()
 			.unwrap_or(now)
 			.max(timeline_start + 1);
-
 		TableBuilder::new(ui)
 			.striped(true)
 			.resizable(true)
@@ -39,15 +35,12 @@ impl TaskManager {
 				header.col(|ui| {
 					ui.label("Name");
 				});
-
 				header.col(|ui| {
 					ui.label("Status");
 				});
-
 				header.col(|ui| {
 					ui.label("Origin");
 				});
-
 				header.col(|ui| {
 					ui.label("Timeline");
 				});
@@ -61,11 +54,9 @@ impl TaskManager {
 						row.col(|ui| {
 							ui.label(format!("{} {}", job.status.icon(), job.status.label()));
 						});
-
 						row.col(|ui| {
 							ui.label("Runtime");
 						});
-
 						row.col(|ui| {
 							self
 								.waterfall
@@ -90,7 +81,6 @@ impl TaskManager {
 			None => EstateState::now(),
 		};
 		let duration_ms = ended_at.saturating_sub(started_at);
-
 		ui.horizontal(|ui| {
 			// -----------------------------------------------------
 			// Job name
@@ -99,7 +89,6 @@ impl TaskManager {
 				[name_width, 32.0],
 				egui::Label::new(egui::RichText::new(job.kind.name()).color(palette::TEXT)),
 			);
-
 			// -----------------------------------------------------
 			// Status
 			// -----------------------------------------------------
@@ -107,7 +96,6 @@ impl TaskManager {
 				[status_width, 32.0],
 				egui::Label::new(format!("{} {}", job.status.icon(), job.status.label())),
 			);
-
 			// -----------------------------------------------------
 			// Duration
 			// -----------------------------------------------------
@@ -117,7 +105,6 @@ impl TaskManager {
 					egui::RichText::new(format_duration_ms(duration_ms)).color(palette::TEXT_MUTED),
 				),
 			);
-
 			// -----------------------------------------------------
 			// Waterfall
 			// -----------------------------------------------------
@@ -133,11 +120,8 @@ impl TaskManager {
 		width: f32,
 	) {
 		let height = 32.0;
-
 		let (response, painter) = ui.allocate_painter(egui::vec2(width, height), egui::Sense::hover());
-
 		let now = EstateState::now();
-
 		// ---------------------------------------------------------
 		// Determine the global timeline window.
 		//
@@ -146,9 +130,7 @@ impl TaskManager {
 		// ---------------------------------------------------------
 		let timeline_start = started_at.min(now);
 		let timeline_end = ended_at.max(timeline_start + 1);
-
 		let total = (timeline_end - timeline_start).max(1) as f32;
-
 		// ---------------------------------------------------------
 		// Convert timestamps -> pixels
 		// ---------------------------------------------------------
@@ -156,20 +138,16 @@ impl TaskManager {
 			let offset = timestamp.saturating_sub(timeline_start) as f32;
 			response.rect.left() + (offset / total) * width
 		};
-
 		let x1 = x(started_at);
 		let x2 = x(ended_at);
-
 		let bar_rect = egui::Rect::from_min_max(
 			egui::pos2(x1, response.rect.top() + 8.0),
 			egui::pos2(x2.max(x1 + 2.0), response.rect.bottom() - 8.0),
 		);
-
 		// ---------------------------------------------------------
 		// Background
 		// ---------------------------------------------------------
 		painter.rect_filled(response.rect, 0.0, palette::SURFACE);
-
 		// ---------------------------------------------------------
 		// Job bar
 		// ---------------------------------------------------------
@@ -183,7 +161,6 @@ impl TaskManager {
 				_ => palette::TEXT_MUTED,
 			},
 		);
-
 		// ---------------------------------------------------------
 		// Hover
 		// ---------------------------------------------------------
@@ -299,11 +276,9 @@ impl Veable<NativeRuntime> for TaskManager {
 		let gap = 6.0;
 		let card_width = (available.x - gap) / 2.0;
 		let card_height = 280.0;
-
 		render_graphs(ui, state, available, gap, card_width, card_height);
 	}
 }
-
 fn render_graphs(
 	ui: &mut Ui,
 	state: &EstateState,
@@ -627,10 +602,8 @@ fn format_duration(duration: Duration) -> String {
 		format!("{}h {}m", secs / 3600, (secs % 3600) / 60)
 	}
 }
-
 #[derive(Debug, Default, Clone, Copy)]
 pub struct WaterfallChart;
-
 impl<R: Runtime> Veable<R> for WaterfallChart {
 	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, R>) {
 		if ctx.state_changed() {
@@ -641,56 +614,43 @@ impl<R: Runtime> Veable<R> for WaterfallChart {
 		self.draw_chart(ui, state.jobs.iter());
 	}
 }
-
 impl WaterfallChart {
 	pub fn new() -> Self {
 		Self
 	}
 	pub fn draw_chart<'a>(&self, ui: &mut Ui, jobs: impl Iterator<Item = &'a Job>) {
 		let jobs: Vec<&Job> = jobs.collect();
-
 		if jobs.is_empty() {
 			ui.centered_and_justified(|ui| {
 				ui.label("No job history");
 			});
 			return;
 		}
-
 		let now = EstateState::now();
-
 		let mut timed_jobs = Vec::new();
-
 		for job in jobs {
 			let Some(started_at) = job.started_at else {
 				continue;
 			};
-
 			let start = started_at as f64;
 			let end = job.completed_at.unwrap_or(now) as f64;
-
 			timed_jobs.push((job, start, end.max(start + 1.0)));
 		}
-
 		if timed_jobs.is_empty() {
 			ui.centered_and_justified(|ui| {
 				ui.label("No timed jobs");
 			});
 			return;
 		}
-
 		// Oldest -> newest.
 		timed_jobs.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
-
 		let mut lanes: Vec<f64> = Vec::new();
 		let mut bars = Vec::with_capacity(timed_jobs.len());
-
 		let mut min_time = f64::MAX;
 		let mut max_time = f64::MIN;
-
 		for (job, start, end) in timed_jobs {
 			min_time = min_time.min(start);
 			max_time = max_time.max(end);
-
 			let lane = lanes
 				.iter()
 				.position(|lane_end| *lane_end <= start)
@@ -698,9 +658,7 @@ impl WaterfallChart {
 					lanes.push(0.0);
 					lanes.len() - 1
 				});
-
 			lanes[lane] = end;
-
 			bars.push(
 				Bar::new(lane as f64, end - start)
 					.horizontal()
@@ -709,9 +667,7 @@ impl WaterfallChart {
 					.name(job.kind.name()),
 			);
 		}
-
 		let padding = ((max_time - min_time) * 0.05).max(1.0);
-
 		Plot::new("job_history")
 			.height(300.0)
 			.include_x(min_time - padding)
@@ -725,42 +681,31 @@ impl WaterfallChart {
 			.show(ui, |plot_ui| {
 				// Keep the Y viewport bounded.
 				let mut bounds = plot_ui.plot_bounds();
-
 				bounds.set_y_center_height(bounds.center().y.clamp(0.0, 20.0), 20.0);
-
 				plot_ui.set_plot_bounds(bounds);
-
 				plot_ui.bar_chart(BarChart::new("jobs", bars).horizontal());
 			});
 	}
 	pub fn draw_job(&self, ui: &mut Ui, job: &Job, timeline_start: u64, timeline_end: u64) {
 		let height = 28.0;
-
 		let (response, painter) = ui.allocate_painter(
 			egui::vec2(ui.available_width(), height),
 			egui::Sense::hover(),
 		);
-
 		let total = (timeline_end - timeline_start).max(1) as f32;
-
 		let x = |timestamp: u64| {
 			let offset = timestamp.saturating_sub(timeline_start) as f32;
 			response.rect.left() + (offset / total) * response.rect.width()
 		};
-
 		let started_at = job.started_at.unwrap_or(timeline_start);
 		let ended_at = job.completed_at.unwrap_or_else(EstateState::now);
-
 		let x1 = x(started_at);
 		let x2 = x(ended_at);
-
 		let bar_rect = egui::Rect::from_min_max(
 			egui::pos2(x1, response.rect.top() + 5.0),
 			egui::pos2(x2.max(x1 + 2.0), response.rect.bottom() - 5.0),
 		);
-
 		painter.rect_filled(response.rect, 0.0, palette::SURFACE);
-
 		painter.rect_filled(
 			bar_rect,
 			2.0,
@@ -771,7 +716,6 @@ impl WaterfallChart {
 				_ => palette::TEXT_MUTED,
 			},
 		);
-
 		if response.hovered() {
 			painter.rect_stroke(
 				bar_rect,
@@ -779,7 +723,6 @@ impl WaterfallChart {
 				egui::Stroke::new(1.0, palette::TEXT),
 				egui::StrokeKind::Outside,
 			);
-
 			response.on_hover_text(format!(
 				"{}\n{}\n{}",
 				job.kind.name(),

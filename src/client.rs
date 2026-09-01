@@ -4,7 +4,7 @@ use crate::{
 	e,
 	model::problem::StoredProblem,
 	prelude::*,
-	ui::{View, rendermd::MarkdownView},
+	ui::{MarkdownView, View},
 };
 
 use crate::proto::leetcode::{

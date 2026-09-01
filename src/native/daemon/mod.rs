@@ -190,14 +190,10 @@ impl<R: Runtime> Daemon<R> {
 		let pid = std::process::id();
 		Self::write_pid(pid)?;
 		tracing::info!(pid, "[Daemon] Foreground run");
-		self
-			.runtime
-			.emit(e::Event::daemon(e::EventKind::DaemonStarted));
+		self.runtime.emit(e::Event::daemon(e::Klass::DaemonStarted));
 		self.shutdown_token.cancelled().await;
 		tracing::info!(pid, "[Daemon] Foreground stop");
-		self
-			.runtime
-			.emit(e::Event::daemon(e::EventKind::DaemonStopped));
+		self.runtime.emit(e::Event::daemon(e::Klass::DaemonStopped));
 		Ok(())
 	}
 

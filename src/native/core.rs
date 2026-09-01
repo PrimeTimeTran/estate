@@ -457,14 +457,10 @@ pub enum Location {
 		uri: String,
 	},
 }
-///      Result produced by the discovery process.
-///
-///      Contains the discovered items and metadata about the scan.
 pub struct DiscoveryResult {
 	pub workspace: Workspace,
 	pub packages: Vec<Package>,
 	pub files: Vec<PathBuf>,
 	pub ignored: Vec<PathBuf>,
 }
-// struct Workspace;
 struct Package;
