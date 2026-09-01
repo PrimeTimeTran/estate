@@ -1,7 +1,7 @@
 use crate::services::*;
 
 use crate::{
-	model::{Difficulty, ProtoProblem},
+	model::{ProtoProblem, common::Difficulty},
 	prelude::*,
 	services::*,
 };

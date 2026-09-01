@@ -3,6 +3,8 @@ pub use crate::proto::leetcode::types::{
 	SubmissionStatus as ProtoSubmissionStatus,
 };
 
+use crate::proto::leetcode::types as P;
+
 pub mod common;
 pub use common::*;
 

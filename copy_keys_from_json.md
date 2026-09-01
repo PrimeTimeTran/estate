@@ -7,12 +7,18 @@ Use VS Code's built-in Regex Find and Replace:
 
 ## 1. Copy items only (no string wrapper or commas)
 
-3. Find: `^\s*"([^"]+)"\s*:\s*.*$`
+3. Find: `^\s*"([^"]+)"\s*:.*$`
 4. Replace: `$1`
 5. Click **Replace All** to strip values and keep only the keys.
 
 ## 2. Copy items with wrapping "" and comma deliinator
 
-3. Find `^\s*"([^"]+)"\s*:\s*.*$`
+3. Find `^\s*"([^"]+)"\s*:.*$`
 4. Replace: `$1`
 5. Click **Replace All** to strip values and keep only the keys.
+
+## 3. Copy items with wrapping "" and comma deliinator
+
+```
+^\s*"([^"]+)"\s*:.*$
+```

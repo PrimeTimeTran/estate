@@ -2,3 +2,7 @@
 # [build]
 # target = "wasm32-unknown-unknown"
 
+
+# macOS (Requires 'brew install llvm' to get lld)
+[target.x86_64-apple-darwin]
+linker = "lld"

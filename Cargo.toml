@@ -192,3 +192,12 @@ tonic = { workspace = true, features = ["transport"] }
 prost-build = "0.14.4"
 resvg.workspace = true
 tonic-build = "0.13.1"
+
+[profile.dev]
+# Keep file names/line numbers for panics, but drop full debug info overhead
+debug = "line-tables-only" #
+
+[profile.dev.package."*"]
+# Compile dependencies with high optimization so your dev binary runs fast,
+# while keeping your own application code unoptimized for fast rebuilds
+opt-level = 3 #

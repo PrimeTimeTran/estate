@@ -1,9 +1,13 @@
 use crate::{
 	app::{prelude::*, state::EstateState},
 	e,
-	model::problem::StoredProblem,
+	model::StoredProblem,
 	prelude::*,
-	proto::leetcode::types::{ListProblemsRequest, PageRequest, SampleProblemRequest},
+	proto::leetcode::{
+		problem_service_client::ProblemServiceClient,
+		submission_service_client::SubmissionServiceClient,
+		types::{ListProblemsRequest, PageRequest, SampleProblemRequest},
+	},
 };
 pub struct App<R: Runtime> {
 	pub(crate) engine: EstateEngine<R>,
@@ -95,7 +99,6 @@ impl<R: Runtime> App<R> {
 		self.engine.runtime.spawn(future);
 	}
 }
-
 impl<R: Runtime> App<R> {
 	pub fn state(&self) -> std::sync::RwLockReadGuard<'_, EstateState> {
 		self.engine.runtime.state().read()

@@ -1,5 +1,5 @@
 use crate::{
-	model::{Language, ProtoProblem, *},
+	model::{ProtoProblem, common::Language, *},
 	prelude::*,
 };
 
@@ -111,25 +111,5 @@ impl TryFrom<CodeTemplate> for StoredCodeTemplate {
 			language: Language::try_from(language)?,
 			source: value.source,
 		})
-	}
-}
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Difficulty {
-	Easy,
-	Medium,
-	Hard,
-}
-
-impl TryFrom<i32> for Difficulty {
-	type Error = anyhow::Error;
-
-	fn try_from(value: i32) -> Result<Self, Self::Error> {
-		match value {
-			1 => Ok(Self::Easy),
-			2 => Ok(Self::Medium),
-			3 => Ok(Self::Hard),
-			0 => anyhow::bail!("difficulty unspecified"),
-			other => anyhow::bail!("unknown difficulty: {other}"),
-		}
 	}
 }

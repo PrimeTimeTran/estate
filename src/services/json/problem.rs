@@ -150,7 +150,6 @@ impl ProblemRepository for JsonProblemRepository {
 	async fn get_by_slug(&self, slug: &str) -> Result<ProtoProblem> {
 		Ok(self.load(slug).await?.into())
 	}
-
 	async fn sample_problem(&self, query: ProblemQuery) -> Result<ProtoProblem> {
 		use rand::seq::IndexedRandom;
 

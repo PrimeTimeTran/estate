@@ -1,5 +1,5 @@
 use crate::{
-	model::{Language, ProtoSubmissionStatus},
+	model::{ProtoSubmissionStatus, common::Language},
 	prelude::*,
 };
 
