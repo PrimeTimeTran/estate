@@ -1,3 +1,5 @@
+use chrono::{DateTime, Utc};
+
 pub fn format_timestamp(timestamp: f64) -> String {
 	let timestamp = timestamp as u64;
 	let datetime = std::time::UNIX_EPOCH + std::time::Duration::from_secs(timestamp);
@@ -39,5 +41,12 @@ pub fn timestamp(value: Option<String>) -> Option<prost_types::Timestamp> {
 				seconds: dt.timestamp(),
 				nanos: dt.timestamp_subsec_nanos() as i32,
 			})
+	})
+}
+
+pub fn to_timestamp(value: Option<&DateTime<Utc>>) -> Option<prost_types::Timestamp> {
+	value.map(|dt| prost_types::Timestamp {
+		seconds: dt.timestamp(),
+		nanos: dt.timestamp_subsec_nanos() as i32,
 	})
 }

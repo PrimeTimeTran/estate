@@ -224,11 +224,14 @@ impl<R: Runtime + 'static> App<R> {
 				})
 				.await
 			{
-				Ok(response) => {
-					let problem = StoredProblem::from(response.into_inner());
-
-					runtime.emit(e::Event::app(e::Klass::ProblemSampled(problem)));
-				}
+				Ok(response) => match StoredProblem::try_from(response.into_inner()) {
+					Ok(problem) => {
+						runtime.emit(e::Event::app(e::Klass::ProblemSampled(problem)));
+					}
+					Err(error) => {
+						runtime.emit(e::Event::app(e::Klass::ApiError(error.to_string())));
+					}
+				},
 
 				Err(error) => {
 					runtime.emit(e::Event::app(e::Klass::ApiError(error.to_string())));
@@ -261,14 +264,20 @@ impl<R: Runtime + 'static> App<R> {
 				.await
 			{
 				Ok(response) => {
-					let problems = response
+					let result = response
 						.into_inner()
 						.problems
 						.into_iter()
-						.map(StoredProblem::from)
-						.collect();
-
-					runtime.emit(e::Event::app(e::Klass::ProblemsLoaded(problems)));
+						.map(StoredProblem::try_from)
+						.collect::<Result<Vec<_>, _>>();
+					match result {
+						Ok(problems) => {
+							runtime.emit(e::Event::app(e::Klass::ProblemsLoaded(problems)));
+						}
+						Err(error) => {
+							runtime.emit(e::Event::app(e::Klass::ApiError(error.to_string())));
+						}
+					}
 				}
 
 				Err(error) => {

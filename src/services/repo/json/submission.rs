@@ -1,4 +1,5 @@
-use crate::{repo::submission::*, services::*};
+use crate::{model::Language, prelude::*, repo::submission::*, services::*};
+use anyhow::Context;
 
 pub struct JsonSubmissionRepository {
 	path: PathBuf,
@@ -10,7 +11,7 @@ pub struct StoredSubmission {
 	pub user_id: String,
 	pub problem_id: String,
 	pub source: String,
-	pub language: String,
+	pub language: Language,
 	pub status: i32,
 	pub runtime_ms: Option<i64>,
 	pub memory_bytes: Option<i64>,
@@ -20,7 +21,6 @@ pub struct StoredSubmission {
 	pub created_at: Option<chrono::DateTime<chrono::Utc>>,
 	pub updated_at: Option<chrono::DateTime<chrono::Utc>>,
 }
-use std::time::SystemTime;
 impl From<StoredSubmission> for Submission {
 	fn from(value: StoredSubmission) -> Self {
 		Self {
@@ -28,7 +28,7 @@ impl From<StoredSubmission> for Submission {
 			user_id: value.user_id,
 			problem_id: value.problem_id,
 			source: value.source,
-			language: value.language,
+			language: value.language.as_proto_i32(),
 			status: value.status,
 			runtime_ms: value.runtime_ms,
 			memory_bytes: value.memory_bytes,
@@ -126,7 +126,6 @@ impl SubmissionRepository for JsonSubmissionRepository {
 			}
 			if query
 				.language
-				.as_deref()
 				.is_some_and(|language| stored.language != language)
 			{
 				continue;
@@ -158,13 +157,15 @@ impl SubmissionRepository for JsonSubmissionRepository {
 	}
 	async fn update(&self, id: &str, update: UpdateSubmission) -> Result<Submission> {
 		let mut submission = self.find_by_id(id).await?;
+
 		if let Some(source) = update.source {
 			submission.source = source;
 		}
-		if let Some(language) = update.language {
-			submission.language = language;
-		}
+
+		submission.language = update.language;
+
 		self.save(&submission).await?;
+
 		Ok(submission.into())
 	}
 	async fn delete(&self, id: &str) -> Result<()> {

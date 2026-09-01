@@ -1,5 +1,7 @@
-use crate::prelude::*;
-use crate::proto::leetcode::types::Problem;
+use crate::{
+	model::{Language, ProtoProblem, *},
+	prelude::*,
+};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, Hash)]
 pub struct StoredProblem {
@@ -14,10 +16,10 @@ pub struct StoredProblem {
 	pub constraints: Vec<String>,
 	pub code_templates: Vec<StoredCodeTemplate>,
 	pub is_published: bool,
-	pub created_at: Option<String>,
-	pub updated_at: Option<String>,
+	pub created_at: Option<DateTime<Utc>>,
+	pub updated_at: Option<DateTime<Utc>>,
 }
-impl From<StoredProblem> for Problem {
+impl From<StoredProblem> for ProtoProblem {
 	fn from(problem: StoredProblem) -> Self {
 		Self {
 			id: problem.id.to_string(),
@@ -31,14 +33,16 @@ impl From<StoredProblem> for Problem {
 			constraints: problem.constraints,
 			code_templates: problem.code_templates.into_iter().map(Into::into).collect(),
 			is_published: problem.is_published,
-			created_at: parse_timestamp(problem.created_at),
-			updated_at: parse_timestamp(problem.updated_at),
+			created_at: to_timestamp(problem.created_at.as_ref()),
+			updated_at: to_timestamp(problem.updated_at.as_ref()),
 		}
 	}
 }
-impl From<Problem> for StoredProblem {
-	fn from(problem: Problem) -> Self {
-		Self {
+impl TryFrom<ProtoProblem> for StoredProblem {
+	type Error = anyhow::Error;
+
+	fn try_from(problem: ProtoProblem) -> Result<Self, Self::Error> {
+		Ok(Self {
 			id: problem.id.parse().unwrap_or_default(),
 			number: problem.number,
 			title: problem.title,
@@ -48,18 +52,23 @@ impl From<Problem> for StoredProblem {
 			tags: problem.tags,
 			examples: problem.examples.into_iter().map(Into::into).collect(),
 			constraints: problem.constraints,
-			code_templates: problem.code_templates.into_iter().map(Into::into).collect(),
+			code_templates: problem
+				.code_templates
+				.into_iter()
+				.map(StoredCodeTemplate::try_from)
+				.collect::<Result<Vec<_>, _>>()?,
 			is_published: problem.is_published,
 			created_at: None,
 			updated_at: None,
-		}
+		})
 	}
 }
 #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
 pub struct StoredCodeTemplate {
-	pub language: String,
+	pub language: Language,
 	pub source: String,
 }
+
 #[derive(Debug, Clone, Serialize, Deserialize, Hash)]
 pub struct StoredExample {
 	pub input: String,
@@ -78,7 +87,7 @@ impl From<StoredExample> for Example {
 impl From<StoredCodeTemplate> for CodeTemplate {
 	fn from(value: StoredCodeTemplate) -> Self {
 		Self {
-			language: value.language,
+			language: ProtoLanguage::from(value.language) as i32,
 			source: value.source,
 		}
 	}
@@ -92,15 +101,18 @@ impl From<Example> for StoredExample {
 		}
 	}
 }
-impl From<CodeTemplate> for StoredCodeTemplate {
-	fn from(value: CodeTemplate) -> Self {
-		Self {
-			language: value.language,
+impl TryFrom<CodeTemplate> for StoredCodeTemplate {
+	type Error = anyhow::Error;
+
+	fn try_from(value: CodeTemplate) -> Result<Self, Self::Error> {
+		let language = ProtoLanguage::try_from(value.language)?;
+
+		Ok(Self {
+			language: Language::try_from(language)?,
 			source: value.source,
-		}
+		})
 	}
 }
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Difficulty {
 	Easy,

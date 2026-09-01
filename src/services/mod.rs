@@ -16,7 +16,6 @@ use crate::{
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 use tonic::{Request, Response, Status};

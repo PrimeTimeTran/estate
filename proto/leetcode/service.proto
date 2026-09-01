@@ -7,12 +7,12 @@ package leetcode;
 import "leetcode/type.proto";
 
 service ProblemService {
-  rpc CreateProblem(types.CreateProblemRequest) returns (leetcode.types.Problem);
+  rpc CreateProblem(leetcode.types.CreateProblemRequest) returns (leetcode.types.Problem);
   rpc GetProblem(leetcode.types.GetProblemRequest) returns (leetcode.types.Problem);
   rpc UpdateProblem(leetcode.types.UpdateProblemRequest) returns (leetcode.types.Problem);
   rpc DeleteProblem(leetcode.types.DeleteProblemRequest) returns (leetcode.types.Empty);
   rpc ListProblems(leetcode.types.ListProblemsRequest) returns (leetcode.types.ListProblemsResponse);
-  rpc sampleProblem(leetcode.types.SampleProblemRequest) returns (leetcode.types.Problem);
+  rpc SampleProblem(leetcode.types.SampleProblemRequest) returns (leetcode.types.Problem);
 }
 
 service SubmissionService {
@@ -22,4 +22,54 @@ service SubmissionService {
   rpc DeleteSubmission(leetcode.types.DeleteSubmissionRequest) returns (leetcode.types.Empty);
   rpc ListSubmissions(leetcode.types.ListSubmissionsRequest) returns (leetcode.types.ListSubmissionsResponse);
   rpc RunSubmission(leetcode.types.RunSubmissionRequest) returns (leetcode.types.Submission);
+}
+
+service SolutionService {
+  rpc CreateSolution(
+  leetcode.types.CreateSolutionRequest
+  ) returns (leetcode.types.Solution);
+
+  rpc GetSolution(
+  leetcode.types.GetSolutionRequest
+  ) returns (leetcode.types.Solution);
+
+  rpc UpdateSolution(
+  leetcode.types.UpdateSolutionRequest
+  ) returns (leetcode.types.Solution);
+
+  rpc DeleteSolution(
+  leetcode.types.DeleteSolutionRequest
+  ) returns (leetcode.types.Empty);
+
+  rpc ListSolutions(
+  leetcode.types.ListSolutionsRequest
+  ) returns (leetcode.types.ListSolutionsResponse);
+
+}
+
+service CommentService {
+  rpc CreateComment(
+  leetcode.types.CreateCommentRequest
+  ) returns (leetcode.types.Comment);
+
+  rpc GetComment(
+  leetcode.types.GetCommentRequest
+  ) returns (leetcode.types.Comment);
+
+  rpc UpdateComment(
+  leetcode.types.UpdateCommentRequest
+  ) returns (leetcode.types.Comment);
+
+  rpc DeleteComment(
+  leetcode.types.DeleteCommentRequest
+  ) returns (leetcode.types.Empty);
+
+  rpc ListComments(
+  leetcode.types.ListCommentsRequest
+  ) returns (leetcode.types.ListCommentsResponse);
+
+  rpc ListReplies(
+  leetcode.types.ListRepliesRequest
+  ) returns (leetcode.types.ListCommentsResponse);
+
 }

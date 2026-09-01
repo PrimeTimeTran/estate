@@ -1,5 +1,3 @@
-// leetcode/type.proto
-
 syntax = "proto3";
 
 package leetcode.types;
@@ -7,22 +5,50 @@ package leetcode.types;
 import "google/protobuf/timestamp.proto";
 
 message Empty {}
+
+// -----------------------------------------------------------------------------
+// Common
+// -----------------------------------------------------------------------------
+
 message PageRequest {
   int32 page = 1;
   int32 page_size = 2;
 }
+
 message PageInfo {
   int32 page = 1;
   int32 page_size = 2;
   int64 total = 3;
 }
+
+// -----------------------------------------------------------------------------
+// Language
+// -----------------------------------------------------------------------------
+
+enum Language {
+  LANGUAGE_RUST = 0;
+  LANGUAGE_PYTHON = 1;
+  LANGUAGE_JAVASCRIPT = 2;
+  LANGUAGE_TYPESCRIPT = 3;
+}
+
+// -----------------------------------------------------------------------------
+// Problem
+// -----------------------------------------------------------------------------
+
+enum Difficulty {
+  DIFFICULTY_UNSPECIFIED = 0;
+  DIFFICULTY_EASY = 1;
+  DIFFICULTY_MEDIUM = 2;
+  DIFFICULTY_HARD = 3;
+}
+
 message Problem {
   string id = 1;
-  int32 number = 2;
 
+  int32 number = 2;
   string title = 3;
   string slug = 4;
-
   string description = 5;
 
   Difficulty difficulty = 6;
@@ -43,27 +69,23 @@ message Problem {
   google.protobuf.Timestamp created_at = 12;
   google.protobuf.Timestamp updated_at = 13;
 }
-enum Difficulty {
-  DIFFICULTY_UNSPECIFIED = 0;
-  DIFFICULTY_EASY = 1;
-  DIFFICULTY_MEDIUM = 2;
-  DIFFICULTY_HARD = 3;
-}
+
 message Example {
   string input = 1;
   string output = 2;
   string explanation = 3;
 }
+
 message CodeTemplate {
-  string language = 1;
+  Language language = 1;
   string source = 2;
 }
+
 message CreateProblemRequest {
   int32 number = 1;
   string title = 2;
   string slug = 3;
   string description = 4;
-
   Difficulty difficulty = 5;
 
   repeated string tags = 6;
@@ -73,9 +95,11 @@ message CreateProblemRequest {
 
   bool is_published = 10;
 }
+
 message GetProblemRequest {
   string id = 1;
 }
+
 message UpdateProblemRequest {
   string id = 1;
 
@@ -92,34 +116,59 @@ message UpdateProblemRequest {
 
   optional bool is_published = 11;
 }
+
 message DeleteProblemRequest {
   string id = 1;
 }
+
 message ListProblemsRequest {
   PageRequest page = 1;
 
   optional Difficulty difficulty = 2;
-
   repeated string tags = 3;
 
   string search = 4;
 
   optional bool published_only = 5;
 }
+
 message ListProblemsResponse {
   repeated Problem problems = 1;
   PageInfo page = 2;
 }
+
 message SampleProblemRequest {
   PageRequest page = 1;
+
   optional Difficulty difficulty = 2;
   repeated string tags = 3;
+
   string search = 4;
+
   optional bool published_only = 5;
 }
+
 message SampleProblemResponse {
   Problem problem = 1;
 }
+
+// -----------------------------------------------------------------------------
+// Submission
+// -----------------------------------------------------------------------------
+
+enum SubmissionStatus {
+  SUBMISSION_STATUS_UNSPECIFIED = 0;
+  SUBMISSION_STATUS_PENDING = 1;
+  SUBMISSION_STATUS_RUNNING = 2;
+  SUBMISSION_STATUS_ACCEPTED = 3;
+  SUBMISSION_STATUS_WRONG_ANSWER = 4;
+  SUBMISSION_STATUS_TIME_LIMIT_EXCEEDED = 5;
+  SUBMISSION_STATUS_MEMORY_LIMIT_EXCEEDED = 6;
+  SUBMISSION_STATUS_RUNTIME_ERROR = 7;
+  SUBMISSION_STATUS_COMPILATION_ERROR = 8;
+  SUBMISSION_STATUS_INTERNAL_ERROR = 9;
+}
+
 message Submission {
   string id = 1;
 
@@ -129,10 +178,10 @@ message Submission {
   // Problem being submitted against.
   string problem_id = 3;
 
-  // The source submitted by the user.
+  // Source submitted by the user.
   string source = 4;
 
-  string language = 5;
+  Language language = 5;
 
   SubmissionStatus status = 6;
 
@@ -150,46 +199,256 @@ message Submission {
   google.protobuf.Timestamp created_at = 12;
   google.protobuf.Timestamp updated_at = 13;
 }
-enum SubmissionStatus {
-  SUBMISSION_STATUS_UNSPECIFIED = 0;
-  SUBMISSION_STATUS_PENDING = 1;
-  SUBMISSION_STATUS_RUNNING = 2;
-  SUBMISSION_STATUS_ACCEPTED = 3;
-  SUBMISSION_STATUS_WRONG_ANSWER = 4;
-  SUBMISSION_STATUS_TIME_LIMIT_EXCEEDED = 5;
-  SUBMISSION_STATUS_MEMORY_LIMIT_EXCEEDED = 6;
-  SUBMISSION_STATUS_RUNTIME_ERROR = 7;
-  SUBMISSION_STATUS_COMPILATION_ERROR = 8;
-  SUBMISSION_STATUS_INTERNAL_ERROR = 9;
-}
+
 message CreateSubmissionRequest {
   string user_id = 1;
   string problem_id = 2;
   string source = 3;
-  string language = 4;
+  Language language = 4;
 }
+
 message GetSubmissionRequest {
   string id = 1;
 }
+
 message UpdateSubmissionRequest {
   string id = 1;
+
   optional string source = 2;
-  optional string language = 3;
+  Language language = 3;
 }
+
 message DeleteSubmissionRequest {
   string id = 1;
 }
+
 message ListSubmissionsRequest {
   PageRequest page = 1;
+
   optional string user_id = 2;
   optional string problem_id = 3;
   optional SubmissionStatus status = 4;
-  optional string language = 5;
+  optional Language language = 5;
 }
+
 message ListSubmissionsResponse {
   repeated Submission submissions = 1;
   PageInfo page = 2;
 }
+
 message RunSubmissionRequest {
   string submission_id = 1;
+}
+
+// -----------------------------------------------------------------------------
+// Solution
+// -----------------------------------------------------------------------------
+
+enum SolutionStatus {
+  SOLUTION_STATUS_UNSPECIFIED = 0;
+  SOLUTION_STATUS_DRAFT = 1;
+  SOLUTION_STATUS_PUBLISHED = 2;
+}
+
+message Solution {
+  string id = 1;
+
+  string problem_id = 2;
+  string author_id = 3;
+
+  string title = 4;
+  string slug = 5;
+
+  // Full written solution / explanation.
+  string content = 6;
+
+  // Summary of the algorithm / approach.
+  string approach = 7;
+
+  string time_complexity = 8;
+  string space_complexity = 9;
+
+  repeated SolutionCode code = 10;
+
+  SolutionStatus status = 11;
+
+  int64 view_count = 12;
+  int64 vote_count = 13;
+
+  google.protobuf.Timestamp created_at = 14;
+  google.protobuf.Timestamp updated_at = 15;
+}
+
+message SolutionCode {
+  Language language = 1;
+  string code = 2;
+}
+
+message CreateSolutionRequest {
+  string problem_id = 1;
+  string author_id = 2;
+
+  string title = 3;
+  string slug = 4;
+  string content = 5;
+  string approach = 6;
+
+  string time_complexity = 7;
+  string space_complexity = 8;
+
+  repeated SolutionCode code = 9;
+
+  SolutionStatus status = 10;
+}
+
+message GetSolutionRequest {
+  string id = 1;
+}
+
+message UpdateSolutionRequest {
+  string id = 1;
+
+  optional string title = 2;
+  optional string slug = 3;
+  optional string content = 4;
+  optional string approach = 5;
+
+  optional string time_complexity = 6;
+  optional string space_complexity = 7;
+
+  repeated SolutionCode code = 8;
+
+  optional SolutionStatus status = 9;
+}
+
+message DeleteSolutionRequest {
+  string id = 1;
+}
+
+message ListSolutionsRequest {
+  PageRequest page = 1;
+
+  optional string problem_id = 2;
+  optional string author_id = 3;
+  optional SolutionStatus status = 4;
+}
+
+message ListSolutionsResponse {
+  repeated Solution solutions = 1;
+  PageInfo page = 2;
+}
+
+// -----------------------------------------------------------------------------
+// Comments
+// -----------------------------------------------------------------------------
+
+enum CommentTargetType {
+  COMMENT_TARGET_TYPE_UNSPECIFIED = 0;
+  COMMENT_TARGET_TYPE_PROBLEM = 1;
+  COMMENT_TARGET_TYPE_SOLUTION = 2;
+}
+
+message CommentTarget {
+  CommentTargetType type = 1;
+  string id = 2;
+}
+
+message Comment {
+  string id = 1;
+
+  string author_id = 2;
+
+  CommentTarget target = 3;
+
+  optional string parent_id = 4;
+
+  string content = 5;
+
+  int64 upvotes = 6;
+  int64 downvotes = 7;
+
+  bool is_deleted = 8;
+
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp updated_at = 10;
+}
+
+message CreateCommentRequest {
+  string author_id = 1;
+
+  CommentTarget target = 2;
+
+  optional string parent_id = 3;
+
+  string content = 4;
+}
+
+message GetCommentRequest {
+  string id = 1;
+}
+
+message UpdateCommentRequest {
+  string id = 1;
+  string content = 2;
+}
+
+message DeleteCommentRequest {
+  string id = 1;
+}
+
+message ListCommentsRequest {
+  PageRequest page = 1;
+
+  CommentTarget target = 2;
+
+  optional string parent_id = 3;
+}
+
+message ListCommentsResponse {
+  repeated Comment comments = 1;
+  PageInfo page = 2;
+}
+
+// -----------------------------------------------------------------------------
+// Votes
+// -----------------------------------------------------------------------------
+
+enum VoteType {
+  VOTE_TYPE_UNSPECIFIED = 0;
+  VOTE_TYPE_UP = 1;
+  VOTE_TYPE_DOWN = 2;
+}
+
+message Vote {
+  string user_id = 1;
+
+  oneof target {
+    string solution_id = 2;
+    string comment_id = 3;
+  }
+
+  VoteType type = 4;
+}
+
+// -----------------------------------------------------------------------------
+// User
+// -----------------------------------------------------------------------------
+
+message User {
+  string id = 1;
+
+  string username = 2;
+  string display_name = 3;
+
+  optional string avatar_url = 4;
+
+  int64 reputation = 5;
+
+  google.protobuf.Timestamp created_at = 6;
+}
+
+message ListRepliesRequest {
+  PageRequest page = 1;
+
+  string parent_id = 2;
 }

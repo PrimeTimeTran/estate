@@ -1,6 +1,4 @@
-use crate::proto::leetcode::{types::Problem, *};
-
-use crate::services::*;
+use crate::{model::ProtoProblem, services::*};
 
 pub struct JsonProblemRepository {
 	path: PathBuf,
@@ -20,7 +18,7 @@ impl JsonProblemRepository {
 		serde_json::from_str(&contents)
 			.with_context(|| format!("failed to parse problem: {}", path.display()))
 	}
-	async fn load_matching(&self, query: &ProblemQuery) -> Result<Vec<Problem>> {
+	async fn load_matching(&self, query: &ProblemQuery) -> Result<Vec<ProtoProblem>> {
 		let mut problems = Vec::new();
 
 		let mut entries = tokio::fs::read_dir(&self.path)

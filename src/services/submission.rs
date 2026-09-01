@@ -1,4 +1,9 @@
-use crate::services::*;
+use crate::proto::leetcode::types::SubmissionStatus as ProtoSubmissionStatus;
+
+use crate::{
+	model::{Language, SubmissionStatus},
+	services::*,
+};
 
 #[derive(Default)]
 pub struct SubmissionServiceImpl<R> {
@@ -28,7 +33,11 @@ where
 				user_id: request.user_id,
 				problem_id: request.problem_id,
 				status: submission_status(request.status)?,
-				language: request.language,
+				language: request
+					.language
+					.map(Language::try_from)
+					.transpose()
+					.map_err(|_| Status::invalid_argument("invalid language"))?,
 			})
 			.await
 			.map_err(internal_error)?;
@@ -48,7 +57,9 @@ where
 				user_id: request.user_id,
 				problem_id: request.problem_id,
 				source: request.source,
-				language: request.language,
+				// language: request.language.as_proto_i32,
+				language: Language::try_from(request.language)
+					.map_err(|_| Status::invalid_argument("invalid language"))?,
 			})
 			.await
 			.map_err(internal_error)?;
@@ -59,17 +70,25 @@ where
 		request: Request<UpdateSubmissionRequest>,
 	) -> Result<Response<Submission>, Status> {
 		let request = request.into_inner();
+
+		let language = ProtoLanguage::try_from(request.language)
+			.map_err(|_| Status::invalid_argument("invalid language"))?;
+
+		let language =
+			Language::try_from(language).map_err(|_| Status::invalid_argument("invalid language"))?;
+
 		let submission = self
 			.repository
 			.update(
 				&request.id,
 				UpdateSubmission {
 					source: request.source,
-					language: request.language,
+					language,
 				},
 			)
 			.await
 			.map_err(internal_error)?;
+
 		Ok(Response::new(submission))
 	}
 	async fn delete_submission(
@@ -103,9 +122,14 @@ where
 		Err(Status::unimplemented("run_submission is not implemented"))
 	}
 }
+
 fn submission_status(status: Option<i32>) -> Result<Option<SubmissionStatus>, Status> {
 	status
-		.map(SubmissionStatus::try_from)
+		.map(|status| {
+			ProtoSubmissionStatus::try_from(status)
+				.map_err(|_| Status::invalid_argument("invalid submission status"))?
+				.try_into()
+				.map_err(|_| Status::invalid_argument("invalid submission status"))
+		})
 		.transpose()
-		.map_err(|_| Status::invalid_argument("invalid submission status"))
 }
