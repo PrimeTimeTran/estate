@@ -20,6 +20,9 @@ pub struct NativeRuntime {
 	pub events: EventBus,
 	pub state: Arc<RuntimeState>,
 	pub tasks: Arc<RwLock<TaskManager>>,
+	// handle: tokio::runtime::Handle,
+	// handle: Mutex<Option<tokio::runtime::Handle>>,
+	// handle: Arc<Mutex<Option<tokio::runtime::Handle>>>,
 	handle: tokio::runtime::Handle,
 	event_rx: Arc<Mutex<broadcast::Receiver<e::Event>>>,
 }
@@ -36,10 +39,16 @@ impl NativeRuntime {
 			events,
 			state: Arc::new(runtime_state),
 			tasks: Arc::new(RwLock::new(TaskManager::new())),
+			// handle: Arc::new(Mutex::new(None)),
 			handle,
+
 			event_rx,
 		})
 	}
+
+	// pub fn set_handle(&self, handle: tokio::runtime::Handle) {
+	// 	*self.handle = handle
+	// }
 }
 impl Runtime for NativeRuntime {
 	fn emit(&self, event: e::Event) {
@@ -55,6 +64,12 @@ impl Runtime for NativeRuntime {
 	fn session(&self) -> Session {
 		self.session.clone()
 	}
+	type EventReceiver = NativeEventReceiver;
+	fn subscribe(&self) -> Self::EventReceiver {
+		NativeEventReceiver {
+			rx: self.events.subscribe(),
+		}
+	}
 	fn try_recv(&self) -> Option<e::Event> {
 		self.event_rx.lock().unwrap().try_recv().ok()
 	}
@@ -62,7 +77,13 @@ impl Runtime for NativeRuntime {
 	where
 		F: Future<Output = ()> + Send + 'static,
 	{
-		self.handle.spawn(future);
+		let handle = self
+			.handle
+			// .lock()
+			// .unwrap()
+			.clone();
+		// .expect("NativeRuntime Tokio runtime not initialized");
+		handle.spawn(future);
 	}
 
 	fn start_dispatcher(self: &Arc<Self>) {
@@ -126,3 +147,11 @@ impl<'a> NativeAppContext<'a> {
 // 		&mut self.app
 // 	}
 // }
+pub struct NativeEventReceiver {
+	pub rx: tokio::sync::broadcast::Receiver<e::Event>,
+}
+impl NativeEventReceiver {
+	pub fn try_recv(&mut self) -> Option<e::Event> {
+		self.rx.try_recv().ok()
+	}
+}

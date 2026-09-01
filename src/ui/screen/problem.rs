@@ -30,14 +30,16 @@ impl<R: Runtime + 'static> Veable<R> for ProblemsScreen {
 	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, R>) {
 		let should_load = {
 			let state = ctx.app.app_state();
-
 			!state.problems_loading && state.problems.is_empty() && state.problems_error.is_none()
 		};
-
 		if should_load {
-			ctx.app.load_problems();
-		}
+			tracing::info!("🔥 BEFORE load_problems");
 
+			ctx.app.load_problems();
+			ctx.load_problems();
+
+			tracing::info!("🔥 AFTER load_problems");
+		}
 		ui.heading("Problems");
 		ui.add_space(8.0);
 

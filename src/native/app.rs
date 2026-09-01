@@ -38,20 +38,30 @@ pub struct NativeApp {
 	scroll_tray: Option<TrayIcon>,
 	tray: Option<TrayIcon>,
 	view_type: ViewType,
+	tokio: tokio::runtime::Runtime,
 }
 impl NativeApp {
 	pub fn new() -> Result<Self> {
 		let (daemon_tx, daemon_rx) = mpsc::channel(100);
+
+		// 1. Create Tokio first.
 		let tokio = tokio::runtime::Runtime::new()?;
 		let handle = tokio.handle().clone();
+
+		// 2. Give the handle to NativeRuntime.
 		let runtime = NativeRuntime::new(handle)?;
+
+		// 3. Then construct the engine.
 		let engine = EstateEngine::new(runtime)?;
+
 		Ok(Self {
 			app: None,
 			clock_running: Arc::new(AtomicBool::new(true)),
 			daemon_rx: Some(daemon_rx),
 			daemon_tx,
 			engine,
+			tokio,
+
 			hotkey_manager: GlobalHotkeys::new().unwrap(),
 			menu: None,
 			menu_bar: None,
@@ -79,15 +89,31 @@ impl NativeApp {
 	}
 	fn start_runtime(&mut self) -> Result<()> {
 		let daemon_rx = self.daemon_rx.take().expect("daemon already started");
-		let (ready_tx, ready_rx) =
-			std::sync::mpsc::sync_channel::<Result<(tokio::runtime::Handle, Arc<ApiClient>)>>(1);
-		Self::spawn_daemon(daemon_rx, Arc::clone(&self.engine.runtime), ready_tx);
-		let (handle, api) = ready_rx.recv().expect("daemon failed to initialize")?;
+
+		let (ready_tx, ready_rx) = std::sync::mpsc::sync_channel::<Result<Arc<ApiClient>>>(1);
+
+		let handle = self.tokio.handle().clone();
+
+		Self::spawn_daemon(
+			daemon_rx,
+			Arc::clone(&self.engine.runtime),
+			handle,
+			ready_tx,
+		);
+		let api = ready_rx.recv().expect("daemon failed to initialize")?;
+
 		let instance = App::new(self.engine.clone(), api);
-		instance
-			.runtime()
-			.emit(e::Event::app(e::EventKind::SessionStart));
 		self.app = Some(instance);
+		// let daemon_rx = self.daemon_rx.take().expect("daemon already started");
+		// let (ready_tx, ready_rx) =
+		// 	std::sync::mpsc::sync_channel::<Result<(tokio::runtime::Handle, Arc<ApiClient>)>>(1);
+		// Self::spawn_daemon(daemon_rx, Arc::clone(&self.engine.runtime), ready_tx);
+		// let (handle, api) = ready_rx.recv().expect("daemon failed to initialize")?;
+		// let instance = App::new(self.engine.clone(), api);
+		// instance
+		// 	.runtime()
+		// 	.emit(e::Event::app(e::EventKind::SessionStart));
+		// self.app = Some(instance);
 		self.spawn_global_hotkey_daemon()?;
 		let event_loop = EventLoop::<AppEvent>::with_user_event()
 			.with_activation_policy(ActivationPolicy::Regular)
@@ -148,52 +174,50 @@ impl NativeApp {
 	fn spawn_daemon(
 		mut rx: mpsc::Receiver<DaemonCommand>,
 		runtime: Arc<NativeRuntime>,
-		ready_tx: std::sync::mpsc::SyncSender<Result<(tokio::runtime::Handle, Arc<ApiClient>)>>,
+		handle: tokio::runtime::Handle,
+		ready_tx: std::sync::mpsc::SyncSender<Result<Arc<ApiClient>>>,
 	) {
-		std::thread::spawn(move || {
-			let tokio_runtime = tokio::runtime::Runtime::new().expect("failed to create Tokio runtime");
-			tokio_runtime.block_on(async move {
-				runtime.start_dispatcher();
-				let api = match ApiClient::connect().await {
-					Ok(api) => Arc::new(api),
-					Err(error) => {
-						let _ = ready_tx.send(Err(error));
-						return;
-					}
-				};
-				let handle = tokio::runtime::Handle::current();
-				let _ = ready_tx.send(Ok((handle, api)));
-				let daemon: Daemon<NativeRuntime> = Daemon::new(runtime.clone());
-				let shutdown_token = daemon.shutdown_token.clone();
-				let daemon_task = tokio::spawn(async move {
-					let mut daemon = daemon;
-					daemon.run_foreground().await
-				});
-				match rx.recv().await {
-					Some(DaemonCommand::Stop) => {
-						tracing::info!("daemon stop requested");
-						shutdown_token.cancel();
-						match daemon_task.await {
-							Ok(Ok(())) => {
-								tracing::info!("daemon stopped cleanly");
-							}
-							Ok(Err(error)) => {
-								tracing::error!(%error, "daemon exited with error");
-							}
-							Err(error) => {
-								tracing::error!(%error, "daemon task panicked");
-							}
+		handle.spawn(async move {
+			runtime.start_dispatcher();
+			let api = match ApiClient::connect().await {
+				Ok(api) => Arc::new(api),
+				Err(error) => {
+					let _ = ready_tx.send(Err(error));
+					return;
+				}
+			};
+			let handle = tokio::runtime::Handle::current();
+			let _ = ready_tx.send(Ok(Arc::clone(&api)));
+			let daemon: Daemon<NativeRuntime> = Daemon::new(runtime.clone());
+			let shutdown_token = daemon.shutdown_token.clone();
+			let daemon_task = tokio::spawn(async move {
+				let mut daemon = daemon;
+				daemon.run_foreground().await
+			});
+			match rx.recv().await {
+				Some(DaemonCommand::Stop) => {
+					tracing::info!("daemon stop requested");
+					shutdown_token.cancel();
+					match daemon_task.await {
+						Ok(Ok(())) => {
+							tracing::info!("daemon stopped cleanly");
+						}
+						Ok(Err(error)) => {
+							tracing::error!(%error, "daemon exited with error");
+						}
+						Err(error) => {
+							tracing::error!(%error, "daemon task panicked");
 						}
 					}
-
-					None => {
-						tracing::info!("daemon command channel closed");
-
-						shutdown_token.cancel();
-						let _ = daemon_task.await;
-					}
 				}
-			});
+
+				None => {
+					tracing::info!("daemon command channel closed");
+
+					shutdown_token.cancel();
+					let _ = daemon_task.await;
+				}
+			}
 		});
 	}
 	fn spawn_signal_handler(&mut self, proxy: EventLoopProxy<AppEvent>) {
@@ -534,7 +558,6 @@ impl NativeApp {
 		Ok(())
 	}
 }
-
 impl NativeApp {
 	fn sync_views(&mut self) {
 		for window in &mut self.windows {

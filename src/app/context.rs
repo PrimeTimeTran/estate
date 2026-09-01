@@ -22,9 +22,9 @@ pub struct AppContext<'a, R: Runtime> {
 	pub event_rx: tokio::sync::broadcast::Receiver<e::Event>,
 }
 
-impl<'a, R: Runtime> AppContext<'a, R> {
-	fn load_problems(&self) {
-		tracing::info!("Loading problems")
+impl<'a, R: Runtime + 'static> AppContext<'a, R> {
+	pub fn load_problems(&mut self) {
+		self.app.load_problems();
 	}
 }
 

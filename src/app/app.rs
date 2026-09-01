@@ -11,12 +11,15 @@ pub struct App<R: Runtime> {
 	pub(crate) view: ViewType,
 	pub(crate) api: Arc<ApiClient>,
 	pub(crate) state: AppState,
+	events: R::EventReceiver,
 }
 impl<R: Runtime> App<R> {
 	pub fn new(engine: EstateEngine<R>, api: Arc<ApiClient>) -> Self {
+		let events = engine.runtime.subscribe();
 		Self {
 			api,
 			engine,
+			events,
 			state: AppState::default(),
 			view: crate::START_VIEW,
 		}
@@ -35,9 +38,9 @@ impl<R: Runtime> App<R> {
 		Arc::clone(&self.api)
 	}
 	pub fn update(&mut self) {
-		while let Some(event) = self.engine.runtime.try_recv() {
-			tracing::info!("update;");
-
+		tracing::info!("🔥🔥🔥 App::update called");
+		while let Some(event) = self.events.try_recv() {
+			tracing::info!("🔥 App received: {:?}", event.kind);
 			match event.kind {
 				e::EventKind::Navigate(view) => {
 					self.view = view;
@@ -64,7 +67,68 @@ impl<R: Runtime> App<R> {
 }
 impl<R: Runtime + 'static> App<R> {
 	pub fn load_problems(&mut self) {
+		// 	eprintln!("🔥🔥🔥🔥🔥 ACTUAL App<R>::load_problems");
+
+		// 	tracing::info!("📡 App::load_problems ENTER");
+		// 	tracing::info!("📡 App::load_problems ENTER");
+		// 	if self.state.problems_loading {
+		// 		tracing::info!("📡 already loading; returning");
+		// 		return;
+		// 	}
+		// 	if !self.state.problems.is_empty() {
+		// 		tracing::info!("📡 already have problems; returning");
+		// 		return;
+		// 	}
+		// 	tracing::info!("📡 load_problems()");
+
+		// 	self.state.problems_loading = true;
+		// 	self.state.problems_error = None;
+
+		// 	let api = Arc::clone(&self.api);
+		// 	let events = self.engine.runtime.clone();
+
+		// 	self.engine.runtime.spawn(async move {
+		// 		tracing::info!("🚀 problems future started");
+		// 		let mut client = api.problems.clone();
+		// 		tracing::info!("📡 calling ListProblems RPC");
+
+		// 		let result = client
+		// 			.list_problems(ListProblemsRequest {
+		// 				tags: vec![],
+		// 				search: String::new(),
+		// 				published_only: None,
+		// 				page: Some(PageRequest {
+		// 					page: 0,
+		// 					page_size: 100,
+		// 				}),
+		// 				difficulty: None,
+		// 			})
+		// 			.await;
+		// 		tracing::info!("📡 ListProblems RPC returned");
+
+		// 		match result {
+		// 			Ok(response) => {
+		// 				let problems = response
+		// 					.into_inner()
+		// 					.problems
+		// 					.into_iter()
+		// 					.map(StoredProblem::from)
+		// 					.collect();
+		// 				tracing::info!("✅ ProblemsLoaded");
+
+		// 				events.emit(e::Event::app(e::EventKind::ProblemsLoaded(problems)));
+		// 			}
+		// 			Err(error) => {
+		// 				tracing::error!("❌ ListProblems: {error}");
+		// 				events.emit(e::Event::app(e::EventKind::ApiError(error.to_string())));
+		// 			}
+		// 		}
+		// 	});
+		// }
+		tracing::info!("🔥 ACTUAL App<R>::load_problems");
+
 		if self.state.problems_loading {
+			tracing::info!("⚠️ already loading");
 			return;
 		}
 
@@ -74,8 +138,14 @@ impl<R: Runtime + 'static> App<R> {
 		let api = Arc::clone(&self.api);
 		let events = self.engine.runtime.clone();
 
+		tracing::info!("🚀 spawning load_problems task");
+
 		self.engine.runtime.spawn(async move {
+			tracing::info!("🏃 load_problems task STARTED");
+
 			let mut client = api.problems.clone();
+
+			tracing::info!("📡 calling list_problems");
 
 			let result = client
 				.list_problems(ListProblemsRequest {
@@ -89,6 +159,9 @@ impl<R: Runtime + 'static> App<R> {
 					difficulty: None,
 				})
 				.await;
+
+			tracing::info!("📡 list_problems returned");
+
 			match result {
 				Ok(response) => {
 					let problems = response
@@ -97,10 +170,14 @@ impl<R: Runtime + 'static> App<R> {
 						.into_iter()
 						.map(StoredProblem::from)
 						.collect();
-					tracing::info!("ProblemsLoaded");
+
+					tracing::info!("📦 emitting ProblemsLoaded");
+
 					events.emit(e::Event::app(e::EventKind::ProblemsLoaded(problems)));
 				}
 				Err(error) => {
+					tracing::error!("❌ list_problems failed: {error}");
+
 					events.emit(e::Event::app(e::EventKind::ApiError(error.to_string())));
 				}
 			}
@@ -173,5 +250,14 @@ impl<R: Runtime> App<R> {
 			.emit(e::Event::app(e::EventKind::CommandExecuted {
 				command: "task_list".into(),
 			}));
+	}
+}
+
+pub trait EventReceiver {
+	fn try_recv(&mut self) -> Option<e::Event>;
+}
+impl EventReceiver for NativeEventReceiver {
+	fn try_recv(&mut self) -> Option<e::Event> {
+		self.rx.try_recv().ok()
 	}
 }
