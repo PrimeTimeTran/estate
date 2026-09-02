@@ -25,7 +25,7 @@ pub struct Window {
 	pending_textures: gui::TexturesDelta,
 	queue: wgpu::Queue,
 	renderer: gui::Renderer,
-	view: ui::ScreenInstance,
+	screen: ui::ScreenInstance,
 }
 impl Window {
 	pub fn new(event_loop: &ActiveEventLoop, view: ViewType, api: Arc<ApiClient>) -> Result<Self> {
@@ -47,7 +47,7 @@ impl Window {
 			queue,
 			renderer,
 			surface,
-			view: ui::ScreenInstance::new(view, api),
+			screen: ui::ScreenInstance::new(view, api),
 		})
 	}
 
@@ -57,89 +57,7 @@ impl Window {
 		self.kind = kind;
 		// self.view = Ve::new(view);
 	}
-	fn egui_view(&mut self, ctx: &egui::Context) {
-		todo!("");
-		doc!(
-			r#"
-     	Estate UI Container
-     	Owns the native window, egui state, wgpu rendering resources, and the
-     	application state required to render and interact with the development UI.
-     	CPU / Rust
-     	  │
-     	  │ create resources + record commands
-     	  ▼
-     	wgpu::Device
-     	  │
-     	  │ command encoder
-     	  ▼
-     	wgpu::Queue
-     	  │
-     	  │ submit
-     	  ▼
-     	┌─────────────────────────────────────────────┐
-     	│                 GPU PIPELINE                │
-     	│                                             │
-     	│ Vertex Input                                │
-     	│      ↓                                      │
-     	│ Vertex Shader                                │
-     	│      ↓                                      │
-     	│ Primitive Assembly                          │
-     	│      ↓                                      │
-     	│ Rasterization                               │
-     	│      ↓                                      │
-     	│ Fragment Shader                              │
-     	│      ↓                                      │
-     	│ Depth / Stencil / Blending                  │
-     	│      ↓                                      │
-     	│ Render Target                               │
-     	└─────────────────────────────────────────────┘
-     	  │
-     	  ▼
-     	Surface Texture
-     	  │
-     	  ▼
-     	Window
-     	Vertex data
-      	   ↓
-     	Vertex Shader
-      	   ↓
-     	Primitive assembly
-      	   ↓
-     	Rasterization
-      	   ↓
-     	Fragment Shader
-      	   ↓
-     	Depth / Stencil / Blending
-      	   ↓
-     	Color attachment
 
-     	1. input assembler
-     	2.vertex shader
-     	3.hull shader
-     	4. tesselator
-     	5.domain shader
-     	6.geometry shader
-     	7.rasterizer
-     	8.pixel shader
-     	9.output merger
-   	"#
-		);
-	}
-	fn dashboard(&mut self, ctx: &egui::Context) {
-		todo!("")
-	}
-	fn waterfall_chart(&mut self, ctx: &egui::Context) {
-		todo!("")
-	}
-	fn telemetry_inspector(&mut self, ctx: &egui::Context) {
-		todo!("")
-	}
-	fn task_manager(&mut self, ctx: &egui::Context) {
-		todo!("")
-	}
-	fn markdown_view(&mut self, ctx: &egui::Context) {
-		todo!("")
-	}
 	pub fn draw(&mut self, ctx: &mut AppContext<'_, NativeRuntime>) -> Result<()> {
 		self.begin_egui();
 		let output = self.build_ui(ctx);
@@ -152,16 +70,18 @@ impl Window {
 	}
 
 	fn build_ui(&mut self, ctx: &mut AppContext<'_, NativeRuntime>) -> gui::FullOutput {
+		// tracing::info!("Window::build_ui");
 		let mut ui = gui::Ui::new(
 			self.gui_ctx.clone(),
 			gui::Id::new("window_root"),
 			gui::UiBuilder::new(),
 		);
-		gui::Frame::NONE
-			// .inner_margin(gui::Margin::same(16))
-			.show(&mut ui, |ui| {
-				self.view.draw(ui, ctx);
-			});
+
+		gui::Frame::NONE.show(&mut ui, |ui| {
+			// tracing::info!("Window → ScreenInstance::draw");
+			self.screen.draw(ui, ctx);
+		});
+
 		self.gui_ctx.end_pass()
 	}
 	fn begin_egui(&mut self) {
@@ -281,16 +201,86 @@ impl Window {
 			.renderer
 			.render(&mut render_pass, primitives, screen_descriptor);
 	}
+	fn egui_view(&mut self, ctx: &egui::Context) {
+		todo!("");
+		doc!(
+			r#"
+     	Estate UI Container
+     	Owns the native window, egui state, wgpu rendering resources, and the
+     	application state required to render and interact with the development UI.
+     	CPU / Rust
+     	  │
+     	  │ create resources + record commands
+     	  ▼
+     	wgpu::Device
+     	  │
+     	  │ command encoder
+     	  ▼
+     	wgpu::Queue
+     	  │
+     	  │ submit
+     	  ▼
+     	┌─────────────────────────────────────────────┐
+     	│                 GPU PIPELINE                │
+     	│                                             │
+     	│ Vertex Input                                │
+     	│      ↓                                      │
+     	│ Vertex Shader                                │
+     	│      ↓                                      │
+     	│ Primitive Assembly                          │
+     	│      ↓                                      │
+     	│ Rasterization                               │
+     	│      ↓                                      │
+     	│ Fragment Shader                              │
+     	│      ↓                                      │
+     	│ Depth / Stencil / Blending                  │
+     	│      ↓                                      │
+     	│ Render Target                               │
+     	└─────────────────────────────────────────────┘
+     	  │
+     	  ▼
+     	Surface Texture
+     	  │
+     	  ▼
+     	Window
+     	Vertex data
+      	   ↓
+     	Vertex Shader
+      	   ↓
+     	Primitive assembly
+      	   ↓
+     	Rasterization
+      	   ↓
+     	Fragment Shader
+      	   ↓
+     	Depth / Stencil / Blending
+      	   ↓
+     	Color attachment
+
+     	1. input assembler
+     	2.vertex shader
+     	3.hull shader
+     	4. tesselator
+     	5.domain shader
+     	6.geometry shader
+     	7.rasterizer
+     	8.pixel shader
+     	9.output merger
+   	"#
+		);
+	}
 }
 impl Window {
 	pub fn sync_view(&mut self, view: ViewType, api: Arc<ApiClient>) {
-		if self.view.kind != view {
-			tracing::info!("🖼️ Window view change: {:?} → {:?}", self.view.kind, view);
-			self.view = ui::ScreenInstance::new(view, api);
+		// tracing::info!("sync_view of kind {:?}", self.screen.kind);
+		// tracing::info!("sync_view of view {:?}", view);
+		if self.screen.kind != view {
+			// tracing::info!("🖼️ Window view change: {:?} → {:?}", self.screen.kind, view);
+			self.screen = ui::ScreenInstance::new(view, api);
+			// self.screen.draw(gui::Ui, ctx);
 		}
 	}
 }
-
 fn initialize_gpu(
 	instance: &wgpu::Instance,
 	surface: &wgpu::Surface<'_>,
@@ -328,7 +318,6 @@ fn create_gpu_surface(
 	let surface = { instance.create_surface(window.clone())? };
 	Ok((window, instance, surface))
 }
-
 // WIP: Self Activating Select
 fn build_egui(event_loop: &ActiveEventLoop) -> (gui::Context, gui::State) {
 	let ctx = gui::Context::default();

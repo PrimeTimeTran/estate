@@ -3,11 +3,7 @@ use crate::{
 	e,
 	model::StoredProblem,
 	prelude::*,
-	proto::leetcode::{
-		problem_service_client::ProblemServiceClient,
-		submission_service_client::SubmissionServiceClient,
-		types::{ListProblemsRequest, PageRequest, SampleProblemRequest},
-	},
+	proto::leetcode::types::{ListProblemsRequest, PageRequest, SampleProblemRequest},
 	ui::Layout,
 };
 pub struct App<R: Runtime> {

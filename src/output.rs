@@ -1,6 +1,11 @@
-use crate::model::{StoredProblem, StoredSolution, StoredSubmission};
-use crate::{e, prelude::*, ui::Layout};
+use crate::{
+	e,
+	model::{StoredProblem, StoredSolution, StoredSubmission},
+	prelude::*,
+	ui::Layout,
+};
 use egui::Ui;
+
 #[derive(Debug, Default)]
 pub struct ProblemScreen<R: Runtime> {
 	source: String,
@@ -21,16 +26,6 @@ impl<R: Runtime> ProblemScreen<R> {
 		}
 	}
 }
-// impl<R: Runtime> ProblemScreen<R> {
-//   fn new() -> Self {
-//     Self {
-//       source: String::from(""),
-//       solutions: vec![],
-//       submissions: vec![],
-//       _marker: vec![],
-//     }
-//   }
-// }
 impl<R: Runtime> ViewTrait<R> for ProblemScreen<R> {
 	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, R>) {
 		println!("Problem Screen view draw")

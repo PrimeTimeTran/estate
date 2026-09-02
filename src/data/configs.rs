@@ -20,7 +20,7 @@ pub static START_WINDOW: WindowType = WindowType::ProblemScreen;
 pub static START_VIEW: ViewType = ViewType::ProblemScreen;
 // Unsafe territory
 // pub static mut START_VIEW: ViewType = ...;
-pub static DEFAULT_VIEW: ViewType = ViewType::MarkdownScreen;
+pub static DEFAULT_VIEW: ViewType = ViewType::ProblemScreen;
 pub static ESTATE_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const GRPC_SOCKET_CLIENT: &str = "http://127.0.0.1:50051";
 pub const GRPC_SOCKET: &str = "127.0.0.1:50051";
@@ -61,9 +61,9 @@ impl VeConfig {
 			bg: palette::BG,
 			surface: palette::SURFACE,
 			activity_bar: PanelState::new(true, 48.0),
-			primary_bar: PanelState::new(false, 40.0),
-			secondary_bar: PanelState::new(false, 48.0),
-			bottom_panel: PanelState::new(false, 240.0),
+			primary_bar: PanelState::new(true, 40.0),
+			secondary_bar: PanelState::new(true, 48.0),
+			bottom_panel: PanelState::new(true, 240.0),
 			status_bar: PanelState::new(true, 24.0),
 			dock_left: PanelState::new(true, 280.0),
 			dock_right: PanelState::new(true, 320.0),

@@ -133,14 +133,18 @@ impl NativeApp {
 			let mut view_index = 0;
 			while running.load(Ordering::Relaxed) {
 				let views = [
-					ViewType::DashboardScreen,
 					ViewType::ProblemScreen,
-					ViewType::MarkdownView,
 					ViewType::ProblemScreen,
-					ViewType::WaterfallScreen,
 					ViewType::ProblemScreen,
-					ViewType::TaskManagerScreen,
-					ViewType::ProblemsScreen,
+					ViewType::ProblemScreen,
+					ViewType::ProblemScreen,
+					// ViewType::DashboardScreen,
+					// ViewType::MarkdownView,
+					// ViewType::ProblemScreen,
+					// ViewType::WaterfallScreen,
+					// ViewType::ProblemScreen,
+					// ViewType::TaskManagerScreen,
+					// ViewType::ProblemsScreen,
 				];
 				let _ = proxy.send_event(AppEvent::TickClock(format!(" {}s", current_time)));
 				tracing::info!("tick {}", current_time);
@@ -275,6 +279,7 @@ impl NativeApp {
 		}
 	}
 	fn open_window(&mut self, event_loop: &ActiveEventLoop, kind: WindowType) {
+		tracing::info!(" open window start");
 		if self.window_by_type(kind).is_some() {
 			return;
 		}
@@ -283,6 +288,7 @@ impl NativeApp {
 			let view = self.active_view;
 			match Window::new(event_loop, view, api) {
 				Ok(window) => {
+					tracing::info!(" open window end, new window");
 					window.instance.set_title(view.name().into());
 					self.windows.push(AppWindow { kind, view, window });
 				}

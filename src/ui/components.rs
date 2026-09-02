@@ -59,7 +59,6 @@ impl WindowType {
 		self.into()
 	}
 }
-
 #[derive(
 	Debug, Copy, Default, Clone, Hash, Deserialize, Serialize, Eq, PartialEq, IntoStaticStr,
 )]
@@ -81,7 +80,6 @@ impl ViewType {
 	}
 }
 
-//
 pub fn draw_tabbed_sidebar<T, F>(
 	ui: &mut Ui,
 	active_tab: &mut T,
@@ -91,7 +89,6 @@ pub fn draw_tabbed_sidebar<T, F>(
 	T: Clone + PartialEq,
 	F: FnMut(&mut Ui, &T),
 {
-	// Tab bar
 	ui.horizontal(|ui| {
 		for (tab, label) in tabs {
 			let selected = *active_tab == *tab;
@@ -103,8 +100,6 @@ pub fn draw_tabbed_sidebar<T, F>(
 	});
 
 	ui.separator();
-
-	// Tab content
 	ScrollArea::vertical()
 		.auto_shrink([false, false])
 		.show(ui, |ui| {
@@ -158,36 +153,3 @@ pub fn draw_tabbed_sidebar<T, F>(
 // 		self.content.draw(ui, ctx);
 // 	}
 // }
-
-pub struct ActivityBar {
-	buttons: Vec<&'static str>,
-}
-impl ActivityBar {
-	pub fn new() -> Self {
-		Self { buttons: vec![] }
-	}
-}
-impl<R: Runtime> ViewTrait<R> for ActivityBar {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>) {
-		ui.vertical(|ui| {
-			// buttons
-		});
-	}
-	fn update(&mut self, ctx: &mut AppContext<'_, R>) {}
-
-	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R>) {}
-}
-pub struct PrimaryBar {
-	buttons: Vec<&'static str>,
-}
-
-impl<R: Runtime> ViewTrait<R> for PrimaryBar {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>) {
-		ui.horizontal(|ui| {
-			// buttons
-		});
-	}
-	fn update(&mut self, ctx: &mut AppContext<'_, R>) {}
-
-	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R>) {}
-}

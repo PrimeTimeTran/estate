@@ -1,27 +1,5 @@
-use crate::{LAYOUT as config, e, prelude::*, theme::palette};
-// pub trait Veable<R: Runtime> {
-// 	// A type-erased container for any concrete `Veable`.
-// 	//
-// 	// `Box<dyn Veable>` stores the concrete implementation on the heap while
-// 	// exposing only the `Veable` interface to callers. This allows different
-// 	// concrete implementations to be substituted without changing the code
-// 	// which consumes them.
-// 	//
-// 	// Top left to bottom right ordering for mental model.
-// 	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>);
-// 	fn update(&mut self, _ctx: &mut AppContext<'_, R>) {}
-// 	fn event(&mut self, _event: &e::Event, _ctx: &mut AppContext<'_, R>) {}
-// }
-// pub struct Ve<R: Runtime> {
-// 	pub activity_bar: Panel<R>,
-// 	pub dock_left: Panel<R>,
-// 	pub main: Panel<R>,
-// 	pub primary_bar: Panel<R>,
-// 	pub secondary_bar: Panel<R>,
-// 	pub bottom_panel: Panel<R>,
-// 	pub status_bar: Panel<R>,
-// 	pub dock_right: Panel<R>,
-// }
+use crate::{LAYOUT as config, e, prelude::*};
+
 pub struct Layout<R: Runtime> {
 	pub activity_bar: Panel<R>,
 	pub dock_left: Panel<R>,
@@ -33,43 +11,121 @@ pub struct Layout<R: Runtime> {
 	pub dock_right: Panel<R>,
 }
 impl<R: Runtime> LayoutTrait<R> for Layout<R> {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>) {}
+	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>) {
+		let rect = ui.max_rect();
+		ui.painter()
+			.rect_filled(rect, 0.0, egui::Color32::from_rgb(30, 30, 30));
 
-	fn update(&mut self, ctx: &mut AppContext<'_, R>) {}
+		ui.painter().rect_stroke(
+			rect,
+			0.0,
+			egui::Stroke::new(5.0, egui::Color32::RED),
+			egui::StrokeKind::Outside,
+		);
 
-	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R>) {}
-}
-impl<R: Runtime> Layout<R> {
-	fn draw(
-		&mut self,
-		// screen: &mut dyn Screen<R>,
-		ui: &mut egui::Ui,
-		ctx: &mut AppContext<'_, R>,
-	) {
+		// STOP HERE FOR TESTING
+		let mouse_pos = ui.input(|i| i.pointer.hover_pos());
+		let available = ui.available_rect_before_wrap();
+		// Background
+		ui.painter().rect_filled(available, 0.0, LAYOUT.bg);
+		// Calculate all region boundaries from the current region sizes.
+		let layout = self.calculate_region_boundaries(available);
+		// Determine what region the cursor is currently over.
+		let cursor_target = self.cursor_target(mouse_pos, &layout);
+		// Update application input state.
+		ctx.input = IOState {
+			cursor_pos: mouse_pos,
+			cursor_target,
+			shift_held: ui.input(|i| i.modifiers.shift),
+			ctrl_held: ui.input(|i| i.modifiers.ctrl),
+			alt_held: ui.input(|i| i.modifiers.alt),
+			command_held: ui.input(|i| i.modifiers.command),
+			primary_down: ui.input(|i| i.pointer.primary_down()),
+		};
+
+		// ---------------------------------------------------------
+		// Draw panels
+		// ---------------------------------------------------------
+
+		Self::draw_panel(ui, ctx, layout.activity_bar, &mut self.activity_bar);
+
+		if self.dock_left.open {
+			Self::draw_panel(ui, ctx, layout.dock_left, &mut self.dock_left);
+		}
+
+		Self::draw_panel(ui, ctx, layout.primary_bar, &mut self.primary_bar);
+
+		Self::draw_panel(ui, ctx, layout.secondary_bar, &mut self.secondary_bar);
+
+		Self::draw_panel(ui, ctx, layout.main, &mut self.main);
+
+		if self.bottom_panel.open {
+			Self::draw_panel(ui, ctx, layout.bottom_panel, &mut self.bottom_panel);
+		}
+
+		if self.dock_right.open {
+			Self::draw_panel(ui, ctx, layout.dock_right, &mut self.dock_right);
+		}
+
+		Self::draw_panel(ui, ctx, layout.status_bar, &mut self.status_bar);
+
+		// ---------------------------------------------------------
+		// Draw resize handles LAST
+		// ---------------------------------------------------------
+
+		if self.dock_left.open {
+			Self::resize_region(
+				ui,
+				"dock_left_resize",
+				layout.dock_left,
+				&mut self.dock_left.region,
+				ResizeEdge::Right,
+				1.0,
+			);
+		}
+
+		if self.bottom_panel.open {
+			Self::resize_region(
+				ui,
+				"bottom_panel_resize",
+				layout.bottom_panel,
+				&mut self.bottom_panel.region,
+				ResizeEdge::Top,
+				-1.0,
+			);
+		}
+
+		if self.dock_right.open {
+			Self::resize_region(
+				ui,
+				"dock_right_resize",
+				layout.dock_right,
+				&mut self.dock_right.region,
+				ResizeEdge::Left,
+				-1.0,
+			);
+		}
 	}
+	fn update(&mut self, _ctx: &mut AppContext<'_, R>) {}
+	fn event(&mut self, _event: &e::Event, _ctx: &mut AppContext<'_, R>) {}
 }
 impl<R: Runtime> Layout<R> {
 	// Rust uses ownership,borrowing, and lifetimes to determine when values
 	// may be safely destroyed, allowing memory to be reclaimed deterministically
 	// without a garbage collector.
 	pub fn new() -> Self {
-		let view = ProblemScreen::new();
+		let main = ProblemView::new();
+		let dock_left = ProblemViewSidebar::new();
+		let bottom_panel = ProblemViewBottomPanel::new();
 		Self {
-			main: Panel::from_config(view, Region::content(), &PanelState::new(true, 0.0)),
+			main: Panel::from_config(main, Region::content(), &PanelState::new(true, 0.0)),
 			activity_bar: Panel::from_config(
-				ActivityBar::new(),
+				DebugPanel::new("Activity Bar"),
 				Region::fixed(config.activity_bar.effective_size()),
 				&config.activity_bar,
 			),
 			dock_left: Panel::from_config(
-				TabbedSidebar::new(
-					Tab::Problem,
-					vec![
-						(Tab::Problem, "Problem"),
-						(Tab::Solutions, "Solutions"),
-						(Tab::Submissions, "Submissions"),
-					],
-				),
+				dock_left,
 				config.dock_left.region(50.0, 600.0).with_fill(config.bg),
 				&config.dock_left,
 			),
@@ -86,9 +142,8 @@ impl<R: Runtime> Layout<R> {
 					.with_fill(config.bg),
 				&config.secondary_bar,
 			),
-
 			bottom_panel: Panel::from_config(
-				DebugPanel::new("DebugPanel"),
+				bottom_panel,
 				config.bottom_panel.region(50.0, 600.0).with_fill(config.bg),
 				&config.bottom_panel,
 			),
@@ -213,24 +268,31 @@ impl<R: Runtime> Layout<R> {
 		Self::draw_view(ui, content_rect, panel.content.as_mut(), ctx);
 	}
 	fn calculate_region_boundaries(&mut self, available: egui::Rect) -> VeLayout {
-		// let config = LAYOUT;
 		// =========================================================
-		// Bottom Status Bar
+		// Fixed outer regions
 		// =========================================================
-		let status_bar_height = config.status_bar.effective_size();
 		let activity_bar_width = if self.activity_bar.open {
 			self.activity_bar.region.size
 		} else {
 			0.0
 		};
+
+		let status_bar_height = if self.status_bar.open {
+			self.status_bar.region.size
+		} else {
+			0.0
+		};
+
 		let activity_bar = egui::Rect::from_min_max(
 			available.min,
 			egui::pos2(available.left() + activity_bar_width, available.bottom()),
 		);
+
 		let workspace_rect = egui::Rect::from_min_max(
 			egui::pos2(available.left() + activity_bar_width, available.top()),
 			egui::pos2(available.right(), available.bottom() - status_bar_height),
 		);
+
 		let status_bar = egui::Rect::from_min_max(
 			egui::pos2(available.left(), workspace_rect.bottom()),
 			available.max,
@@ -276,12 +338,21 @@ impl<R: Runtime> Layout<R> {
 		// =========================================================
 		// CENTER: tabs / breadcrumbs / main / bottom
 		// =========================================================
-		let tabs_height = config.primary_bar.effective_size();
-		let breadcrumbs_height = config.secondary_bar.effective_size();
 		let min_main_height = 100.0;
 		// =========================================================
 		// Tabs
 		// =========================================================
+		let tabs_height = if self.primary_bar.open {
+			self.primary_bar.region.size
+		} else {
+			0.0
+		};
+
+		let breadcrumbs_height = if self.secondary_bar.open {
+			self.secondary_bar.region.size
+		} else {
+			0.0
+		};
 		let primary_bar = egui::Rect::from_min_max(
 			center_rect.min,
 			egui::pos2(center_rect.right(), center_rect.top() + tabs_height),
@@ -334,33 +405,87 @@ impl<R: Runtime> Layout<R> {
 			status_bar,
 		}
 	}
-	fn resize_handle(ui: &mut egui::Ui, id: &str, rect: egui::Rect, mut resize: impl FnMut(f32)) {
+	fn resize_handle(
+		ui: &mut egui::Ui,
+		id: &str,
+		rect: egui::Rect,
+		edge: ResizeEdge,
+		mut resize: impl FnMut(f32),
+	) {
+		let cursor = match edge {
+			ResizeEdge::Left | ResizeEdge::Right => egui::CursorIcon::ResizeHorizontal,
+			ResizeEdge::Top | ResizeEdge::Bottom => egui::CursorIcon::ResizeVertical,
+		};
+
+		let response = ui.interact(rect, egui::Id::new(id), egui::Sense::drag());
+
+		if response.hovered() || response.dragged() {
+			ui.ctx().set_cursor_icon(cursor);
+		}
+
+		// Visible divider.
+		let divider = match edge {
+			ResizeEdge::Left | ResizeEdge::Right => egui::Rect::from_min_max(
+				egui::pos2(rect.center().x - 1.0, rect.top()),
+				egui::pos2(rect.center().x + 1.0, rect.bottom()),
+			),
+
+			ResizeEdge::Top | ResizeEdge::Bottom => egui::Rect::from_min_max(
+				egui::pos2(rect.left(), rect.center().y - 1.0),
+				egui::pos2(rect.right(), rect.center().y + 1.0),
+			),
+		};
+
+		ui.painter().rect_filled(divider, 0.0, palette::BORDER);
+
+		if response.dragged() {
+			let delta = match edge {
+				ResizeEdge::Left | ResizeEdge::Right => response.drag_motion().x,
+				ResizeEdge::Top | ResizeEdge::Bottom => response.drag_motion().y,
+			};
+
+			resize(delta);
+		}
+	}
+	fn resize_handle2(ui: &mut egui::Ui, id: &str, rect: egui::Rect, mut resize: impl FnMut(f32)) {
 		let cursor = if id == "bottom_panel_resize" {
 			egui::CursorIcon::ResizeVertical
 		} else {
 			egui::CursorIcon::ResizeHorizontal
 		};
-		let id = egui::Id::new(id);
-		let response = ui.interact(rect, id, egui::Sense::drag());
+
+		let response = ui.interact(rect, egui::Id::new(id), egui::Sense::drag());
+
 		if response.hovered() || response.dragged() {
 			ui.ctx().set_cursor_icon(cursor);
 		}
-		let hovered = response.hovered();
-		let dragged = response.dragged();
-		let stroke = if hovered || dragged {
-			ui.visuals().widgets.active.bg_stroke
-		} else {
-			ui.visuals().widgets.noninteractive.bg_stroke
+
+		// Visible resize divider.
+		let divider = match cursor {
+			egui::CursorIcon::ResizeVertical => {
+				egui::Rect::from_center_size(rect.center(), egui::vec2(2.0, rect.height()))
+			}
+			_ => egui::Rect::from_center_size(rect.center(), egui::vec2(rect.width(), 2.0)),
 		};
-		ui.painter().rect_filled(rect, 0.0, stroke.color);
-		if dragged {
+
+		let color = if response.hovered() || response.dragged() {
+			palette::BORDER
+		} else {
+			palette::BORDER
+		};
+
+		ui.painter().rect_filled(divider, 0.0, color);
+
+		if response.dragged() {
 			let delta = match cursor {
 				egui::CursorIcon::ResizeVertical => response.drag_motion().y,
 				_ => response.drag_motion().x,
 			};
+
 			resize(delta);
 		}
 	}
+
 	fn resize_region(
 		ui: &mut egui::Ui,
 		id: &str,
@@ -372,32 +497,36 @@ impl<R: Runtime> Layout<R> {
 		if !region.resizable {
 			return;
 		}
+
+		let handle_size = 8.0;
+
 		let handle = match edge {
 			ResizeEdge::Left => egui::Rect::from_min_max(
-				egui::pos2(rect.left() - 3.0, rect.top()),
-				egui::pos2(rect.left() + 3.0, rect.bottom()),
+				egui::pos2(rect.left() - handle_size / 2.0, rect.top()),
+				egui::pos2(rect.left() + handle_size / 2.0, rect.bottom()),
 			),
+
 			ResizeEdge::Right => egui::Rect::from_min_max(
-				egui::pos2(rect.right() - 3.0, rect.top()),
-				egui::pos2(rect.right() + 3.0, rect.bottom()),
+				egui::pos2(rect.right() - handle_size / 2.0, rect.top()),
+				egui::pos2(rect.right() + handle_size / 2.0, rect.bottom()),
 			),
+
 			ResizeEdge::Top => egui::Rect::from_min_max(
-				egui::pos2(rect.left(), rect.top() - 3.0),
-				egui::pos2(rect.right(), rect.top() + 3.0),
+				egui::pos2(rect.left(), rect.top() - handle_size / 2.0),
+				egui::pos2(rect.right(), rect.top() + handle_size / 2.0),
 			),
+
 			ResizeEdge::Bottom => egui::Rect::from_min_max(
-				egui::pos2(rect.left(), rect.bottom() - 3.0),
-				egui::pos2(rect.right(), rect.bottom() + 3.0),
+				egui::pos2(rect.left(), rect.bottom() - handle_size / 2.0),
+				egui::pos2(rect.right(), rect.bottom() + handle_size / 2.0),
 			),
 		};
-		Self::resize_handle(ui, id, handle, |delta| {
-			let delta = match edge {
-				ResizeEdge::Left | ResizeEdge::Right => delta,
-				ResizeEdge::Top | ResizeEdge::Bottom => delta,
-			};
+
+		Self::resize_handle(ui, id, handle, edge, |delta| {
 			region.size = (region.size + delta * direction).clamp(region.min_size, region.max_size);
 		});
 	}
+
 	pub fn cursor_target(&self, pos: Option<egui::Pos2>, layout: &VeLayout) -> CursorTarget {
 		let Some(pos) = pos else {
 			return CursorTarget::None;
@@ -423,88 +552,7 @@ impl<R: Runtime> Layout<R> {
 		}
 	}
 }
-// impl<R: Runtime> Veable<R> for Ve<R> {
-// 	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>) {
-// 		self.main.draw(ui, ctx);
-// 		// self.activity_bar.draw(ui, ctx);
-// 		// self.dock_left.draw(ui, ctx);
-// 		// self.primary_bar.draw(ui, ctx);
-// 		// self.secondary_bar.draw(ui, ctx);
-// 		// self.bottom_panel.draw(ui, ctx);
-// 		// self.status_bar.draw(ui, ctx);
-// 		// self.dock_right.draw(ui, ctx);
-// 	}
-// }
-// pub struct Ve<R: Runtime> {
-// 	///      A type-erased container for any concrete `Veable`.
-// 	///
-// 	///      `Box<dyn Veable>` stores the concrete implementation on the heap while
-// 	///      exposing only the `Veable` interface to callers. This allows different
-// 	///      concrete implementations to be substituted without changing the code
-// 	///      which consumes them.
-// 	// Top left to bottom right ordering for mental model.
-// 	// Top left to bottom right ordering for mental model.
-// 	// pub activity_bar: Region<R>,
-// 	// pub dock_left: Panel<R>,
-// 	pub main: Region<R>,
-// 	// pub primary_bar: Region<R>,
-// 	// pub secondary_bar: Region<R>,
-// 	// pub bottom_panel: Panel<R>,
-// 	// pub status_bar: Region<R>,
-// 	// pub dock_right: Panel<R>,
-// }
-// impl<R: Runtime> Ve<R> {
-// 	pub fn new(view: impl Veable<R> + 'static) -> Self {
-// 		Self {
-// 			main: Region::content(view),
-// 		}
-// 	}
-// }
-// impl<R: Runtime> Veable<R> for Region<R> {
-// 	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>) {
-// 		// Region itself controls layout/presentation.
-// 		//
-// 		// For now, simply delegate to the contained view.
-// 		self.content.draw(ui, ctx);
-// 	}
-// 	fn update(&mut self, ctx: &mut AppContext<'_, R>) {
-// 		self.content.update(ctx);
-// 	}
-// 	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R>) {
-// 		self.content.event(event, ctx);
-// 	}
-// }
-///      A named, interactive view that occupies a region.
-///
-///      Panels add interaction and lifecycle behavior to a Region.
-///      They may be opened, closed, overlaid, auto-hidden, moved,
-///      or potentially detached from their parent layout.
-pub struct DebugPanel {
-	pub title: String,
-}
-impl DebugPanel {
-	pub fn new(title: impl Into<String>) -> Self {
-		Self {
-			title: title.into(),
-		}
-	}
-}
-impl<R: Runtime> ViewTrait<R> for DebugPanel {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>) {
-		ui.vertical_centered(|ui| {
-			ui.heading(&self.title);
-			ui.separator();
-			ui.label(format!(
-				"{} × {}",
-				ui.available_width(),
-				ui.available_height()
-			));
-		});
-	}
-	fn update(&mut self, ctx: &mut AppContext<'_, R>) {}
 
-	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R>) {}
-}
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum FocusedPane {
 	#[default]

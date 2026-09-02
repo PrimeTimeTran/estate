@@ -14,7 +14,7 @@
 mod wasm {
 	use eframe::{WebOptions, WebRunner};
 	use estate::{
-		ui::{ve::*, *},
+		ui::{layout::*, *},
 		web::bridge::*,
 	};
 	use wasm_bindgen::{JsCast, prelude::*};
