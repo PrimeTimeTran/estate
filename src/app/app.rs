@@ -1,4 +1,5 @@
 use crate::{
+	api::{Api, AppState},
 	app::{prelude::*, state::EstateState},
 	e,
 	model::StoredProblem,
@@ -12,45 +13,68 @@ use crate::{
 use crate::logger::{LogConfig, Tracer};
 
 pub struct App {
-	cli: Cli,
-	#[cfg(feature = "native")]
-	#[cfg(not(target_arch = "wasm32"))]
+	// cli: Cli,
+	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 	native: NativeApp,
 }
 
 impl App {
-	pub fn new(cli: Cli) -> Result<Self> {
-		#[cfg(not(target_arch = "wasm32"))]
-		let mut config = LogConfig::load()?;
-		#[cfg(not(target_arch = "wasm32"))]
-		config.apply_cli(&cli)?;
+	pub fn new() -> Result<Self> {
+		#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+		{
+			let mut config = LogConfig::load()?;
+			config.apply_cli(&cli)?;
+			logger::init_logging(&config)?;
 
-		#[cfg(feature = "native")]
-		#[cfg(not(target_arch = "wasm32"))]
-		logger::init_logging(&config)?;
+			return Ok(Self {
+				native: NativeApp::new()?,
+			});
+		}
 
-		Ok(Self {
-			cli,
-			#[cfg(feature = "native")]
-			#[cfg(not(target_arch = "wasm32"))]
-			native: NativeApp::new()?,
-		})
+		#[cfg(any(not(feature = "native"), target_arch = "wasm32"))]
+		{
+			Ok(Self {})
+		}
 	}
-	pub fn run(mut self) -> Result<()> {
-		self.native.run(self.cli)
+
+	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+	pub fn run(mut self, cli: Cli) -> Result<()> {
+		self.native.run(cli)
 	}
 }
 
+// #[derive(Debug, Clone)]
+// pub struct AppRuntime<R: Runtime, A: Api> {
+// 	pub(crate) engine: EstateEngine<R>,
+// 	pub(crate) view: ViewType,
+// 	pub(crate) api: Arc<A>,
+// 	pub(crate) state: AppState,
+// 	events: R::EventReceiver,
+// }
+// impl<R: Runtime, A: Api> AppRuntime<R, A> {
+// 	pub fn new(engine: EstateEngine<R>, api: Arc<A>) -> Self {
+// 		let events = engine.runtime.subscribe();
+
+// 		Self {
+// 			api,
+// 			engine,
+// 			events,
+// 			state: AppState::default(),
+// 			view: crate::START_VIEW,
+// 		}
+// 	}
+// }
+
 #[derive(Debug, Clone)]
-pub struct AppRuntime<R: Runtime> {
+pub struct AppRuntime<R: Runtime, A: Api> {
 	pub(crate) engine: EstateEngine<R>,
 	pub(crate) view: ViewType,
-	pub(crate) api: Arc<ApiClient>,
+	pub(crate) api: Arc<A>,
 	pub(crate) state: AppState,
 	events: R::EventReceiver,
 }
-impl<R: Runtime> AppRuntime<R> {
-	pub fn new(engine: EstateEngine<R>, api: Arc<ApiClient>) -> Self {
+impl<R: Runtime, A: Api> AppRuntime<R, A> {
+	pub fn new(engine: EstateEngine<R>, api: Arc<A>) -> Self {
 		let events = engine.runtime.subscribe();
 		Self {
 			api,
@@ -61,7 +85,7 @@ impl<R: Runtime> AppRuntime<R> {
 		}
 	}
 }
-impl<R: Runtime> AppRuntime<R> {
+impl<R: Runtime, A: Api> AppRuntime<R, A> {
 	pub fn runtime(&self) -> Arc<R> {
 		Arc::clone(&self.engine.runtime)
 	}
@@ -98,7 +122,7 @@ impl<R: Runtime> AppRuntime<R> {
 			}
 		});
 	}
-	pub fn api(&self) -> Arc<ApiClient> {
+	pub fn api(&self) -> Arc<A> {
 		Arc::clone(&self.api)
 	}
 
@@ -163,7 +187,7 @@ impl<R: Runtime> AppRuntime<R> {
 		self.engine.runtime.spawn(future);
 	}
 }
-impl<R: Runtime> AppRuntime<R> {
+impl<R: Runtime, A: Api> AppRuntime<R, A> {
 	pub fn state(&self) -> std::sync::RwLockReadGuard<'_, EstateState> {
 		self.engine.runtime.state().read()
 	}
@@ -174,7 +198,7 @@ impl<R: Runtime> AppRuntime<R> {
 		self.state()
 	}
 }
-impl<R: Runtime> AppRuntime<R> {
+impl<R: Runtime, A: Api> AppRuntime<R, A> {
 	pub fn new_task(&mut self) {
 		self
 			.engine
@@ -212,7 +236,7 @@ impl<R: Runtime> AppRuntime<R> {
 		self.view = view;
 	}
 }
-impl<R: Runtime + 'static> AppRuntime<R> {
+impl<R: Runtime + 'static, A: Api> AppRuntime<R, A> {
 	fn spawn_request<F, T, E>(&self, future: F, on_success: impl FnOnce(T) + Send + 'static)
 	where
 		F: Future<Output = Result<T, E>> + Send + 'static,
@@ -252,7 +276,7 @@ impl<R: Runtime + 'static> AppRuntime<R> {
 		true
 	}
 }
-impl<R: Runtime + 'static> AppRuntime<R> {
+impl<R: Runtime + 'static, A: Api> AppRuntime<R, A> {
 	pub fn sample_problem(&mut self) {
 		if !self.start_problems_request() {
 			return;

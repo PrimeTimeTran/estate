@@ -1,4 +1,5 @@
 use crate::{
+	api::Api,
 	app::{state::*, *},
 	e,
 };
@@ -29,8 +30,9 @@ use crate::native::ui::IOState;
 //    3. Once that quick operations phase ends, AppContext is dropped, releasing the borrow so the application can continue running its background async tasks.
 
 // Would you like to look at how to optimize the trait names alongside these lifetimes, or do you want to verify if AppRuntime<R> can be safely shared across your background threads?
-pub struct AppContext<'a, R: Runtime> {
-	pub app: &'a mut AppRuntime<R>,
+// impl<R: Runtime + 'static, A: Api> AppRuntime<R, A> {
+pub struct AppContext<'a, R: Runtime, A: Api> {
+	pub app: &'a mut AppRuntime<R, A>,
 	pub last_revision: u64,
 
 	pub event_rx: R::EventReceiver,
@@ -43,13 +45,13 @@ pub struct AppContext<'a, R: Runtime> {
 // ## 2. What the 'static constraint tells you
 // The + 'static on impl<'a, R: Runtime + 'static> AppContext<'a, R> tells
 // us that the underlying runtime implementation (R) must be completely free of short-lived borrows.
-impl<'a, R: Runtime + 'static> AppContext<'a, R> {
+impl<'a, R: Runtime + 'static, A: Api> AppContext<'a, R, A> {
 	pub fn load_problems(&mut self) {
 		self.app.load_problems();
 	}
 }
 
-impl<'a, R: Runtime> AppContext<'a, R> {
+impl<'a, R: Runtime, A: Api> AppContext<'a, R, A> {
 	pub fn state(&self) -> std::sync::RwLockReadGuard<'_, EstateState> {
 		self.app.state()
 	}

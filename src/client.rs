@@ -1,52 +1,59 @@
 #![cfg(not(target_arch = "wasm32"))]
-use crate::{
-	app::{self, App, Runtime, model::EstateEngine},
-	e,
-	model::problem::StoredProblem,
-	prelude::*,
-	ui::MarkdownScreen,
-};
+// use crate::{
+// 	app::{self, App, Runtime, model::EstateEngine},
+// 	e,
+// 	model::problem::StoredProblem,
+// 	prelude::*,
+// 	ui::MarkdownScreen,
+// };
 
-use crate::proto::leetcode::{
-	problem_service_client::ProblemServiceClient, submission_service_client::SubmissionServiceClient,
-};
-use tonic::transport::Channel;
+// // use crate::proto::leetcode::{
+// // 	problem_service_client::ProblemServiceClient, submission_service_client::SubmissionServiceClient,
+// // };
+// // use tonic::transport::Channel;
 
-#[derive(Debug, Clone)]
-pub struct ApiClient {
-	pub problems: ProblemServiceClient<Channel>,
-	pub submissions: SubmissionServiceClient<Channel>,
-}
+// #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+// #[derive(Debug, Clone)]
+// pub struct NativeApiClient {
+// 	pub problems: ProblemServiceClient<Channel>,
+// 	pub submissions: SubmissionServiceClient<Channel>,
+// }
 
-impl ApiClient {
-	pub async fn connect() -> anyhow::Result<Self> {
-		let channel = Channel::from_static(crate::GRPC_SOCKET_CLIENT)
-			.connect()
-			.await?;
+// #[derive(Debug, Clone)]
+// pub struct ApiClient {
+// 	pub problems: ProblemServiceClient<Channel>,
+// 	pub submissions: SubmissionServiceClient<Channel>,
+// }
 
-		Ok(Self {
-			problems: ProblemServiceClient::new(channel.clone()),
-			submissions: SubmissionServiceClient::new(channel),
-		})
-	}
-}
+// impl ApiClient {
+// 	pub async fn connect() -> anyhow::Result<Self> {
+// 		let channel = Channel::from_static(crate::GRPC_SOCKET_CLIENT)
+// 			.connect()
+// 			.await?;
 
-#[derive(Debug, Default, Clone)]
-pub struct AppState {
-	pub problems: ProblemListState,
-	pub problem: ProblemState,
-}
+// 		Ok(Self {
+// 			problems: ProblemServiceClient::new(channel.clone()),
+// 			submissions: SubmissionServiceClient::new(channel),
+// 		})
+// 	}
+// }
 
-#[derive(Debug, Default, Clone)]
-pub struct ProblemListState {
-	pub items: Vec<StoredProblem>,
-	pub loading: bool,
-	pub error: Option<String>,
-}
+// #[derive(Debug, Default, Clone)]
+// pub struct AppState {
+// 	pub problems: ProblemListState,
+// 	pub problem: ProblemState,
+// }
 
-#[derive(Debug, Default, Clone)]
-pub struct ProblemState {
-	pub value: Option<StoredProblem>,
-	pub loading: bool,
-	pub error: Option<String>,
-}
+// #[derive(Debug, Default, Clone)]
+// pub struct ProblemListState {
+// 	pub items: Vec<StoredProblem>,
+// 	pub loading: bool,
+// 	pub error: Option<String>,
+// }
+
+// #[derive(Debug, Default, Clone)]
+// pub struct ProblemState {
+// 	pub value: Option<StoredProblem>,
+// 	pub loading: bool,
+// 	pub error: Option<String>,
+// }

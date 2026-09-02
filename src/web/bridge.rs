@@ -1,4 +1,4 @@
-use crate::app::*;
+use crate::prelude::*;
 
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::{JsValue, prelude::*};
