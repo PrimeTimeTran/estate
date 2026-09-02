@@ -20,11 +20,17 @@ pub struct NativeRuntime {
 	pub state: Arc<RuntimeState>,
 	pub store: NativeStateStore,
 	pub tasks: Arc<RwLock<TaskManager>>,
+	pub state_service: Arc<StateService>,
+	pub session_service: Arc<SessionService>,
 }
 
 impl NativeRuntime {
 	pub fn new(handle: tokio::runtime::Handle) -> Result<Self> {
 		let store = NativeStateStore::new()?;
+		let session_service = Arc::new(SessionService::new(Arc::new(StateService::new(
+			crate::STATE_PATH,
+		))));
+		let state_service = Arc::new(StateService::new(crate::STATE_PATH));
 		let state = store.load()?;
 		let runtime_state = RuntimeState::new(state);
 		let events = EventBus::new();
@@ -38,6 +44,8 @@ impl NativeRuntime {
 			state: Arc::new(runtime_state),
 			store,
 			tasks: Arc::new(RwLock::new(TaskManager::new())),
+			state_service,
+			session_service,
 		})
 	}
 
@@ -110,8 +118,8 @@ impl Runtime for NativeRuntime {
 		dispatcher.register(crate::event::handler::StateHandler);
 		dispatcher.register(crate::event::handler::CommandHandler);
 		dispatcher.register(crate::event::handler::FileWatcherHandler);
-		dispatcher.register(crate::event::handler::AppHandler);
 		dispatcher.register(crate::event::handler::NavigationHandler);
+		dispatcher.register(crate::event::handler::AppHandler);
 
 		handle.spawn(async move {
 			loop {

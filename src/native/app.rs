@@ -57,6 +57,7 @@ impl NativeApp {
 		let daemon_runtime = NativeRuntime::new(handle)?;
 		// 3. Then construct the engine.
 		let engine = EstateEngine::new(daemon_runtime)?;
+
 		let api = Arc::new(tokio.block_on(ApiClient::connect())?);
 		let runtime = AppRuntime::new(engine.clone(), api.clone());
 		runtime.start();
@@ -215,15 +216,24 @@ impl NativeApp {
 			tracing::info!("SIGNAL: thread exiting");
 		});
 	}
-	fn shutdown(&mut self) {
+	fn shutdown(&mut self, event_loop: &ActiveEventLoop) {
 		tracing::info!(">>> shutting down runtime");
+		let snapshot = {
+			let runtime = self.runtime();
+			let mut state = runtime.state.write();
+			state.session.end();
+			state.clone()
+		};
+		self.runtime().save(&snapshot);
 		self.is_clocking.store(false, Ordering::Relaxed);
 		self.hotkey_manager.shutdown();
+
 		match self.daemon_tx.try_send(DaemonCommand::Stop) {
 			Ok(()) => tracing::info!(">>> daemon stop sent"),
 			Err(error) => tracing::error!(%error, ">>> daemon stop failed"),
 		}
 		tracing::info!(">>> runtime shutdown complete");
+		event_loop.exit();
 	}
 }
 impl NativeApp {
@@ -240,8 +250,7 @@ impl NativeApp {
 		let id = event.id();
 		if id == menu.quit.id() {
 			tracing::debug!(">>> tray quit requested");
-			self.shutdown();
-			event_loop.exit();
+			self.shutdown(event_loop);
 			tracing::debug!(">>> event_loop.exit() called");
 		} else if id == menu.dev.id() {
 			self.open_window(event_loop, WindowType::DashboardScreen);
@@ -534,8 +543,8 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 			}
 			AppEvent::Shutdown => {
 				tracing::info!(">>> shutdown event received");
-				self.shutdown();
-				event_loop.exit();
+				self.shutdown(event_loop);
+
 				tracing::info!(">>> event_loop.exit() called");
 			}
 			AppEvent::CursorPosition { x, y } => {

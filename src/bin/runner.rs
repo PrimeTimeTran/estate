@@ -477,43 +477,6 @@ struct ContainerResult {
 	exit_code: Option<i32>,
 }
 
-/// Language
-// #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, Hash, Eq, PartialEq)]
-// #[serde(rename_all = "lowercase")]
-// pub enum Language {
-// #[default]
-// Rust,
-// Python,
-// JavaScript,
-// }
-// impl Language {
-// pub fn as_str(&self) -> &'static str {
-// match self {
-// Self::Rust => "rust",
-// Self::Python => "python",
-// Self::JavaScript => "javascript",
-// }
-// }
-// fn entry(self) -> &'static str {
-// match self {
-// Self::Rust => "solution.rs",
-// Self::Python => "solution.py",
-// Self::JavaScript => "solution.js",
-// }
-// }
-// fn from_arg(arg: Option<&str>) -> anyhow::Result<Self> {
-// match arg {
-// Some("rust") => Ok(Self::Rust),
-// Some("python") | Some("py") => Ok(Self::Python),
-// Some("javascript") | Some("js") => Ok(Self::JavaScript),
-// Some(lang) => {
-// anyhow::bail!("unknown language '{lang}', expected rust, python, or javascript")
-// }
-// None => Ok(Self::Rust),
-// }
-// }
-// }
-
 #[derive(Clone, Debug)]
 pub struct Problem {
 	pub id: i64,

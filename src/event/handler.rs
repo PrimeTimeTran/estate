@@ -55,8 +55,6 @@ impl EventHandler for TaskHandler {
 					}
 					TaskKind::SessionStop => {
 						tracing::debug!("🛑 SessionStop");
-						// let session = runtime.session.clone();
-						// Master::save(session);
 					}
 					_ => {}
 				}
@@ -119,27 +117,33 @@ impl EventHandler for FileWatcherHandler {
 	}
 }
 pub struct StateHandler;
+
 #[async_trait::async_trait]
 impl EventHandler for StateHandler {
 	async fn handle(&self, event: &e::Event, runtime: &NativeRuntime) {
 		tracing::debug!("🔥 StateHandler received: {:?}", event.kind);
+
 		let snapshot = {
 			let mut state = runtime.state.write();
+
 			match &event.kind {
-				e::Klass::DaemonStarted => {}
 				e::Klass::DaemonStarted => {
 					state.starts += 1;
 					state.status_checks += 1;
 					state.started_at = event.timestamp;
 				}
+
 				e::Klass::StatusRequested => {
 					state.status_checks += 1;
 				}
+
 				e::Klass::IndexUpdated { files_changed } => {
 					state.files_indexed += files_changed;
 				}
+
 				e::Klass::TaskCreated { task_id, kind } => {
 					state.tasks_created += 1;
+
 					state.jobs.push_back(Job {
 						id: task_id.clone(),
 						task_id: task_id.clone(),
@@ -150,37 +154,48 @@ impl EventHandler for StateHandler {
 						completed_at: None,
 					});
 				}
+
 				e::Klass::TaskStarted { task_id } => {
 					if let Some(job) = state.jobs.iter_mut().find(|job| &job.id == task_id) {
 						job.status = JobStatus::Running;
 						job.started_at = Some(event.timestamp);
 					}
 				}
+
 				e::Klass::TaskCompleted { task_id } => {
 					state.tasks_completed += 1;
+
 					if let Some(job) = state.jobs.iter_mut().find(|job| &job.id == task_id) {
 						job.status = JobStatus::Completed;
 						job.completed_at = Some(event.timestamp);
 					}
 				}
-				e::Klass::TaskFailed { task_id, error } => {
+
+				e::Klass::TaskFailed { task_id, .. } => {
 					if let Some(job) = state.jobs.iter_mut().find(|job| &job.id == task_id) {
 						job.status = JobStatus::Failed;
 						job.completed_at = Some(event.timestamp);
 					}
 				}
+
 				e::Klass::DaemonStopped => {
 					let run_duration = event.timestamp.saturating_sub(state.started_at);
+
 					state.longest_run = state.longest_run.max(run_duration);
 				}
+
 				_ => {}
 			}
+
 			state.events_processed += 1;
 			state.revision += 1;
+
 			state.clone()
 		};
-		// Ok(runtime.save(&snapshot)?)
-		runtime.save(&snapshot);
+
+		if let Err(error) = runtime.state_service.save(&snapshot).await {
+			tracing::error!(%error, "failed to persist state");
+		}
 	}
 }
 pub struct CommandHandler;
@@ -194,8 +209,9 @@ impl EventHandler for CommandHandler {
 				tracing::debug!("ABOUT TO SAVE SESSION");
 
 				let mut session = runtime.session.clone();
-				let serialized = session.end_session();
-				match Master::save(serialized).await {
+				session.end_session();
+				// let serialized = session.end_session();
+				match Master::save(session.as_json()).await {
 					Ok(()) => {
 						tracing::debug!("SESSION SAVED");
 					}
@@ -283,6 +299,7 @@ impl TaskRunner {
 		tracing::info!("TaskRunner execute {:?}", task);
 		match task.kind {
 			TaskKind::SessionStart => {
+				tracing::info!("Session Start in Task Runner Execute");
 				tracing::debug!("SessionStart");
 				tracing::debug!("✅ LoadMaster complete");
 			}
@@ -351,20 +368,29 @@ impl EventHandler for AppHandler {
 			return;
 		}
 		match event.kind.clone() {
-			e::Klass::SessionStop { session } => {
-				tracing::info!("🛑 SessionStop");
-			}
-			e::Klass::SessionStart => {}
+			e::Klass::SessionStop { session } => match runtime.session_service.end().await {
+				Ok(session) => {
+					tracing::info!("🛑 SessionStop");
+				}
+				Err(error) => {
+					tracing::error!(%error, "failed to create session");
+				}
+			},
+			e::Klass::SessionStart => match runtime.session_service.create().await {
+				Ok(session) => {
+					tracing::info!(?session, "session created");
+				}
+				Err(error) => {
+					tracing::error!(%error, "failed to create session");
+				}
+			},
 			_ => {
-				println!("not interested")
+				println!("not interested {:?}", event.kind.clone())
 			}
 		}
-		tracing::debug!("🔥 SessionStart → SessionStart");
-		runtime.emit(e::Event::daemon(e::Klass::TaskRequested {
-			request: TaskRequest::Create(TaskKind::SessionStart),
-		}));
 	}
 }
+
 pub struct NavigationHandler;
 #[async_trait::async_trait]
 impl EventHandler for NavigationHandler {

@@ -29,12 +29,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	println!("📚 Problems available: {}", page.total);
 	let submission_repository = JsonSubmissionRepository::new(estate::data::GRPC_SUBMISSIONS_PATH);
 
-	// Services
 	let problem_service = ProblemServiceImpl::new(problem_repository);
 
 	let submission_service = SubmissionServiceImpl::new(submission_repository);
 
-	// Server
 	println!("API listening on {addr}");
 
 	tonic::transport::Server::builder()
@@ -50,18 +48,3 @@ pub struct App {
 	pub problems: JsonProblemRepository,
 	pub submissions: JsonSubmissionRepository,
 }
-
-// let app = App {
-// 	problems: JsonProblemRepository::new("src/data/problems"),
-// 	submissions: JsonSubmissionRepository::new("src/data/submissions"),
-// };
-
-// tonic::transport::Server::builder()
-// 	.add_service(ProblemServiceServer::new(
-// 		ProblemServiceImpl::new(app.problems),
-// 	))
-// 	.add_service(SubmissionServiceServer::new(
-// 		SubmissionServiceImpl::new(app.submissions),
-// 	))
-// 	.serve(addr)
-// 	.await?;

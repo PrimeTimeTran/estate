@@ -25,7 +25,3 @@
        ▼      ▼        ▼
     Sidebar Editor   Output
 ```
-
-```rust
-
-```

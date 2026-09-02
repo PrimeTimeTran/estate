@@ -140,6 +140,10 @@ impl<R: Runtime> AppRuntime<R> {
 	}
 	pub fn start_services(&self) {
 		println!("AppRuntime start_services");
+		self
+			.engine
+			.runtime
+			.emit(e::Event::app(e::Klass::SessionStart {}));
 		tracing::info!("AppRuntime start_services");
 	}
 	pub fn spawn<F>(&self, future: F)
@@ -178,7 +182,9 @@ impl<R: Runtime> AppRuntime<R> {
 			}));
 	}
 	pub fn stop_session(&mut self) {
-		println!("stop_session from app");
+		// self.session_service.end().await.unwrap_or_else(|e| {
+		// 	tracing::error!("Error occurred while ending session: {}", e);
+		// });
 	}
 	pub fn show_tasks(&mut self) {
 		self.show_view(ViewType::TaskManagerScreen);

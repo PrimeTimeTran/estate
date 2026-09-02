@@ -44,7 +44,7 @@ impl<T> EventSender<T> {
 }
 
 impl<T> EventReceiver<T> {
-	/// Consume one event if one is available.
+	/// Consume one event if available.
 	pub fn poll(&mut self) -> Option<T> {
 		self.rx.try_recv().ok()
 	}
