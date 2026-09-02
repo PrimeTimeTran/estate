@@ -1,8 +1,8 @@
-use std::fmt;
 use egui::{ScrollArea, Ui};
+use std::fmt;
 use strum::IntoStaticStr;
 
-use crate::{e, ui::Layout,prelude::*};
+use crate::{e, prelude::*, ui::Layout};
 
 #[cfg(feature = "native")]
 use crate::native::{DashboardScreen, WaterfallChart, prelude::*};
@@ -15,22 +15,20 @@ pub(crate) struct ScreenInstance {
 
 impl fmt::Debug for ScreenInstance {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		f.debug_struct("View")
-			.field("kind", &self.kind)
-			.finish()
+		f.debug_struct("View").field("kind", &self.kind).finish()
 	}
 }
 impl ScreenInstance {
 	pub fn new(kind: ViewType, api: Arc<ApiClient>) -> Self {
-	let screen: Box<dyn Screen<NativeRuntime>> = match kind {
-		ViewType::DashboardScreen => Box::new(DashboardScreen::new()),
-		ViewType::TaskManagerScreen => Box::new(TaskManagerScreen::new()),
-		// ViewType::WaterfallScreen => Box::new(WaterfallScreen::new()),
-		ViewType::ProblemsScreen => Box::new(ProblemsScreen::new()),
-		ViewType::ProblemScreen => Box::new(ProblemScreen::new()),
-		ViewType::MarkdownView => Box::new(MarkdownScreen::new(crate::MARKDOWN)),
-		_ => Box::new(MarkdownScreen::new(crate::MARKDOWN)),
-	};
+		let screen: Box<dyn Screen<NativeRuntime>> = match kind {
+			ViewType::DashboardScreen => Box::new(DashboardScreen::new()),
+			ViewType::TaskManagerScreen => Box::new(TaskManagerScreen::new()),
+			// ViewType::WaterfallScreen => Box::new(WaterfallScreen::new()),
+			ViewType::ProblemsScreen => Box::new(ProblemsScreen::new()),
+			ViewType::ProblemScreen => Box::new(ProblemScreen::new()),
+			ViewType::MarkdownView => Box::new(MarkdownScreen::new(crate::MARKDOWN)),
+			_ => Box::new(MarkdownScreen::new(crate::MARKDOWN)),
+		};
 
 		Self {
 			kind,
@@ -39,11 +37,7 @@ impl ScreenInstance {
 		}
 	}
 
-	pub fn draw(
-		&mut self,
-		ui: &mut egui::Ui,
-		ctx: &mut AppContext<'_, NativeRuntime>,
-	) {
+	pub fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, NativeRuntime>) {
 		self.layout.draw(ui, ctx);
 	}
 }
@@ -87,7 +81,6 @@ impl ViewType {
 	}
 }
 
-
 //
 pub fn draw_tabbed_sidebar<T, F>(
 	ui: &mut Ui,
@@ -118,7 +111,6 @@ pub fn draw_tabbed_sidebar<T, F>(
 			draw_content(ui, active_tab);
 		});
 }
-
 
 // pub struct View<R: Runtime> {
 // 	pub kind: ViewType,
@@ -168,58 +160,34 @@ pub fn draw_tabbed_sidebar<T, F>(
 // }
 
 pub struct ActivityBar {
-    buttons: Vec<&'static str>,
+	buttons: Vec<&'static str>,
 }
 impl ActivityBar {
-  pub fn new() -> Self {
-    Self {
-      buttons: vec![]
-    }
-  }
+	pub fn new() -> Self {
+		Self { buttons: vec![] }
+	}
 }
 impl<R: Runtime> ViewTrait<R> for ActivityBar {
-    fn draw(
-        &mut self,
-        ui: &mut egui::Ui,
-        ctx: &mut AppContext<'_, R>,
-    ) {
-        ui.vertical(|ui| {
-            // buttons
-        });
-    }
-    fn update(
-		&mut self,
-		ctx: &mut AppContext<'_, R>,
-	){}
+	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>) {
+		ui.vertical(|ui| {
+			// buttons
+		});
+	}
+	fn update(&mut self, ctx: &mut AppContext<'_, R>) {}
 
-	fn event(
-		&mut self,
-		event: &e::Event,
-		ctx: &mut AppContext<'_, R>,
-	){}
+	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R>) {}
 }
 pub struct PrimaryBar {
-    buttons: Vec<&'static str>,
+	buttons: Vec<&'static str>,
 }
 
 impl<R: Runtime> ViewTrait<R> for PrimaryBar {
-    fn draw(
-        &mut self,
-        ui: &mut egui::Ui,
-        ctx: &mut AppContext<'_, R>,
-    ) {
-        ui.horizontal(|ui| {
-            // buttons
-        });
-    }
-    fn update(
-		&mut self,
-		ctx: &mut AppContext<'_, R>,
-	){}
+	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>) {
+		ui.horizontal(|ui| {
+			// buttons
+		});
+	}
+	fn update(&mut self, ctx: &mut AppContext<'_, R>) {}
 
-	fn event(
-		&mut self,
-		event: &e::Event,
-		ctx: &mut AppContext<'_, R>,
-	){}
+	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R>) {}
 }

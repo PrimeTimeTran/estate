@@ -2,13 +2,13 @@ use crate::{
 	app::{prelude::*, state::EstateState},
 	e,
 	model::StoredProblem,
-	ui::Layout,
 	prelude::*,
 	proto::leetcode::{
 		problem_service_client::ProblemServiceClient,
 		submission_service_client::SubmissionServiceClient,
 		types::{ListProblemsRequest, PageRequest, SampleProblemRequest},
 	},
+	ui::Layout,
 };
 pub struct App<R: Runtime> {
 	pub(crate) engine: EstateEngine<R>,
@@ -136,7 +136,6 @@ impl<R: Runtime> App<R> {
 	}
 }
 impl<R: Runtime> App<R> {
-
 	pub fn view(&self) -> ViewType {
 		self.view
 	}

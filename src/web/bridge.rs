@@ -1,7 +1,7 @@
 use crate::app::*;
 
-use serde::{ Deserialize, Serialize };
-use wasm_bindgen::{ prelude::*, JsValue };
+use serde::{Deserialize, Serialize};
+use wasm_bindgen::{JsValue, prelude::*};
 use web_sys::js_sys;
 
 #[wasm_bindgen]
@@ -44,7 +44,7 @@ pub fn create_payload() -> Result<JsValue, JsValue> {
 				id: 2,
 				name: "Second".into(),
 				enabled: false,
-			}
+			},
 		],
 	};
 	serde_wasm_bindgen::to_value(&payload).map_err(|err| JsValue::from_str(&err.to_string()))
@@ -52,16 +52,16 @@ pub fn create_payload() -> Result<JsValue, JsValue> {
 
 #[wasm_bindgen]
 pub fn receive_payload(value: JsValue) -> Result<(), JsValue> {
-	let payload: Payload = serde_wasm_bindgen
-		::from_value(value)
-		.map_err(|err| JsValue::from_str(&err.to_string()))?;
+	let payload: Payload =
+		serde_wasm_bindgen::from_value(value).map_err(|err| JsValue::from_str(&err.to_string()))?;
 
-	web_sys::console::log_1(&JsValue::from_str(&format!("[RUST] RECEIVED:\n{payload:#?}")));
+	web_sys::console::log_1(&JsValue::from_str(&format!(
+		"[RUST] RECEIVED:\n{payload:#?}"
+	)));
 
 	// Serialize Rust back into JavaScript.
-	let response = serde_wasm_bindgen
-		::to_value(&payload)
-		.map_err(|err| JsValue::from_str(&err.to_string()))?;
+	let response =
+		serde_wasm_bindgen::to_value(&payload).map_err(|err| JsValue::from_str(&err.to_string()))?;
 
 	js_test(response);
 
@@ -72,17 +72,18 @@ pub fn receive_payload(value: JsValue) -> Result<(), JsValue> {
 pub fn install_api() {
 	let window = web_sys::window().expect("no window");
 
-	let receive = wasm_bindgen::closure::Closure::wrap(
-		Box::new(move |value: JsValue| {
-			if let Err(error) = receive_payload(value) {
-				web_sys::console::error_1(&error);
-			}
-		}) as Box<dyn FnMut(JsValue)>
-	);
+	let receive = wasm_bindgen::closure::Closure::wrap(Box::new(move |value: JsValue| {
+		if let Err(error) = receive_payload(value) {
+			web_sys::console::error_1(&error);
+		}
+	}) as Box<dyn FnMut(JsValue)>);
 
-	js_sys::Reflect
-		::set(&window, &JsValue::from_str("receive_payload"), receive.as_ref().unchecked_ref())
-		.expect("failed to install receive_payload");
+	js_sys::Reflect::set(
+		&window,
+		&JsValue::from_str("receive_payload"),
+		receive.as_ref().unchecked_ref(),
+	)
+	.expect("failed to install receive_payload");
 
 	receive.forget();
 }
@@ -144,7 +145,5 @@ pub enum Status {
 	Created,
 	Running,
 	Completed,
-	Failed {
-		message: String,
-	},
+	Failed { message: String },
 }

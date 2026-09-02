@@ -86,7 +86,7 @@ fn struct_with_borrow() {
 
 // -----------------------------------------------------------------------------
 // 5.2 A STRUCT LIFETIME PARAMETER (Tuple)
-// 
+//
 // So the struct creates a distinct type around the underlying value.
 // -----------------------------------------------------------------------------
 //
@@ -290,9 +290,7 @@ fn one_struct_lifetime() {
 
 	let x = 42;
 
-	let borrowed = Borrowed {
-		value: &x,
-	};
+	let borrowed = Borrowed { value: &x };
 
 	println!("borrowed: {:?}", borrowed);
 
@@ -418,7 +416,10 @@ fn lifetime_outlives() {
 	// If `'a` outlives `'b`, then a reference valid for `'a`
 	// can also be used where a reference valid for `'b` is required.
 
-	fn shorten<'a, 'b>(value: &'a i32) -> &'b i32 where 'a: 'b {
+	fn shorten<'a, 'b>(value: &'a i32) -> &'b i32
+	where
+		'a: 'b,
+	{
 		// `value` is valid for `'a`.
 		//
 		// `'a` is guaranteed to last at least as long as `'b`.
@@ -514,7 +515,10 @@ fn lifetime_outlives() {
 //     LONGER lifetime
 
 fn lifetime_constraint_direction() {
-	fn use_shorter<'a, 'b>(value: &'a i32) where 'a: 'b {
+	fn use_shorter<'a, 'b>(value: &'a i32)
+	where
+		'a: 'b,
+	{
 		// `'a` is guaranteed to outlive `'b`.
 		//
 		// Therefore the `'a` reference can be used for `'b`.
@@ -595,7 +599,10 @@ fn lifetime_constraint_direction() {
 
 fn constrained_struct() {
 	#[derive(Debug)]
-	struct Borrowed<'a, 'b> where 'a: 'b {
+	struct Borrowed<'a, 'b>
+	where
+		'a: 'b,
+	{
 		long: &'a i32,
 		short: &'b i32,
 	}
@@ -674,7 +681,10 @@ fn constrained_struct() {
 
 fn constraint_syntax() {
 	#[derive(Debug)]
-	struct WhereForm<'a, 'b> where 'a: 'b {
+	struct WhereForm<'a, 'b>
+	where
+		'a: 'b,
+	{
 		long: &'a i32,
 		short: &'b i32,
 	}
@@ -741,15 +751,9 @@ fn struct_and_enum_example() {
 
 	let single = Borrowing(&x);
 
-	let double = NamedBorrowed {
-		x: &x,
-		y: &y,
-	};
+	let double = NamedBorrowed { x: &x, y: &y };
 
-	let independent = IndependentlyBorrowed {
-		x: &x,
-		y: &y,
-	};
+	let independent = IndependentlyBorrowed { x: &x, y: &y };
 
 	let reference = Either::Ref(&x);
 	let number = Either::Num(y);

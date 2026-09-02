@@ -1,13 +1,16 @@
 pub(crate) mod chart;
 pub(crate) mod components;
 pub(crate) mod primitive;
+pub(crate) mod r#trait;
 pub mod ve;
 pub(crate) mod view;
-pub(crate) mod r#trait;
 
-pub use crate::ui::{components::*, ve::{*}, view::*,primitive::*};
+pub use crate::ui::{components::*, primitive::*, ve::*, view::*};
+use crate::{
+	e,
+	ui::r#trait::{LayoutTrait, Screen, ViewTrait},
+};
 pub use crate::{palette::*, prelude::*};
-use crate::{e, ui::r#trait::{Screen, LayoutTrait, ViewTrait}};
 
 pub const TRAY_ICON: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/estate-tray.png"));
 pub const TRAY_SCROLL_ICON: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/estate-tray.png"));
@@ -144,16 +147,9 @@ impl<R: Runtime> ViewTrait<R> for Panel<R> {
 	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>) {
 		self.content.draw(ui, ctx);
 	}
- fn update(
-&mut self,
-ctx: &mut AppContext<'_, R>,
-){}
+	fn update(&mut self, ctx: &mut AppContext<'_, R>) {}
 
-fn event(
-&mut self,
-event: &e::Event,
-ctx: &mut AppContext<'_, R>,
-){}
+	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R>) {}
 }
 impl<R: Runtime> Panel<R> {
 	pub fn new(content: impl ViewTrait<R> + 'static, region: Region) -> Self {

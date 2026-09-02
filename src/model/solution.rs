@@ -1,5 +1,5 @@
 use crate::{
-	model::{*, common::Language, *},
+	model::{common::Language, *},
 	prelude::*,
 };
 
@@ -53,9 +53,7 @@ impl From<ProtoSolution> for StoredSolution {
 	}
 }
 
-fn timestamp_to_datetime(
-	timestamp: Option<prost_types::Timestamp>,
-) -> Option<DateTime<Utc>> {
+fn timestamp_to_datetime(timestamp: Option<prost_types::Timestamp>) -> Option<DateTime<Utc>> {
 	timestamp.and_then(|timestamp| {
 		DateTime::<Utc>::from_timestamp(timestamp.seconds, timestamp.nanos as u32)
 	})

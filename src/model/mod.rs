@@ -1,9 +1,7 @@
 pub use crate::proto::leetcode::types::{
 	CodeTemplate, Difficulty as ProtoDifficulty, Language as ProtoLanguage, Problem as ProtoProblem,
-	SubmissionStatus as ProtoSubmissionStatus,
-	Solution as ProtoSolution,
-	SolutionCode as ProtoSolutionCode,
-	SolutionStatus as ProtoSolutionStatus
+	Solution as ProtoSolution, SolutionCode as ProtoSolutionCode,
+	SolutionStatus as ProtoSolutionStatus, SubmissionStatus as ProtoSubmissionStatus,
 };
 
 use crate::proto::leetcode::types as P;

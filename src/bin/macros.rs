@@ -1,6 +1,6 @@
 use foo::*;
-use macros_decl::{ declarative_macro };
-use macros_proc::{ attribute_macro, Hello, procedural_macro };
+use macros_decl::declarative_macro;
+use macros_proc::{Hello, attribute_macro, procedural_macro};
 
 fn main() {
 	_declarative();
@@ -62,10 +62,7 @@ fn _declarative() {
 	// .any(...)
 
 	// 1. Simple Syntax
-	let squared: Vec<i32> = values
-		.iter()
-		.map(|i| i * i)
-		.collect();
+	let squared: Vec<i32> = values.iter().map(|i| i * i).collect();
 	// 2. Verbose
 	// let squared: Vec<i32> = core::iter::IntoIterator
 	// 	::into_iter(values)
@@ -89,10 +86,7 @@ fn _declarative() {
 	let words = vec!["hello", "world"];
 	// USING flat_map: Expands each word into its individual characters.
 	// Each &str turns into an iterator of chars, which flat_map flattens.
-	let chars: Vec<char> = words
-		.iter()
-		.flat_map(|s| s.chars())
-		.collect();
+	let chars: Vec<char> = words.iter().flat_map(|s| s.chars()).collect();
 	println!("{:?}", chars);
 	// Output: ['h', 'e', 'l', 'l', 'o', 'w', 'o', 'r', 'l', 'd']
 	let result = count_block_identifiers!({

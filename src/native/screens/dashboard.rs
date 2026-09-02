@@ -1,8 +1,8 @@
 use crate::{
-  e,
 	app::*,
+	e,
 	native::{OracleScreen, monitor::StateMonitor, runtime::NativeRuntime},
-	ui::{Layout, Component,chart::*},
+	ui::{Component, Layout, chart::*},
 };
 
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
@@ -29,28 +29,13 @@ pub struct DashboardScreen {
 	pub secondary_scroll_offset: f32,
 }
 impl<R: Runtime> Screen<R> for DashboardScreen {
-  fn configure(
-		&mut self,
-		layout: &mut Layout<R>,
-		ctx: &mut AppContext<'_, R>,
-	) {
+	fn configure(&mut self, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {
 		// Configure the regions this screen uses.
 	}
 
-	fn update(
-		&mut self,
-		layout: &mut Layout<R>,
-		ctx: &mut AppContext<'_, R>,
-	) {
-	}
+	fn update(&mut self, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {}
 
-	fn event(
-		&mut self,
-		event: &e::Event,
-		layout: &mut Layout<R>,
-		ctx: &mut AppContext<'_, R>,
-	) {
-	}
+	fn event(&mut self, event: &e::Event, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {}
 }
 impl DashboardScreen {
 	pub fn new() -> Self {
@@ -102,7 +87,7 @@ impl DashboardScreen {
 		}
 	}
 }
-impl  DashboardScreen {
+impl DashboardScreen {
 	fn from_path(path: impl Into<PathBuf>) -> Result<Self> {
 		use crate::native::monitor::StateMonitor;
 		let data_path = path.into();

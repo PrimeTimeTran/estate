@@ -1,10 +1,10 @@
 use crate::{
 	app::{state::EstateState, *},
 	e,
-	native::{runtime::NativeRuntime},
+	native::runtime::NativeRuntime,
 	prelude::*,
 	theme::palette,
-	ui::{Layout,Component}
+	ui::{Component, Layout},
 };
 use egui::Ui;
 use egui_extras::{Column, TableBuilder};
@@ -15,51 +15,28 @@ use std::time::Duration;
 pub struct WaterfallScreen {}
 
 impl WaterfallScreen {
-  pub fn new() {}
+	pub fn new() {}
 }
 
 impl<R: Runtime> Screen<R> for WaterfallScreen {
-  fn configure(
-		&mut self,
-		layout: &mut Layout<R>,
-		ctx: &mut AppContext<'_, R>,
-	) {
+	fn configure(&mut self, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {
 		// Configure the regions this screen uses.
 	}
 
-	fn update(
-		&mut self,
-		layout: &mut Layout<R>,
-		ctx: &mut AppContext<'_, R>,
-	) {
-	}
+	fn update(&mut self, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {}
 
-	fn event(
-		&mut self,
-		event: &e::Event,
-		layout: &mut Layout<R>,
-		ctx: &mut AppContext<'_, R>,
-	) {
-	}
-
+	fn event(&mut self, event: &e::Event, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {}
 }
 
 // pub struct TaskManagerScreen<R: Runtime> {}
 #[derive(Debug, Default, Clone)]
 pub struct WaterfallChart {
-  jobs: Vec<&'static Job>,
+	jobs: Vec<&'static Job>,
 }
 impl<R: Runtime> ViewTrait<R> for WaterfallChart {
-	fn update(
-		&mut self,
-		ctx: &mut AppContext<'_, R>,
-	) {}
-	fn event(
-		&mut self,
-		event: &e::Event,
-		ctx: &mut AppContext<'_, R>,
-	) {}
-  fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, R>) {
+	fn update(&mut self, ctx: &mut AppContext<'_, R>) {}
+	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R>) {}
+	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, R>) {
 		if ctx.state_changed() {
 			ui.ctx().request_repaint();
 		}
@@ -69,7 +46,7 @@ impl<R: Runtime> ViewTrait<R> for WaterfallChart {
 	}
 }
 impl WaterfallChart {
- // 	pub fn new() -> Self {
+	// 	pub fn new() -> Self {
 	// 	Self
 	// }
 	pub fn draw_chart<'a>(&self, ui: &mut Ui, jobs: impl Iterator<Item = &'a Job>) {

@@ -1,6 +1,6 @@
-use egui::Ui;
+use crate::model::{StoredProblem, StoredSolution, StoredSubmission};
 use crate::{e, prelude::*, ui::Layout};
-use crate::model::{StoredProblem, StoredSubmission, StoredSolution};
+use egui::Ui;
 #[derive(Debug, Default)]
 pub struct ProblemScreen<R: Runtime> {
 	source: String,
@@ -32,50 +32,26 @@ impl<R: Runtime> ProblemScreen<R> {
 //   }
 // }
 impl<R: Runtime> ViewTrait<R> for ProblemScreen<R> {
- 	fn draw(
-		&mut self,
-		ui: &mut Ui,
-		ctx: &mut AppContext<'_, R>,
-	) {
-	println!("Problem Screen view draw")
+	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, R>) {
+		println!("Problem Screen view draw")
 	}
-  fn update(
- &mut self,
- ctx: &mut AppContext<'_, R>,
- ){
-   println!("Problem Screen view update")
- }
- fn event(
- &mut self,
- event: &e::Event,
- ctx: &mut AppContext<'_, R>,
- ){
-   println!("Problem Screen view event")
- }
+	fn update(&mut self, ctx: &mut AppContext<'_, R>) {
+		println!("Problem Screen view update")
+	}
+	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R>) {
+		println!("Problem Screen view event")
+	}
 }
 impl<R: Runtime> Screen<R> for ProblemScreen<R> {
-	fn configure(
-		&mut self,
-		layout: &mut Layout<R>,
-		ctx: &mut AppContext<'_, R>,
-	) {
-	println!("Problem Screen configure")
+	fn configure(&mut self, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {
+		println!("Problem Screen configure")
 		// Configure the regions this screen uses.
 	}
-	fn update(
-		&mut self,
-		layout: &mut Layout<R>,
-		ctx: &mut AppContext<'_, R>,
-	) {
-	println!("Problem Screen update")
+	fn update(&mut self, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {
+		println!("Problem Screen update")
 	}
-	fn event(
-		&mut self,
-		event: &e::Event,
-		layout: &mut Layout<R>,
-		ctx: &mut AppContext<'_, R>,
-	) {
-	println!("Problem Screen screen eventupdate")
+	fn event(&mut self, event: &e::Event, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {
+		println!("Problem Screen screen eventupdate")
 	}
 }
 
@@ -97,21 +73,9 @@ impl<R: Runtime> ProblemViewSidebar<R> {
 	}
 }
 impl<R: Runtime> ViewTrait<R> for ProblemViewSidebar<R> {
-	fn draw(
-		&mut self,
-		ui: &mut Ui,
-		ctx: &mut AppContext<'_, R>,
-	) {
-	}
- fn update(
-&mut self,
-ctx: &mut AppContext<'_, R>,
-){}
-fn event(
-&mut self,
-event: &e::Event,
-ctx: &mut AppContext<'_, R>,
-){}
+	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, R>) {}
+	fn update(&mut self, ctx: &mut AppContext<'_, R>) {}
+	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R>) {}
 }
 #[derive(Debug, Default)]
 pub struct ProblemViewBottomPanel<R: Runtime> {
@@ -125,21 +89,9 @@ impl<R: Runtime> ProblemViewBottomPanel<R> {
 	}
 }
 impl<R: Runtime> ViewTrait<R> for ProblemViewBottomPanel<R> {
-	fn draw(
-		&mut self,
-		ui: &mut Ui,
-		ctx: &mut AppContext<'_, R>,
-	) {
-	}
- fn update(
-&mut self,
-ctx: &mut AppContext<'_, R>,
-){}
-fn event(
-&mut self,
-event: &e::Event,
-ctx: &mut AppContext<'_, R>,
-){}
+	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, R>) {}
+	fn update(&mut self, ctx: &mut AppContext<'_, R>) {}
+	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R>) {}
 }
 #[derive(Debug, Default)]
 pub struct ProblemView<R: Runtime> {
@@ -153,21 +105,9 @@ impl<R: Runtime> ProblemView<R> {
 	}
 }
 impl<R: Runtime> ViewTrait<R> for ProblemView<R> {
-	fn draw(
-		&mut self,
-		ui: &mut Ui,
-		ctx: &mut AppContext<'_, R>,
-	) {
-	}
-  fn update(
-    &mut self,
-    ctx: &mut AppContext<'_, R>,
-    ){}
-  fn event(
-    &mut self,
-    event: &e::Event,
-    ctx: &mut AppContext<'_, R>,
-    ){}
+	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, R>) {}
+	fn update(&mut self, ctx: &mut AppContext<'_, R>) {}
+	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R>) {}
 }
 // impl View<NativeRuntime> for ProblemView {
 //   fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, NativeRuntime>) {

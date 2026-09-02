@@ -1,7 +1,7 @@
 use crate::helpers::*;
 
 // ## 1. Memory
-// 
+//
 // - Stack vs Heap
 // - Ownership
 // - Allocation and deallocation

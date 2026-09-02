@@ -23,66 +23,55 @@ use crate::{LAYOUT as config, e, prelude::*, theme::palette};
 // 	pub dock_right: Panel<R>,
 // }
 pub struct Layout<R: Runtime> {
-    pub activity_bar: Panel<R>,
-    pub dock_left: Panel<R>,
-    pub main: Panel<R>,
-    pub primary_bar: Panel<R>,
-    pub secondary_bar: Panel<R>,
-    pub bottom_panel: Panel<R>,
-    pub status_bar: Panel<R>,
-    pub dock_right: Panel<R>,
+	pub activity_bar: Panel<R>,
+	pub dock_left: Panel<R>,
+	pub main: Panel<R>,
+	pub primary_bar: Panel<R>,
+	pub secondary_bar: Panel<R>,
+	pub bottom_panel: Panel<R>,
+	pub status_bar: Panel<R>,
+	pub dock_right: Panel<R>,
 }
 impl<R: Runtime> LayoutTrait<R> for Layout<R> {
-  fn draw(
-		&mut self,
-		ui: &mut egui::Ui,
-		ctx: &mut AppContext<'_, R>,
-	) {}
+	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>) {}
 
-	fn update(
-		&mut self,
-		ctx: &mut AppContext<'_, R>,
-	) {}
+	fn update(&mut self, ctx: &mut AppContext<'_, R>) {}
 
-	fn event(
-		&mut self,
-		event: &e::Event,
-		ctx: &mut AppContext<'_, R>,
-	) {}
+	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R>) {}
 }
 impl<R: Runtime> Layout<R> {
-  fn draw(
-    &mut self,
+	fn draw(
+		&mut self,
 		// screen: &mut dyn Screen<R>,
 		ui: &mut egui::Ui,
 		ctx: &mut AppContext<'_, R>,
-  ) {
-  }
+	) {
+	}
 }
 impl<R: Runtime> Layout<R> {
 	// Rust uses ownership,borrowing, and lifetimes to determine when values
 	// may be safely destroyed, allowing memory to be reclaimed deterministically
 	// without a garbage collector.
 	pub fn new() -> Self {
-	  let view = ProblemScreen::new();
+		let view = ProblemScreen::new();
 		Self {
-		  main: Panel::from_config(view, Region::content(), &PanelState::new(true, 0.0)),
+			main: Panel::from_config(view, Region::content(), &PanelState::new(true, 0.0)),
 			activity_bar: Panel::from_config(
 				ActivityBar::new(),
 				Region::fixed(config.activity_bar.effective_size()),
 				&config.activity_bar,
 			),
 			dock_left: Panel::from_config(
-        TabbedSidebar::new(
-            Tab::Problem,
-            vec![
-                (Tab::Problem, "Problem"),
-                (Tab::Solutions, "Solutions"),
-                (Tab::Submissions, "Submissions"),
-            ],
-        ),
-        config.dock_left.region(50.0, 600.0).with_fill(config.bg),
-        &config.dock_left,
+				TabbedSidebar::new(
+					Tab::Problem,
+					vec![
+						(Tab::Problem, "Problem"),
+						(Tab::Solutions, "Solutions"),
+						(Tab::Submissions, "Submissions"),
+					],
+				),
+				config.dock_left.region(50.0, 600.0).with_fill(config.bg),
+				&config.dock_left,
 			),
 			primary_bar: Panel::from_config(
 				DebugPanel::new("Primary Bar"),
@@ -512,16 +501,9 @@ impl<R: Runtime> ViewTrait<R> for DebugPanel {
 			));
 		});
 	}
-	fn update(
-		&mut self,
-		ctx: &mut AppContext<'_, R>,
-	){}
+	fn update(&mut self, ctx: &mut AppContext<'_, R>) {}
 
-	fn event(
-		&mut self,
-		event: &e::Event,
-		ctx: &mut AppContext<'_, R>,
-	){}
+	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R>) {}
 }
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum FocusedPane {
@@ -532,108 +514,100 @@ pub enum FocusedPane {
 	Unknown,
 }
 pub struct TabbedSidebar<T> {
-    pub active_tab: T,
-    pub tabs: Vec<(T, String)>,
+	pub active_tab: T,
+	pub tabs: Vec<(T, String)>,
 }
 impl<T> TabbedSidebar<T>
 where
-    T: Clone + PartialEq,
+	T: Clone + PartialEq,
 {
-    pub fn new(active_tab: T, tabs: Vec<(T, impl Into<String>)>) -> Self {
-        Self {
-            active_tab,
-            tabs: tabs
-                .into_iter()
-                .map(|(tab, label)| (tab, label.into()))
-                .collect(),
-        }
-    }
-    pub fn draw<F>(&mut self, ui: &mut egui::Ui, mut draw_content: F)
-    where
-        F: FnMut(&mut egui::Ui, &T),
-    {
-        ui.horizontal(|ui| {
-            for (tab, label) in &self.tabs {
-                if ui
-                    .selectable_label(self.active_tab == *tab, label)
-                    .clicked()
-                {
-                    self.active_tab = tab.clone();
-                }
-            }
-        });
-        ui.separator();
-        egui::ScrollArea::vertical()
-            .auto_shrink([false, false])
-            .show(ui, |ui| {
-                draw_content(ui, &self.active_tab);
-            });
-    }
+	pub fn new(active_tab: T, tabs: Vec<(T, impl Into<String>)>) -> Self {
+		Self {
+			active_tab,
+			tabs: tabs
+				.into_iter()
+				.map(|(tab, label)| (tab, label.into()))
+				.collect(),
+		}
+	}
+	pub fn draw<F>(&mut self, ui: &mut egui::Ui, mut draw_content: F)
+	where
+		F: FnMut(&mut egui::Ui, &T),
+	{
+		ui.horizontal(|ui| {
+			for (tab, label) in &self.tabs {
+				if ui
+					.selectable_label(self.active_tab == *tab, label)
+					.clicked()
+				{
+					self.active_tab = tab.clone();
+				}
+			}
+		});
+		ui.separator();
+		egui::ScrollArea::vertical()
+			.auto_shrink([false, false])
+			.show(ui, |ui| {
+				draw_content(ui, &self.active_tab);
+			});
+	}
 }
 impl<R, T> ViewTrait<R> for TabbedSidebar<T>
 where
-    R: Runtime,
-    T: Clone + PartialEq + 'static,
+	R: Runtime,
+	T: Clone + PartialEq + 'static,
 {
-    fn draw(&mut self, ui: &mut egui::Ui, _ctx: &mut AppContext<'_, R>) {
-        self.draw(ui, |ui, _tab| {
-            // content gets supplied by the owning view
-        });
-    }
-    fn update(
-		&mut self,
-		ctx: &mut AppContext<'_, R>,
-	){}
+	fn draw(&mut self, ui: &mut egui::Ui, _ctx: &mut AppContext<'_, R>) {
+		self.draw(ui, |ui, _tab| {
+			// content gets supplied by the owning view
+		});
+	}
+	fn update(&mut self, ctx: &mut AppContext<'_, R>) {}
 
-	fn event(
-		&mut self,
-		event: &e::Event,
-		ctx: &mut AppContext<'_, R>,
-	){}
-
+	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R>) {}
 }
 #[derive(Debug, Clone, PartialEq)]
 pub struct Sidebar<T> {
-    pub active_tab: T,
-    pub tabs: Vec<(T, String)>,
+	pub active_tab: T,
+	pub tabs: Vec<(T, String)>,
 }
 impl<T> Sidebar<T>
 where
-    T: Clone + PartialEq,
+	T: Clone + PartialEq,
 {
-    pub fn new(active_tab: T, tabs: Vec<(T, impl Into<String>)>) -> Self {
-        Self {
-            active_tab,
-            tabs: tabs
-                .into_iter()
-                .map(|(tab, label)| (tab, label.into()))
-                .collect(),
-        }
-    }
-    pub fn draw<F>(&mut self, ui: &mut egui::Ui, mut content: F)
-    where
-        F: FnMut(&mut egui::Ui, &T),
-    {
-        ui.horizontal(|ui| {
-            for (tab, label) in &self.tabs {
-                if ui
-                    .selectable_label(self.active_tab == *tab, label)
-                    .clicked()
-                {
-                    self.active_tab = tab.clone();
-                }
-            }
-        });
-        ui.separator();
-        egui::ScrollArea::vertical().show(ui, |ui| {
-            content(ui, &self.active_tab);
-        });
-    }
+	pub fn new(active_tab: T, tabs: Vec<(T, impl Into<String>)>) -> Self {
+		Self {
+			active_tab,
+			tabs: tabs
+				.into_iter()
+				.map(|(tab, label)| (tab, label.into()))
+				.collect(),
+		}
+	}
+	pub fn draw<F>(&mut self, ui: &mut egui::Ui, mut content: F)
+	where
+		F: FnMut(&mut egui::Ui, &T),
+	{
+		ui.horizontal(|ui| {
+			for (tab, label) in &self.tabs {
+				if ui
+					.selectable_label(self.active_tab == *tab, label)
+					.clicked()
+				{
+					self.active_tab = tab.clone();
+				}
+			}
+		});
+		ui.separator();
+		egui::ScrollArea::vertical().show(ui, |ui| {
+			content(ui, &self.active_tab);
+		});
+	}
 }
 #[derive(Debug, Default, Clone, PartialEq)]
 pub enum Tab {
-    #[default]
-    Problem,
-    Solutions,
-    Submissions,
+	#[default]
+	Problem,
+	Solutions,
+	Submissions,
 }

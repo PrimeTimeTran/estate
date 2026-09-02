@@ -4,7 +4,6 @@ pub fn associated_types() {
 	println!("Distance: {}", p1.distance(&p2));
 }
 
-
 struct Point<T> {
 	x: T,
 	y: T,
@@ -36,4 +35,3 @@ where
 		(dx * dx + dy * dy).sqrt()
 	}
 }
-

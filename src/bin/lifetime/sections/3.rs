@@ -384,7 +384,10 @@ fn borrowing_rules() {
 // This is a relationship between lifetimes.
 // It does not create either lifetime.
 
-fn outlives<'a, 'b>(x: &'a i32, y: &'b i32) where 'a: 'b {
+fn outlives<'a, 'b>(x: &'a i32, y: &'b i32)
+where
+	'a: 'b,
+{
 	println!("x: {x}");
 	println!("y: {y}");
 

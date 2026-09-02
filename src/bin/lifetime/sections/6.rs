@@ -1,5 +1,5 @@
 // ## 6. Ownership Transfer
-// 
+//
 // - `.into()`
 // - `.take()`
 // - `.unwrap()`

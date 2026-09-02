@@ -3,7 +3,10 @@
 // https://www.youtube.com/watch?v=8gNKE5jVqYY
 #![allow(warnings)]
 use std::{
-	sync::{ Arc, Barrier, Mutex, RwLock, atomic::{ AtomicUsize, Ordering } },
+	sync::{
+		Arc, Barrier, Mutex, RwLock,
+		atomic::{AtomicUsize, Ordering},
+	},
 	thread,
 	time::Duration,
 };
@@ -36,7 +39,10 @@ fn threads_are_async() {
 fn demo_loop() {
 	let t3 = thread::spawn(|| {
 		for i in 1..3 {
-			println!("{:?} Spawned thread '3' running... {i}", thread::current().id());
+			println!(
+				"{:?} Spawned thread '3' running... {i}",
+				thread::current().id()
+			);
 			thread::sleep(Duration::from_millis(10));
 		}
 		println!("{:?} thread '3' done", thread::current().id())
@@ -50,7 +56,11 @@ fn threads_have_non_deterministic_lifetimes() {
 	let s = "hello";
 	// let t4 = thread::spawn(|| {
 	let t4 = thread::spawn(move || {
-		println!("{:?} Spawned thread '4' running... {}", thread::current().id(), s);
+		println!(
+			"{:?} Spawned thread '4' running... {}",
+			thread::current().id(),
+			s
+		);
 		println!("{:?} thread '4' done", thread::current().id())
 	});
 	t4.join().unwrap();
@@ -67,10 +77,18 @@ fn move_transfers_ownership() {
 	let s = "hello";
 	let t5 = thread::spawn(move || {
 		// "Move the variables captured by the closure into the closure."
-		println!("{:?} Spawned thread '5' running... {}", thread::current().id(), s);
+		println!(
+			"{:?} Spawned thread '5' running... {}",
+			thread::current().id(),
+			s
+		);
 	});
 	let t6 = thread::spawn(move || {
-		println!("{:?} Spawned thread '6' running... {}", thread::current().id(), s);
+		println!(
+			"{:?} Spawned thread '6' running... {}",
+			thread::current().id(),
+			s
+		);
 	});
 	t5.join().unwrap();
 	t6.join().unwrap();
@@ -100,10 +118,18 @@ fn arc_handles_ownership() {
 	let s1 = Arc::clone(&s);
 	let s2 = Arc::clone(&s);
 	let t5 = thread::spawn(move || {
-		println!("{:?} Spawned thread '7' running... {}", thread::current().id(), s1);
+		println!(
+			"{:?} Spawned thread '7' running... {}",
+			thread::current().id(),
+			s1
+		);
 	});
 	let t6 = thread::spawn(move || {
-		println!("{:?} Spawned thread '8' running... {}", thread::current().id(), s2);
+		println!(
+			"{:?} Spawned thread '8' running... {}",
+			thread::current().id(),
+			s2
+		);
 	});
 	t5.join().unwrap();
 	t6.join().unwrap();
@@ -322,16 +348,28 @@ fn size() {
 		// Double indirection
 		let box_in_a_box = Box::new(boxed_origin());
 
-		println!("Point occupies {} bytes on the stack", mem::size_of_val(&point));
-		println!("Rectangle occupies {} bytes on the stack", mem::size_of_val(&rectangle));
+		println!(
+			"Point occupies {} bytes on the stack",
+			mem::size_of_val(&point)
+		);
+		println!(
+			"Rectangle occupies {} bytes on the stack",
+			mem::size_of_val(&rectangle)
+		);
 
 		// box size == pointer size
 		println!(
 			"Boxed point occupies {} bytes on the stack", // 8
 			mem::size_of_val(&boxed_point)
 		);
-		println!("Boxed rectangle occupies {} bytes on the stack", mem::size_of_val(&boxed_rectangle));
-		println!("Boxed box occupies {} bytes on the stack", mem::size_of_val(&box_in_a_box));
+		println!(
+			"Boxed rectangle occupies {} bytes on the stack",
+			mem::size_of_val(&boxed_rectangle)
+		);
+		println!(
+			"Boxed box occupies {} bytes on the stack",
+			mem::size_of_val(&box_in_a_box)
+		);
 
 		// Copy the data contained in `boxed_point` into `unboxed_point`
 		let unboxed_point: Point = *boxed_point;

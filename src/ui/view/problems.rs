@@ -1,4 +1,8 @@
-use crate::{model::problem::StoredProblem, *, ui::{r#trait::{Screen},Component}};
+use crate::{
+	model::problem::StoredProblem,
+	ui::{Component, r#trait::Screen},
+	*,
+};
 use egui::Ui;
 
 #[derive(Debug, Default)]
@@ -20,30 +24,14 @@ impl ProblemsScreen {
 }
 
 impl<R: Runtime> Screen<R> for ProblemsScreen {
-	fn configure(
-		&mut self,
-		layout: &mut Layout<R>,
-		ctx: &mut AppContext<'_, R>,
-	) {
+	fn configure(&mut self, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {
 		// Configure the regions this screen uses.
 	}
 
-	fn update(
-		&mut self,
-		layout: &mut Layout<R>,
-		ctx: &mut AppContext<'_, R>,
-	) {
-	}
+	fn update(&mut self, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {}
 
-	fn event(
-		&mut self,
-		event: &e::Event,
-		layout: &mut Layout<R>,
-		ctx: &mut AppContext<'_, R>,
-	) {
-	}
+	fn event(&mut self, event: &e::Event, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {}
 }
-
 
 impl ProblemsScreen {
 	// fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, R>) {

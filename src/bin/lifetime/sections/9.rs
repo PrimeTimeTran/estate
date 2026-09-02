@@ -1,5 +1,5 @@
 // ## 9. Lifetimes in Types
-// 
+//
 // - References as part of a type
 // - Generic lifetimes
 // - Lifetime bounds

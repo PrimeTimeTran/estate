@@ -1,23 +1,23 @@
-#[path = "./1.rs"]
-pub mod one;
-#[path = "./2.rs"]
-pub mod two;
-#[path = "./3.rs"]
-pub mod three;
-#[path = "./4.rs"]
-pub mod four;
-#[path = "./5.rs"]
-pub mod five;
-#[path = "./6.rs"]
-pub mod six;
-#[path = "./7.rs"]
-pub mod seven;
 #[path = "./8.rs"]
 pub mod eight;
+#[path = "./5.rs"]
+pub mod five;
+#[path = "./4.rs"]
+pub mod four;
 #[path = "./9.rs"]
 pub mod nine;
+#[path = "./1.rs"]
+pub mod one;
+#[path = "./7.rs"]
+pub mod seven;
+#[path = "./6.rs"]
+pub mod six;
 #[path = "./10.rs"]
 pub mod ten;
+#[path = "./3.rs"]
+pub mod three;
+#[path = "./2.rs"]
+pub mod two;
 // #[path = "./11.rs"]
 // pub mod eleven;
 // #[path = "./12.rs"]

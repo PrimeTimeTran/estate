@@ -1,5 +1,5 @@
 // ## 10. Lifetime Patterns
-// 
+//
 // - Borrowing a value
 // - Sharing data
 // - Temporarily borrowing

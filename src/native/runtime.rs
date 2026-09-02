@@ -1,6 +1,4 @@
-pub use crate::native::{
-	monitor::NativeMonitor, prelude::*, state::NativeStateStore,
-};
+pub use crate::native::{monitor::NativeMonitor, prelude::*, state::NativeStateStore};
 use crate::{
 	app::{
 		Runtime,
@@ -9,7 +7,6 @@ use crate::{
 	e,
 };
 use std::sync::Mutex;
-
 
 #[derive(Clone, Debug)]
 pub struct NativeRuntime {
