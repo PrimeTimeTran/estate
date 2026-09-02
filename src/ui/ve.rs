@@ -1,47 +1,89 @@
 use crate::{LAYOUT as config, e, prelude::*, theme::palette};
-
-pub trait Veable<R: Runtime> {
-	// A type-erased container for any concrete `Veable`.
-	//
-	// `Box<dyn Veable>` stores the concrete implementation on the heap while
-	// exposing only the `Veable` interface to callers. This allows different
-	// concrete implementations to be substituted without changing the code
-	// which consumes them.
-	//
-	// Top left to bottom right ordering for mental model.
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>);
-	fn update(&mut self, _ctx: &mut AppContext<'_, R>) {}
-	fn event(&mut self, _event: &e::Event, _ctx: &mut AppContext<'_, R>) {}
+// pub trait Veable<R: Runtime> {
+// 	// A type-erased container for any concrete `Veable`.
+// 	//
+// 	// `Box<dyn Veable>` stores the concrete implementation on the heap while
+// 	// exposing only the `Veable` interface to callers. This allows different
+// 	// concrete implementations to be substituted without changing the code
+// 	// which consumes them.
+// 	//
+// 	// Top left to bottom right ordering for mental model.
+// 	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>);
+// 	fn update(&mut self, _ctx: &mut AppContext<'_, R>) {}
+// 	fn event(&mut self, _event: &e::Event, _ctx: &mut AppContext<'_, R>) {}
+// }
+// pub struct Ve<R: Runtime> {
+// 	pub activity_bar: Panel<R>,
+// 	pub dock_left: Panel<R>,
+// 	pub main: Panel<R>,
+// 	pub primary_bar: Panel<R>,
+// 	pub secondary_bar: Panel<R>,
+// 	pub bottom_panel: Panel<R>,
+// 	pub status_bar: Panel<R>,
+// 	pub dock_right: Panel<R>,
+// }
+pub struct Layout<R: Runtime> {
+    pub activity_bar: Panel<R>,
+    pub dock_left: Panel<R>,
+    pub main: Panel<R>,
+    pub primary_bar: Panel<R>,
+    pub secondary_bar: Panel<R>,
+    pub bottom_panel: Panel<R>,
+    pub status_bar: Panel<R>,
+    pub dock_right: Panel<R>,
 }
+impl<R: Runtime> LayoutTrait<R> for Layout<R> {
+  fn draw(
+		&mut self,
+		ui: &mut egui::Ui,
+		ctx: &mut AppContext<'_, R>,
+	) {}
 
-pub struct Ve<R: Runtime> {
-	pub activity_bar: Panel<R>,
-	pub dock_left: Panel<R>,
-	pub main: Panel<R>,
-	pub primary_bar: Panel<R>,
-	pub secondary_bar: Panel<R>,
-	pub bottom_panel: Panel<R>,
-	pub status_bar: Panel<R>,
-	pub dock_right: Panel<R>,
+	fn update(
+		&mut self,
+		ctx: &mut AppContext<'_, R>,
+	) {}
+
+	fn event(
+		&mut self,
+		event: &e::Event,
+		ctx: &mut AppContext<'_, R>,
+	) {}
 }
-impl<R: Runtime> Ve<R> {
+impl<R: Runtime> Layout<R> {
+  fn draw(
+    &mut self,
+		// screen: &mut dyn Screen<R>,
+		ui: &mut egui::Ui,
+		ctx: &mut AppContext<'_, R>,
+  ) {
+  }
+}
+impl<R: Runtime> Layout<R> {
 	// Rust uses ownership,borrowing, and lifetimes to determine when values
 	// may be safely destroyed, allowing memory to be reclaimed deterministically
 	// without a garbage collector.
-	pub fn new(view: impl Veable<R> + 'static) -> Self {
+	pub fn new() -> Self {
+	  let view = ProblemScreen::new();
 		Self {
+		  main: Panel::from_config(view, Region::content(), &PanelState::new(true, 0.0)),
 			activity_bar: Panel::from_config(
 				ActivityBar::new(),
 				Region::fixed(config.activity_bar.effective_size()),
 				&config.activity_bar,
 			),
-
 			dock_left: Panel::from_config(
-				Sidebar::new(),
-				config.dock_left.region(50.0, 600.0).with_fill(config.bg),
-				&config.dock_left,
+        TabbedSidebar::new(
+            Tab::Problem,
+            vec![
+                (Tab::Problem, "Problem"),
+                (Tab::Solutions, "Solutions"),
+                (Tab::Submissions, "Submissions"),
+            ],
+        ),
+        config.dock_left.region(50.0, 600.0).with_fill(config.bg),
+        &config.dock_left,
 			),
-
 			primary_bar: Panel::from_config(
 				DebugPanel::new("Primary Bar"),
 				config.primary_bar.region(50.0, 600.0).with_fill(config.bg),
@@ -55,13 +97,12 @@ impl<R: Runtime> Ve<R> {
 					.with_fill(config.bg),
 				&config.secondary_bar,
 			),
-			main: Panel::from_config(view, Region::content(), &PanelState::new(true, 0.0)),
+
 			bottom_panel: Panel::from_config(
 				DebugPanel::new("DebugPanel"),
 				config.bottom_panel.region(50.0, 600.0).with_fill(config.bg),
 				&config.bottom_panel,
 			),
-
 			status_bar: Panel::from_config(
 				DebugPanel::new("Status Bar"),
 				Region::fixed(config.status_bar.effective_size())
@@ -69,7 +110,6 @@ impl<R: Runtime> Ve<R> {
 					.with_top_border(true),
 				&config.status_bar,
 			),
-
 			dock_right: Panel::from_config(
 				DebugPanel::new("Dock Right"),
 				config.dock_right.region(50.0, 600.0).with_fill(config.bg),
@@ -77,90 +117,87 @@ impl<R: Runtime> Ve<R> {
 			),
 		}
 	}
-	pub fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>) {
-		// Forwards the drawing contract to the concrete implementation.
-		//
-		// `Ve` doesn't know how the view is drawn. It only knows that the
-		// contained implementation satisfies `Veable`.
-		let mouse_pos = ui.input(|i| i.pointer.hover_pos());
-		let available = ui.available_rect_before_wrap();
-		ui.painter().rect_filled(available, 0.0, LAYOUT.bg);
-		let layout = self.calculate_region_boundaries(available);
-		let VeLayout {
-			activity_bar,
-			bottom_panel,
-			dock_left,
-			dock_right,
-			main,
-			primary_bar,
-			secondary_bar,
-			status_bar,
-		} = layout;
-		let cursor_target = self.cursor_target(mouse_pos, &layout);
-
-		ctx.input = IOState {
-			cursor_pos: mouse_pos,
-			cursor_target,
-			shift_held: ui.input(|i| i.modifiers.shift),
-			ctrl_held: ui.input(|i| i.modifiers.ctrl),
-			alt_held: ui.input(|i| i.modifiers.alt),
-			command_held: ui.input(|i| i.modifiers.command),
-			primary_down: ui.input(|i| i.pointer.primary_down()),
-		};
-		if self.dock_left.open {
-			Self::draw_panel(ui, ctx, dock_left, &mut self.dock_left);
-			Self::resize_region(
-				ui,
-				"dock_left_resize",
-				dock_left,
-				&mut self.dock_left.region,
-				ResizeEdge::Right,
-				1.0,
-			);
-		}
-		Self::draw_panel(ui, ctx, primary_bar, &mut self.primary_bar);
-		Self::draw_panel(ui, ctx, secondary_bar, &mut self.secondary_bar);
-		Self::draw_panel(ui, ctx, main, &mut self.main);
-		if self.bottom_panel.open {
-			Self::draw_panel(ui, ctx, bottom_panel, &mut self.bottom_panel);
-			Self::resize_region(
-				ui,
-				"bottom_panel_resize",
-				bottom_panel,
-				&mut self.bottom_panel.region,
-				ResizeEdge::Top,
-				-1.0,
-			);
-		}
-		if self.dock_right.open {
-			Self::draw_panel(ui, ctx, dock_right, &mut self.dock_right);
-			Self::resize_region(
-				ui,
-				"dock_right_resize",
-				dock_right,
-				&mut self.dock_right.region,
-				ResizeEdge::Left,
-				-1.0,
-			);
-		}
-		Self::draw_panel(ui, ctx, status_bar, &mut self.status_bar);
-	}
+	// pub fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>) {
+	// 	// Forwards the drawing contract to the concrete implementation.
+	// 	//
+	// 	// `Ve` doesn't know how the view is drawn. It only knows that the
+	// 	// contained implementation satisfies `Veable`.
+	// 	let mouse_pos = ui.input(|i| i.pointer.hover_pos());
+	// 	let available = ui.available_rect_before_wrap();
+	// 	ui.painter().rect_filled(available, 0.0, LAYOUT.bg);
+	// 	let layout = self.calculate_region_boundaries(available);
+	// 	let VeLayout {
+	// 		activity_bar,
+	// 		bottom_panel,
+	// 		dock_left,
+	// 		dock_right,
+	// 		main,
+	// 		primary_bar,
+	// 		secondary_bar,
+	// 		status_bar,
+	// 	} = layout;
+	// 	let cursor_target = self.cursor_target(mouse_pos, &layout);
+	// 	ctx.input = IOState {
+	// 		cursor_pos: mouse_pos,
+	// 		cursor_target,
+	// 		shift_held: ui.input(|i| i.modifiers.shift),
+	// 		ctrl_held: ui.input(|i| i.modifiers.ctrl),
+	// 		alt_held: ui.input(|i| i.modifiers.alt),
+	// 		command_held: ui.input(|i| i.modifiers.command),
+	// 		primary_down: ui.input(|i| i.pointer.primary_down()),
+	// 	};
+	// 	if self.dock_left.open {
+	// 		Self::draw_panel(ui, ctx, dock_left, &mut self.dock_left);
+	// 		Self::resize_region(
+	// 			ui,
+	// 			"dock_left_resize",
+	// 			dock_left,
+	// 			&mut self.dock_left.region,
+	// 			ResizeEdge::Right,
+	// 			1.0,
+	// 		);
+	// 	}
+	// 	Self::draw_panel(ui, ctx, primary_bar, &mut self.primary_bar);
+	// 	Self::draw_panel(ui, ctx, secondary_bar, &mut self.secondary_bar);
+	// 	Self::draw_panel(ui, ctx, main, &mut self.main);
+	// 	if self.bottom_panel.open {
+	// 		Self::draw_panel(ui, ctx, bottom_panel, &mut self.bottom_panel);
+	// 		Self::resize_region(
+	// 			ui,
+	// 			"bottom_panel_resize",
+	// 			bottom_panel,
+	// 			&mut self.bottom_panel.region,
+	// 			ResizeEdge::Top,
+	// 			-1.0,
+	// 		);
+	// 	}
+	// 	if self.dock_right.open {
+	// 		Self::draw_panel(ui, ctx, dock_right, &mut self.dock_right);
+	// 		Self::resize_region(
+	// 			ui,
+	// 			"dock_right_resize",
+	// 			dock_right,
+	// 			&mut self.dock_right.region,
+	// 			ResizeEdge::Left,
+	// 			-1.0,
+	// 		);
+	// 	}
+	// 	Self::draw_panel(ui, ctx, status_bar, &mut self.status_bar);
+	// }
 	fn draw_view(
 		ui: &mut egui::Ui,
 		rect: egui::Rect,
-		view: &mut dyn Veable<R>,
+		view: &mut dyn ViewTrait<R>,
 		ctx: &mut AppContext<'_, R>,
 	) {
 		while let Some(event) = ctx.next_event() {
 			view.event(&event, ctx);
 		}
-
 		let mut child = ui.new_child(
 			egui::UiBuilder::new()
 				.max_rect(rect)
 				.layout(egui::Layout::top_down(egui::Align::LEFT)),
 		);
-
 		view.draw(&mut child, ctx);
 	}
 	fn draw_panel(
@@ -172,22 +209,18 @@ impl<R: Runtime> Ve<R> {
 		if !panel.open {
 			return;
 		}
-
 		// Outer panel appearance.
 		if let Some(fill) = panel.region.fill {
 			ui.painter().rect_filled(rect, 0.0, fill);
 		}
-
 		if panel.region.top_border {
 			ui.painter().line_segment(
 				[rect.left_top(), rect.right_top()],
 				egui::Stroke::new(1.0, palette::BORDER),
 			);
 		}
-
 		// Inner content area.
 		let content_rect = panel.region.content_rect(rect);
-
 		Self::draw_view(ui, content_rect, panel.content.as_mut(), ctx);
 	}
 	fn calculate_region_boundaries(&mut self, available: egui::Rect) -> VeLayout {
@@ -201,12 +234,10 @@ impl<R: Runtime> Ve<R> {
 		} else {
 			0.0
 		};
-
 		let activity_bar = egui::Rect::from_min_max(
 			available.min,
 			egui::pos2(available.left() + activity_bar_width, available.bottom()),
 		);
-
 		let workspace_rect = egui::Rect::from_min_max(
 			egui::pos2(available.left() + activity_bar_width, available.top()),
 			egui::pos2(available.right(), available.bottom() - status_bar_height),
@@ -382,7 +413,6 @@ impl<R: Runtime> Ve<R> {
 		let Some(pos) = pos else {
 			return CursorTarget::None;
 		};
-
 		if self.activity_bar.open && layout.activity_bar.contains(pos) {
 			CursorTarget::ActivityBar
 		} else if self.dock_left.open && layout.dock_left.contains(pos) {
@@ -404,7 +434,6 @@ impl<R: Runtime> Ve<R> {
 		}
 	}
 }
-
 // impl<R: Runtime> Veable<R> for Ve<R> {
 // 	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>) {
 // 		self.main.draw(ui, ctx);
@@ -456,12 +485,11 @@ impl<R: Runtime> Ve<R> {
 // 		self.content.event(event, ctx);
 // 	}
 // }
-/// A named, interactive view that occupies a region.
+///      A named, interactive view that occupies a region.
 ///
-/// Panels add interaction and lifecycle behavior to a Region.
-/// They may be opened, closed, overlaid, auto-hidden, moved,
-/// or potentially detached from their parent layout.
-
+///      Panels add interaction and lifecycle behavior to a Region.
+///      They may be opened, closed, overlaid, auto-hidden, moved,
+///      or potentially detached from their parent layout.
 pub struct DebugPanel {
 	pub title: String,
 }
@@ -472,7 +500,7 @@ impl DebugPanel {
 		}
 	}
 }
-impl<R: Runtime> Veable<R> for DebugPanel {
+impl<R: Runtime> ViewTrait<R> for DebugPanel {
 	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>) {
 		ui.vertical_centered(|ui| {
 			ui.heading(&self.title);
@@ -484,31 +512,17 @@ impl<R: Runtime> Veable<R> for DebugPanel {
 			));
 		});
 	}
-}
+	fn update(
+		&mut self,
+		ctx: &mut AppContext<'_, R>,
+	){}
 
-pub struct Size {
-	pub value: f32,
-	pub min: f32,
-	pub max: f32,
-	pub resizable: bool,
+	fn event(
+		&mut self,
+		event: &e::Event,
+		ctx: &mut AppContext<'_, R>,
+	){}
 }
-impl Size {
-	pub fn new(value: f32, min: f32, max: f32) -> Self {
-		Self {
-			value: value.clamp(min, max),
-			min,
-			max,
-			resizable: true,
-		}
-	}
-	pub fn set(&mut self, value: f32) {
-		self.value = value.clamp(self.min, self.max);
-	}
-	pub fn resize(&mut self, delta: f32) {
-		self.set(self.value + delta);
-	}
-}
-
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum FocusedPane {
 	#[default]
@@ -516,4 +530,110 @@ pub enum FocusedPane {
 	SidePanel,
 	CenterGrid,
 	Unknown,
+}
+pub struct TabbedSidebar<T> {
+    pub active_tab: T,
+    pub tabs: Vec<(T, String)>,
+}
+impl<T> TabbedSidebar<T>
+where
+    T: Clone + PartialEq,
+{
+    pub fn new(active_tab: T, tabs: Vec<(T, impl Into<String>)>) -> Self {
+        Self {
+            active_tab,
+            tabs: tabs
+                .into_iter()
+                .map(|(tab, label)| (tab, label.into()))
+                .collect(),
+        }
+    }
+    pub fn draw<F>(&mut self, ui: &mut egui::Ui, mut draw_content: F)
+    where
+        F: FnMut(&mut egui::Ui, &T),
+    {
+        ui.horizontal(|ui| {
+            for (tab, label) in &self.tabs {
+                if ui
+                    .selectable_label(self.active_tab == *tab, label)
+                    .clicked()
+                {
+                    self.active_tab = tab.clone();
+                }
+            }
+        });
+        ui.separator();
+        egui::ScrollArea::vertical()
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
+                draw_content(ui, &self.active_tab);
+            });
+    }
+}
+impl<R, T> ViewTrait<R> for TabbedSidebar<T>
+where
+    R: Runtime,
+    T: Clone + PartialEq + 'static,
+{
+    fn draw(&mut self, ui: &mut egui::Ui, _ctx: &mut AppContext<'_, R>) {
+        self.draw(ui, |ui, _tab| {
+            // content gets supplied by the owning view
+        });
+    }
+    fn update(
+		&mut self,
+		ctx: &mut AppContext<'_, R>,
+	){}
+
+	fn event(
+		&mut self,
+		event: &e::Event,
+		ctx: &mut AppContext<'_, R>,
+	){}
+
+}
+#[derive(Debug, Clone, PartialEq)]
+pub struct Sidebar<T> {
+    pub active_tab: T,
+    pub tabs: Vec<(T, String)>,
+}
+impl<T> Sidebar<T>
+where
+    T: Clone + PartialEq,
+{
+    pub fn new(active_tab: T, tabs: Vec<(T, impl Into<String>)>) -> Self {
+        Self {
+            active_tab,
+            tabs: tabs
+                .into_iter()
+                .map(|(tab, label)| (tab, label.into()))
+                .collect(),
+        }
+    }
+    pub fn draw<F>(&mut self, ui: &mut egui::Ui, mut content: F)
+    where
+        F: FnMut(&mut egui::Ui, &T),
+    {
+        ui.horizontal(|ui| {
+            for (tab, label) in &self.tabs {
+                if ui
+                    .selectable_label(self.active_tab == *tab, label)
+                    .clicked()
+                {
+                    self.active_tab = tab.clone();
+                }
+            }
+        });
+        ui.separator();
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            content(ui, &self.active_tab);
+        });
+    }
+}
+#[derive(Debug, Default, Clone, PartialEq)]
+pub enum Tab {
+    #[default]
+    Problem,
+    Solutions,
+    Submissions,
 }

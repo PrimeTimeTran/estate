@@ -378,7 +378,7 @@ Registry
 
 Eventually:
 
-```bash
+```sh
 estate watch
 ```
 
@@ -454,7 +454,7 @@ This is where your earlier JSON idea becomes useful.
 
 Commands:
 
-```bash
+```sh
 estate export
 estate import
 ```
@@ -478,7 +478,7 @@ Useful for:
 
 And:
 
-```bash
+```sh
 estate resource list --json
 ```
 
@@ -770,7 +770,7 @@ I wouldn't start with "implement CRUD."
 
 I'd literally make this work:
 
-```bash
+```sh
 estate anchor create foo
 estate anchor list
 estate resolve @foo
@@ -795,7 +795,7 @@ SQLite
 
 Then:
 
-```bash
+```sh
 estate resolve @foo --json
 ```
 

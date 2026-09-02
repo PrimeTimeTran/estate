@@ -1,14 +1,42 @@
 pub(crate) mod chart;
 pub(crate) mod components;
+pub(crate) mod primitive;
 pub mod ve;
 pub(crate) mod view;
+pub(crate) mod r#trait;
 
-pub use crate::ui::{components::*, ve::*, view::*};
+pub use crate::ui::{components::*, ve::{*}, view::*,primitive::*};
 pub use crate::{palette::*, prelude::*};
+use crate::{e, ui::r#trait::{Screen, LayoutTrait, ViewTrait}};
 
 pub const TRAY_ICON: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/estate-tray.png"));
 pub const TRAY_SCROLL_ICON: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/estate-tray.png"));
 
+// View
+//   │
+//   │ selects which screen is active
+//   ▼
+// Screen
+//   │
+//   │ composes/configures regions
+//   ▼
+// Ve
+//   │
+//   │ owns global layout + panels
+//   ▼
+// Veable
+//   │
+//   │ renders one concrete piece of UI
+//   ▼
+// egui
+// 1. View — application-level navigation
+// "What screen is the application currently displaying?"
+// 2. Screen — composition/coordinator
+// "What does this particular screen put into the available UI regions?"
+// 3. Ve — the visual skeleton
+// "Where do things go and how does the workspace behave?"
+// 4. Veable — a renderable UI component
+// "How do I render this particular piece of UI?"
 pub struct Region {
 	// Layout
 	pub size: f32,
@@ -107,18 +135,28 @@ impl Region {
 
 pub struct Panel<R: Runtime> {
 	pub region: Region,
-	pub content: Box<dyn Veable<R>>,
+	pub content: Box<dyn ViewTrait<R>>,
 	pub open: bool,
 	pub overlay: bool,
 	pub auto_hide: bool,
 }
-impl<R: Runtime> Veable<R> for Panel<R> {
+impl<R: Runtime> ViewTrait<R> for Panel<R> {
 	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>) {
 		self.content.draw(ui, ctx);
 	}
+ fn update(
+&mut self,
+ctx: &mut AppContext<'_, R>,
+){}
+
+fn event(
+&mut self,
+event: &e::Event,
+ctx: &mut AppContext<'_, R>,
+){}
 }
 impl<R: Runtime> Panel<R> {
-	pub fn new(content: impl Veable<R> + 'static, region: Region) -> Self {
+	pub fn new(content: impl ViewTrait<R> + 'static, region: Region) -> Self {
 		Self {
 			region,
 			content: Box::new(content),
@@ -128,7 +166,7 @@ impl<R: Runtime> Panel<R> {
 		}
 	}
 	pub fn from_config(
-		content: impl Veable<R> + 'static,
+		content: impl ViewTrait<R> + 'static,
 		region: Region,
 		config: &PanelState,
 	) -> Self {
@@ -213,11 +251,4 @@ impl PanelState {
 	pub const fn dock_right() -> Self {
 		Self::new(true, 320.0)
 	}
-}
-#[derive(Clone, Copy)]
-pub enum ResizeEdge {
-	Left,
-	Right,
-	Top,
-	Bottom,
 }

@@ -3,7 +3,8 @@ use crate::{
 	app::{Runtime, state::EstateState},
 	e,
 	native::prelude::*,
-	ui::*,
+	ui::{*,Layout, r#trait::*},
+
 };
 use core_foundation::runloop::{CFRunLoop, kCFRunLoopCommonModes};
 use core_graphics::{
@@ -31,10 +32,51 @@ pub struct EguiVeable {
 	top_tab: DevTopTab,
 	side_tab: DevSideTab,
 }
-impl Veable<NativeRuntime> for EguiVeable {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, NativeRuntime>) {
-		self.draw_ui(ui);
+impl<R: Runtime> Screen<R> for EguiVeable {
+  fn configure(
+		&mut self,
+		layout: &mut Layout<R>,
+		ctx: &mut AppContext<'_, R>,
+	) {
+	  todo!("")
 	}
+
+	fn update(
+		&mut self,
+		layout: &mut Layout<R>,
+		ctx: &mut AppContext<'_, R>,
+	) {
+	todo!("")
+	}
+
+	fn event(
+		&mut self,
+		event: &e::Event,
+		layout: &mut Layout<R>,
+		ctx: &mut AppContext<'_, R>,
+	) {
+	todo!("")
+	}
+}
+impl<R: Runtime> ViewTrait<R> for EguiVeable {
+ 	fn draw(
+		&mut self,
+		ui: &mut egui::Ui,
+		ctx: &mut AppContext<'_, R>,
+	) {
+	  self.draw_ui(ui);
+	}
+
+	fn update(
+		&mut self,
+		ctx: &mut AppContext<'_, R>,
+	){}
+
+	fn event(
+		&mut self,
+		event: &e::Event,
+		ctx: &mut AppContext<'_, R>,
+	){}
 }
 impl EguiVeable {
 	pub fn new() -> Self {
@@ -680,30 +722,52 @@ impl Sidebar {
 		}
 	}
 }
-impl<R: Runtime> Veable<R> for Sidebar {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>) {
-		ui.vertical(|ui| {
-			for button in &self.buttons {
-				if ui.button(*button).clicked() {
-					match *button {
-						"New Task" => ctx.app.new_task(),
-						"Show Tasks" => ctx.app.show_tasks(),
-						"Clear Tasks" => ctx.app.clear_tasks(),
-						"Stop Session" => {
-							ctx
-								.app
-								.engine
-								.runtime
-								.emit(e::Event::app(e::EventKind::SessionStop {
-									session: ctx.app.engine.runtime.session(),
-								}));
-						}
-						_ => {}
-					}
-				}
-			}
-		});
+impl<R: Runtime> Screen<R> for Sidebar {
+  fn configure(
+		&mut self,
+		layout: &mut Layout<R>,
+		ctx: &mut AppContext<'_, R>,
+	) {
+		// Configure the regions this screen uses.
 	}
+
+	fn update(
+		&mut self,
+		layout: &mut Layout<R>,
+		ctx: &mut AppContext<'_, R>,
+	) {
+	}
+
+	fn event(
+		&mut self,
+		event: &e::Event,
+		layout: &mut Layout<R>,
+		ctx: &mut AppContext<'_, R>,
+	) {
+	}
+	// fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>) {
+	// 	ui.vertical(|ui| {
+	// 		for button in &self.buttons {
+	// 			if ui.button(*button).clicked() {
+	// 				match *button {
+	// 					"New Task" => ctx.app.new_task(),
+	// 					"Show Tasks" => ctx.app.show_tasks(),
+	// 					"Clear Tasks" => ctx.app.clear_tasks(),
+	// 					"Stop Session" => {
+	// 						ctx
+	// 							.app
+	// 							.engine
+	// 							.runtime
+	// 							.emit(e::Event::app(e::EventKind::SessionStop {
+	// 								session: ctx.app.engine.runtime.session(),
+	// 							}));
+	// 					}
+	// 					_ => {}
+	// 				}
+	// 			}
+	// 		}
+	// 	});
+	// }
 }
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -716,35 +780,4 @@ pub struct IOState {
 	pub cursor_target: CursorTarget,
 	pub primary_down: bool,
 	pub shift_held: bool,
-}
-
-pub struct ActivityBar {
-	buttons: Vec<&'static str>,
-}
-impl ActivityBar {
-	pub fn new() -> Self {
-		Self {
-			buttons: vec!["New Task", "Show Tasks", "Clear Tasks", "Stop Session"],
-		}
-	}
-}
-impl<R: Runtime> Veable<R> for ActivityBar {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>) {
-		ui.vertical(|ui| {});
-	}
-}
-pub struct PrimaryBar {
-	buttons: Vec<&'static str>,
-}
-impl PrimaryBar {
-	pub fn new() -> Self {
-		Self {
-			buttons: vec!["New Task", "Show Tasks", "Clear Tasks", "Stop Session"],
-		}
-	}
-}
-impl<R: Runtime> Veable<R> for PrimaryBar {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>) {
-		ui.vertical(|ui| {});
-	}
 }

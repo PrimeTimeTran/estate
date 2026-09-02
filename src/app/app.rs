@@ -2,6 +2,7 @@ use crate::{
 	app::{prelude::*, state::EstateState},
 	e,
 	model::StoredProblem,
+	ui::Layout,
 	prelude::*,
 	proto::leetcode::{
 		problem_service_client::ProblemServiceClient,
@@ -135,9 +136,7 @@ impl<R: Runtime> App<R> {
 	}
 }
 impl<R: Runtime> App<R> {
-	pub fn default_view(&self) -> Ve<R> {
-		Ve::new(MarkdownView::new(crate::MARKDOWN))
-	}
+
 	pub fn view(&self) -> ViewType {
 		self.view
 	}
@@ -150,10 +149,10 @@ impl<R: Runtime> App<R> {
 		&self.state
 	}
 	pub fn show_dashboard(&mut self) {
-		self.show_view(ViewType::Dashboard);
+		self.show_view(ViewType::DashboardScreen);
 	}
 	pub fn show_tasks(&mut self) {
-		self.show_view(ViewType::TaskManager);
+		self.show_view(ViewType::TaskManagerScreen);
 		self
 			.engine
 			.runtime

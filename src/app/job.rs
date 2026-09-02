@@ -43,3 +43,12 @@ pub enum JobStatus {
 	Cancelled,
 	Interrupted,
 }
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TaskStatus {
+	Pending,
+	Running,
+	Completed,
+	Failed(String),
+	Stopped,
+	Interrupted,
+}

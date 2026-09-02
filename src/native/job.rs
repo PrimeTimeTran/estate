@@ -8,7 +8,8 @@
 
 use crate::{
 	app::{state::EstateState, *},
-	native::{agent::AgentContext, prelude::*, task_manager::WaterfallChart},
+	native::{agent::AgentContext, prelude::*},
+	ui::TaskManagerScreen,
 };
 
 use notify::{Event, EventKind};
@@ -24,7 +25,7 @@ pub struct Task {
 #[derive(Debug)]
 pub struct TaskManagerRuntime {
 	watcher: notify::RecommendedWatcher,
-	rx: tokio::sync::mpsc::Receiver<()>,
+	pub rx: tokio::sync::mpsc::Receiver<()>,
 }
 impl TaskManagerRuntime {
 	pub fn new(path: &Path) -> Result<Self> {
@@ -54,130 +55,6 @@ pub struct TaskManagerState {
 	pub state: Option<EstateState>,
 	pub state_path: PathBuf,
 	pub tasks: HashMap<TaskId, Task>,
-}
-
-#[derive(Debug)]
-pub struct TaskManager {
-	runtime: TaskManagerRuntime,
-	pub state: TaskManagerState,
-	pub waterfall: WaterfallChart,
-}
-
-impl TaskManager {
-	pub fn new() -> Self {
-		let path = PathBuf::from(STATE_PATH);
-		Self::from_path(path).unwrap()
-	}
-	pub fn from_path(path: impl Into<PathBuf>) -> Result<Self> {
-		let state_path = path.into();
-		let runtime = TaskManagerRuntime::new(&state_path)?;
-		let mut state = TaskManagerState {
-			state_path,
-			..Default::default()
-		};
-		let mut manager = Self {
-			state,
-			runtime,
-			waterfall: WaterfallChart::default(),
-		};
-		manager.reload();
-
-		Ok(manager)
-	}
-	pub fn reload(&mut self) {
-		match EstateState::load_from_path(&self.state.state_path) {
-			Ok(state) => {
-				self.state.state = Some(state);
-				self.state.dirty = false;
-				self.state.error = None;
-				self.state.last_loaded = fs::metadata(&self.state.state_path)
-					.and_then(|metadata| metadata.modified())
-					.ok();
-			}
-			Err(error) => {
-				self.state.error = Some(error.to_string());
-				self.state.dirty = true;
-			}
-		}
-	}
-	pub fn poll_changes(&mut self) -> bool {
-		#[cfg(not(target_arch = "wasm32"))]
-		{
-			if self.runtime.rx.try_recv().is_ok() {
-				self.reload();
-				return true;
-			}
-		}
-
-		false
-	}
-}
-impl TaskManager {
-	pub fn create(&mut self, kind: TaskKind) -> TaskId {
-		let id = Uuid::new_v4();
-		let task = Task {
-			id,
-			name: kind.name().into(),
-			kind,
-			status: TaskStatus::Pending,
-		};
-		self.state.tasks.insert(id, task);
-		self.state.dirty = true;
-		id
-	}
-	pub fn get(&self, id: TaskId) -> Option<&Task> {
-		self.state.tasks.get(&id)
-	}
-	fn get_mut(&mut self, id: TaskId) -> Option<&mut Task> {
-		self.state.tasks.get_mut(&id)
-	}
-	pub fn count(&self) -> usize {
-		self.state.tasks.len()
-	}
-	pub fn list(&self) -> impl Iterator<Item = &Task> {
-		self.state.tasks.values()
-	}
-	pub fn set_status(&mut self, id: TaskId, status: TaskStatus) -> Result<()> {
-		let task = self
-			.state
-			.tasks
-			.get_mut(&id)
-			.ok_or_else(|| anyhow::anyhow!("task {id} not found"))?;
-
-		task.status = status;
-
-		Ok(())
-	}
-	pub fn save(&mut self) -> Result<()> {
-		todo!("save")
-	}
-	pub fn clear(&mut self) -> bool {
-		if self.state.tasks.is_empty() {
-			return false;
-		}
-
-		self.state.tasks.clear();
-		self.state.dirty = true;
-		true
-	}
-	pub fn delete(&mut self, id: TaskId) -> Option<Task> {
-		let task = self.state.tasks.remove(&id);
-
-		if task.is_some() {
-			self.state.dirty = true;
-		}
-
-		task
-	}
-}
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum TaskStatus {
-	Pending,
-	Running,
-	Completed,
-	Failed(String),
-	Stopped,
-	Interrupted,
 }
 
 #[derive(Debug, Clone)]

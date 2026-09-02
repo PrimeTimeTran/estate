@@ -25,7 +25,7 @@ pub struct Window {
 	pending_textures: gui::TexturesDelta,
 	queue: wgpu::Queue,
 	renderer: gui::Renderer,
-	view: ui::View,
+	view: ui::ScreenInstance,
 }
 impl Window {
 	pub fn new(event_loop: &ActiveEventLoop, view: ViewType, api: Arc<ApiClient>) -> Result<Self> {
@@ -40,14 +40,14 @@ impl Window {
 			gui_ctx,
 			gui_state,
 			instance: window,
-			kind: WindowType::Markdown,
+			kind: WindowType::MarkdownScreen,
 			needs_resize: false,
 			occluded: true,
 			pending_textures: gui::TexturesDelta::default(),
 			queue,
 			renderer,
 			surface,
-			view: ui::View::new(view, api),
+			view: ui::ScreenInstance::new(view, api),
 		})
 	}
 
@@ -286,7 +286,7 @@ impl Window {
 	pub fn sync_view(&mut self, view: ViewType, api: Arc<ApiClient>) {
 		if self.view.kind != view {
 			tracing::info!("🖼️ Window view change: {:?} → {:?}", self.view.kind, view);
-			self.view = ui::View::new(view, api);
+			self.view = ui::ScreenInstance::new(view, api);
 		}
 	}
 }

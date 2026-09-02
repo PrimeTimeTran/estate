@@ -1,13 +1,14 @@
 use crate::{
+  e,
 	app::*,
-	native::{OracleView, monitor::StateMonitor, runtime::NativeRuntime},
-	ui::chart::*,
+	native::{OracleScreen, monitor::StateMonitor, runtime::NativeRuntime},
+	ui::{Layout, Component,chart::*},
 };
 
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 
 #[derive(Debug, Default)]
-pub struct Dashboard {
+pub struct DashboardScreen {
 	#[cfg(not(target_arch = "wasm32"))]
 	data_path: PathBuf,
 
@@ -27,8 +28,31 @@ pub struct Dashboard {
 	pub active_focus: FocusedPane,
 	pub secondary_scroll_offset: f32,
 }
+impl<R: Runtime> Screen<R> for DashboardScreen {
+  fn configure(
+		&mut self,
+		layout: &mut Layout<R>,
+		ctx: &mut AppContext<'_, R>,
+	) {
+		// Configure the regions this screen uses.
+	}
 
-impl Dashboard {
+	fn update(
+		&mut self,
+		layout: &mut Layout<R>,
+		ctx: &mut AppContext<'_, R>,
+	) {
+	}
+
+	fn event(
+		&mut self,
+		event: &e::Event,
+		layout: &mut Layout<R>,
+		ctx: &mut AppContext<'_, R>,
+	) {
+	}
+}
+impl DashboardScreen {
 	pub fn new() -> Self {
 		let data_path = PathBuf::from(HMR_CHART_JSON);
 		let mut dashboard = Self {
@@ -78,7 +102,7 @@ impl Dashboard {
 		}
 	}
 }
-impl Dashboard {
+impl  DashboardScreen {
 	fn from_path(path: impl Into<PathBuf>) -> Result<Self> {
 		use crate::native::monitor::StateMonitor;
 		let data_path = path.into();
@@ -166,7 +190,7 @@ impl Dashboard {
 		Ok(watcher)
 	}
 	fn setup_watcher(
-		oracle: Arc<Mutex<OracleView>>,
+		oracle: Arc<Mutex<OracleScreen>>,
 		path: &Path,
 	) -> Result<RecommendedWatcher, notify::Error> {
 		// Watcher closure/event handler
@@ -235,7 +259,7 @@ impl Dashboard {
 		}
 	}
 }
-impl Veable<NativeRuntime> for Dashboard {
+impl DashboardScreen {
 	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, NativeRuntime>) {
 		// 1. Poll the channel for file changes on every frame render tick
 		#[cfg(not(target_arch = "wasm32"))]

@@ -1,6 +1,6 @@
-use crate::{app::*, native::prelude::*};
+use crate::{app::*, native::prelude::*, prelude::*, ui::Layout, e};
 
-pub struct OracleView {
+pub struct OracleScreen {
 	active_focus: FocusedPane,
 	dirty: bool,
 	error: Option<String>,
@@ -10,13 +10,38 @@ pub struct OracleView {
 	scroll_x: f32,
 	scroll_y: f32,
 }
-impl Veable<NativeRuntime> for OracleView {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, NativeRuntime>) {
+impl<R: Runtime> Screen<R> for OracleScreen {
+	fn configure(
+		&mut self,
+		layout: &mut Layout<R>,
+		ctx: &mut AppContext<'_, R>,
+	) {
+		// Configure the regions this screen uses.
+	}
+
+	fn update(
+		&mut self,
+		layout: &mut Layout<R>,
+		ctx: &mut AppContext<'_, R>,
+	) {
+	}
+
+	fn event(
+		&mut self,
+		event: &e::Event,
+		layout: &mut Layout<R>,
+		ctx: &mut AppContext<'_, R>,
+	) {
+	}
+
+
+
+}
+impl OracleScreen {
+  fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, NativeRuntime>) {
 		self.draw_ui(ui, ctx);
 		self.draw_status_bar(ui);
 	}
-}
-impl OracleView {
 	pub fn new() -> Self {
 		Self {
 			active_focus: FocusedPane::MainEditor,

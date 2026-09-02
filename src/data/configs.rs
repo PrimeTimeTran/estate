@@ -20,7 +20,7 @@ pub static START_WINDOW: WindowType = WindowType::ProblemScreen;
 pub static START_VIEW: ViewType = ViewType::ProblemScreen;
 // Unsafe territory
 // pub static mut START_VIEW: ViewType = ...;
-pub static DEFAULT_VIEW: ViewType = ViewType::Markdown;
+pub static DEFAULT_VIEW: ViewType = ViewType::MarkdownScreen;
 pub static ESTATE_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const GRPC_SOCKET_CLIENT: &str = "http://127.0.0.1:50051";
 pub const GRPC_SOCKET: &str = "127.0.0.1:50051";

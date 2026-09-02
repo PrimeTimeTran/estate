@@ -33,6 +33,7 @@ pub fn parse_timestamp(value: Option<String>) -> Option<prost_types::Timestamp> 
 			})
 	})
 }
+
 pub fn timestamp(value: Option<String>) -> Option<prost_types::Timestamp> {
 	value.and_then(|value| {
 		chrono::DateTime::parse_from_rfc3339(&value)
@@ -43,7 +44,6 @@ pub fn timestamp(value: Option<String>) -> Option<prost_types::Timestamp> {
 			})
 	})
 }
-
 pub fn to_timestamp(value: Option<&DateTime<Utc>>) -> Option<prost_types::Timestamp> {
 	value.map(|dt| prost_types::Timestamp {
 		seconds: dt.timestamp(),

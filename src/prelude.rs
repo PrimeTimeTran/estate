@@ -11,7 +11,8 @@ pub use crate::{
 	share::{prelude::*, *},
 	theme::*,
 	tool::{time::*, *},
-	ui::*,
+	ui::{*, r#trait::*},
+
 };
 
 #[cfg(not(target_arch = "wasm32"))]

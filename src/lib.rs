@@ -2,6 +2,7 @@
 pub mod app;
 pub(crate) use crate::app::event as e;
 
+pub mod output;
 pub mod data;
 pub mod helpers;
 pub mod model;

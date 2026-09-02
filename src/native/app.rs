@@ -133,13 +133,13 @@ impl NativeApp {
 			let mut view_index = 0;
 			while running.load(Ordering::Relaxed) {
 				let views = [
-					ViewType::Dashboard,
+					ViewType::DashboardScreen,
 					ViewType::ProblemScreen,
 					ViewType::MarkdownView,
 					ViewType::ProblemScreen,
-					ViewType::WaterfallChart,
+					ViewType::WaterfallScreen,
 					ViewType::ProblemScreen,
-					ViewType::TaskManager,
+					ViewType::TaskManagerScreen,
 					ViewType::ProblemsScreen,
 				];
 				let _ = proxy.send_event(AppEvent::TickClock(format!(" {}s", current_time)));
@@ -254,11 +254,11 @@ impl NativeApp {
 			event_loop.exit();
 			tracing::debug!(">>> event_loop.exit() called");
 		} else if id == menu.dev.id() {
-			self.open_window(event_loop, WindowType::Dashboard);
+			self.open_window(event_loop, WindowType::DashboardScreen);
 		} else if id == menu.oracle.id() {
-			self.open_window(event_loop, WindowType::OracleView);
+			self.open_window(event_loop, WindowType::OracleScreen);
 		} else if id == menu.task_manager.id() {
-			self.open_window(event_loop, WindowType::TaskManager);
+			self.open_window(event_loop, WindowType::TaskManagerScreen);
 		} else if id == menu.new_task.id() {
 			self.new_task();
 		} else if id == menu.list_tasks.id() {

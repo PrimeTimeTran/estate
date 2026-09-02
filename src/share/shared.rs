@@ -273,7 +273,7 @@ pub struct EstateSection {
 // }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
-pub struct View {
+pub struct Viewed {
 	pub id: Uuid,
 	pub name: String,
 	pub filters: Vec<ViewFilter>,

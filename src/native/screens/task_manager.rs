@@ -1,16 +1,281 @@
 use crate::{
 	app::{state::EstateState, *},
 	e,
-	native::{job::TaskManager, runtime::NativeRuntime},
+	native::{runtime::NativeRuntime},
 	prelude::*,
 	theme::palette,
+	ui::{Layout,Component}
 };
 use egui::Ui;
 use egui_extras::{Column, TableBuilder};
 use egui_plot::{Bar, BarChart, Plot};
 use std::time::Duration;
 
+
+#[derive(Debug)]
+pub struct TaskManager {
+    runtime: TaskManagerRuntime,
+    state: TaskManagerState,
+}
 impl TaskManager {
+	pub fn new() -> Self {
+		let path = PathBuf::from(STATE_PATH);
+		Self::from_path(path).unwrap()
+	}
+	pub fn from_path(path: impl Into<PathBuf>) -> Result<Self> {
+		let state_path = path.into();
+		let runtime = TaskManagerRuntime::new(&state_path)?;
+		let mut state = TaskManagerState {
+			state_path,
+			..Default::default()
+		};
+		let mut manager = Self {
+			state,
+			runtime,
+		};
+		manager.reload();
+
+		Ok(manager)
+	}
+	pub fn reload(&mut self) {
+		match EstateState::load_from_path(&self.state.state_path) {
+			Ok(state) => {
+				self.state.state = Some(state);
+				self.state.dirty = false;
+				self.state.error = None;
+				self.state.last_loaded = fs::metadata(&self.state.state_path)
+					.and_then(|metadata| metadata.modified())
+					.ok();
+			}
+			Err(error) => {
+				self.state.error = Some(error.to_string());
+				self.state.dirty = true;
+			}
+		}
+	}
+	pub fn poll_changes(&mut self) -> bool {
+		#[cfg(not(target_arch = "wasm32"))]
+		{
+			if self.runtime.rx.try_recv().is_ok() {
+				self.reload();
+				return true;
+			}
+		}
+
+		false
+	}
+}
+impl TaskManager {
+	pub fn create(&mut self, kind: TaskKind) -> TaskId {
+		let id = Uuid::new_v4();
+		let task = Task {
+			id,
+			name: kind.name().into(),
+			kind,
+			status: TaskStatus::Pending,
+		};
+		self.state.tasks.insert(id, task);
+		self.state.dirty = true;
+		id
+	}
+	pub fn get(&self, id: TaskId) -> Option<&Task> {
+		self.state.tasks.get(&id)
+	}
+	fn get_mut(&mut self, id: TaskId) -> Option<&mut Task> {
+		self.state.tasks.get_mut(&id)
+	}
+	pub fn count(&self) -> usize {
+		self.state.tasks.len()
+	}
+	pub fn list(&self) -> impl Iterator<Item = &Task> {
+		self.state.tasks.values()
+	}
+	pub fn set_status(&mut self, id: TaskId, status: TaskStatus) -> Result<()> {
+		let task = self
+			.state
+			.tasks
+			.get_mut(&id)
+			.ok_or_else(|| anyhow::anyhow!("task {id} not found"))?;
+
+		task.status = status;
+
+		Ok(())
+	}
+	pub fn save(&mut self) -> Result<()> {
+		todo!("save")
+	}
+	pub fn clear(&mut self) -> bool {
+		if self.state.tasks.is_empty() {
+			return false;
+		}
+
+		self.state.tasks.clear();
+		self.state.dirty = true;
+		true
+	}
+	pub fn delete(&mut self, id: TaskId) -> Option<Task> {
+		let task = self.state.tasks.remove(&id);
+
+		if task.is_some() {
+			self.state.dirty = true;
+		}
+
+		task
+	}
+}
+
+
+#[derive(Debug)]
+pub struct TaskManagerScreen {
+	pub waterfall: WaterfallChart,
+	view: TaskManagerView
+	// manager: TaskManager,
+}
+impl TaskManagerScreen {
+	pub fn new() -> Self {
+		Self {
+		  view:TaskManagerView::default(),
+      waterfall: WaterfallChart::default()
+		}
+	}
+}
+
+impl<R: Runtime> Screen<R> for TaskManagerScreen {
+    fn configure(
+        &mut self,
+        layout: &mut Layout<R>,
+        ctx: &mut AppContext<'_, R>,
+    ) {
+        // Put TaskManagerView into the appropriate region/panel.
+    }
+
+    fn update(
+        &mut self,
+        layout: &mut Layout<R>,
+        ctx: &mut AppContext<'_, R>,
+    ) {
+        // self.manager.poll_changes();
+        self.view.update(ctx);
+    }
+
+    fn event(
+        &mut self,
+        event: &e::Event,
+        layout: &mut Layout<R>,
+        ctx: &mut AppContext<'_, R>,
+    ) {
+        // Feature-level event handling.
+        //
+        // e.g. TaskCreated, TaskDeleted, etc.
+    }
+}
+// impl<R: Runtime> TaskManagerScreen {
+// 	fn event(&mut self, event: &e::Event, _ctx: &mut AppContext<'_, R>) {
+// 		if let e::EventKind::TaskCreated { .. } = event.kind {}
+// 	}
+// }
+
+#[derive(Debug, Default)]
+pub struct TaskManagerView {
+    waterfall: WaterfallChart
+}
+impl TaskManagerView {
+ // 	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, R>) {
+	// 	ui.heading("Task Manager draw");
+	// 	if self.poll_changes() {
+	// 		ui.ctx().request_repaint();
+	// 	}
+	// 	if let Some(error) = &self.state.error {
+	// 		ui.heading("Task Manager");
+	// 		ui.colored_label(palette::ERROR, error);
+	// 		ui.label(self.state.state_path.display().to_string());
+	// 		return;
+	// 	}
+	// 	let Some(state) = &self.state.state else {
+	// 		ui.centered_and_justified(|ui| {
+	// 			ui.label("Loading task state...");
+	// 		});
+	// 		return;
+	// 	};
+	// 	// =========================================================
+	// 	// Header
+	// 	// =========================================================
+	// 	ui.vertical(|ui| {
+	// 		ui.label(
+	// 			egui::RichText::new("Task Overview")
+	// 				.size(24.0)
+	// 				.strong()
+	// 				.color(palette::TEXT),
+	// 		);
+	// 		ui.add_space(2.0);
+	// 		ui.label(
+	// 			egui::RichText::new("Estate Runtime")
+	// 				.size(12.0)
+	// 				.color(palette::TEXT_MUTED),
+	// 		);
+	// 	});
+	// 	ui.add_space(16.0);
+	// 	// =========================================================
+	// 	// Summary metrics
+	// 	// =========================================================
+	// 	ui.columns(4, |columns| {
+	// 		metric(
+	// 			&mut columns[0],
+	// 			"Tasks Created",
+	// 			state.tasks_created,
+	// 			palette::PRIMARY,
+	// 		);
+	// 		metric(
+	// 			&mut columns[1],
+	// 			"Tasks Completed",
+	// 			state.tasks_completed,
+	// 			palette::SUCCESS,
+	// 		);
+	// 		metric(
+	// 			&mut columns[2],
+	// 			"Events Processed",
+	// 			state.events_processed,
+	// 			palette::WARNING,
+	// 		);
+	// 		metric(
+	// 			&mut columns[3],
+	// 			"Status Checks",
+	// 			state.status_checks,
+	// 			palette::TEXT_MUTED,
+	// 		);
+	// 	});
+	// 	ui.add_space(16.0);
+	// 	// =========================================================
+	// 	// Charts
+	// 	// =========================================================
+	// 	let available = ui.available_size();
+	// 	let gap = 6.0;
+	// 	let card_width = (available.x - gap) / 2.0;
+	// 	let card_height = 280.0;
+	// 	// =========================================================
+	// 	// Jobs / Waterfall
+	// 	// =========================================================
+	// 	ui.add_space(16.0);
+	// 	ui.label(
+	// 		egui::RichText::new("Jobs")
+	// 			.size(16.0)
+	// 			.strong()
+	// 			.color(palette::TEXT),
+	// 	);
+	// 	// Replace this with however your EstateState stores jobs.
+	// 	self.draw_jobs(ui, &ctx.state().jobs);
+	// 	ui.add_space(24.0);
+	// 	// =========================================================
+	// 	// Aggregate Charts
+	// 	// =========================================================
+	// 	let available = ui.available_size();
+	// 	let gap = 6.0;
+	// 	let card_width = (available.x - gap) / 2.0;
+	// 	let card_height = 280.0;
+	// 	render_graphs(ui, state, available, gap, card_width, card_height);
+	// }
+}
+impl TaskManagerView {
 	fn draw_jobs(&self, ui: &mut egui::Ui, jobs: &std::collections::VecDeque<Job>) {
 		let now = EstateState::now();
 		let timeline_start = jobs
@@ -180,105 +445,27 @@ impl TaskManager {
 		}
 	}
 }
-impl Veable<NativeRuntime> for TaskManager {
-	fn event(&mut self, event: &e::Event, _ctx: &mut AppContext<'_, NativeRuntime>) {
-		if let e::EventKind::TaskCreated { .. } = event.kind {}
-	}
-	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, NativeRuntime>) {
-		ui.heading("Task Manager draw");
-		if self.poll_changes() {
-			ui.ctx().request_repaint();
-		}
-		if let Some(error) = &self.state.error {
-			ui.heading("Task Manager");
-			ui.colored_label(palette::ERROR, error);
-			ui.label(self.state.state_path.display().to_string());
-			return;
-		}
-		let Some(state) = &self.state.state else {
-			ui.centered_and_justified(|ui| {
-				ui.label("Loading task state...");
-			});
-			return;
-		};
-		// =========================================================
-		// Header
-		// =========================================================
-		ui.vertical(|ui| {
-			ui.label(
-				egui::RichText::new("Task Overview")
-					.size(24.0)
-					.strong()
-					.color(palette::TEXT),
-			);
-			ui.add_space(2.0);
-			ui.label(
-				egui::RichText::new("Estate Runtime")
-					.size(12.0)
-					.color(palette::TEXT_MUTED),
-			);
-		});
-		ui.add_space(16.0);
-		// =========================================================
-		// Summary metrics
-		// =========================================================
-		ui.columns(4, |columns| {
-			metric(
-				&mut columns[0],
-				"Tasks Created",
-				state.tasks_created,
-				palette::PRIMARY,
-			);
-			metric(
-				&mut columns[1],
-				"Tasks Completed",
-				state.tasks_completed,
-				palette::SUCCESS,
-			);
-			metric(
-				&mut columns[2],
-				"Events Processed",
-				state.events_processed,
-				palette::WARNING,
-			);
-			metric(
-				&mut columns[3],
-				"Status Checks",
-				state.status_checks,
-				palette::TEXT_MUTED,
-			);
-		});
-		ui.add_space(16.0);
-		// =========================================================
-		// Charts
-		// =========================================================
-		let available = ui.available_size();
-		let gap = 6.0;
-		let card_width = (available.x - gap) / 2.0;
-		let card_height = 280.0;
-		// =========================================================
-		// Jobs / Waterfall
-		// =========================================================
-		ui.add_space(16.0);
-		ui.label(
-			egui::RichText::new("Jobs")
-				.size(16.0)
-				.strong()
-				.color(palette::TEXT),
-		);
-		// Replace this with however your EstateState stores jobs.
-		self.draw_jobs(ui, &ctx.state().jobs);
-		ui.add_space(24.0);
-		// =========================================================
-		// Aggregate Charts
-		// =========================================================
-		let available = ui.available_size();
-		let gap = 6.0;
-		let card_width = (available.x - gap) / 2.0;
-		let card_height = 280.0;
-		render_graphs(ui, state, available, gap, card_width, card_height);
-	}
+impl<R: Runtime> ViewTrait<R> for TaskManagerView {
+    fn draw(
+        &mut self,
+        ui: &mut egui::Ui,
+        ctx: &mut AppContext<'_, R>,
+    ) {
+        // compose child views
+    }
+    fn update(
+		&mut self,
+		ctx: &mut AppContext<'_, R>,
+	) {}
+
+	fn event(
+		&mut self,
+		event: &e::Event,
+		ctx: &mut AppContext<'_, R>,
+	) {}
 }
+
+
 fn render_graphs(
 	ui: &mut Ui,
 	state: &EstateState,
@@ -600,135 +787,5 @@ fn format_duration(duration: Duration) -> String {
 		format!("{}m {}s", secs / 60, secs % 60)
 	} else {
 		format!("{}h {}m", secs / 3600, (secs % 3600) / 60)
-	}
-}
-#[derive(Debug, Default, Clone, Copy)]
-pub struct WaterfallChart;
-impl<R: Runtime> Veable<R> for WaterfallChart {
-	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, R>) {
-		if ctx.state_changed() {
-			ui.ctx().request_repaint();
-		}
-		ui.heading("Job History");
-		let state = ctx.state();
-		self.draw_chart(ui, state.jobs.iter());
-	}
-}
-impl WaterfallChart {
-	pub fn new() -> Self {
-		Self
-	}
-	pub fn draw_chart<'a>(&self, ui: &mut Ui, jobs: impl Iterator<Item = &'a Job>) {
-		let jobs: Vec<&Job> = jobs.collect();
-		if jobs.is_empty() {
-			ui.centered_and_justified(|ui| {
-				ui.label("No job history");
-			});
-			return;
-		}
-		let now = EstateState::now();
-		let mut timed_jobs = Vec::new();
-		for job in jobs {
-			let Some(started_at) = job.started_at else {
-				continue;
-			};
-			let start = started_at as f64;
-			let end = job.completed_at.unwrap_or(now) as f64;
-			timed_jobs.push((job, start, end.max(start + 1.0)));
-		}
-		if timed_jobs.is_empty() {
-			ui.centered_and_justified(|ui| {
-				ui.label("No timed jobs");
-			});
-			return;
-		}
-		// Oldest -> newest.
-		timed_jobs.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
-		let mut lanes: Vec<f64> = Vec::new();
-		let mut bars = Vec::with_capacity(timed_jobs.len());
-		let mut min_time = f64::MAX;
-		let mut max_time = f64::MIN;
-		for (job, start, end) in timed_jobs {
-			min_time = min_time.min(start);
-			max_time = max_time.max(end);
-			let lane = lanes
-				.iter()
-				.position(|lane_end| *lane_end <= start)
-				.unwrap_or_else(|| {
-					lanes.push(0.0);
-					lanes.len() - 1
-				});
-			lanes[lane] = end;
-			bars.push(
-				Bar::new(lane as f64, end - start)
-					.horizontal()
-					.base_offset(start)
-					.width(0.7)
-					.name(job.kind.name()),
-			);
-		}
-		let padding = ((max_time - min_time) * 0.05).max(1.0);
-		Plot::new("job_history")
-			.height(300.0)
-			.include_x(min_time - padding)
-			.include_x(max_time + padding)
-			.include_y(-0.75)
-			.include_y(lanes.len() as f64)
-			.show_axes([true, true])
-			.show_grid([true, true])
-			.legend(egui_plot::Legend::default())
-			.x_axis_formatter(|mark, _range| format_timestamp(mark.value))
-			.show(ui, |plot_ui| {
-				// Keep the Y viewport bounded.
-				let mut bounds = plot_ui.plot_bounds();
-				bounds.set_y_center_height(bounds.center().y.clamp(0.0, 20.0), 20.0);
-				plot_ui.set_plot_bounds(bounds);
-				plot_ui.bar_chart(BarChart::new("jobs", bars).horizontal());
-			});
-	}
-	pub fn draw_job(&self, ui: &mut Ui, job: &Job, timeline_start: u64, timeline_end: u64) {
-		let height = 28.0;
-		let (response, painter) = ui.allocate_painter(
-			egui::vec2(ui.available_width(), height),
-			egui::Sense::hover(),
-		);
-		let total = (timeline_end - timeline_start).max(1) as f32;
-		let x = |timestamp: u64| {
-			let offset = timestamp.saturating_sub(timeline_start) as f32;
-			response.rect.left() + (offset / total) * response.rect.width()
-		};
-		let started_at = job.started_at.unwrap_or(timeline_start);
-		let ended_at = job.completed_at.unwrap_or_else(EstateState::now);
-		let x1 = x(started_at);
-		let x2 = x(ended_at);
-		let bar_rect = egui::Rect::from_min_max(
-			egui::pos2(x1, response.rect.top() + 5.0),
-			egui::pos2(x2.max(x1 + 2.0), response.rect.bottom() - 5.0),
-		);
-		painter.rect_filled(response.rect, 0.0, palette::SURFACE);
-		painter.rect_filled(
-			bar_rect,
-			2.0,
-			match job.status {
-				JobStatus::Completed => palette::SUCCESS,
-				JobStatus::Running => palette::PRIMARY,
-				JobStatus::Failed => palette::ERROR,
-				_ => palette::TEXT_MUTED,
-			},
-		);
-		if response.hovered() {
-			painter.rect_stroke(
-				bar_rect,
-				2.0,
-				egui::Stroke::new(1.0, palette::TEXT),
-				egui::StrokeKind::Outside,
-			);
-			response.on_hover_text(format!(
-				"{}\n{}\n{}",
-				job.kind.name(),
-				job.status.label(),
-				format_duration_ms(ended_at.saturating_sub(started_at)),
-			));
-		}
 	}
 }
