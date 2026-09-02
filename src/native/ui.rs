@@ -3,7 +3,7 @@ use crate::{
 	app::{Runtime, state::EstateState},
 	e,
 	native::prelude::*,
-	ui::{Layout, r#trait::*, *},
+	ui::{Layout, ViewType, r#trait::*, *},
 };
 use core_foundation::runloop::{CFRunLoop, kCFRunLoopCommonModes};
 use core_graphics::{

@@ -4,7 +4,22 @@ use crate::{
 	prelude::*,
 };
 
+// App, AppPlatform, Host, AppHost, Engine, CoreEngine, AppContext, Environment
+//
 pub trait Runtime: Clone + Sync + std::marker::Send + 'static {
+	// Services own long-lived responsibilities and their concurrency/lifecycle;
+	//
+	// Events are the standardized mechanism by which those services expose meaningful
+	// changes to the rest of the application; the Runtime owns the services and EventBus,
+	// while the Dispatcher routes those events to consumers.
+	type EventReceiver: EventReceiver;
+	fn emit(&self, event: e::Event);
+	fn subscribe(&self) -> Self::EventReceiver;
+	fn try_recv(&self) -> Option<e::Event>;
+	fn start_dispatcher(self: &Arc<Self>);
+	fn state(&self) -> &RuntimeState;
+	fn save(&self, state: &EstateState) -> Result<()>;
+	fn session(&self) -> Session;
 	fn spawn<F>(&self, future: F)
 	where
 		F: std::future::Future<Output = ()> + Send + 'static;
@@ -12,24 +27,6 @@ pub trait Runtime: Clone + Sync + std::marker::Send + 'static {
 		&self,
 		duration: std::time::Duration,
 	) -> impl std::future::Future<Output = ()> + Send + '_;
-
-	// Services own long-lived responsibilities and their concurrency/lifecycle;
-	//
-	// Events are the standardized mechanism by which those services expose meaningful
-	// changes to the rest of the application; the Runtime owns the services and EventBus,
-	// while the Dispatcher routes those events to consumers.
-	type EventReceiver: EventReceiver;
-	fn subscribe(&self) -> Self::EventReceiver;
-	fn emit(&self, event: e::Event);
-	fn try_recv(&self) -> Option<e::Event>;
-	// fn spawn<F>(&self, future: F)
-	// where
-	// 	F: Future<Output = ()> + Send + 'static;
-
-	fn start_dispatcher(self: &Arc<Self>);
-	fn state(&self) -> &RuntimeState;
-	fn save(&self, state: &EstateState) -> Result<()>;
-	fn session(&self) -> Session;
 }
 
 #[derive(Debug)]

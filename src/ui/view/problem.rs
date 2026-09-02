@@ -13,7 +13,7 @@ pub struct ProblemScreen<R: Runtime> {
 }
 impl<R: Runtime> ProblemScreen<R> {
 	pub fn new() -> Self {
-		tracing::info!("ProblemScreen new");
+		tracing::debug!("ProblemScreen new");
 		Self {
 			source: String::new(),
 			submission_status: None,
@@ -233,7 +233,6 @@ impl<R: Runtime> ViewTrait<R> for ProblemView<R> {
 	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, R>) {
 		let (loading, error, problem) = {
 			let state = ctx.app.app_state();
-
 			(
 				state.problem.loading,
 				state.problem.error.clone(),

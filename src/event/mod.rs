@@ -17,15 +17,16 @@ impl Default for EventDispatcher {
 }
 impl EventDispatcher {
 	pub fn new() -> Self {
+		// # Fan Out
+		// One event → Many handlers
+		//                  ┌──> Handler A
+		//                  │
+		// Event           ─┼──> Handler B
+		//                  │
+		//                  └──> Handler C
 		Self {
 			handlers: Vec::new(),
 		}
-	}
-	pub fn register<H>(&mut self, handler: H)
-	where
-		H: EventHandler + 'static,
-	{
-		self.handlers.push(Box::new(handler));
 	}
 	pub async fn run(
 		self,
@@ -41,6 +42,12 @@ impl EventDispatcher {
 			handler.handle(&event, runtime).await;
 		}
 		runtime.event_processed();
+	}
+	pub fn register<H>(&mut self, handler: H)
+	where
+		H: EventHandler + 'static,
+	{
+		self.handlers.push(Box::new(handler));
 	}
 }
 
@@ -76,23 +83,4 @@ impl EventBus {
 	pub fn subscribe(&self) -> broadcast::Receiver<e::Event> {
 		self.sender.subscribe()
 	}
-}
-
-#[derive(Debug)]
-pub enum AppEvent {
-	Shutdown,
-	ModifiersChanged {
-		alt: bool,
-		command: bool,
-		ctrl: bool,
-		shift: bool,
-	},
-	CursorPosition {
-		x: f64,
-		y: f64,
-	},
-	TickClock(String),
-	AppEvent,
-	Navigate(ui::ViewType),
-	RuntimeEvent,
 }

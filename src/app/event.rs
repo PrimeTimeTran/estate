@@ -104,3 +104,22 @@ impl From<ProtoProblem> for ProblemLoaded {
 		}
 	}
 }
+
+#[derive(Debug)]
+pub enum AppEvent {
+	Shutdown,
+	ModifiersChanged {
+		alt: bool,
+		command: bool,
+		ctrl: bool,
+		shift: bool,
+	},
+	CursorPosition {
+		x: f64,
+		y: f64,
+	},
+	TickClock(String),
+	AppEvent,
+	Navigate(crate::ui::ViewType),
+	RuntimeEvent,
+}

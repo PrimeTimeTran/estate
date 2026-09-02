@@ -6,6 +6,7 @@ use crate::{
 	session::Session,
 };
 
+/// # Background event handling
 #[async_trait::async_trait]
 pub trait EventHandler: Send + Sync {
 	async fn handle(&self, event: &e::Event, runtime: &NativeRuntime);
@@ -14,6 +15,18 @@ pub struct TaskHandler;
 #[async_trait::async_trait]
 impl EventHandler for TaskHandler {
 	async fn handle(&self, event: &e::Event, runtime: &NativeRuntime) {
+		// # Push/async-based
+		//
+		// EventBus
+		//   │
+		//   ▼
+		// receiver.recv().await
+		//   │
+		//   ▼
+		// dispatcher
+		//   │
+		//   ▼
+		// handlers
 		tracing::debug!("📡 EventHandler.handle {:?}", event);
 		let e::Klass::TaskRequested { request } = &event.kind else {
 			return;
@@ -346,7 +359,7 @@ impl EventHandler for AppHandler {
 				println!("not interested")
 			}
 		}
-		tracing::info!("🔥 SessionStart → SessionStart");
+		tracing::debug!("🔥 SessionStart → SessionStart");
 		runtime.emit(e::Event::daemon(e::Klass::TaskRequested {
 			request: TaskRequest::Create(TaskKind::SessionStart),
 		}));
@@ -360,7 +373,7 @@ impl EventHandler for NavigationHandler {
 			return;
 		};
 
-		tracing::info!("🎯 NavigationHandler received Navigate → {:?}", view_type);
+		tracing::debug!("🎯 NavigationHandler received Navigate → {:?}", view_type);
 	}
 }
 pub struct Master;

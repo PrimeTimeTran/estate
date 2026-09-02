@@ -1,4 +1,6 @@
-use crate::prelude::*;
+use tokio::sync::mpsc::error::TryRecvError;
+
+use crate::{e, prelude::*};
 
 pub fn channel<T>(capacity: usize) -> (EventSender<T>, EventReceiver<T>) {
 	// EventSender<T> ─┐
@@ -50,5 +52,19 @@ impl<T> EventReceiver<T> {
 	/// Consume every currently available event.
 	pub fn drain(&mut self) -> impl Iterator<Item = T> + '_ {
 		std::iter::from_fn(|| self.rx.try_recv().ok())
+	}
+
+	pub fn try_recv(&mut self) -> Result<T, TryRecvError> {
+		self.rx.try_recv()
+	}
+}
+
+pub struct NativeEventReceiver {
+	rx: tokio::sync::broadcast::Receiver<e::Event>,
+}
+
+impl NativeEventReceiver {
+	pub fn try_recv(&mut self) -> Result<e::Event, tokio::sync::broadcast::error::TryRecvError> {
+		self.rx.try_recv()
 	}
 }

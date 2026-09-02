@@ -17,6 +17,7 @@ pub struct ApiClient {
 	pub problems: ProblemServiceClient<Channel>,
 	pub submissions: SubmissionServiceClient<Channel>,
 }
+
 impl ApiClient {
 	pub async fn connect() -> anyhow::Result<Self> {
 		let channel = Channel::from_static(crate::GRPC_SOCKET_CLIENT)
@@ -30,20 +31,20 @@ impl ApiClient {
 	}
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct AppState {
 	pub problems: ProblemListState,
 	pub problem: ProblemState,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct ProblemListState {
 	pub items: Vec<StoredProblem>,
 	pub loading: bool,
 	pub error: Option<String>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct ProblemState {
 	pub value: Option<StoredProblem>,
 	pub loading: bool,

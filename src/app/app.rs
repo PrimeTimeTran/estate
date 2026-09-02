@@ -2,18 +2,44 @@ use crate::{
 	app::{prelude::*, state::EstateState},
 	e,
 	model::StoredProblem,
-	prelude::*,
+	prelude::{
+		logger::{LogConfig, Tracer},
+		*,
+	},
 	proto::leetcode::types::{ListProblemsRequest, PageRequest, SampleProblemRequest},
 	ui::Layout,
 };
-pub struct App<R: Runtime> {
+
+pub struct App {
+	cli: Cli,
+	native: NativeApp,
+}
+
+impl App {
+	pub fn new(cli: Cli) -> Result<Self> {
+		let mut config = LogConfig::load()?;
+		config.apply_cli(&cli)?;
+		logger::init_logging(&config)?;
+
+		Ok(Self {
+			cli,
+			native: NativeApp::new()?,
+		})
+	}
+	pub fn run(mut self) -> Result<()> {
+		self.native.run(self.cli)
+	}
+}
+
+#[derive(Debug, Clone)]
+pub struct AppRuntime<R: Runtime> {
 	pub(crate) engine: EstateEngine<R>,
 	pub(crate) view: ViewType,
 	pub(crate) api: Arc<ApiClient>,
 	pub(crate) state: AppState,
 	events: R::EventReceiver,
 }
-impl<R: Runtime> App<R> {
+impl<R: Runtime> AppRuntime<R> {
 	pub fn new(engine: EstateEngine<R>, api: Arc<ApiClient>) -> Self {
 		let events = engine.runtime.subscribe();
 		Self {
@@ -25,7 +51,7 @@ impl<R: Runtime> App<R> {
 		}
 	}
 }
-impl<R: Runtime> App<R> {
+impl<R: Runtime> AppRuntime<R> {
 	pub fn runtime(&self) -> Arc<R> {
 		Arc::clone(&self.engine.runtime)
 	}
@@ -50,26 +76,38 @@ impl<R: Runtime> App<R> {
 			loop {
 				runtime.sleep(std::time::Duration::from_secs(1)).await;
 				if current_time == 0 {
-					current_time = 3;
+					current_time = 5;
 					view_idx = (view_idx + 1) % views.len();
 					let view = views[view_idx];
-					println!("🧭 Clock navigation → {:?}", view);
+					// println!("🧭 Clock navigation → {:?}", view);
 					runtime.emit(e::Event::app(e::Klass::Navigate(view)));
 				} else {
 					current_time -= 1;
+					println!("⏰ App<T> CLOCK TICK: {}", current_time);
 				}
-				println!("⏰ App<T> CLOCK TICK: {}", current_time);
 			}
 		});
 	}
 	pub fn api(&self) -> Arc<ApiClient> {
 		Arc::clone(&self.api)
 	}
+
+	/// # UI/application state
+	/// "We have two event consumers, and we need to decide which events belong to which execution domain."
 	pub fn update(&mut self) {
+		// # Pull Based
+		// Event routing
+		// UI update cycle
+		//      │
+		//      ▼
+		// events.try_recv()
+		//      │
+		//      ▼
+		// match
 		while let Some(event) = self.events.try_recv() {
 			match event.kind {
 				e::Klass::Navigate(view) => {
-					println!("♻️ App<T> new view from app update {:?}", view.name());
+					tracing::debug!("♻️ App<T> new view from app update {:?}", view.name());
 					self.view = view;
 				}
 				e::Klass::ProblemsLoaded(problems) => {
@@ -90,17 +128,19 @@ impl<R: Runtime> App<R> {
 					self.state.problem.loading = false;
 					self.state.problem.error = Some(error);
 				}
-
 				e::Klass::ApiError(error) => {
 					// If you have separate error events for different
 					// requests, handle them separately here.
 					self.state.problems.loading = false;
 					self.state.problems.error = Some(error);
 				}
-
 				_ => {}
 			}
 		}
+	}
+	pub fn start_services(&self) {
+		println!("AppRuntime start_services");
+		tracing::info!("AppRuntime start_services");
 	}
 	pub fn spawn<F>(&self, future: F)
 	where
@@ -109,21 +149,18 @@ impl<R: Runtime> App<R> {
 		self.engine.runtime.spawn(future);
 	}
 }
-impl<R: Runtime> App<R> {
+impl<R: Runtime> AppRuntime<R> {
 	pub fn state(&self) -> std::sync::RwLockReadGuard<'_, EstateState> {
 		self.engine.runtime.state().read()
+	}
+	pub fn app_state(&self) -> &AppState {
+		&self.state
 	}
 	pub fn jobs(&self) -> std::sync::RwLockReadGuard<'_, EstateState> {
 		self.state()
 	}
 }
-impl<R: Runtime> App<R> {
-	pub fn on_start(&mut self) {
-		self
-			.engine
-			.runtime
-			.emit(e::Event::app(e::Klass::SessionStart));
-	}
+impl<R: Runtime> AppRuntime<R> {
 	pub fn new_task(&mut self) {
 		self
 			.engine
@@ -143,22 +180,6 @@ impl<R: Runtime> App<R> {
 	pub fn stop_session(&mut self) {
 		println!("stop_session from app");
 	}
-}
-impl<R: Runtime> App<R> {
-	pub fn view(&self) -> ViewType {
-		self.view
-	}
-	pub fn show_view(&mut self, view: ViewType) {
-		self.view = view;
-	}
-}
-impl<R: Runtime> App<R> {
-	pub fn app_state(&self) -> &AppState {
-		&self.state
-	}
-	pub fn show_dashboard(&mut self) {
-		self.show_view(ViewType::DashboardScreen);
-	}
 	pub fn show_tasks(&mut self) {
 		self.show_view(ViewType::TaskManagerScreen);
 		self
@@ -168,8 +189,14 @@ impl<R: Runtime> App<R> {
 				command: "task_list".into(),
 			}));
 	}
+	pub fn view(&self) -> ViewType {
+		self.view
+	}
+	pub fn show_view(&mut self, view: ViewType) {
+		self.view = view;
+	}
 }
-impl<R: Runtime + 'static> App<R> {
+impl<R: Runtime + 'static> AppRuntime<R> {
 	fn spawn_request<F, T, E>(&self, future: F, on_success: impl FnOnce(T) + Send + 'static)
 	where
 		F: Future<Output = Result<T, E>> + Send + 'static,
@@ -177,7 +204,6 @@ impl<R: Runtime + 'static> App<R> {
 		T: Send + 'static,
 	{
 		let runtime = self.engine.runtime.clone();
-
 		self.engine.runtime.spawn(async move {
 			match future.await {
 				Ok(value) => on_success(value),
@@ -210,7 +236,7 @@ impl<R: Runtime + 'static> App<R> {
 		true
 	}
 }
-impl<R: Runtime + 'static> App<R> {
+impl<R: Runtime + 'static> AppRuntime<R> {
 	pub fn sample_problem(&mut self) {
 		if !self.start_problems_request() {
 			return;
@@ -251,13 +277,10 @@ impl<R: Runtime + 'static> App<R> {
 		if !self.start_problems_request() {
 			return;
 		}
-
 		let api = Arc::clone(&self.api);
 		let runtime = self.engine.runtime.clone();
-
 		self.engine.runtime.spawn(async move {
 			let mut client = api.problems.clone();
-
 			match client
 				.list_problems(ListProblemsRequest {
 					tags: vec![],
@@ -287,7 +310,6 @@ impl<R: Runtime + 'static> App<R> {
 						}
 					}
 				}
-
 				Err(error) => {
 					runtime.emit(e::Event::app(e::Klass::ApiError(error.to_string())));
 				}

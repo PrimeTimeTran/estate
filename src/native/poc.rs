@@ -17,14 +17,12 @@ impl McpClient {
 	pub async fn hello(&self) -> Result<String> {
 		Ok(self.server.hello().await)
 	}
-
 	pub async fn greeting(&self) -> Result<Vec<PromptMessage>> {
 		Ok(self.server.greeting().await)
 	}
 
 	pub async fn code_review(&self, args: CodeReviewArgs) -> Result<String> {
 		let res = self.server.code_review(Parameters(args)).await?;
-
 		Ok(format_prompt_messages(res.messages))
 	}
 }
