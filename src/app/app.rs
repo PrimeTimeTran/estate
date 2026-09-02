@@ -2,27 +2,37 @@ use crate::{
 	app::{prelude::*, state::EstateState},
 	e,
 	model::StoredProblem,
-	prelude::{
-		logger::{LogConfig, Tracer},
-		*,
-	},
+	prelude::*,
 	proto::leetcode::types::{ListProblemsRequest, PageRequest, SampleProblemRequest},
 	ui::Layout,
 };
 
+#[cfg(feature = "native")]
+#[cfg(not(target_arch = "wasm32"))]
+use crate::logger::{LogConfig, Tracer};
+
 pub struct App {
 	cli: Cli,
+	#[cfg(feature = "native")]
+	#[cfg(not(target_arch = "wasm32"))]
 	native: NativeApp,
 }
 
 impl App {
 	pub fn new(cli: Cli) -> Result<Self> {
+		#[cfg(not(target_arch = "wasm32"))]
 		let mut config = LogConfig::load()?;
+		#[cfg(not(target_arch = "wasm32"))]
 		config.apply_cli(&cli)?;
+
+		#[cfg(feature = "native")]
+		#[cfg(not(target_arch = "wasm32"))]
 		logger::init_logging(&config)?;
 
 		Ok(Self {
 			cli,
+			#[cfg(feature = "native")]
+			#[cfg(not(target_arch = "wasm32"))]
 			native: NativeApp::new()?,
 		})
 	}

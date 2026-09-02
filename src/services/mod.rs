@@ -10,16 +10,11 @@ pub use submission::*;
 use crate::{
 	model::{submission::*, *},
 	prelude::*,
-	proto::leetcode::{
-		problem_service_server::ProblemService, submission_service_server::SubmissionService,
-	},
 };
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use std::path::PathBuf;
-
-use tonic::{Request, Response, Status};
 
 #[derive(Debug)]
 pub struct Page<T> {
@@ -47,3 +42,10 @@ pub fn internal_error(error: anyhow::Error) -> Status {
 pub fn page_request(request: Option<PageRequest>) -> Result<PageRequest, Status> {
 	request.ok_or_else(|| Status::invalid_argument("page is required"))
 }
+
+#[cfg(not(target_arch = "wasm32"))]
+use crate::proto::leetcode::{
+	problem_service_server::ProblemService, submission_service_server::SubmissionService,
+};
+#[cfg(not(target_arch = "wasm32"))]
+use tonic::{Request, Response, Status};

@@ -62,7 +62,6 @@ impl SessionService {
 		Ok(())
 	}
 }
-
 #[derive(Debug)]
 pub struct JsonRepo<T> {
 	path: PathBuf,

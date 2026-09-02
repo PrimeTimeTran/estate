@@ -1,5 +1,7 @@
 #[cfg(feature = "native")]
+#[cfg(not(target_arch = "wasm32"))]
 pub use crate::app::session::Session;
+
 pub use crate::prelude::*;
 
 mod estate;

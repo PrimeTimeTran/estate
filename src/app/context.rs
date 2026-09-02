@@ -3,8 +3,8 @@ use crate::{
 	e,
 };
 
-// #[cfg(not(target_arch = "wasm32"))]
 #[cfg(feature = "native")]
+#[cfg(not(target_arch = "wasm32"))]
 use crate::native::ui::IOState;
 
 // The lifetimes 'a and 'static in your code tell a precise story about memory ownership, data borrows, and concurrency safety.

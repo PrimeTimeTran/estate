@@ -17,14 +17,6 @@ pub mod util;
 pub mod ui;
 pub use ui::*;
 
-#[cfg(not(target_arch = "wasm32"))]
-pub mod client;
-
-pub use services::*;
-
-#[cfg(feature = "native")]
-pub mod native;
-
 #[cfg(feature = "native")]
 pub mod event;
 
@@ -33,3 +25,19 @@ pub mod web;
 
 #[cfg(feature = "mobile")]
 pub mod mobile;
+
+#[cfg(not(target_arch = "wasm32"))]
+pub mod native;
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) use crate::native::*;
+
+#[cfg(not(target_arch = "wasm32"))]
+pub mod client;
+
+#[cfg(not(target_arch = "wasm32"))]
+pub use services::*;
+
+#[cfg(not(target_arch = "wasm32"))]
+pub mod native_lib {
+	pub use crate::native::*;
+}

@@ -9,6 +9,12 @@
 //
 //   cargo build --bin web --no-default-features --features="web" --target wasm32-unknown-unknown && trunk serve src/web/public/index.html --features web
 //
+// Debug Build
+// cargo tree \
+//   --bin web \
+//   --target wasm32-unknown-unknown \
+//   -e features
+//
 // "rust-analyzer.cargo.target": "wasm32-unknown-unknown",
 #[cfg(target_arch = "wasm32")]
 mod wasm {

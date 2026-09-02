@@ -1,4 +1,6 @@
-use crate::{LAYOUT as config, e, prelude::*};
+use crate::{e, prelude::*};
+
+use crate::LAYOUT as config;
 
 pub struct Layout<R: Runtime> {
 	pub activity_bar: Panel<R>,

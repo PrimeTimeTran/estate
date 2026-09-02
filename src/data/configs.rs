@@ -105,6 +105,7 @@ impl VeConfig {
 		}
 	}
 }
+
 pub(crate) const LAYOUT: VeConfig = VeConfig::default();
 
 use std::sync::atomic::AtomicU64;

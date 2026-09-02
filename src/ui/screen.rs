@@ -4,13 +4,13 @@ use strum::IntoStaticStr;
 
 use crate::{e, prelude::*, ui::Layout};
 
-#[cfg(feature = "native")]
+#[cfg(not(target_arch = "wasm32"))]
 use crate::native::{DashboardScreen, WaterfallChart, prelude::*};
 
 pub(crate) struct ScreenInstance {
 	pub kind: ViewType,
-	pub screen: Box<dyn Screen<NativeRuntime>>,
-	pub layout: Layout<NativeRuntime>,
+	pub screen: Box<dyn Screen<dyn Runtime>>,
+	pub layout: Layout<dyn Runtime>,
 }
 
 impl fmt::Debug for ScreenInstance {
@@ -22,9 +22,9 @@ impl fmt::Debug for ScreenInstance {
 impl ScreenInstance {
 	pub fn new(kind: ViewType, api: Arc<ApiClient>) -> Self {
 		tracing::debug!("📺 Screen Instance {:?}", kind);
-		let screen: Box<dyn Screen<NativeRuntime>> = match kind {
-			ViewType::DashboardScreen => Box::new(DashboardScreen::new()),
-			ViewType::TaskManagerScreen => Box::new(TaskManagerScreen::new()),
+		let screen: Box<dyn Screen<dyn Runtime>> = match kind {
+			// ViewType::TaskManagerScreen => Box::new(TaskManagerScreen::new()),
+			// ViewType::DashboardScreen => Box::new(DashboardScreen::new()),
 			// ViewType::WaterfallScreen => Box::new(WaterfallScreen::new()),
 			ViewType::ProblemsScreen => Box::new(ProblemsScreen::new()),
 			ViewType::ProblemScreen => Box::new(ProblemScreen::new()),
@@ -37,7 +37,7 @@ impl ScreenInstance {
 			layout: Layout::new(),
 		}
 	}
-	pub fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, NativeRuntime>) {
+	pub fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, Runtime>) {
 		self.layout.draw(ui, ctx);
 	}
 }

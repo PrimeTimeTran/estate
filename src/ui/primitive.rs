@@ -28,3 +28,33 @@ pub enum ResizeEdge {
 	Top,
 	Bottom,
 }
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum CursorTarget {
+	ActivityBar,
+	DockLeft,
+	#[default]
+	Main,
+	PrimaryBar,
+	SecondaryBar,
+	BottomPanel,
+	StatusBar,
+	DockRight,
+	None,
+}
+
+impl CursorTarget {
+	pub fn name(self) -> &'static str {
+		match self {
+			Self::ActivityBar => "Activity Bar",
+			Self::DockLeft => "Dock Left",
+			Self::Main => "Main",
+			Self::PrimaryBar => "Primary Bar",
+			Self::SecondaryBar => "Secondary Bar",
+			Self::BottomPanel => "Bottom Panel",
+			Self::StatusBar => "Status Bar",
+			Self::DockRight => "Dock Right",
+			Self::None => "Nothing",
+		}
+	}
+}

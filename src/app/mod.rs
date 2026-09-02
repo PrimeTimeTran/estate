@@ -12,7 +12,7 @@ pub(crate) mod job;
 pub(crate) mod model;
 pub(crate) mod modules;
 pub mod prelude;
-pub(crate) mod session;
+
 pub(crate) mod state;
 pub(crate) mod task;
 
@@ -20,17 +20,15 @@ pub use app::*;
 pub use context::*;
 pub use event::*;
 pub use job::*;
-pub(crate) use modules::{
-	// runtime::{Runtime, RuntimeState},
-	*,
-};
-pub use session::*;
-pub use task::*;
+pub(crate) use modules::*;
 
-// #[cfg(not(target_arch = "wasm32"))]
-// #[path = "../native/mod.rs"]
-// pub(crate) mod native;
+pub use task::*;
 
 pub use anyhow::{Error, Result};
 pub use serde::{Deserialize, Serialize};
 pub use std::collections::{HashMap, HashSet, VecDeque};
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) mod session;
+#[cfg(not(target_arch = "wasm32"))]
+pub use session::*;
