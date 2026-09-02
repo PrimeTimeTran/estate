@@ -116,7 +116,7 @@ impl NativeApp {
 		self.spawn_clock(proxy.clone());
 		self.spawn_cursor_daemon(proxy.clone());
 		self.spawn_signal_handler(proxy.clone());
-
+		self.engine.runtime.as_ref().attach_event_proxy(proxy);
 		self
 			.engine
 			.runtime
@@ -129,37 +129,33 @@ impl NativeApp {
 		let running = Arc::clone(&self.clock_running);
 		let runtime = self.engine.runtime();
 		std::thread::spawn(move || {
-			let mut current_time = 60;
-			let mut view_index = 0;
-			while running.load(Ordering::Relaxed) {
-				let views = [
-					ViewType::ProblemScreen,
-					ViewType::ProblemScreen,
-					ViewType::ProblemScreen,
-					ViewType::ProblemScreen,
-					ViewType::ProblemScreen,
-					// ViewType::DashboardScreen,
-					// ViewType::MarkdownView,
-					// ViewType::ProblemScreen,
-					// ViewType::WaterfallScreen,
-					// ViewType::ProblemScreen,
-					// ViewType::TaskManagerScreen,
-					// ViewType::ProblemsScreen,
-				];
-				let _ = proxy.send_event(AppEvent::TickClock(format!(" {}s", current_time)));
-				tracing::info!("tick {}", current_time);
-				if current_time == 0 {
-					current_time = 3;
-					view_index = (view_index + 1) % views.len();
-					let view = views[view_index];
-					tracing::info!("⏩ Clock navigation → {:?}", view);
-					runtime.emit(e::Event::app(e::Klass::Navigate(view)));
-					let _ = proxy.send_event(AppEvent::RuntimeEvent);
-				} else {
-					current_time -= 1;
-				}
-				std::thread::sleep(std::time::Duration::from_secs(1));
-			}
+			// let mut current_time = 3;
+			// let mut view_index = 0;
+			// while running.load(Ordering::Relaxed) {
+			// 	let views = [
+			// 		ViewType::ProblemScreen,
+			// 		ViewType::DashboardScreen,
+			// 		ViewType::MarkdownView,
+			// 		ViewType::ProblemScreen,
+			// 		ViewType::WaterfallScreen,
+			// 		ViewType::ProblemScreen,
+			// 		ViewType::TaskManagerScreen,
+			// 		ViewType::ProblemsScreen,
+			// 	];
+			// 	let _ = proxy.send_event(AppEvent::TickClock(format!(" {}s", current_time)));
+			// 	tracing::info!("tick {}", current_time);
+			// 	if current_time == 0 {
+			// 		current_time = 3;
+			// 		view_index = (view_index + 1) % views.len();
+			// 		let view = views[view_index];
+			// 		tracing::info!("⏩ Clock navigation → {:?}", view);
+			// 		runtime.emit(e::Event::app(e::Klass::Navigate(view)));
+			// 		let _ = proxy.send_event(AppEvent::RuntimeEvent);
+			// 	} else {
+			// 		current_time -= 1;
+			// 	}
+			// 	std::thread::sleep(std::time::Duration::from_secs(1));
+			// }
 		});
 	}
 	fn spawn_cursor_daemon(&mut self, proxy: EventLoopProxy<AppEvent>) {
@@ -285,12 +281,16 @@ impl NativeApp {
 		}
 		if let Some(app) = self.app.as_mut() {
 			let api = app.api();
-			let view = self.active_view;
-			match Window::new(event_loop, view, api) {
+			// let view = self.active_view;
+			match Window::new(event_loop, app.view, api) {
 				Ok(window) => {
 					tracing::info!(" open window end, new window");
-					window.instance.set_title(view.name().into());
-					self.windows.push(AppWindow { kind, view, window });
+					window.instance.set_title(app.view.name().into());
+					self.windows.push(AppWindow {
+						kind,
+						view: app.view,
+						window,
+					});
 				}
 				Err(error) => {
 					tracing::error!("failed to create window: {error}");
@@ -360,8 +360,10 @@ impl NativeApp {
 	fn sync_views(&mut self) {
 		for window in &mut self.windows {
 			if let Some(app) = self.app.as_mut() {
+				println!("NativeApp {:?}", app.view().name());
 				let api = app.api();
 				self.active_view = app.view();
+				tracing::info!("sync views {:?}", app.view());
 				window.window.sync_view(app.view(), api);
 				window.window.instance.request_redraw();
 				window.window.instance.set_title(self.active_view.name());
@@ -554,6 +556,7 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 				tracing::info!("🔄 Runtime event");
 				if let Some(app) = &mut self.app {
 					app.update();
+					self.sync_views();
 				}
 			}
 			AppEvent::Navigate(view) => {
@@ -563,6 +566,7 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 					.emit(e::Event::app(e::Klass::Navigate(view)));
 				if let Some(app) = &mut self.app {
 					app.update();
+					self.sync_views();
 				}
 			}
 			AppEvent::Shutdown => {

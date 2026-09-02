@@ -17,15 +17,28 @@ pub struct WaterfallScreen {}
 impl WaterfallScreen {
 	pub fn new() {}
 }
-
 impl<R: Runtime> Screen<R> for WaterfallScreen {
 	fn configure(&mut self, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {
-		// Configure the regions this screen uses.
+		// Put TaskManagerView into the appropriate region/panel.
 	}
 
-	fn update(&mut self, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {}
+	fn update(&mut self, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {
+		// self.manager.poll_changes();
+		// self.view.update(ctx);
+	}
 
-	fn event(&mut self, event: &e::Event, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {}
+	fn event(&mut self, event: &e::Event, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {
+		// Feature-level event handling.
+		//
+		// e.g. TaskCreated, TaskDeleted, etc.
+	}
+	// fn configure(&mut self, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {
+	// 	// Configure the regions this screen uses.
+	// }
+
+	// fn update(&mut self, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {}
+
+	// fn event(&mut self, event: &e::Event, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {}
 }
 
 // pub struct TaskManagerScreen<R: Runtime> {}

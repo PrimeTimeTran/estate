@@ -15,7 +15,7 @@ pub static TEMPLATE_PATH: &str = "/Users/future/KB/project/crates/estate/templat
 
 use std::sync::LazyLock;
 
-pub static START_APP_CLOCK: bool = false;
+pub static START_APP_CLOCK: bool = true;
 pub static START_WINDOW: WindowType = WindowType::ProblemScreen;
 pub static START_VIEW: ViewType = ViewType::ProblemScreen;
 // Unsafe territory

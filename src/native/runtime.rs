@@ -1,3 +1,5 @@
+use winit::event_loop::EventLoopProxy;
+
 pub use crate::native::{monitor::NativeMonitor, prelude::*, state::NativeStateStore};
 use crate::{
 	app::{
@@ -17,6 +19,7 @@ pub struct NativeRuntime {
 	pub tasks: Arc<RwLock<TaskManager>>,
 	handle: tokio::runtime::Handle,
 	event_rx: Arc<Mutex<broadcast::Receiver<e::Event>>>,
+	proxy: Arc<Mutex<Option<EventLoopProxy<AppEvent>>>>,
 }
 impl NativeRuntime {
 	pub fn new(handle: tokio::runtime::Handle) -> Result<Self> {
@@ -31,6 +34,7 @@ impl NativeRuntime {
 			.expect("failed to create Tokio runtime");
 		Ok(Self {
 			event_rx,
+			proxy: Arc::new(Mutex::new(None)),
 			events,
 			handle,
 			session: Session::default(),
@@ -38,6 +42,9 @@ impl NativeRuntime {
 			store,
 			tasks: Arc::new(RwLock::new(TaskManager::new())),
 		})
+	}
+	pub fn attach_event_proxy(&self, proxy: EventLoopProxy<AppEvent>) {
+		*self.proxy.lock().unwrap() = Some(proxy);
 	}
 }
 
@@ -52,7 +59,11 @@ impl Runtime for NativeRuntime {
 		tokio::time::sleep(duration).await;
 	}
 	fn emit(&self, event: e::Event) {
+		tracing::info!("NativeRuntime {:?}", event.kind.clone());
 		self.events.emit(event);
+		if let Some(proxy) = self.proxy.lock().unwrap().as_ref() {
+			let _ = proxy.send_event(AppEvent::RuntimeEvent);
+		}
 	}
 	fn state(&self) -> &RuntimeState {
 		&self.state

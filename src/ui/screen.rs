@@ -18,8 +18,10 @@ impl fmt::Debug for ScreenInstance {
 		f.debug_struct("View").field("kind", &self.kind).finish()
 	}
 }
+
 impl ScreenInstance {
 	pub fn new(kind: ViewType, api: Arc<ApiClient>) -> Self {
+		tracing::debug!("📺 Screen Instance {:?}", kind);
 		let screen: Box<dyn Screen<NativeRuntime>> = match kind {
 			ViewType::DashboardScreen => Box::new(DashboardScreen::new()),
 			ViewType::TaskManagerScreen => Box::new(TaskManagerScreen::new()),
@@ -29,14 +31,12 @@ impl ScreenInstance {
 			ViewType::MarkdownView => Box::new(MarkdownScreen::new(crate::MARKDOWN)),
 			_ => Box::new(MarkdownScreen::new(crate::MARKDOWN)),
 		};
-
 		Self {
 			kind,
 			screen,
 			layout: Layout::new(),
 		}
 	}
-
 	pub fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, NativeRuntime>) {
 		self.layout.draw(ui, ctx);
 	}

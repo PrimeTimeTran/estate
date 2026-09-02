@@ -1,14 +1,14 @@
 pub(crate) mod chart;
-pub(crate) mod components;
 pub(crate) mod layout;
 pub(crate) mod panel;
 mod prelude;
 pub(crate) mod primitive;
 pub(crate) mod region;
+pub(crate) mod screen;
 pub(crate) mod theme;
 pub(crate) mod r#trait;
 pub(crate) mod view;
-pub(crate) use crate::ui::{components::*, layout::*, primitive::*, view::*};
+pub(crate) use crate::ui::{layout::*, primitive::*, screen::*, view::*};
 use crate::{
 	e,
 	ui::r#trait::{LayoutTrait, Screen, ViewTrait},

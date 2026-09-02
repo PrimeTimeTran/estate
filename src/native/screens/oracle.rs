@@ -14,9 +14,7 @@ impl<R: Runtime> Screen<R> for OracleScreen {
 	fn configure(&mut self, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {
 		// Configure the regions this screen uses.
 	}
-
 	fn update(&mut self, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {}
-
 	fn event(&mut self, event: &e::Event, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {}
 }
 impl OracleScreen {

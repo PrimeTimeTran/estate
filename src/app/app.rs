@@ -33,21 +33,32 @@ impl<R: Runtime> App<R> {
 		if !crate::START_APP_CLOCK {
 			return;
 		}
-		let mut count = 0;
-		println!("⏰ App<T> START CLOCK: {}", count);
-		tracing::info!("⏰ App<T> START CLOCK: {}", count);
-
+		let views = [
+			ViewType::ProblemScreen,
+			ViewType::DashboardScreen,
+			ViewType::MarkdownView,
+			ViewType::ProblemScreen,
+			ViewType::WaterfallScreen,
+			ViewType::ProblemScreen,
+			ViewType::TaskManagerScreen,
+			ViewType::ProblemsScreen,
+		];
+		let mut view_idx = 0;
+		let mut current_time = 5;
 		let runtime = self.engine.runtime.clone();
-
 		self.spawn(async move {
-			println!("⏰ App<T> CLOCK TASK STARTED: {}", count);
-			tracing::info!("⏰ App<T> CLOCK TASK STARTED: {}", count);
-
 			loop {
-				count += 1;
 				runtime.sleep(std::time::Duration::from_secs(1)).await;
-				println!("⏰ App<T> CLOCK TICK: {}", count);
-				tracing::info!("⏰ App<T> CLOCK TICK: {}", count);
+				if current_time == 0 {
+					current_time = 3;
+					view_idx = (view_idx + 1) % views.len();
+					let view = views[view_idx];
+					println!("🧭 Clock navigation → {:?}", view);
+					runtime.emit(e::Event::app(e::Klass::Navigate(view)));
+				} else {
+					current_time -= 1;
+				}
+				println!("⏰ App<T> CLOCK TICK: {}", current_time);
 			}
 		});
 	}
@@ -57,6 +68,10 @@ impl<R: Runtime> App<R> {
 	pub fn update(&mut self) {
 		while let Some(event) = self.events.try_recv() {
 			match event.kind {
+				e::Klass::Navigate(view) => {
+					println!("♻️ App<T> new view from app update {:?}", view.name());
+					self.view = view;
+				}
 				e::Klass::ProblemsLoaded(problems) => {
 					self.state.problems.items = problems;
 					self.state.problems.loading = false;
@@ -75,9 +90,7 @@ impl<R: Runtime> App<R> {
 					self.state.problem.loading = false;
 					self.state.problem.error = Some(error);
 				}
-				e::Klass::Navigate(view) => {
-					self.view = view;
-				}
+
 				e::Klass::ApiError(error) => {
 					// If you have separate error events for different
 					// requests, handle them separately here.
@@ -156,7 +169,6 @@ impl<R: Runtime> App<R> {
 			}));
 	}
 }
-
 impl<R: Runtime + 'static> App<R> {
 	fn spawn_request<F, T, E>(&self, future: F, on_success: impl FnOnce(T) + Send + 'static)
 	where
@@ -198,7 +210,6 @@ impl<R: Runtime + 'static> App<R> {
 		true
 	}
 }
-
 impl<R: Runtime + 'static> App<R> {
 	pub fn sample_problem(&mut self) {
 		if !self.start_problems_request() {

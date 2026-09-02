@@ -10,105 +10,6 @@ pub struct Layout<R: Runtime> {
 	pub status_bar: Panel<R>,
 	pub dock_right: Panel<R>,
 }
-impl<R: Runtime> LayoutTrait<R> for Layout<R> {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>) {
-		let rect = ui.max_rect();
-		ui.painter()
-			.rect_filled(rect, 0.0, egui::Color32::from_rgb(30, 30, 30));
-
-		ui.painter().rect_stroke(
-			rect,
-			0.0,
-			egui::Stroke::new(5.0, egui::Color32::RED),
-			egui::StrokeKind::Outside,
-		);
-
-		// STOP HERE FOR TESTING
-		let mouse_pos = ui.input(|i| i.pointer.hover_pos());
-		let available = ui.available_rect_before_wrap();
-		// Background
-		ui.painter().rect_filled(available, 0.0, LAYOUT.bg);
-		// Calculate all region boundaries from the current region sizes.
-		let layout = self.calculate_region_boundaries(available);
-		// Determine what region the cursor is currently over.
-		let cursor_target = self.cursor_target(mouse_pos, &layout);
-		// Update application input state.
-		ctx.input = IOState {
-			cursor_pos: mouse_pos,
-			cursor_target,
-			shift_held: ui.input(|i| i.modifiers.shift),
-			ctrl_held: ui.input(|i| i.modifiers.ctrl),
-			alt_held: ui.input(|i| i.modifiers.alt),
-			command_held: ui.input(|i| i.modifiers.command),
-			primary_down: ui.input(|i| i.pointer.primary_down()),
-		};
-
-		// ---------------------------------------------------------
-		// Draw panels
-		// ---------------------------------------------------------
-
-		Self::draw_panel(ui, ctx, layout.activity_bar, &mut self.activity_bar);
-
-		if self.dock_left.open {
-			Self::draw_panel(ui, ctx, layout.dock_left, &mut self.dock_left);
-		}
-
-		Self::draw_panel(ui, ctx, layout.primary_bar, &mut self.primary_bar);
-
-		Self::draw_panel(ui, ctx, layout.secondary_bar, &mut self.secondary_bar);
-
-		Self::draw_panel(ui, ctx, layout.main, &mut self.main);
-
-		if self.bottom_panel.open {
-			Self::draw_panel(ui, ctx, layout.bottom_panel, &mut self.bottom_panel);
-		}
-
-		if self.dock_right.open {
-			Self::draw_panel(ui, ctx, layout.dock_right, &mut self.dock_right);
-		}
-
-		Self::draw_panel(ui, ctx, layout.status_bar, &mut self.status_bar);
-
-		// ---------------------------------------------------------
-		// Draw resize handles LAST
-		// ---------------------------------------------------------
-
-		if self.dock_left.open {
-			Self::resize_region(
-				ui,
-				"dock_left_resize",
-				layout.dock_left,
-				&mut self.dock_left.region,
-				ResizeEdge::Right,
-				1.0,
-			);
-		}
-
-		if self.bottom_panel.open {
-			Self::resize_region(
-				ui,
-				"bottom_panel_resize",
-				layout.bottom_panel,
-				&mut self.bottom_panel.region,
-				ResizeEdge::Top,
-				-1.0,
-			);
-		}
-
-		if self.dock_right.open {
-			Self::resize_region(
-				ui,
-				"dock_right_resize",
-				layout.dock_right,
-				&mut self.dock_right.region,
-				ResizeEdge::Left,
-				-1.0,
-			);
-		}
-	}
-	fn update(&mut self, _ctx: &mut AppContext<'_, R>) {}
-	fn event(&mut self, _event: &e::Event, _ctx: &mut AppContext<'_, R>) {}
-}
 impl<R: Runtime> Layout<R> {
 	// Rust uses ownership,borrowing, and lifetimes to determine when values
 	// may be safely destroyed, allowing memory to be reclaimed deterministically
@@ -161,73 +62,91 @@ impl<R: Runtime> Layout<R> {
 			),
 		}
 	}
-	// pub fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>) {
-	// 	// Forwards the drawing contract to the concrete implementation.
-	// 	//
-	// 	// `Ve` doesn't know how the view is drawn. It only knows that the
-	// 	// contained implementation satisfies `Veable`.
-	// 	let mouse_pos = ui.input(|i| i.pointer.hover_pos());
-	// 	let available = ui.available_rect_before_wrap();
-	// 	ui.painter().rect_filled(available, 0.0, LAYOUT.bg);
-	// 	let layout = self.calculate_region_boundaries(available);
-	// 	let VeLayout {
-	// 		activity_bar,
-	// 		bottom_panel,
-	// 		dock_left,
-	// 		dock_right,
-	// 		main,
-	// 		primary_bar,
-	// 		secondary_bar,
-	// 		status_bar,
-	// 	} = layout;
-	// 	let cursor_target = self.cursor_target(mouse_pos, &layout);
-	// 	ctx.input = IOState {
-	// 		cursor_pos: mouse_pos,
-	// 		cursor_target,
-	// 		shift_held: ui.input(|i| i.modifiers.shift),
-	// 		ctrl_held: ui.input(|i| i.modifiers.ctrl),
-	// 		alt_held: ui.input(|i| i.modifiers.alt),
-	// 		command_held: ui.input(|i| i.modifiers.command),
-	// 		primary_down: ui.input(|i| i.pointer.primary_down()),
-	// 	};
-	// 	if self.dock_left.open {
-	// 		Self::draw_panel(ui, ctx, dock_left, &mut self.dock_left);
-	// 		Self::resize_region(
-	// 			ui,
-	// 			"dock_left_resize",
-	// 			dock_left,
-	// 			&mut self.dock_left.region,
-	// 			ResizeEdge::Right,
-	// 			1.0,
-	// 		);
-	// 	}
-	// 	Self::draw_panel(ui, ctx, primary_bar, &mut self.primary_bar);
-	// 	Self::draw_panel(ui, ctx, secondary_bar, &mut self.secondary_bar);
-	// 	Self::draw_panel(ui, ctx, main, &mut self.main);
-	// 	if self.bottom_panel.open {
-	// 		Self::draw_panel(ui, ctx, bottom_panel, &mut self.bottom_panel);
-	// 		Self::resize_region(
-	// 			ui,
-	// 			"bottom_panel_resize",
-	// 			bottom_panel,
-	// 			&mut self.bottom_panel.region,
-	// 			ResizeEdge::Top,
-	// 			-1.0,
-	// 		);
-	// 	}
-	// 	if self.dock_right.open {
-	// 		Self::draw_panel(ui, ctx, dock_right, &mut self.dock_right);
-	// 		Self::resize_region(
-	// 			ui,
-	// 			"dock_right_resize",
-	// 			dock_right,
-	// 			&mut self.dock_right.region,
-	// 			ResizeEdge::Left,
-	// 			-1.0,
-	// 		);
-	// 	}
-	// 	Self::draw_panel(ui, ctx, status_bar, &mut self.status_bar);
-	// }
+}
+impl<R: Runtime> LayoutTrait<R> for Layout<R> {
+	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>) {
+		let rect = ui.max_rect();
+		ui.painter()
+			.rect_filled(rect, 0.0, egui::Color32::from_rgb(30, 30, 30));
+		ui.painter().rect_stroke(
+			rect,
+			0.0,
+			egui::Stroke::new(5.0, egui::Color32::RED),
+			egui::StrokeKind::Outside,
+		);
+		let mouse_pos = ui.input(|i| i.pointer.hover_pos());
+		let available = ui.available_rect_before_wrap();
+		// Background
+		ui.painter().rect_filled(available, 0.0, LAYOUT.bg);
+		// Calculate all region boundaries from the current region sizes.
+		let layout = self.calculate_region_boundaries(available);
+		// Determine what region the cursor is currently over.
+		let cursor_target = self.cursor_target(mouse_pos, &layout);
+		// Update application input state.
+		ctx.input = IOState {
+			cursor_pos: mouse_pos,
+			cursor_target,
+			shift_held: ui.input(|i| i.modifiers.shift),
+			ctrl_held: ui.input(|i| i.modifiers.ctrl),
+			alt_held: ui.input(|i| i.modifiers.alt),
+			command_held: ui.input(|i| i.modifiers.command),
+			primary_down: ui.input(|i| i.pointer.primary_down()),
+		};
+		// ---------------------------------------------------------
+		// Draw panels
+		// ---------------------------------------------------------
+		Self::draw_panel(ui, ctx, layout.activity_bar, &mut self.activity_bar);
+		if self.dock_left.open {
+			Self::draw_panel(ui, ctx, layout.dock_left, &mut self.dock_left);
+		}
+		Self::draw_panel(ui, ctx, layout.primary_bar, &mut self.primary_bar);
+		Self::draw_panel(ui, ctx, layout.secondary_bar, &mut self.secondary_bar);
+		Self::draw_panel(ui, ctx, layout.main, &mut self.main);
+		if self.bottom_panel.open {
+			Self::draw_panel(ui, ctx, layout.bottom_panel, &mut self.bottom_panel);
+		}
+		if self.dock_right.open {
+			Self::draw_panel(ui, ctx, layout.dock_right, &mut self.dock_right);
+		}
+		Self::draw_panel(ui, ctx, layout.status_bar, &mut self.status_bar);
+		// ---------------------------------------------------------
+		// Draw resize handles LAST
+		// ---------------------------------------------------------
+		if self.dock_left.open {
+			Self::resize_region(
+				ui,
+				"dock_left_resize",
+				layout.dock_left,
+				&mut self.dock_left.region,
+				ResizeEdge::Right,
+				1.0,
+			);
+		}
+		if self.bottom_panel.open {
+			Self::resize_region(
+				ui,
+				"bottom_panel_resize",
+				layout.bottom_panel,
+				&mut self.bottom_panel.region,
+				ResizeEdge::Top,
+				-1.0,
+			);
+		}
+		if self.dock_right.open {
+			Self::resize_region(
+				ui,
+				"dock_right_resize",
+				layout.dock_right,
+				&mut self.dock_right.region,
+				ResizeEdge::Left,
+				-1.0,
+			);
+		}
+	}
+	fn update(&mut self, _ctx: &mut AppContext<'_, R>) {}
+	fn event(&mut self, _event: &e::Event, _ctx: &mut AppContext<'_, R>) {}
+}
+impl<R: Runtime> Layout<R> {
 	fn draw_view(
 		ui: &mut egui::Ui,
 		rect: egui::Rect,
@@ -276,23 +195,19 @@ impl<R: Runtime> Layout<R> {
 		} else {
 			0.0
 		};
-
 		let status_bar_height = if self.status_bar.open {
 			self.status_bar.region.size
 		} else {
 			0.0
 		};
-
 		let activity_bar = egui::Rect::from_min_max(
 			available.min,
 			egui::pos2(available.left() + activity_bar_width, available.bottom()),
 		);
-
 		let workspace_rect = egui::Rect::from_min_max(
 			egui::pos2(available.left() + activity_bar_width, available.top()),
 			egui::pos2(available.right(), available.bottom() - status_bar_height),
 		);
-
 		let status_bar = egui::Rect::from_min_max(
 			egui::pos2(available.left(), workspace_rect.bottom()),
 			available.max,
@@ -347,7 +262,6 @@ impl<R: Runtime> Layout<R> {
 		} else {
 			0.0
 		};
-
 		let breadcrumbs_height = if self.secondary_bar.open {
 			self.secondary_bar.region.size
 		} else {
@@ -416,34 +330,27 @@ impl<R: Runtime> Layout<R> {
 			ResizeEdge::Left | ResizeEdge::Right => egui::CursorIcon::ResizeHorizontal,
 			ResizeEdge::Top | ResizeEdge::Bottom => egui::CursorIcon::ResizeVertical,
 		};
-
 		let response = ui.interact(rect, egui::Id::new(id), egui::Sense::drag());
-
 		if response.hovered() || response.dragged() {
 			ui.ctx().set_cursor_icon(cursor);
 		}
-
 		// Visible divider.
 		let divider = match edge {
 			ResizeEdge::Left | ResizeEdge::Right => egui::Rect::from_min_max(
 				egui::pos2(rect.center().x - 1.0, rect.top()),
 				egui::pos2(rect.center().x + 1.0, rect.bottom()),
 			),
-
 			ResizeEdge::Top | ResizeEdge::Bottom => egui::Rect::from_min_max(
 				egui::pos2(rect.left(), rect.center().y - 1.0),
 				egui::pos2(rect.right(), rect.center().y + 1.0),
 			),
 		};
-
 		ui.painter().rect_filled(divider, 0.0, palette::BORDER);
-
 		if response.dragged() {
 			let delta = match edge {
 				ResizeEdge::Left | ResizeEdge::Right => response.drag_motion().x,
 				ResizeEdge::Top | ResizeEdge::Bottom => response.drag_motion().y,
 			};
-
 			resize(delta);
 		}
 	}
@@ -453,13 +360,10 @@ impl<R: Runtime> Layout<R> {
 		} else {
 			egui::CursorIcon::ResizeHorizontal
 		};
-
 		let response = ui.interact(rect, egui::Id::new(id), egui::Sense::drag());
-
 		if response.hovered() || response.dragged() {
 			ui.ctx().set_cursor_icon(cursor);
 		}
-
 		// Visible resize divider.
 		let divider = match cursor {
 			egui::CursorIcon::ResizeVertical => {
@@ -467,25 +371,20 @@ impl<R: Runtime> Layout<R> {
 			}
 			_ => egui::Rect::from_center_size(rect.center(), egui::vec2(rect.width(), 2.0)),
 		};
-
 		let color = if response.hovered() || response.dragged() {
 			palette::BORDER
 		} else {
 			palette::BORDER
 		};
-
 		ui.painter().rect_filled(divider, 0.0, color);
-
 		if response.dragged() {
 			let delta = match cursor {
 				egui::CursorIcon::ResizeVertical => response.drag_motion().y,
 				_ => response.drag_motion().x,
 			};
-
 			resize(delta);
 		}
 	}
-
 	fn resize_region(
 		ui: &mut egui::Ui,
 		id: &str,
@@ -497,36 +396,29 @@ impl<R: Runtime> Layout<R> {
 		if !region.resizable {
 			return;
 		}
-
 		let handle_size = 8.0;
-
 		let handle = match edge {
 			ResizeEdge::Left => egui::Rect::from_min_max(
 				egui::pos2(rect.left() - handle_size / 2.0, rect.top()),
 				egui::pos2(rect.left() + handle_size / 2.0, rect.bottom()),
 			),
-
 			ResizeEdge::Right => egui::Rect::from_min_max(
 				egui::pos2(rect.right() - handle_size / 2.0, rect.top()),
 				egui::pos2(rect.right() + handle_size / 2.0, rect.bottom()),
 			),
-
 			ResizeEdge::Top => egui::Rect::from_min_max(
 				egui::pos2(rect.left(), rect.top() - handle_size / 2.0),
 				egui::pos2(rect.right(), rect.top() + handle_size / 2.0),
 			),
-
 			ResizeEdge::Bottom => egui::Rect::from_min_max(
 				egui::pos2(rect.left(), rect.bottom() - handle_size / 2.0),
 				egui::pos2(rect.right(), rect.bottom() + handle_size / 2.0),
 			),
 		};
-
 		Self::resize_handle(ui, id, handle, edge, |delta| {
 			region.size = (region.size + delta * direction).clamp(region.min_size, region.max_size);
 		});
 	}
-
 	pub fn cursor_target(&self, pos: Option<egui::Pos2>, layout: &VeLayout) -> CursorTarget {
 		let Some(pos) = pos else {
 			return CursorTarget::None;
@@ -611,7 +503,6 @@ where
 		});
 	}
 	fn update(&mut self, ctx: &mut AppContext<'_, R>) {}
-
 	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R>) {}
 }
 #[derive(Debug, Clone, PartialEq)]

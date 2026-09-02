@@ -1,6 +1,10 @@
 use crate::prelude::*;
 
 pub fn channel<T>(capacity: usize) -> (EventSender<T>, EventReceiver<T>) {
+	// EventSender<T> ─┐
+	// EventSender<T> ─┼──> EventReceiver<T>
+	// EventSender<T> ─┘
+	// Multi Producer Single Consumer
 	let (tx, rx) = tokio::sync::mpsc::channel(capacity);
 	(EventSender { tx }, EventReceiver { rx })
 }

@@ -272,12 +272,9 @@ impl Window {
 }
 impl Window {
 	pub fn sync_view(&mut self, view: ViewType, api: Arc<ApiClient>) {
-		// tracing::info!("sync_view of kind {:?}", self.screen.kind);
-		// tracing::info!("sync_view of view {:?}", view);
 		if self.screen.kind != view {
-			// tracing::info!("🖼️ Window view change: {:?} → {:?}", self.screen.kind, view);
+			tracing::debug!("🖼️ Window view change: {:?} → {:?}", self.screen.kind, view);
 			self.screen = ui::ScreenInstance::new(view, api);
-			// self.screen.draw(gui::Ui, ctx);
 		}
 	}
 }

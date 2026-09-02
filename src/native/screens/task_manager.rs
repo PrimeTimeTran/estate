@@ -123,7 +123,7 @@ impl TaskManager {
 #[derive(Debug)]
 pub struct TaskManagerScreen {
 	pub waterfall: WaterfallChart,
-	view: TaskManagerView, // manager: TaskManager,
+	view: TaskManagerView,
 }
 impl TaskManagerScreen {
 	pub fn new() -> Self {

@@ -1,4 +1,27 @@
-[
+[{
+  "number": 3875,
+  "normalized-name": "construct-uniform-parity-array-i",
+  "title": "Construct Uniform Parity Array I",
+  "difficulty": "easy",
+  "description": "You are given an array nums1 of n distinct integers.\n\nYou want to construct another array nums2 of length n such that the elements in nums2 are either all odd or all even.",
+  "url": "https://leetcode.com/problems/construct-uniform-parity-array-i/",
+  "filename": "3875-construct-uniform-parity-array-i.py",
+  "description-raw": "<p>You are given an array <code>nums1</code> of <code>n</code> <strong>distinct</strong> integers.</p>\n<p>You want to construct another array <code>nums2</code> of length <code>n</code> such that the elements in <code>nums2</code> are either <strong>all odd or all even</strong>.</p>",
+  "test-cases": [
+    {
+      "index": 0,
+      "input": "nums1 = [2,3]",
+      "output": "true",
+      "explanation": ""
+    },
+    {
+      "index": 1,
+      "input": "nums1 = [4,6]",
+      "output": "true",
+      "explanation": "​​​​​​​"
+    }
+  ]
+},
   {
     "number": 3568,
     "normalized-name": "minimum-moves-to-clean-the-classroom",

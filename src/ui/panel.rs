@@ -1,4 +1,5 @@
 use crate::{LAYOUT as config, e, prelude::*};
+
 // A named, interactive view that occupies a region.
 // Panels add interaction and lifecycle behavior to a Region.
 // They may be opened, closed, overlaid, auto-hidden, moved,

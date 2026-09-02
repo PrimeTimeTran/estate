@@ -29,7 +29,6 @@ impl<R: Runtime> Screen<R> for ProblemsScreen {
 	}
 
 	fn update(&mut self, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {}
-
 	fn event(&mut self, event: &e::Event, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {}
 }
 
