@@ -1,22 +1,26 @@
-pub mod db;
-pub mod json;
-pub mod problem;
-pub mod submission;
-pub use db::*;
-pub use json::*;
-pub use problem::*;
-pub use submission::*;
-
 use crate::{
 	model::{submission::*, *},
 	prelude::*,
 };
 
 use crate::proto::types::*;
+// use crate::services::prelude::*;
 
-use anyhow::{Context, Result};
-use async_trait::async_trait;
-use std::path::PathBuf;
+#[derive(Debug)]
+pub struct JsonRepo<T> {
+	path: PathBuf,
+	_marker: std::marker::PhantomData<T>,
+}
+
+#[derive(Clone, Debug)]
+pub struct SessionService {
+	state_service: Arc<StateService>,
+}
+
+#[derive(Debug)]
+pub struct StateService {
+	repo: JsonRepo<EstateState>,
+}
 
 #[derive(Debug)]
 pub struct Page<T> {
@@ -36,23 +40,7 @@ impl<T> Page<T> {
 	}
 }
 
-pub fn internal_error(error: anyhow::Error) -> Status {
-	tracing::error!("{error:#}");
-	Status::internal(error.to_string())
-}
-
-pub fn page_request(request: Option<PageRequest>) -> Result<PageRequest, Status> {
-	request.ok_or_else(|| Status::invalid_argument("page is required"))
-}
-
-#[cfg(not(feature = "web"))]
-pub mod native;
-#[cfg(not(feature = "web"))]
-pub use native::*;
-
 #[cfg(not(feature = "web"))]
 use crate::proto::{
 	problem_service_server::ProblemService, submission_service_server::SubmissionService,
 };
-#[cfg(not(feature = "web"))]
-use tonic::{Request, Response, Status};

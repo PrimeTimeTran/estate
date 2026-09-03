@@ -1,14 +1,6 @@
-use crate::app::*;
 use crate::app::{state::EstateState, *};
-use serde::{Serialize, de::DeserializeOwned};
-use std::path::{Path, PathBuf};
 
-use crate::app::*;
-
-#[derive(Debug)]
-pub struct StateService {
-	repo: JsonRepo<EstateState>,
-}
+use crate::{app::*, prelude::*};
 
 impl StateService {
 	pub fn new(path: impl Into<std::path::PathBuf>) -> Self {
@@ -30,10 +22,6 @@ impl StateService {
 	}
 }
 
-#[derive(Clone, Debug)]
-pub struct SessionService {
-	state_service: Arc<StateService>,
-}
 impl SessionService {
 	pub fn new(state_service: Arc<StateService>) -> Self {
 		Self { state_service }
@@ -61,11 +49,6 @@ impl SessionService {
 
 		Ok(())
 	}
-}
-#[derive(Debug)]
-pub struct JsonRepo<T> {
-	path: PathBuf,
-	_marker: std::marker::PhantomData<T>,
 }
 
 impl<T> JsonRepo<T>

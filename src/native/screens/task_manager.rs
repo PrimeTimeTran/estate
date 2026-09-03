@@ -12,11 +12,6 @@ use egui_extras::{Column, TableBuilder};
 use egui_plot::{Bar, BarChart, Plot};
 use std::time::Duration;
 
-#[derive(Debug)]
-pub struct TaskManager {
-	runtime: TaskManagerRuntime,
-	state: TaskManagerState,
-}
 impl TaskManager {
 	pub fn new() -> Self {
 		let path = PathBuf::from(STATE_PATH);

@@ -2,7 +2,6 @@
 
 pub mod api;
 pub mod data;
-pub mod event;
 pub mod helpers;
 pub mod model;
 pub mod prelude;
@@ -14,7 +13,6 @@ pub mod r#trait;
 pub mod ui;
 pub mod util;
 
-pub use event::*;
 pub use tool::*;
 pub use r#trait::*;
 pub use ui::*;
@@ -22,10 +20,17 @@ pub use ui::*;
 pub mod app;
 pub use crate::app::event as e;
 
+#[cfg(not(all(feature = "web", target_arch = "wasm32")))]
+pub mod server;
+
+#[cfg(all(feature = "web", target_arch = "wasm32"))]
+pub mod web;
+
 #[cfg(feature = "native")]
 pub mod native;
+
 #[cfg(feature = "native")]
-pub use crate::services::native as s;
+pub mod server;
 
 // pub mod event;
 //
@@ -50,6 +55,3 @@ pub use crate::services::native as s;
 // pub use crate::native::*;
 // }
 //
-
-#[cfg(feature = "web")]
-pub mod web;

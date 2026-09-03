@@ -1,3 +1,8 @@
+// VSCode does not recognize this paths via cmd+click.
+// With default = ["native"] in Cargo.toml Zed does.
+// - [x] Native builds.
+// cargo build --bin native --features native
+// - [ ] WASM builds.
 pub mod types {
 	include!(concat!(env!("OUT_DIR"), "/leetcode.types.rs"));
 }

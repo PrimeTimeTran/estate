@@ -53,7 +53,7 @@ impl Clone for Box<dyn Api> {
 // ============================================================
 
 #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-use crate::proto::leetcode::{
+use crate::proto::{
 	problem_service_client::ProblemServiceClient, submission_service_client::SubmissionServiceClient,
 };
 
@@ -67,6 +67,7 @@ pub struct NativeApiClient {
 	pub submissions: SubmissionServiceClient<Channel>,
 }
 
+#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 impl NativeApiClient {
 	pub fn new(
 		problems: ProblemServiceClient<Channel>,
@@ -157,6 +158,9 @@ impl WasmApiClient {
 #[cfg(target_arch = "wasm32")]
 #[async_trait::async_trait(?Send)]
 impl Api for WasmApiClient {
+	fn clone_box(&self) -> Box<dyn Api> {
+		Box::new(self.clone())
+	}
 	async fn load_problems(&self) -> anyhow::Result<Vec<StoredProblem>> {
 		// fetch(...)
 		// deserialize response

@@ -14,14 +14,6 @@ use crate::{
 
 use notify::{Event, EventKind};
 
-#[derive(Debug, Clone, Eq, Deserialize, PartialEq, Serialize)]
-pub struct Task {
-	pub id: TaskId,
-	pub name: String,
-	pub kind: TaskKind,
-	pub status: TaskStatus,
-}
-
 #[derive(Debug)]
 pub struct TaskManagerRuntime {
 	watcher: notify::RecommendedWatcher,
@@ -46,15 +38,6 @@ impl TaskManagerRuntime {
 
 		Ok(Self { watcher, rx })
 	}
-}
-#[derive(Debug, Default)]
-pub struct TaskManagerState {
-	pub dirty: bool,
-	pub error: Option<String>,
-	pub last_loaded: Option<SystemTime>,
-	pub state: Option<EstateState>,
-	pub state_path: PathBuf,
-	pub tasks: HashMap<TaskId, Task>,
 }
 
 #[derive(Debug, Clone)]

@@ -6,6 +6,7 @@ pub use crate::{
 	event::*,
 	model::*,
 	proto::{types, *},
+	services::*,
 	share::{prelude::*, *},
 	theme::*,
 	tool::{time::*, *},

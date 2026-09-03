@@ -15,7 +15,7 @@ impl WasmRuntime {
 		let (events, _) = broadcast(256);
 
 		Self {
-			api: WasmApiClient::new(),
+			// api: WasmApiClient::new(),
 			state: Arc::new(RwLock::new(state)),
 			events,
 		}
@@ -56,7 +56,7 @@ impl Runtime for WasmRuntime {
 	}
 	fn event_processed(&self) {
 		let mut state = self.state.write();
-		state.events_processed += 1;
+		// state.events_processed += 1;
 	}
 	fn tasks(&self) -> &Arc<RwLock<TaskManager>> {
 		todo!("tasks")

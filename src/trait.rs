@@ -22,11 +22,10 @@ pub trait Runtime: Clone + Sync + std::marker::Send + 'static {
 	fn session(&self) -> Session;
 
 	async fn sleep(&self, duration: std::time::Duration);
-	fn tasks(&self) -> &Arc<RwLock<TaskManager>>;
 
+	fn tasks(&self) -> &Arc<RwLock<TaskManager>>;
 	fn state_service(&self) -> &Arc<StateService>;
 	fn session_service(&self) -> &Arc<SessionService>;
-
 	// fn spawn<F>(&self, future: F)
 	// where
 	// 	F: std::future::Future<Output = ()> + Send + 'static;

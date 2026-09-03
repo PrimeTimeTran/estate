@@ -16,7 +16,26 @@
 //   -e features
 //
 // "rust-analyzer.cargo.target": "wasm32-unknown-unknown",
-#[cfg(target_arch = "wasm32")]
+
+use estate::{
+	app::state::EstateState,
+	app::{model::EstateEngine, *},
+	web::WasmRuntime,
+};
+
+// Turning feature flag is not enough, must set rust analyzer feature as well for cmd+click
+#[cfg(all(feature = "web", target_arch = "wasm32"))]
+fn main() -> Result<()> {
+	use estate::api::WasmApiClient;
+	let state = EstateState::default();
+	let runtime = WasmRuntime::new(state);
+	let engine = EstateEngine::new(runtime)?;
+	let api = Arc::new(WasmApiClient::new("http://localhost:3000"));
+	let _app = AppRuntime::new(engine, api);
+	Ok(())
+}
+
+#[cfg(all(feature = "web", target_arch = "wasm32"))]
 mod wasm {
 	use eframe::{WebOptions, WebRunner};
 	use estate::{ui::*, web::bridge::*};
@@ -76,23 +95,6 @@ mod wasm {
 	pub fn evaluate_ui(canvas: web_sys::HtmlCanvasElement) {
 		let _rect = canvas.get_bounding_client_rect();
 	}
-}
-
-use estate::{
-	app::state::EstateState,
-	app::{model::EstateEngine, *},
-	web::WasmRuntime,
-};
-
-#[cfg(target_arch = "wasm32")]
-fn main() -> Result<()> {
-	use estate::api::WasmApiClient;
-	let state = EstateState::default();
-	let runtime = WasmRuntime::new(state);
-	let engine = EstateEngine::new(runtime)?;
-	let api = Arc::new(WasmApiClient::new("http://localhost:3000"));
-	let _app = AppRuntime::new(engine, api);
-	Ok(())
 }
 
 #[cfg(not(target_arch = "wasm32"))]
