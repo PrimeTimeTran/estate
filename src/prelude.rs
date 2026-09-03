@@ -17,13 +17,17 @@ pub use crate::data::*;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub use crate::{
+	app::{app_native::*, *},
 	data::*,
-	native::{app::*, prelude::*, *},
+	native::{prelude::*, *},
 	server::{self, event::*},
 };
 
 #[cfg(not(target_arch = "wasm32"))]
 pub use cli::context::*;
+
+// #[cfg(all(feature = "web", target_arch = "wasm32"))]
+pub use crate::web::*;
 
 pub use ::serde::{Deserialize, Serialize, de::DeserializeOwned};
 pub use anyhow::{self, Error, Result};

@@ -195,6 +195,7 @@ impl<'a> NativeAppContext<'a> {
 // 	}
 // }
 
+// #[derive(Clone)]
 pub struct NativeEventReceiver {
 	pub rx: broadcast::Receiver<e::Event>,
 }

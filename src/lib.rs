@@ -20,13 +20,13 @@ pub use ui::*;
 pub mod app;
 pub use crate::app::event as e;
 
-#[cfg(not(target_arch = "wasm32"))]
-pub mod server;
-
-#[cfg(all(feature = "web", target_arch = "wasm32"))]
+// #[cfg(all(feature = "web", target_arch = "wasm32"))]
 pub mod web;
 
-#[cfg(feature = "native")]
+#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+pub mod server;
+
+#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 pub mod native;
 
 // pub mod event;

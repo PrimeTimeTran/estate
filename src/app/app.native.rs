@@ -1,4 +1,11 @@
 use crate::{
+	EventReceiver,
+	app::prelude::*,
+	prelude::*,
+	r#trait::{self, Context},
+};
+
+use crate::{
 	AppEvent, DaemonCommand, NativeExecutor,
 	api::NativeApiClient,
 	app::App,
@@ -21,7 +28,11 @@ use winit::{
 	window::WindowId,
 };
 
-pub struct NativeAppGrr {
+pub struct NativeApp {
+	pub app: AppRuntime<NativeRuntime>,
+	pub host: NativeHost,
+	pub runtime: NativeRuntime,
+	pub services: NativeServices,
 	// Receiver channel for process/daemon
 	pub daemon_rx: Option<mpsc::Receiver<DaemonCommand>>,
 	// Sender channel for process/daemon
@@ -31,21 +42,118 @@ pub struct NativeAppGrr {
 	pub menu: Option<TrayMenu>,
 	pub menu_bar: Option<Menu>,
 	pub monitor: NativeMonitor,
-	pub runtime: AppRuntime<NativeRuntime>,
 	pub tokio: tokio::runtime::Runtime,
 	pub tray_clock: Option<TrayIcon>,
 	pub tray_cursor: Option<TrayIcon>,
 	pub windows: Vec<AppWindow>,
 }
 
-#[cfg(feature = "native")]
-impl NativeAppGrr {
+impl Context for NativeApp {
+	type Host = NativeHost;
+	type Runtime = NativeRuntime;
+	type Services = NativeServices;
+	type Args = Cli;
+
+	fn new() -> Result<Self> {
+		NativeApp::new()
+	}
+
+	fn host(&self) -> &Self::Host {
+		&self.host
+	}
+
+	fn runtime(&self) -> &Self::Runtime {
+		&self.runtime
+	}
+
+	fn services(&self) -> &Self::Services {
+		&self.services
+	}
+
+	fn run(&mut self, cli: Self::Args) -> Result<()> {
+		NativeApp::run(self, cli)
+	}
+
+	fn foo(&self, args: String) -> Result<()> {
+		NativeApp::foo(&self, args)
+	}
+	fn bar(&self, args: String) -> Result<()> {
+		NativeApp::bar(&self, args)
+	}
+}
+
+impl NativeApp {
 	pub fn new() -> Result<Self> {
+		let tokio = tokio::runtime::Runtime::new()?;
+		let handle = tokio.handle().clone();
+		// 2. Give the handle to NativeRuntime.
+		let runtime = NativeRuntime::new(handle.clone())?;
+		// 3. Then construct the engine.
+		let engine = EstateEngine::new(runtime.clone())?;
+		let api = Arc::new(tokio.block_on(NativeApiClient::connect())?);
+		let executor = NativeExecutor {
+			handle: handle.clone(),
+		};
+
+		let host = NativeHost::new();
+		let services = NativeServices::default();
+		let app = AppRuntime::new(engine.clone(), api.clone());
+		app.start();
+		let (daemon_tx, daemon_rx) = mpsc::channel(100);
+		Ok(Self {
+			app,
+			host,
+			runtime,
+			services,
+			is_clocking: Arc::new(AtomicBool::new(true)),
+			daemon_rx: Some(daemon_rx),
+			daemon_tx,
+			hotkey_manager: GlobalHotkeys::new().unwrap(),
+			menu: None,
+			menu_bar: None,
+			monitor: NativeMonitor::new()?,
+			tokio,
+			tray_clock: None,
+			tray_cursor: None,
+			windows: vec![],
+		})
+	}
+	fn foo(&self, cli: String) -> Result<()> {
+		todo!("run")
+	}
+	fn bar(&self, cli: String) -> Result<()> {
+		todo!("run")
+	}
+	// Inner NativeApp
+	fn runtime_old(&self) -> Arc<NativeRuntime> {
+		// [Flexibility]
+		// Decide later if theres any bad things that can happen from enabling app runtime
+		// access.
+		Arc::clone(&self.app.engine.runtime)
+	}
+	pub fn handle(&self) -> tokio::runtime::Handle {
+		self.tokio.handle().clone()
+	}
+}
+impl NativeApp {
+	pub fn run(&mut self, cli: Cli) -> Result<()> {
+		tracing::debug!(">>> NativeApp::run entered");
+		let result = match cli.command {
+			None | Some(Command::Start { .. }) | Some(Command::Tray) => self.start_runtime(),
+			Some(_) => self.tokio.block_on(async {
+				let ctx = cli::context::Context::new();
+				router::execute(cli, ctx, self.app.engine.clone()).await
+			}),
+		};
+		tracing::debug!(">>> NativeApp::run returning");
+		result
+	}
+	fn start_runtime(&mut self) -> Result<()> {
 		// // App
 		// self.engine.runtime.spawn(future);       // ✅
 		// // NativeRuntime
 		// self.handle.spawn(future);               // ✅
-		// // NativeAppGrr
+		// // NativeApp
 		// self.tokio = Runtime::new()?;             // ✅
 		// // App
 		// tokio::spawn(future);                     // ❌
@@ -54,58 +162,6 @@ impl NativeAppGrr {
 		// // AppContext
 		// tokio::runtime::Handle;
 		// 1. Create Tokio first.
-		let tokio = tokio::runtime::Runtime::new()?;
-		let handle = tokio.handle().clone();
-		// 2. Give the handle to NativeRuntime.
-		let daemon_runtime = NativeRuntime::new(handle.clone())?;
-		// 3. Then construct the engine.
-		let engine = EstateEngine::new(daemon_runtime)?;
-		let api = Arc::new(tokio.block_on(NativeApiClient::connect())?);
-		let executor = NativeExecutor {
-			handle: handle.clone(),
-		};
-		let runtime = AppRuntime::new(engine.clone(), api.clone());
-		runtime.start();
-		let (daemon_tx, daemon_rx) = mpsc::channel(100);
-		Ok(Self {
-			is_clocking: Arc::new(AtomicBool::new(true)),
-			daemon_rx: Some(daemon_rx),
-			daemon_tx,
-			hotkey_manager: GlobalHotkeys::new().unwrap(),
-			menu: None,
-			menu_bar: None,
-			monitor: NativeMonitor::new()?,
-			runtime,
-			tokio,
-			tray_clock: None,
-			tray_cursor: None,
-			windows: vec![],
-		})
-	}
-	pub fn runtime(&self) -> Arc<NativeRuntime> {
-		// [Flexibility]
-		// Decide later if theres any bad things that can happen from enabling app runtime
-		// access.
-		self.runtime.runtime()
-	}
-	pub fn handle(&self) -> tokio::runtime::Handle {
-		self.tokio.handle().clone()
-	}
-}
-impl NativeAppGrr {
-	pub fn run(&mut self, cli: Cli) -> Result<()> {
-		tracing::debug!(">>> NativeAppGrr::run entered");
-		let result = match cli.command {
-			None | Some(Command::Start { .. }) | Some(Command::Tray) => self.start_runtime(),
-			Some(_) => self.tokio.block_on(async {
-				let ctx = cli::context::Context::new();
-				router::execute(cli, ctx, self.runtime.engine.clone()).await
-			}),
-		};
-		tracing::debug!(">>> NativeAppGrr::run returning");
-		result
-	}
-	fn start_runtime(&mut self) -> Result<()> {
 		// AppRuntime
 		self.runtime.start_services();
 		// EstateEngineRuntime
@@ -124,15 +180,17 @@ impl NativeAppGrr {
 		self.spawn_clock(proxy.clone());
 		self.spawn_cursor_daemon(proxy.clone());
 		self.spawn_signal_handler(proxy.clone());
-		self.runtime().attach_event_proxy(proxy);
-		self.runtime().emit(e::Event::app(e::Klass::SessionStart));
+		self.runtime_old().attach_event_proxy(proxy);
+		self
+			.runtime_old()
+			.emit(e::Event::app(e::Klass::SessionStart));
 		event_loop.run_app(self)?;
-		tracing::info!(">>> NativeAppGrr::start_runtime returning");
+		tracing::info!(">>> NativeApp::start_runtime returning");
 		Ok(())
 	}
 	fn spawn_clock(&mut self, proxy: EventLoopProxy<AppEvent>) {
 		let running = Arc::clone(&self.is_clocking);
-		let runtime = self.runtime();
+		let runtime = self.runtime_old();
 		std::thread::spawn(move || {
 			let mut current_time = 10;
 			let mut view_index = 0;
@@ -148,7 +206,7 @@ impl NativeAppGrr {
 					ViewType::ProblemsScreen,
 				];
 				let _ = proxy.send_event(AppEvent::TickClock(format!(" {}s", current_time)));
-				tracing::debug!("NativeAppGrr spawn_clock {}", current_time);
+				tracing::debug!("NativeApp spawn_clock {}", current_time);
 				if current_time == 0 {
 					current_time = 10;
 					view_index = (view_index + 1) % views.len();
@@ -241,7 +299,7 @@ impl NativeAppGrr {
 		event_loop.exit();
 	}
 }
-impl NativeAppGrr {
+impl NativeApp {
 	fn bootstrap() -> Result<(TrayMenu, TrayIcon)> {
 		bootstrap()
 	}
@@ -282,13 +340,13 @@ impl NativeAppGrr {
 		if self.window_by_type(kind).is_some() {
 			return;
 		}
-		match Window::new(event_loop, self.runtime.view()) {
+		match Window::new(event_loop, self.app.view()) {
 			Ok(window) => {
 				tracing::info!(" open window end, new window");
-				window.instance.set_title(self.runtime.view().name().into());
+				window.instance.set_title(self.app.view().name().into());
 				self.windows.push(AppWindow {
 					kind,
-					view: self.runtime.view(),
+					view: self.app.view(),
 					window,
 				});
 			}
@@ -298,7 +356,7 @@ impl NativeAppGrr {
 		}
 	}
 }
-impl NativeAppGrr {
+impl NativeApp {
 	fn new_task(&mut self) {
 		self.runtime().emit(e::Event::app(e::Klass::TaskRequested {
 			request: TaskRequest::Create(TaskKind::SyncBookmarks),
@@ -350,16 +408,16 @@ impl NativeAppGrr {
 		Ok(())
 	}
 }
-impl NativeAppGrr {
+impl NativeApp {
 	fn sync_views(&mut self) {
 		for window in &mut self.windows {
-			// println!("NativeAppGrr {:?}", self.runtime.view);
-			tracing::debug!("sync views {:?}", self.runtime.view.name());
+			// println!("NativeApp {:?}", self.runtime.view);
+			tracing::debug!("sync views {:?}", self.app.view.name());
 			// window
 			// 	.window
 			// 	.sync_view(self.runtime.view, self.runtime.api.clone());
 			window.window.instance.request_redraw();
-			window.window.instance.set_title(self.runtime.view.name());
+			window.window.instance.set_title(self.app.view.name());
 		}
 	}
 	fn set_menu_bar(&mut self, new_menu: Menu) {
@@ -420,7 +478,7 @@ impl NativeAppGrr {
 		menu
 	}
 }
-impl ApplicationHandler<AppEvent> for NativeAppGrr {
+impl ApplicationHandler<AppEvent> for NativeApp {
 	fn resumed(&mut self, event_loop: &ActiveEventLoop) {
 		if self.menu_bar.is_none() {
 			let menu = Self::menu_bar(true);
@@ -459,7 +517,7 @@ impl ApplicationHandler<AppEvent> for NativeAppGrr {
 		}
 	}
 	fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
-		self.runtime.update();
+		self.app.update();
 		while let Ok(event) = MenuEvent::receiver().try_recv() {
 			self.handle_event(event, event_loop);
 		}
@@ -497,9 +555,9 @@ impl ApplicationHandler<AppEvent> for NativeAppGrr {
 					return;
 				}
 				let menu = {
-					let event_rx = self.runtime.engine.runtime().subscribe();
+					let event_rx = self.app.engine.runtime().subscribe();
 					let mut ctx = AppContext {
-						app: &mut self.runtime,
+						app: &mut self.app,
 						input: IOState::default(),
 						event_rx,
 						last_revision: 0,
@@ -538,12 +596,12 @@ impl ApplicationHandler<AppEvent> for NativeAppGrr {
 	fn user_event(&mut self, event_loop: &ActiveEventLoop, event: AppEvent) {
 		match event {
 			AppEvent::RuntimeEvent => {
-				self.runtime.update();
+				self.app.update();
 				self.sync_views();
 			}
 			AppEvent::Navigate(view) => {
 				self.runtime().emit(e::Event::app(e::Klass::Navigate(view)));
-				self.runtime.update();
+				self.app.update();
 				self.sync_views();
 			}
 			AppEvent::Shutdown => {
@@ -586,8 +644,93 @@ impl ApplicationHandler<AppEvent> for NativeAppGrr {
 	}
 }
 
-impl Drop for NativeAppGrr {
+#[derive(Default)]
+pub struct NativeHost {
+	window: NativeWindow,
+	storage: NativeStorage,
+	clock: NativeClock,
+}
+
+impl NativeHost {
+	fn new() -> Self {
+		Self::default()
+	}
+}
+#[derive(Default)]
+pub struct NativeWindow;
+#[derive(Default)]
+pub struct NativeStorage;
+#[derive(Default)]
+pub struct NativeClock;
+
+impl Clock for NativeClock {
+	fn now(&self) -> std::time::Instant {
+		todo!("now")
+	}
+}
+
+impl Host for NativeHost {
+	type Window = NativeWindow;
+	type Storage = NativeStorage;
+	type Clock = NativeClock;
+
+	fn window(&self) -> &Self::Window {
+		&self.window
+	}
+
+	fn storage(&self) -> &Self::Storage {
+		&self.storage
+	}
+
+	fn clock(&self) -> &Self::Clock {
+		&self.clock
+	}
+}
+
+#[derive(Default)]
+pub struct NativeServices {
+	persistance: NativePersistance,
+	network: NativeNetwork,
+	clock: NativeClock,
+}
+
+impl Services for NativeServices {
+	type Persistence = NativePersistance;
+	type Network = NativeNetwork;
+	type Clock = NativeClock;
+
+	fn persistence(&self) -> &Self::Persistence {
+		todo!("");
+	}
+	fn network(&self) -> &Self::Network {
+		todo!("")
+	}
+	fn clock(&self) -> &Self::Clock {
+		todo!("");
+	}
+}
+#[derive(Default)]
+pub struct NativePersistance;
+
+impl Persistence for NativePersistance {
+	fn load(&self, key: &str) -> Result<Option<Vec<u8>>> {
+		todo!("")
+	}
+	fn save(&self, key: &str, value: &[u8]) -> Result<()> {
+		todo!("")
+	}
+}
+#[derive(Default)]
+pub struct NativeNetwork;
+
+impl Network for NativeNetwork {
+	fn is_available(&self) -> bool {
+		todo!("")
+	}
+}
+
+impl Drop for NativeApp {
 	fn drop(&mut self) {
-		tracing::info!("💀 NativeAppGrr DROPPED");
+		tracing::info!("💀 NativeApp DROPPED");
 	}
 }

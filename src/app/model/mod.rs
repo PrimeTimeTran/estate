@@ -1,6 +1,6 @@
 use crate::api::Api;
-#[cfg(feature = "native")]
-#[cfg(not(target_arch = "wasm32"))]
+
+#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 pub use crate::app::session::Session;
 
 pub use crate::prelude::*;

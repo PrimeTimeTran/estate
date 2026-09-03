@@ -5,13 +5,23 @@
 // ./src/mobile
 
 // Available to all consumers, external and internal.
+// pub mod app_web;
 pub mod event;
 pub mod model;
 pub mod prelude;
 pub mod state;
 
+#[path = "./app.mobile.rs"]
+pub mod app_mobile;
+#[cfg(feature = "native")]
+#[path = "./app.native.rs"]
+pub mod app_native;
+#[path = "./app.web.rs"]
+pub mod app_web;
+
 // Glob reexport to make it easier to use.
 pub use app::*;
+// pub use app_web::*;
 pub use context::*;
 pub use event::*;
 pub use job::*;

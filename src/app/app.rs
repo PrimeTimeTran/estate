@@ -1,44 +1,116 @@
 use crate::{
 	Executor,
 	api::{Api, AppState},
-	app::{prelude::*, state::EstateState},
+	app::{prelude::*, state::EstateState, *},
 	e,
 	model::StoredProblem,
 	prelude::*,
 	proto::types::{ListProblemsRequest, PageRequest, SampleProblemRequest},
-	r#trait::EventReceiver,
+	r#trait::{Context, EventReceiver},
 	ui::Layout,
 };
 
 #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 use crate::logger::{LogConfig, Tracer};
 
-// $ cargo build --bin native --no-default-features --features native
-// $ cargo build --bin web --no-default-features --features="web" --target wasm32-unknown-unknown
-//
-pub struct App {
-	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-	native: NativeApp,
+/// # App
+/// We have 3 primary target platforms which we're developing for. They access resources in similar yet
+/// unique ways. Native (Desktop/Laptop), Web (Browser/Client/WASM), Server (Api/Backend) all want access to user,
+/// anchors (bookmarks), jobs (tasks), and more.
+///
+/// Generic indirection adds complication but solves problems downstream.
+///
+pub struct App<C>
+where
+	C: Context,
+{
+	// C is a generic type parameter.
+	// Caller supplies it.
+	// App<WebApp>
+	// App<NativeApp>
+	context: C,
 }
 
-impl App {
+impl<C> App<C>
+where
+	C: Context,
+{
+	/// Bounded implementation of App.
+	///
+	/// "Everything in this impl block only exists for App<C> where C implements Context."
+	pub fn host(&self) -> &C::Host {
+		self.context.host()
+	}
+	pub fn runtime(&self) -> &C::Runtime {
+		self.context.runtime()
+	}
+	pub fn services(&self) -> &C::Services {
+		self.context.services()
+	}
+}
+impl<C: Context> App<C> {
+	/// Initialize a new Estate App instance.
+	/// - [Native]
+	/// - [Server]
+	/// - [Web]
 	pub fn new() -> Result<Self> {
-		#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-		{
-			return Ok(Self {
-				native: NativeApp::new()?,
-			});
-		}
-		#[cfg(any(not(feature = "native"), target_arch = "wasm32"))]
-		{
-			Ok(Self {})
-		}
+		Ok(Self { context: C::new()? })
 	}
+	fn start(&self) -> Result<()> {
+		Ok(())
+	}
+	pub fn foo(&mut self, args: String) -> Result<()> {
+		self.context.foo(args)
+		// App::<WebApp>::foo();
+		// App::<NativeApp>::foo();
+	}
+	pub fn bar(&mut self, args: String) -> Result<()> {
+		self.context.bar(args)
+	}
+}
+impl<C: Context> App<C> {
+	/// # Running
+	/// Ensure estate builds before running
+	///
+	/// ## Native
+	/// - **build:**
+	///
+	///     `cargo build --bin native --features native`
+	///
+	/// - **run:**
+	///
+	///     `cargo run --bin native --no-default-features --features native`
+	///
+	/// ## Server
+	/// - **build:**
+	///
+	///     `cargo build --bin server --no-default-features --features native`
+	///
+	/// - **run/start:**
+	///
+	///     `cargo run --bin server --no-default-features --features native`
+	///
+	/// ## Web
+	/// - **build**
+	///
+	///   `cargo build --bin web --no-default-features --features web --target wasm32-unknown-unknown`
+	///
+	/// - **run**
+	///
+	///   `cargo run --bin native --no-default-features --features native`
+	pub fn run(&mut self, args: C::Args) -> Result<()> {
+		self.context.run(args)
+	}
+}
 
-	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-	pub fn run(mut self, cli: Cli) -> Result<()> {
-		self.native.run(cli)
-	}
+impl<C: Context> App<C> {
+	// Outer App<C>
+	// pub fn runtime(&self) -> Arc<R> {
+	// 	Arc::clone(&self.engine.runtime)
+	// }
+	// pub fn runtime(&self) -> Arc<C::Runtime> {
+	// 	Arc::clone(&self.context.runtime().something)
+	// }
 }
 
 #[derive(Debug, Clone)]
@@ -72,9 +144,17 @@ impl<R: Runtime> AppRuntime<R> {
 	}
 }
 impl<R: Runtime> AppRuntime<R> {
+	/// Outer App<C>
+	///
+	/// "Here's a thread-safe shared handle to the runtime. You can keep this."
 	pub fn runtime(&self) -> Arc<R> {
 		Arc::clone(&self.engine.runtime)
 	}
+	/// "Here's my runtime while I'm borrowing this context."
+	///
+	// fn runtime(&self) -> &Self::Runtime {
+	// 	self.runtime
+	// }
 	pub fn api(&self) -> Arc<dyn Api> {
 		Arc::clone(&self.api)
 	}
@@ -200,22 +280,22 @@ impl<R: Runtime + 'static> AppRuntime<R> {
 }
 impl<R: Runtime + 'static> AppRuntime<R> {
 	pub fn start(&self) {
-		if !crate::START_APP_CLOCK {
-			return;
-		}
-		let views = [
-			ViewType::ProblemScreen,
-			ViewType::DashboardScreen,
-			ViewType::MarkdownView,
-			ViewType::ProblemScreen,
-			ViewType::WaterfallScreen,
-			ViewType::ProblemScreen,
-			ViewType::TaskManagerScreen,
-			ViewType::ProblemsScreen,
-		];
-		let mut view_idx = 0;
-		let mut current_time = 5;
-		let runtime = self.engine.runtime.clone();
+		// if !crate::START_APP_CLOCK {
+		// 	return;
+		// }
+		// let views = [
+		// 	ViewType::ProblemScreen,
+		// 	ViewType::DashboardScreen,
+		// 	ViewType::MarkdownView,
+		// 	ViewType::ProblemScreen,
+		// 	ViewType::WaterfallScreen,
+		// 	ViewType::ProblemScreen,
+		// 	ViewType::TaskManagerScreen,
+		// 	ViewType::ProblemsScreen,
+		// ];
+		// let mut view_idx = 0;
+		// let mut current_time = 5;
+		// let runtime = self.engine.runtime.clone();
 		// self.executor.spawn(async move {
 		// 	loop {
 		// 		runtime.sleep(std::time::Duration::from_secs(1)).await;

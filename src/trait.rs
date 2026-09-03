@@ -20,9 +20,7 @@ pub trait Runtime: Clone + Sync + std::marker::Send + 'static {
 	fn state(&self) -> &RuntimeState;
 	fn save(&self, state: &EstateState) -> Result<()>;
 	fn session(&self) -> Session;
-
 	async fn sleep(&self, duration: std::time::Duration);
-
 	fn tasks(&self) -> &Arc<RwLock<TaskManager>>;
 	fn state_service(&self) -> &Arc<StateService>;
 	fn session_service(&self) -> &Arc<SessionService>;
@@ -30,12 +28,71 @@ pub trait Runtime: Clone + Sync + std::marker::Send + 'static {
 	// where
 	// 	F: std::future::Future<Output = ()> + Send + 'static;
 }
+
+/// Context from runtime, host, platform
+///
+/// Do with that what you will.
+pub trait Context: Sized {
+	/// The host running the application
+	type Host: Host;
+	/// Runtime environment in which the app is running.
+	/// Multiple factor influence runtime such as plaftorm, host, config & more.
+	type Runtime: Runtime;
+	/// Services
+	type Services: Services;
+
+	fn host(&self) -> &Self::Host;
+	fn runtime(&self) -> &Self::Runtime;
+	fn services(&self) -> &Self::Services;
+
+	type Args;
+	/// Stuff about generic news
+	fn new() -> Result<Self>;
+
+	fn run(&mut self, args: Self::Args) -> Result<()>;
+	fn foo(&self, args: String) -> Result<()>;
+	fn bar(&self, args: String) -> Result<()>;
+}
+
+// struct NativeHost;
+pub trait Host {
+	/// The concrete environment providing the resources through which the application runs.
+	/// type Platform: Platform;
+	type Window;
+	type Storage;
+	type Clock;
+
+	// fn platform(&self) -> &Self::Platform;
+	fn window(&self) -> &Self::Window;
+	fn storage(&self) -> &Self::Storage;
+	fn clock(&self) -> &Self::Clock;
+}
+
+pub trait Services {
+	/// What capabilities are available?
+	type Persistence: Persistence;
+	type Network: Network;
+	type Clock: Clock;
+	fn persistence(&self) -> &Self::Persistence;
+	fn network(&self) -> &Self::Network;
+	fn clock(&self) -> &Self::Clock;
+}
+pub trait Persistence {
+	fn load(&self, key: &str) -> Result<Option<Vec<u8>>>;
+	fn save(&self, key: &str, value: &[u8]) -> Result<()>;
+}
+pub trait Network {
+	fn is_available(&self) -> bool;
+}
+pub trait Clock {
+	fn now(&self) -> std::time::Instant;
+}
+
 pub trait Spawner: Clone + 'static {
 	fn spawn<F>(&self, future: F)
 	where
 		F: Future<Output = ()> + 'static;
 }
-
 pub trait Executor: Clone + 'static {
 	fn spawn(&self, future: impl Future<Output = ()> + 'static);
 }
@@ -59,3 +116,18 @@ pub trait EventHandler<R: Runtime>: 'static {
 pub trait EventReceiver {
 	fn try_recv(&mut self) -> Option<e::Event>;
 }
+
+// pub trait Platform {
+// 	type Input: Input;
+// 	type Media: Media;
+
+// 	fn input(&self) -> &Self::Input;
+// 	fn media(&self) -> &Self::Media;
+
+// 	/// What kind of execution/application environment am I targeting?
+// 	fn is_available(&self) -> bool;
+// 	fn has_camera(&self) -> bool;
+// 	fn has_keyboard(&self) -> bool;
+// 	fn has_pointer(&self) -> bool;
+// 	fn has_touch(&self) -> bool;
+// }
