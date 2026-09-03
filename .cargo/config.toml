@@ -1,7 +1,15 @@
+# These all have to run to be considered a good build. They do at the time of this comment.
+# We always mistakenly leave a feature flag after development. So when the pre commit hook runs, it often gives
+# false positive if we don't use --no-default-features flag when testing.
 [alias]
-server = "build --bin server --no-default-features --features native"
-native = "run --bin native --no-default-features --features native"
-web = "build --bin web --no-default-features --features web --target wasm32-unknown-unknown"
-web-run = "run --bin web --no-default-features --target wasm32-unknown-unknown --features web"
-trunk-build = "trunk build --release"
+server = "build -q --bin server --no-default-features --features native"
+server-run = "run -q --bin server --no-default-features --features=native"
+
+native = "build -q --bin native --no-default-features --features native"
+native-run = "run -q --bin native --no-default-features --features native"
+
+# No build. The Wasm is run with other server.
+web = "build -q --bin web --no-default-features --features web --target wasm32-unknown-unknown"
+
+trunk = "trunk build -q --release"
 trunk-run = "trunk serve src/web/public/index.html --features web"

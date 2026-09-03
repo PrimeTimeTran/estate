@@ -26,7 +26,7 @@ pub use crate::{
 #[cfg(not(target_arch = "wasm32"))]
 pub use cli::context::*;
 
-// #[cfg(all(feature = "web", target_arch = "wasm32"))]
+#[cfg(all(feature = "web", target_arch = "wasm32"))]
 pub use crate::web::*;
 
 pub use ::serde::{Deserialize, Serialize, de::DeserializeOwned};

@@ -20,7 +20,7 @@ pub use ui::*;
 pub mod app;
 pub use crate::app::event as e;
 
-// #[cfg(all(feature = "web", target_arch = "wasm32"))]
+#[cfg(all(feature = "web", target_arch = "wasm32"))]
 pub mod web;
 
 #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
