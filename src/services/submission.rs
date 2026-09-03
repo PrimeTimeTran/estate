@@ -1,5 +1,6 @@
 use crate::{
 	model::{Language, ProtoSubmissionStatus, SubmissionStatus},
+	proto::types::{Submission, *},
 	services::*,
 };
 

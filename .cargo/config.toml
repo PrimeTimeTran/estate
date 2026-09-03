@@ -1,8 +1,6 @@
-# Sets default target
-# [build]
-# target = "wasm32-unknown-unknown"
-
-
-# macOS (Requires 'brew install llvm' to get lld)
-[target.x86_64-apple-darwin]
-linker = "lld"
+[alias]
+native = "run --bin native --no-default-features --features native"
+web = "run --bin web --no-default-features --target wasm32-unknown-unknown --features web"
+web-build = "build --bin web --no-default-features --features web --target wasm32-unknown-unknown"
+trunk-build = "trunk build --release"
+web-run = "trunk serve src/web/public/index.html --features web"

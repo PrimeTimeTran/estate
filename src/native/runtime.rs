@@ -1,19 +1,20 @@
-use winit::event_loop::EventLoopProxy;
-
 pub use crate::native::{monitor::NativeMonitor, prelude::*, state::NativeStateStore};
 use crate::{
+	EventDispatcher, EventReceiver,
 	app::{
 		Runtime,
 		state::{EstateState, StateStore},
 	},
 	e,
+	event::handler::*,
 };
 use std::sync::Mutex;
+use winit::event_loop::EventLoopProxy;
 
 #[derive(Clone, Debug)]
 pub struct NativeRuntime {
 	event_rx: Arc<Mutex<broadcast::Receiver<e::Event>>>,
-	handle: tokio::runtime::Handle,
+	pub handle: tokio::runtime::Handle,
 	proxy: Arc<Mutex<Option<EventLoopProxy<AppEvent>>>>,
 	pub events: EventBus,
 	pub session: Session,
@@ -21,24 +22,28 @@ pub struct NativeRuntime {
 	pub store: NativeStateStore,
 	pub tasks: Arc<RwLock<TaskManager>>,
 	pub state_service: Arc<StateService>,
+	// pub api: Box<dyn Api>,
 	pub session_service: Arc<SessionService>,
+	pub executor: NativeExecutor,
 }
 
 impl NativeRuntime {
 	pub fn new(handle: tokio::runtime::Handle) -> Result<Self> {
 		let store = NativeStateStore::new()?;
-		let session_service = Arc::new(SessionService::new(Arc::new(StateService::new(
-			crate::STATE_PATH,
-		))));
 		let state_service = Arc::new(StateService::new(crate::STATE_PATH));
+		let session_service = Arc::new(SessionService::new(Arc::clone(&state_service)));
 		let state = store.load()?;
 		let runtime_state = RuntimeState::new(state);
 		let events = EventBus::new();
 		let event_rx = Arc::new(Mutex::new(events.subscribe()));
+		let executor = NativeExecutor {
+			handle: handle.clone(),
+		};
 		Ok(Self {
 			event_rx,
 			events,
 			handle,
+			// api: Box::new(NativeApiClient::new()),
 			proxy: Arc::new(Mutex::new(None)),
 			session: Session::default(),
 			state: Arc::new(runtime_state),
@@ -46,6 +51,7 @@ impl NativeRuntime {
 			tasks: Arc::new(RwLock::new(TaskManager::new())),
 			state_service,
 			session_service,
+			executor,
 		})
 	}
 
@@ -66,13 +72,11 @@ impl NativeRuntime {
 
 impl Runtime for NativeRuntime {
 	type EventReceiver = NativeEventReceiver;
+	// type Api = NativeApiClient;
 
-	fn spawn<F>(&self, future: F)
-	where
-		F: std::future::Future<Output = ()> + Send + 'static,
-	{
-		self.handle.spawn(future);
-	}
+	// fn api(&self) -> &Self::Api {
+	// 	&self.api
+	// }
 
 	async fn sleep(&self, duration: std::time::Duration) {
 		tokio::time::sleep(duration).await;
@@ -107,40 +111,53 @@ impl Runtime for NativeRuntime {
 	fn try_recv(&self) -> Option<e::Event> {
 		self.event_rx.lock().unwrap().try_recv().ok()
 	}
+	fn event_processed(&self) {
+		todo!("event_processed")
+	}
+	fn tasks(&self) -> &Arc<RwLock<TaskManager>> {
+		&self.tasks
+	}
 
 	fn start_dispatcher(self: &Arc<Self>) {
 		let runtime = Arc::clone(self);
 		let handle = runtime.handle.clone();
 		let mut receiver = runtime.events.subscribe();
-		let mut dispatcher = EventDispatcher::new();
+		let mut dispatcher = EventDispatcher::<NativeRuntime>::new();
+		// let mut dispatcher = EventDispatcher::new();
 
-		dispatcher.register(crate::event::handler::TaskHandler);
-		dispatcher.register(crate::event::handler::StateHandler);
-		dispatcher.register(crate::event::handler::CommandHandler);
-		dispatcher.register(crate::event::handler::FileWatcherHandler);
-		dispatcher.register(crate::event::handler::NavigationHandler);
-		dispatcher.register(crate::event::handler::AppHandler);
+		dispatcher.register(TaskHandler);
+		dispatcher.register(StateHandler);
+		dispatcher.register(CommandHandler);
+		dispatcher.register(FileWatcherHandler);
+		dispatcher.register(NavigationHandler);
+		dispatcher.register(AppHandler);
 
-		handle.spawn(async move {
-			loop {
-				match receiver.recv().await {
-					Ok(event) => {
-						tracing::debug!("🔥 native::runtime::dispatcher {:?}", event.kind);
-
-						dispatcher.dispatch(event, &runtime).await;
-					}
-					Err(broadcast::error::RecvError::Lagged(count)) => {
-						tracing::warn!(count, "native::runtime::start_dispatcher lagged");
-					}
-					Err(broadcast::error::RecvError::Closed) => {
-						tracing::warn!("native::runtime::start_dispatcher closed");
-						break;
-					}
-				}
-			}
-		});
+		// handle.spawn(async move {
+		// 	loop {
+		// 		match receiver.recv().await {
+		// 			Ok(event) => {
+		// 				tracing::debug!("🔥 native::runtime::dispatcher {:?}", event.kind);
+		// 				dispatcher.dispatch(event, &runtime).await;
+		// 			}
+		// 			Err(broadcast::error::RecvError::Lagged(count)) => {
+		// 				tracing::warn!(count, "native::runtime::start_dispatcher lagged");
+		// 			}
+		// 			Err(broadcast::error::RecvError::Closed) => {
+		// 				tracing::warn!("native::runtime::start_dispatcher closed");
+		// 				break;
+		// 			}
+		// 		}
+		// 	}
+		// });
+	}
+	fn state_service(&self) -> &Arc<StateService> {
+		&self.state_service
+	}
+	fn session_service(&self) -> &Arc<SessionService> {
+		&self.session_service
 	}
 }
+
 pub struct NativeAppContext<'a> {
 	pub base: AppContext<'a, NativeRuntime>,
 	pub monitor: &'a mut NativeMonitor,
@@ -154,20 +171,59 @@ impl<'a> NativeAppContext<'a> {
 		todo!("Unused for not.")
 	}
 }
+
+// impl SendSpawnRuntime for NativeRuntime {
+// 	fn spawn<F>(&self, future: F)
+// 	where
+// 		F: Future<Output = ()> + Send + 'static,
+// 	{
+// 		self.handle.spawn(future);
+// 	}
+// }
+
+// impl SpawnRuntime for NativeRuntime {
+// 	fn spawn<F>(&self, future: F)
+// 	where
+// 		F: Future<Output = ()> + std::marker::Send + 'static,
+// 	{
+// 		self.handle.spawn(future);
+// 	}
+// }
+
+// impl EventReceiver for async_broadcast::Receiver<e::Event> {
+// 	fn try_recv(&mut self) -> Option<e::Event> {
+// 		self.try_recv().ok()
+// 	}
+// }
+
 pub struct NativeEventReceiver {
 	pub rx: broadcast::Receiver<e::Event>,
 }
+
 impl EventReceiver for NativeEventReceiver {
 	fn try_recv(&mut self) -> Option<e::Event> {
 		self.rx.try_recv().ok()
 	}
 }
+
 // impl AppHost<NativeRuntime> for NativeApp {
 // 	fn app(&mut self) -> &mut App<NativeRuntime> {
 // 		&mut self.app
 // 	}
 // }
 
+#[derive(Clone, Debug)]
+pub struct NativeExecutor {
+	pub handle: tokio::runtime::Handle,
+}
+impl NativeExecutor {
+	pub fn spawn<F>(&self, future: F)
+	where
+		F: Future<Output = ()> + Send + 'static,
+	{
+		self.handle.spawn(future);
+	}
+}
 impl Drop for NativeRuntime {
 	fn drop(&mut self) {
 		tracing::info!("💀 NativeRuntime DROPPED");

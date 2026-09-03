@@ -1,3 +1,6 @@
+use egui::Pos2;
+
+use crate::api::Api;
 use crate::{e, prelude::*};
 
 use crate::LAYOUT as config;
@@ -85,6 +88,8 @@ impl<R: Runtime> LayoutTrait<R> for Layout<R> {
 		// Determine what region the cursor is currently over.
 		let cursor_target = self.cursor_target(mouse_pos, &layout);
 		// Update application input state.
+
+		// self.update_input(ctx, ui, mouse_pos);
 		ctx.input = IOState {
 			cursor_pos: mouse_pos,
 			cursor_target,
@@ -455,58 +460,58 @@ pub enum FocusedPane {
 	CenterGrid,
 	Unknown,
 }
-pub struct TabbedSidebar<T> {
-	pub active_tab: T,
-	pub tabs: Vec<(T, String)>,
-}
-impl<T> TabbedSidebar<T>
-where
-	T: Clone + PartialEq,
-{
-	pub fn new(active_tab: T, tabs: Vec<(T, impl Into<String>)>) -> Self {
-		Self {
-			active_tab,
-			tabs: tabs
-				.into_iter()
-				.map(|(tab, label)| (tab, label.into()))
-				.collect(),
-		}
-	}
-	pub fn draw<F>(&mut self, ui: &mut egui::Ui, mut draw_content: F)
-	where
-		F: FnMut(&mut egui::Ui, &T),
-	{
-		ui.horizontal(|ui| {
-			for (tab, label) in &self.tabs {
-				if ui
-					.selectable_label(self.active_tab == *tab, label)
-					.clicked()
-				{
-					self.active_tab = tab.clone();
-				}
-			}
-		});
-		ui.separator();
-		egui::ScrollArea::vertical()
-			.auto_shrink([false, false])
-			.show(ui, |ui| {
-				draw_content(ui, &self.active_tab);
-			});
-	}
-}
-impl<R, T> ViewTrait<R> for TabbedSidebar<T>
-where
-	R: Runtime,
-	T: Clone + PartialEq + 'static,
-{
-	fn draw(&mut self, ui: &mut egui::Ui, _ctx: &mut AppContext<'_, R>) {
-		self.draw(ui, |ui, _tab| {
-			// content gets supplied by the owning view
-		});
-	}
-	fn update(&mut self, ctx: &mut AppContext<'_, R>) {}
-	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R>) {}
-}
+// pub struct TabbedSidebar<T> {
+// 	pub active_tab: T,
+// 	pub tabs: Vec<(T, String)>,
+// }
+// impl<T> TabbedSidebar<T>
+// where
+// 	T: Clone + PartialEq,
+// {
+// 	pub fn new(active_tab: T, tabs: Vec<(T, impl Into<String>)>) -> Self {
+// 		Self {
+// 			active_tab,
+// 			tabs: tabs
+// 				.into_iter()
+// 				.map(|(tab, label)| (tab, label.into()))
+// 				.collect(),
+// 		}
+// 	}
+// 	pub fn draw<F>(&mut self, ui: &mut egui::Ui, mut draw_content: F)
+// 	where
+// 		F: FnMut(&mut egui::Ui, &T),
+// 	{
+// 		ui.horizontal(|ui| {
+// 			for (tab, label) in &self.tabs {
+// 				if ui
+// 					.selectable_label(self.active_tab == *tab, label)
+// 					.clicked()
+// 				{
+// 					self.active_tab = tab.clone();
+// 				}
+// 			}
+// 		});
+// 		ui.separator();
+// 		egui::ScrollArea::vertical()
+// 			.auto_shrink([false, false])
+// 			.show(ui, |ui| {
+// 				draw_content(ui, &self.active_tab);
+// 			});
+// 	}
+// }
+// impl<R, T> ViewTrait<R> for TabbedSidebar<T>
+// where
+// 	R: Runtime,
+// 	T: Clone + PartialEq + 'static,
+// {
+// 	fn draw(&mut self, ui: &mut egui::Ui, _ctx: &mut AppContext<'_, R>) {
+// 		self.draw(ui, |ui, _tab| {
+// 			// content gets supplied by the owning view
+// 		});
+// 	}
+// 	fn update(&mut self, ctx: &mut AppContext<'_, R>) {}
+// 	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R>) {}
+// }
 #[derive(Debug, Clone, PartialEq)]
 pub struct Sidebar<T> {
 	pub active_tab: T,

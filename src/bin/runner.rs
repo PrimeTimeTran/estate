@@ -646,23 +646,23 @@ pub enum TestStatus {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-use estate::proto::leetcode::types::{ListProblemsRequest, PageRequest};
+use estate::proto::types::{ListProblemsRequest, PageRequest};
 
-pub async fn connect() -> Result<()> {
-	let mut client = estate::proto::client().await?;
-	let response = client
-		.list_problems(ListProblemsRequest {
-			page: Some(PageRequest {
-				page: 1,
-				page_size: 20,
-			}),
-			difficulty: None,
-			tags: vec![],
-			search: String::new(),
-			published_only: Some(true),
-		})
-		.await?;
-	println!("{:?}", response);
-	let problems = response.into_inner().problems;
-	Ok(())
-}
+// pub async fn connect() -> Result<()> {
+// 	let mut client = estate::proto::client().await?;
+// 	let response = client
+// 		.list_problems(ListProblemsRequest {
+// 			page: Some(PageRequest {
+// 				page: 1,
+// 				page_size: 20,
+// 			}),
+// 			difficulty: None,
+// 			tags: vec![],
+// 			search: String::new(),
+// 			published_only: Some(true),
+// 		})
+// 		.await?;
+// 	println!("{:?}", response);
+// 	let problems = response.into_inner().problems;
+// 	Ok(())
+// }

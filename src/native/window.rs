@@ -25,10 +25,10 @@ pub struct Window {
 	pending_textures: gui::TexturesDelta,
 	queue: wgpu::Queue,
 	renderer: gui::Renderer,
-	screen: ui::ScreenInstance,
+	screen: ui::ScreenInstance<NativeRuntime>,
 }
 impl Window {
-	pub fn new(event_loop: &ActiveEventLoop, view: ViewType, api: Arc<ApiClient>) -> Result<Self> {
+	pub fn new(event_loop: &ActiveEventLoop, view: ViewType) -> Result<Self> {
 		let (gui_ctx, gui_state) = build_egui(event_loop);
 		let (window, instance, surface) = create_gpu_surface(event_loop)?;
 		let (adapter, device, queue) = initialize_gpu(&instance, &surface)?;
@@ -47,7 +47,7 @@ impl Window {
 			queue,
 			renderer,
 			surface,
-			screen: ui::ScreenInstance::new(view, api),
+			screen: ui::ScreenInstance::new(view),
 		})
 	}
 
@@ -68,8 +68,10 @@ impl Window {
 		self.render_egui(surface_texture, output)?;
 		Ok(())
 	}
-
-	fn build_ui(&mut self, ctx: &mut AppContext<'_, NativeRuntime>) -> gui::FullOutput {
+	fn build_ui(
+		&mut self,
+		ctx: &mut AppContext<'_, NativeRuntime>,
+	) -> gui::FullOutput {
 		// tracing::info!("Window::build_ui");
 		let mut ui = gui::Ui::new(
 			self.gui_ctx.clone(),
@@ -271,10 +273,10 @@ impl Window {
 	}
 }
 impl Window {
-	pub fn sync_view(&mut self, view: ViewType, api: Arc<ApiClient>) {
+	pub fn sync_view(&mut self, view: ViewType, api: Arc<NativeApiClient>) {
 		if self.screen.kind != view {
 			tracing::debug!("🖼️ Window view change: {:?} → {:?}", self.screen.kind, view);
-			self.screen = ui::ScreenInstance::new(view, api);
+			self.screen = ui::ScreenInstance::new(view);
 		}
 	}
 }

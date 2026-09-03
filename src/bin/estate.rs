@@ -1,5 +1,6 @@
 use estate::prelude::*;
 
 fn main() -> Result<()> {
-	App::new(cli::context::parse())?.run()
+	// let _app = App::new()
+	Ok(())
 }

@@ -2,7 +2,7 @@ use egui::{ScrollArea, Ui};
 use std::fmt;
 use strum::IntoStaticStr;
 
-use crate::{e, prelude::*, ui::Layout};
+use crate::{api::Api, e, prelude::*, ui::Layout};
 
 #[cfg(feature = "native")]
 use crate::native::{DashboardScreen, WaterfallChart, prelude::*};

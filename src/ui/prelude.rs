@@ -1,14 +1,12 @@
 pub use crate::{
-	app::{
-		modules::{Runtime, RuntimeState},
-		*,
-	},
+	app::{modules::RuntimeState, *},
 	proto::{
-		leetcode::types::{self, *},
+		types::{self, *},
 		*,
 	},
 	share::{prelude::*, *},
 	tool::{time::*, *},
+	r#trait::Runtime,
 	ui::{theme::*, r#trait::*, *},
 };
 
@@ -36,9 +34,6 @@ pub use uuid::Uuid;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub use crate::native::{app::*, prelude::*, *};
-
-#[cfg(not(target_arch = "wasm32"))]
-pub use crate::client::*;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub use crate::{data::*, event::*};

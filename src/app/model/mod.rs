@@ -1,3 +1,4 @@
+use crate::api::Api;
 #[cfg(feature = "native")]
 #[cfg(not(target_arch = "wasm32"))]
 pub use crate::app::session::Session;
@@ -8,7 +9,7 @@ mod estate;
 use estate::Estate;
 
 #[derive(Clone, Debug)]
-pub(crate) struct EstateEngine<R: Runtime> {
+pub struct EstateEngine<R: Runtime> {
 	// Domain
 	pub estate: Estate,
 	pub runtime: Arc<R>,

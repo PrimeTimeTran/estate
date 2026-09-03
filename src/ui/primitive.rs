@@ -58,3 +58,15 @@ impl CursorTarget {
 		}
 	}
 }
+
+#[derive(Debug, Default, Clone, Copy)]
+
+pub struct IOState {
+	pub alt_held: bool,
+	pub command_held: bool,
+	pub ctrl_held: bool,
+	pub cursor_pos: Option<egui::Pos2>,
+	pub cursor_target: CursorTarget,
+	pub primary_down: bool,
+	pub shift_held: bool,
+}

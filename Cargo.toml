@@ -75,18 +75,21 @@ path = "src/bin/macros.rs"
 # To get IDE diagnostics functioning correctly remove the hardcoded default when troubleshooting another build target.
 #
 # cargo build --bin web --no-default-features --features="web" --target wasm32-unknown-unknown
-# default = ["native"]
 # cargo build --bin web --no-default-features --features="web" --target wasm32-unknown-unknown
 # default = []
+
+# [CHOOSE 1]
+default = ["native"]
 # default = ["web"]
-# Default this this
-default = []
+# [DEFAULT to this]
+
+# default = []
 mobile = []
 web = [
   "dep:wasm-bindgen",
   "dep:web-sys",
   "dep:eframe",
-  "dep:egui_commonmark",
+  # "dep:egui_commonmark",
   "dep:egui_extras",
   "dep:jsonc-parser",
 ]
@@ -109,7 +112,7 @@ native = [
   "dep:tray-icon",
   "dep:egui-winit",
   "dep:macos-accessibility-client",
-  "dep:egui_commonmark",
+  # "dep:egui_commonmark",
   "dep:egui_extras",
   "dep:jsonc-parser",
 ]
@@ -163,7 +166,7 @@ core-graphics = { workspace = true, optional = true }
 demand = { workspace = true, optional = true }
 eframe = { workspace = true, optional = true }
 egui-winit = { workspace = true, optional = true }
-egui_commonmark = { workspace = true, optional = true }
+egui_commonmark = { workspace = true }
 egui_extras = { workspace = true, optional = true }
 jsonc-parser = { workspace = true, optional = true }
 jsonschema = { workspace = true, optional = true }
@@ -183,6 +186,7 @@ web-sys = { workspace = true, optional = true }
 sqlx = "0.9.0"
 strum = { version = "0.27", features = ["derive"] }
 rand.workspace = true
+async-broadcast = "0.7.2"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tonic = { workspace = true, features = ["transport"] }

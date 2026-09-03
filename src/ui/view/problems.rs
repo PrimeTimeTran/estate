@@ -1,4 +1,5 @@
 use crate::{
+	api::Api,
 	model::problem::StoredProblem,
 	ui::{Component, r#trait::Screen},
 	*,
@@ -40,10 +41,10 @@ impl ProblemsScreen {
 	// 		!state.problems.loading && state.problems.items.is_empty() && state.problems.error.is_none()
 	// 	};
 
-	// 	if should_load {
-	// 		tracing::info!("🔥 Loading problems");
-	// 		ctx.app.load_problems();
-	// 	}
+	// if should_load {
+	// 	tracing::info!("🔥 Loading problems");
+	// 	ctx.app.load_problems();
+	// }
 
 	// 	ui.heading("Problems");
 	// 	ui.add_space(8.0);

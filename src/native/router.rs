@@ -42,7 +42,8 @@
 /// estate format path/to/file.rs
 /// ```
 use crate::{
-	app::{model, modules::runtime::Runtime, *},
+	Runtime,
+	app::{model, *},
 	doc,
 	native::daemon::projection::command,
 };

@@ -1,19 +1,19 @@
 use crate::{
+	Executor,
 	api::{Api, AppState},
 	app::{prelude::*, state::EstateState},
 	e,
 	model::StoredProblem,
 	prelude::*,
-	proto::leetcode::types::{ListProblemsRequest, PageRequest, SampleProblemRequest},
+	proto::types::{ListProblemsRequest, PageRequest, SampleProblemRequest},
+	r#trait::EventReceiver,
 	ui::Layout,
 };
 
-#[cfg(feature = "native")]
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 use crate::logger::{LogConfig, Tracer};
 
 pub struct App {
-	// cli: Cli,
 	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 	native: NativeApp,
 }
@@ -22,15 +22,10 @@ impl App {
 	pub fn new() -> Result<Self> {
 		#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 		{
-			let mut config = LogConfig::load()?;
-			config.apply_cli(&cli)?;
-			logger::init_logging(&config)?;
-
 			return Ok(Self {
 				native: NativeApp::new()?,
 			});
 		}
-
 		#[cfg(any(not(feature = "native"), target_arch = "wasm32"))]
 		{
 			Ok(Self {})
@@ -43,93 +38,47 @@ impl App {
 	}
 }
 
-// #[derive(Debug, Clone)]
-// pub struct AppRuntime<R: Runtime, A: Api> {
-// 	pub(crate) engine: EstateEngine<R>,
-// 	pub(crate) view: ViewType,
-// 	pub(crate) api: Arc<A>,
-// 	pub(crate) state: AppState,
-// 	events: R::EventReceiver,
-// }
-// impl<R: Runtime, A: Api> AppRuntime<R, A> {
-// 	pub fn new(engine: EstateEngine<R>, api: Arc<A>) -> Self {
-// 		let events = engine.runtime.subscribe();
-
-// 		Self {
-// 			api,
-// 			engine,
-// 			events,
-// 			state: AppState::default(),
-// 			view: crate::START_VIEW,
-// 		}
-// 	}
-// }
-
 #[derive(Debug, Clone)]
-pub struct AppRuntime<R: Runtime, A: Api> {
+pub struct AppRuntime<R: Runtime> {
 	pub(crate) engine: EstateEngine<R>,
 	pub(crate) view: ViewType,
-	pub(crate) api: Arc<A>,
+	pub(crate) api: Arc<dyn Api>,
 	pub(crate) state: AppState,
+	// pub(crate) executor: dyn Executor,
 	events: R::EventReceiver,
 }
-impl<R: Runtime, A: Api> AppRuntime<R, A> {
-	pub fn new(engine: EstateEngine<R>, api: Arc<A>) -> Self {
+impl<R: Runtime> AppRuntime<R> {
+	pub fn new(engine: EstateEngine<R>, api: Arc<dyn Api>) -> Self {
 		let events = engine.runtime.subscribe();
 		Self {
 			api,
 			engine,
 			events,
+			// executor,
 			state: AppState::default(),
 			view: crate::START_VIEW,
 		}
 	}
+	pub fn start_services(&self) {
+		println!("AppRuntime start_services");
+		self
+			.engine
+			.runtime
+			.emit(e::Event::app(e::Klass::SessionStart {}));
+		tracing::info!("AppRuntime start_services");
+	}
 }
-impl<R: Runtime, A: Api> AppRuntime<R, A> {
+impl<R: Runtime> AppRuntime<R> {
 	pub fn runtime(&self) -> Arc<R> {
 		Arc::clone(&self.engine.runtime)
 	}
-	pub fn start(&self) {
-		if !crate::START_APP_CLOCK {
-			return;
-		}
-		let views = [
-			ViewType::ProblemScreen,
-			ViewType::DashboardScreen,
-			ViewType::MarkdownView,
-			ViewType::ProblemScreen,
-			ViewType::WaterfallScreen,
-			ViewType::ProblemScreen,
-			ViewType::TaskManagerScreen,
-			ViewType::ProblemsScreen,
-		];
-		let mut view_idx = 0;
-		let mut current_time = 5;
-		let runtime = self.engine.runtime.clone();
-		self.spawn(async move {
-			loop {
-				runtime.sleep(std::time::Duration::from_secs(1)).await;
-				if current_time == 0 {
-					current_time = 5;
-					view_idx = (view_idx + 1) % views.len();
-					let view = views[view_idx];
-					// println!("🧭 Clock navigation → {:?}", view);
-					runtime.emit(e::Event::app(e::Klass::Navigate(view)));
-				} else {
-					current_time -= 1;
-					println!("⏰ App<T> CLOCK TICK: {}", current_time);
-				}
-			}
-		});
-	}
-	pub fn api(&self) -> Arc<A> {
+	pub fn api(&self) -> Arc<dyn Api> {
 		Arc::clone(&self.api)
 	}
-
 	/// # UI/application state
 	/// "We have two event consumers, and we need to decide which events belong to which execution domain."
+	// # Pull Based
 	pub fn update(&mut self) {
-		// # Pull Based
 		// Event routing
 		// UI update cycle
 		//      │
@@ -172,22 +121,8 @@ impl<R: Runtime, A: Api> AppRuntime<R, A> {
 			}
 		}
 	}
-	pub fn start_services(&self) {
-		println!("AppRuntime start_services");
-		self
-			.engine
-			.runtime
-			.emit(e::Event::app(e::Klass::SessionStart {}));
-		tracing::info!("AppRuntime start_services");
-	}
-	pub fn spawn<F>(&self, future: F)
-	where
-		F: Future<Output = ()> + Send + 'static,
-	{
-		self.engine.runtime.spawn(future);
-	}
 }
-impl<R: Runtime, A: Api> AppRuntime<R, A> {
+impl<R: Runtime> AppRuntime<R> {
 	pub fn state(&self) -> std::sync::RwLockReadGuard<'_, EstateState> {
 		self.engine.runtime.state().read()
 	}
@@ -198,7 +133,7 @@ impl<R: Runtime, A: Api> AppRuntime<R, A> {
 		self.state()
 	}
 }
-impl<R: Runtime, A: Api> AppRuntime<R, A> {
+impl<R: Runtime> AppRuntime<R> {
 	pub fn new_task(&mut self) {
 		self
 			.engine
@@ -236,23 +171,7 @@ impl<R: Runtime, A: Api> AppRuntime<R, A> {
 		self.view = view;
 	}
 }
-impl<R: Runtime + 'static, A: Api> AppRuntime<R, A> {
-	fn spawn_request<F, T, E>(&self, future: F, on_success: impl FnOnce(T) + Send + 'static)
-	where
-		F: Future<Output = Result<T, E>> + Send + 'static,
-		E: std::fmt::Display + Send + 'static,
-		T: Send + 'static,
-	{
-		let runtime = self.engine.runtime.clone();
-		self.engine.runtime.spawn(async move {
-			match future.await {
-				Ok(value) => on_success(value),
-				Err(error) => {
-					runtime.emit(e::Event::app(e::Klass::ApiError(error.to_string())));
-				}
-			}
-		});
-	}
+impl<R: Runtime + 'static> AppRuntime<R> {
 	fn start_problems_request(&mut self) -> bool {
 		if self.state.problems.loading {
 			tracing::info!("⚠️ problems already loading");
@@ -276,7 +195,40 @@ impl<R: Runtime + 'static, A: Api> AppRuntime<R, A> {
 		true
 	}
 }
-impl<R: Runtime + 'static, A: Api> AppRuntime<R, A> {
+impl<R: Runtime + 'static> AppRuntime<R> {
+	pub fn start(&self) {
+		if !crate::START_APP_CLOCK {
+			return;
+		}
+		let views = [
+			ViewType::ProblemScreen,
+			ViewType::DashboardScreen,
+			ViewType::MarkdownView,
+			ViewType::ProblemScreen,
+			ViewType::WaterfallScreen,
+			ViewType::ProblemScreen,
+			ViewType::TaskManagerScreen,
+			ViewType::ProblemsScreen,
+		];
+		let mut view_idx = 0;
+		let mut current_time = 5;
+		let runtime = self.engine.runtime.clone();
+		// self.executor.spawn(async move {
+		// 	loop {
+		// 		runtime.sleep(std::time::Duration::from_secs(1)).await;
+		// 		if current_time == 0 {
+		// 			current_time = 5;
+		// 			view_idx = (view_idx + 1) % views.len();
+		// 			let view = views[view_idx];
+		// 			// println!("🧭 Clock navigation → {:?}", view);
+		// 			runtime.emit(e::Event::app(e::Klass::Navigate(view)));
+		// 		} else {
+		// 			current_time -= 1;
+		// 			println!("⏰ App<T> CLOCK TICK: {}", current_time);
+		// 		}
+		// 	}
+		// });
+	}
 	pub fn sample_problem(&mut self) {
 		if !self.start_problems_request() {
 			return;
@@ -284,34 +236,27 @@ impl<R: Runtime + 'static, A: Api> AppRuntime<R, A> {
 
 		let api = Arc::clone(&self.api);
 		let runtime = self.engine.runtime.clone();
-
-		self.engine.runtime.spawn(async move {
-			let mut client = api.problems.clone();
-
-			match client
-				.sample_problem(SampleProblemRequest {
-					page: None,
-					difficulty: None,
-					tags: vec![],
-					search: String::new(),
-					published_only: None,
-				})
-				.await
-			{
-				Ok(response) => match StoredProblem::try_from(response.into_inner()) {
-					Ok(problem) => {
-						runtime.emit(e::Event::app(e::Klass::ProblemSampled(problem)));
-					}
-					Err(error) => {
-						runtime.emit(e::Event::app(e::Klass::ApiError(error.to_string())));
-					}
-				},
-
-				Err(error) => {
-					runtime.emit(e::Event::app(e::Klass::ApiError(error.to_string())));
-				}
-			}
-		});
+		// self.executor.spawn(async move {
+		// 	match api
+		// 		.sample_problem(SampleProblemRequest {
+		// 			page: None,
+		// 			difficulty: None,
+		// 			tags: vec![],
+		// 			search: String::new(),
+		// 			published_only: None,
+		// 		})
+		// 		.await
+		// 	{
+		// 		Ok(problem) => {
+		// 			runtime.emit(e::Event::app(e::Klass::ProblemSampled(problem)));
+		// 		}
+		// 		Err(error) => {
+		// 			runtime.emit(e::Event::app(e::Klass::ProblemSampleFailed(
+		// 				error.to_string(),
+		// 			)));
+		// 		}
+		// 	}
+		// });
 	}
 	pub fn load_problems(&mut self) {
 		if !self.start_problems_request() {
@@ -319,41 +264,15 @@ impl<R: Runtime + 'static, A: Api> AppRuntime<R, A> {
 		}
 		let api = Arc::clone(&self.api);
 		let runtime = self.engine.runtime.clone();
-		self.engine.runtime.spawn(async move {
-			let mut client = api.problems.clone();
-			match client
-				.list_problems(ListProblemsRequest {
-					tags: vec![],
-					search: String::new(),
-					published_only: None,
-					page: Some(PageRequest {
-						page: 0,
-						page_size: 100,
-					}),
-					difficulty: None,
-				})
-				.await
-			{
-				Ok(response) => {
-					let result = response
-						.into_inner()
-						.problems
-						.into_iter()
-						.map(StoredProblem::try_from)
-						.collect::<Result<Vec<_>, _>>();
-					match result {
-						Ok(problems) => {
-							runtime.emit(e::Event::app(e::Klass::ProblemsLoaded(problems)));
-						}
-						Err(error) => {
-							runtime.emit(e::Event::app(e::Klass::ApiError(error.to_string())));
-						}
-					}
-				}
-				Err(error) => {
-					runtime.emit(e::Event::app(e::Klass::ApiError(error.to_string())));
-				}
-			}
-		});
+		// self.executor.spawn(async move {
+		// 	match api.load_problems().await {
+		// 		Ok(problems) => {
+		// 			runtime.emit(e::Event::app(e::Klass::ProblemsLoaded(problems)));
+		// 		}
+		// 		Err(error) => {
+		// 			runtime.emit(e::Event::app(e::Klass::ApiError(error.to_string())));
+		// 		}
+		// 	}
+		// });
 	}
 }

@@ -286,18 +286,6 @@ pub fn move_cursor_to(pos: ScreenPosition) {
 	}
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct VeLayout {
-	pub activity_bar: egui::Rect,
-	pub dock_left: egui::Rect,
-	pub main: egui::Rect,
-	pub primary_bar: egui::Rect,
-	pub secondary_bar: egui::Rect,
-	pub bottom_panel: egui::Rect,
-	pub status_bar: egui::Rect,
-	pub dock_right: egui::Rect,
-}
-
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum DevTopTab {
 	#[default]
@@ -700,16 +688,4 @@ impl<R: Runtime> Screen<R> for Sidebar {
 	// 		}
 	// 	});
 	// }
-}
-
-#[derive(Debug, Default, Clone, Copy)]
-
-pub struct IOState {
-	pub alt_held: bool,
-	pub command_held: bool,
-	pub ctrl_held: bool,
-	pub cursor_pos: Option<egui::Pos2>,
-	pub cursor_target: CursorTarget,
-	pub primary_down: bool,
-	pub shift_held: bool,
 }

@@ -1,12 +1,11 @@
 use crate::{
+	Executor,
 	api::Api,
 	app::{state::*, *},
 	e,
+	prelude::*,
+	r#trait::EventReceiver,
 };
-
-#[cfg(feature = "native")]
-#[cfg(not(target_arch = "wasm32"))]
-use crate::native::ui::IOState;
 
 // The lifetimes 'a and 'static in your code tell a precise story about memory ownership, data borrows, and concurrency safety.
 // Here is exactly what each lifetime communicates to the Rust compiler and to other developers:
@@ -30,28 +29,25 @@ use crate::native::ui::IOState;
 //    3. Once that quick operations phase ends, AppContext is dropped, releasing the borrow so the application can continue running its background async tasks.
 
 // Would you like to look at how to optimize the trait names alongside these lifetimes, or do you want to verify if AppRuntime<R> can be safely shared across your background threads?
-// impl<R: Runtime + 'static, A: Api> AppRuntime<R, A> {
-pub struct AppContext<'a, R: Runtime, A: Api> {
-	pub app: &'a mut AppRuntime<R, A>,
+// impl<R: Runtime + 'static> AppRuntime<R> {
+pub struct AppContext<'a, R: Runtime> {
+	pub app: &'a mut AppRuntime<R>,
 	pub last_revision: u64,
-
 	pub event_rx: R::EventReceiver,
-
-	#[cfg(feature = "native")]
-	#[cfg(not(target_arch = "wasm32"))]
 	pub input: IOState,
+	// #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 }
 
 // ## 2. What the 'static constraint tells you
 // The + 'static on impl<'a, R: Runtime + 'static> AppContext<'a, R> tells
 // us that the underlying runtime implementation (R) must be completely free of short-lived borrows.
-impl<'a, R: Runtime + 'static, A: Api> AppContext<'a, R, A> {
+impl<'a, R: Runtime + 'static> AppContext<'a, R> {
 	pub fn load_problems(&mut self) {
 		self.app.load_problems();
 	}
 }
 
-impl<'a, R: Runtime, A: Api> AppContext<'a, R, A> {
+impl<'a, R: Runtime> AppContext<'a, R> {
 	pub fn state(&self) -> std::sync::RwLockReadGuard<'_, EstateState> {
 		self.app.state()
 	}
@@ -65,8 +61,7 @@ impl<'a, R: Runtime, A: Api> AppContext<'a, R, A> {
 			false
 		}
 	}
-	#[cfg(feature = "native")]
-	#[cfg(not(target_arch = "wasm32"))]
+	// #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 	pub fn next_event(&mut self) -> Option<e::Event> {
 		self.event_rx.try_recv()
 	}

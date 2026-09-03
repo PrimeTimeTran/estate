@@ -1,3 +1,4 @@
+use crate::api::Api;
 use crate::model::{ProtoLanguage, StoredProblem, StoredSolution, StoredSubmission};
 
 use crate::{e, prelude::*, ui::Layout};
@@ -141,7 +142,6 @@ impl<R: Runtime> ProblemViewSidebar<R> {
 				}
 			});
 	}
-
 	fn draw_submissions(&self, ui: &mut Ui) {
 		ui.separator();
 		ui.heading("Submissions");
@@ -299,7 +299,7 @@ impl<R: Runtime> ProblemView<R> {
 	}
 }
 impl<R: Runtime> ProblemView<R> {
-	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, R>) {
+	fn draw<A: Api>(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, R>) {
 		let (loading, error, problem) = {
 			let state = ctx.app.app_state();
 			(

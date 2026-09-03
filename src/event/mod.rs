@@ -1,21 +1,18 @@
-use crate::{e, native::prelude::*, ui};
+use crate::{EventHandler, Runtime, e, native::prelude::*, ui};
 
 pub(crate) mod channel;
 pub(crate) mod handler;
-pub(crate) use handler::EventHandler;
 
-pub trait EventReceiver {
-	fn try_recv(&mut self) -> Option<e::Event>;
+pub struct EventDispatcher<R: Runtime> {
+	handlers: Vec<Box<dyn EventHandler<R>>>,
 }
-pub struct EventDispatcher {
-	handlers: Vec<Box<dyn EventHandler>>,
-}
-impl Default for EventDispatcher {
+impl<R: Runtime> Default for EventDispatcher<R> {
 	fn default() -> Self {
 		Self::new()
 	}
 }
-impl EventDispatcher {
+
+impl<R: Runtime> EventDispatcher<R> {
 	pub fn new() -> Self {
 		// # Fan Out
 		// One event → Many handlers
@@ -28,16 +25,12 @@ impl EventDispatcher {
 			handlers: Vec::new(),
 		}
 	}
-	pub async fn run(
-		self,
-		mut rx: tokio::sync::broadcast::Receiver<e::Event>,
-		runtime: NativeRuntime,
-	) {
+	pub async fn run(self, mut rx: tokio::sync::broadcast::Receiver<e::Event>, runtime: R) {
 		while let Ok(event) = rx.recv().await {
 			self.dispatch(event, &runtime).await;
 		}
 	}
-	pub async fn dispatch(&self, event: e::Event, runtime: &NativeRuntime) {
+	pub async fn dispatch(&self, event: e::Event, runtime: &R) {
 		for handler in &self.handlers {
 			handler.handle(&event, runtime).await;
 		}
@@ -45,7 +38,7 @@ impl EventDispatcher {
 	}
 	pub fn register<H>(&mut self, handler: H)
 	where
-		H: EventHandler + 'static,
+		H: EventHandler<R> + 'static,
 	{
 		self.handlers.push(Box::new(handler));
 	}

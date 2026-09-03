@@ -1,10 +1,10 @@
-pub use crate::proto::leetcode::types::{
+pub use crate::proto::types::{
 	CodeTemplate, Difficulty as ProtoDifficulty, Language as ProtoLanguage, Problem as ProtoProblem,
 	Solution as ProtoSolution, SolutionCode as ProtoSolutionCode,
 	SolutionStatus as ProtoSolutionStatus, SubmissionStatus as ProtoSubmissionStatus,
 };
 
-use crate::proto::leetcode::types as P;
+use crate::proto::types as P;
 
 pub mod common;
 pub use common::*;
@@ -17,3 +17,6 @@ pub use solution::*;
 
 pub mod submission;
 pub use submission::*;
+
+pub mod session;
+pub use session::*;

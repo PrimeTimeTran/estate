@@ -1,20 +1,15 @@
 use crate::{
-	e,
+	EventHandler, e,
 	e::{Event, Klass},
-	native::{core::EstateDiscovery, job::Task, prelude::*, runtime::NativeRuntime},
+	native::{core::EstateDiscovery, job::Task, prelude::*},
 	prelude::*,
 	session::Session,
 };
 
-/// # Background event handling
-#[async_trait::async_trait]
-pub trait EventHandler: Send + Sync {
-	async fn handle(&self, event: &e::Event, runtime: &NativeRuntime);
-}
 pub struct TaskHandler;
 #[async_trait::async_trait]
-impl EventHandler for TaskHandler {
-	async fn handle(&self, event: &e::Event, runtime: &NativeRuntime) {
+impl<R: Runtime> EventHandler<R> for TaskHandler {
+	async fn handle(&self, event: &e::Event, runtime: &R) {
 		// # Push/async-based
 		//
 		// EventBus
@@ -34,7 +29,7 @@ impl EventHandler for TaskHandler {
 		let task_id = match request {
 			TaskRequest::Create(kind) => {
 				tracing::debug!("TaskRequest::Create {:?}", kind);
-				let mut tasks = runtime.tasks.write().unwrap();
+				let mut tasks = runtime.tasks().write().unwrap();
 				let task_id = tasks.create(kind.clone());
 				runtime.emit(e::Event::daemon(e::Klass::TaskCreated {
 					task_id,
@@ -66,7 +61,7 @@ impl EventHandler for TaskHandler {
 			}
 		};
 		let task = {
-			let tasks = runtime.tasks.read().unwrap();
+			let tasks = runtime.tasks().read().unwrap();
 			let Some(task) = tasks.get(task_id).cloned() else {
 				tracing::warn!(%task_id, "requested task not found");
 				return;
@@ -74,7 +69,7 @@ impl EventHandler for TaskHandler {
 			task
 		};
 		{
-			let mut tasks = runtime.tasks.write().unwrap();
+			let mut tasks = runtime.tasks().write().unwrap();
 		}
 		runtime.emit(Event::daemon(e::Klass::TaskStarted { task_id }));
 		let runtime = runtime.clone();
@@ -101,15 +96,15 @@ impl EventHandler for TaskHandler {
 }
 pub struct LogHandler;
 #[async_trait::async_trait]
-impl EventHandler for LogHandler {
-	async fn handle(&self, event: &e::Event, _runtime: &NativeRuntime) {
+impl<R: Runtime> EventHandler<R> for LogHandler {
+	async fn handle(&self, event: &e::Event, _runtime: &R) {
 		tracing::debug!("📡 received {:?}", event);
 	}
 }
 pub struct FileWatcherHandler;
 #[async_trait::async_trait]
-impl EventHandler for FileWatcherHandler {
-	async fn handle(&self, event: &e::Event, runtime: &NativeRuntime) {
+impl<R: Runtime> EventHandler<R> for FileWatcherHandler {
+	async fn handle(&self, event: &e::Event, runtime: &R) {
 		if let e::Klass::FileModified { inode, path } = &event.kind {
 			tracing::debug!("📡 FileWatcherHandler handle {:?} ({:?})", event, inode);
 			runtime.emit(Event::daemon(e::Klass::IndexUpdated { files_changed: 1 }));
@@ -119,12 +114,12 @@ impl EventHandler for FileWatcherHandler {
 pub struct StateHandler;
 
 #[async_trait::async_trait]
-impl EventHandler for StateHandler {
-	async fn handle(&self, event: &e::Event, runtime: &NativeRuntime) {
+impl<R: Runtime> EventHandler<R> for StateHandler {
+	async fn handle(&self, event: &e::Event, runtime: &R) {
 		tracing::debug!("🔥 StateHandler received: {:?}", event.kind);
 
 		let snapshot = {
-			let mut state = runtime.state.write();
+			let mut state = runtime.state().write();
 
 			match &event.kind {
 				e::Klass::DaemonStarted => {
@@ -193,32 +188,29 @@ impl EventHandler for StateHandler {
 			state.clone()
 		};
 
-		if let Err(error) = runtime.state_service.save(&snapshot).await {
+		if let Err(error) = runtime.state_service().save(&snapshot).await {
 			tracing::error!(%error, "failed to persist state");
 		}
 	}
 }
 pub struct CommandHandler;
 #[async_trait::async_trait]
-impl EventHandler for CommandHandler {
-	async fn handle(&self, event: &e::Event, runtime: &NativeRuntime) {
+impl<R: Runtime> EventHandler<R> for CommandHandler {
+	async fn handle(&self, event: &e::Event, runtime: &R) {
 		tracing::debug!("CommandHandler handler {:?}", event);
 
 		match &event.kind {
 			e::Klass::SessionStop { .. } => {
 				tracing::debug!("ABOUT TO SAVE SESSION");
-
-				let mut session = runtime.session.clone();
-				session.end_session();
-				// let serialized = session.end_session();
-				match Master::save(session.as_json()).await {
-					Ok(()) => {
-						tracing::debug!("SESSION SAVED");
-					}
-					Err(err) => {
-						tracing::error!("SESSION SAVE FAILED: {err:#}");
-					}
-				}
+				// let mut session = runtime.session_service().end();
+				// match Master::save(session.).await {
+				// 	Ok(()) => {
+				// 		tracing::debug!("SESSION SAVED");
+				// 	}
+				// 	Err(err) => {
+				// 		tracing::error!("SESSION SAVE FAILED: {err:#}");
+				// 	}
+				// }
 			}
 
 			e::Klass::CommandExecuted { command } => {
@@ -295,7 +287,7 @@ impl EventHandler for CommandHandler {
 }
 pub struct TaskRunner;
 impl TaskRunner {
-	pub async fn execute(runtime: &NativeRuntime, task: Task) -> Result<()> {
+	pub async fn execute<R: Runtime>(runtime: &R, task: Task) -> Result<()> {
 		tracing::info!("TaskRunner execute {:?}", task);
 		match task.kind {
 			TaskKind::SessionStart => {
@@ -362,13 +354,13 @@ impl TaskRunner {
 #[derive(Debug, Clone)]
 pub struct AppHandler;
 #[async_trait::async_trait]
-impl EventHandler for AppHandler {
-	async fn handle(&self, event: &e::Event, runtime: &NativeRuntime) {
+impl<R: Runtime> EventHandler<R> for AppHandler {
+	async fn handle(&self, event: &e::Event, runtime: &R) {
 		if !matches!(event.kind, e::Klass::SessionStart) {
 			return;
 		}
 		match event.kind.clone() {
-			e::Klass::SessionStop { session } => match runtime.session_service.end().await {
+			e::Klass::SessionStop { session } => match runtime.session_service().end().await {
 				Ok(session) => {
 					tracing::info!("🛑 SessionStop");
 				}
@@ -376,7 +368,7 @@ impl EventHandler for AppHandler {
 					tracing::error!(%error, "failed to create session");
 				}
 			},
-			e::Klass::SessionStart => match runtime.session_service.create().await {
+			e::Klass::SessionStart => match runtime.session_service().create().await {
 				Ok(session) => {
 					tracing::info!(?session, "session created");
 				}
@@ -393,8 +385,8 @@ impl EventHandler for AppHandler {
 
 pub struct NavigationHandler;
 #[async_trait::async_trait]
-impl EventHandler for NavigationHandler {
-	async fn handle(&self, event: &e::Event, _runtime: &NativeRuntime) {
+impl<R: Runtime> EventHandler<R> for NavigationHandler {
+	async fn handle(&self, event: &e::Event, _runtime: &R) {
 		let e::Klass::Navigate(view_type) = event.kind else {
 			return;
 		};

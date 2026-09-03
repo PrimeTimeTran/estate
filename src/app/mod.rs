@@ -4,27 +4,24 @@
 // ./src/web
 // ./src/mobile
 
-pub(crate) mod app;
-pub(crate) mod context;
+// Available to all consumers, external and internal.
 pub mod event;
-pub(crate) mod host;
-pub(crate) mod job;
-pub(crate) mod model;
-pub(crate) mod modules;
+pub mod model;
 pub mod prelude;
+pub mod state;
 
-pub(crate) mod state;
-pub(crate) mod task;
-
+// Glob reexport to make it easier to use.
 pub use app::*;
 pub use context::*;
 pub use event::*;
 pub use job::*;
-pub(crate) use modules::*;
-
+pub use state::*;
 pub use task::*;
 
-#[cfg(not(target_arch = "wasm32"))]
-pub(crate) mod session;
-#[cfg(not(target_arch = "wasm32"))]
-pub use session::*;
+// Only inside of this crate.
+pub(crate) mod app;
+pub(crate) mod context;
+pub(crate) mod job;
+pub(crate) mod modules;
+pub(crate) mod task;
+pub(crate) use modules::*;

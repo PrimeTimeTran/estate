@@ -1,5 +1,6 @@
 use crate::{
-	AppEvent, DaemonCommand,
+	AppEvent, DaemonCommand, NativeExecutor,
+	api::NativeApiClient,
 	app::{App, Runtime, model::EstateEngine},
 	e,
 	native::{router, runtime::NativeRuntime},
@@ -54,11 +55,13 @@ impl NativeApp {
 		let tokio = tokio::runtime::Runtime::new()?;
 		let handle = tokio.handle().clone();
 		// 2. Give the handle to NativeRuntime.
-		let daemon_runtime = NativeRuntime::new(handle)?;
+		let daemon_runtime = NativeRuntime::new(handle.clone())?;
 		// 3. Then construct the engine.
 		let engine = EstateEngine::new(daemon_runtime)?;
-
-		let api = Arc::new(tokio.block_on(ApiClient::connect())?);
+		let api = Arc::new(tokio.block_on(NativeApiClient::connect())?);
+		let executor = NativeExecutor {
+			handle: handle.clone(),
+		};
 		let runtime = AppRuntime::new(engine.clone(), api.clone());
 		runtime.start();
 		let (daemon_tx, daemon_rx) = mpsc::channel(100);
@@ -106,7 +109,7 @@ impl NativeApp {
 		// EstateEngineRuntime
 		self.runtime().start_services();
 		let daemon_rx = self.daemon_rx.take().expect("daemon already started");
-		let (ready_tx, ready_rx) = std::sync::mpsc::sync_channel::<Result<Arc<ApiClient>>>(1);
+		let (ready_tx, ready_rx) = std::sync::mpsc::sync_channel::<Result<Arc<NativeApiClient>>>(1);
 		self.spawn_daemon(daemon_rx, ready_tx);
 		self.spawn_global_hotkey_daemon()?;
 		let event_loop = EventLoop::<AppEvent>::with_user_event()
@@ -168,40 +171,40 @@ impl NativeApp {
 	fn spawn_daemon(
 		&mut self,
 		mut rx: mpsc::Receiver<DaemonCommand>,
-		ready_tx: std::sync::mpsc::SyncSender<Result<Arc<ApiClient>>>,
+		ready_tx: std::sync::mpsc::SyncSender<Result<Arc<NativeApiClient>>>,
 	) {
 		let runtime = self.runtime();
-		self.handle().spawn(async move {
-			runtime.start_dispatcher();
-			let daemon: Daemon<NativeRuntime> = Daemon::new(runtime.clone());
-			let shutdown_token = daemon.shutdown_token.clone();
-			let daemon_task = tokio::spawn(async move {
-				let mut daemon = daemon;
-				daemon.run_foreground().await
-			});
-			match rx.recv().await {
-				Some(DaemonCommand::Stop) => {
-					tracing::info!("daemon stop requested");
-					shutdown_token.cancel();
-					match daemon_task.await {
-						Ok(Ok(())) => {
-							tracing::info!("daemon stopped cleanly");
-						}
-						Ok(Err(error)) => {
-							tracing::error!(%error, "daemon exited with error");
-						}
-						Err(error) => {
-							tracing::error!(%error, "daemon task panicked");
-						}
-					}
-				}
-				None => {
-					tracing::info!("daemon command channel closed");
-					shutdown_token.cancel();
-					let _ = daemon_task.await;
-				}
-			}
-		});
+		// self.handle().spawn(async move {
+		// 	runtime.start_dispatcher();
+		// 	let daemon: Daemon<NativeRuntime> = Daemon::new(runtime.clone());
+		// 	let shutdown_token = daemon.shutdown_token.clone();
+		// 	let daemon_task = tokio::spawn(async move {
+		// 		let mut daemon = daemon;
+		// 		daemon.run_foreground().await
+		// 	});
+		// 	match rx.recv().await {
+		// 		Some(DaemonCommand::Stop) => {
+		// 			tracing::info!("daemon stop requested");
+		// 			shutdown_token.cancel();
+		// 			match daemon_task.await {
+		// 				Ok(Ok(())) => {
+		// 					tracing::info!("daemon stopped cleanly");
+		// 				}
+		// 				Ok(Err(error)) => {
+		// 					tracing::error!(%error, "daemon exited with error");
+		// 				}
+		// 				Err(error) => {
+		// 					tracing::error!(%error, "daemon task panicked");
+		// 				}
+		// 			}
+		// 		}
+		// 		None => {
+		// 			tracing::info!("daemon command channel closed");
+		// 			shutdown_token.cancel();
+		// 			let _ = daemon_task.await;
+		// 		}
+		// 	}
+		// });
 	}
 	fn spawn_signal_handler(&mut self, proxy: EventLoopProxy<AppEvent>) {
 		std::thread::spawn(move || {
@@ -277,7 +280,7 @@ impl NativeApp {
 		if self.window_by_type(kind).is_some() {
 			return;
 		}
-		match Window::new(event_loop, self.runtime.view(), self.runtime.api.clone()) {
+		match Window::new(event_loop, self.runtime.view()) {
 			Ok(window) => {
 				tracing::info!(" open window end, new window");
 				window.instance.set_title(self.runtime.view().name().into());
@@ -350,9 +353,9 @@ impl NativeApp {
 		for window in &mut self.windows {
 			// println!("NativeApp {:?}", self.runtime.view);
 			tracing::debug!("sync views {:?}", self.runtime.view.name());
-			window
-				.window
-				.sync_view(self.runtime.view, self.runtime.api.clone());
+			// window
+			// 	.window
+			// 	.sync_view(self.runtime.view, self.runtime.api.clone());
 			window.window.instance.request_redraw();
 			window.window.instance.set_title(self.runtime.view.name());
 		}

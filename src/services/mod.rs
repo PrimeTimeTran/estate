@@ -12,6 +12,8 @@ use crate::{
 	prelude::*,
 };
 
+use crate::proto::types::*;
+
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use std::path::PathBuf;
@@ -43,9 +45,14 @@ pub fn page_request(request: Option<PageRequest>) -> Result<PageRequest, Status>
 	request.ok_or_else(|| Status::invalid_argument("page is required"))
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-use crate::proto::leetcode::{
+#[cfg(not(feature = "web"))]
+pub mod native;
+#[cfg(not(feature = "web"))]
+pub use native::*;
+
+#[cfg(not(feature = "web"))]
+use crate::proto::{
 	problem_service_server::ProblemService, submission_service_server::SubmissionService,
 };
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(feature = "web"))]
 use tonic::{Request, Response, Status};

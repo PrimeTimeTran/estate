@@ -1,7 +1,7 @@
 use std::net::SocketAddr;
 
 use estate::{
-	proto::leetcode::{
+	proto::{
 		problem_service_server::ProblemServiceServer,
 		submission_service_server::SubmissionServiceServer,
 	},

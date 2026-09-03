@@ -1,29 +1,33 @@
 #![allow(warnings)]
 
-#[cfg(feature = "web")]
-pub mod web;
-
 pub mod api;
-pub mod app;
-pub mod client;
 pub mod data;
+pub mod event;
 pub mod helpers;
 pub mod model;
-pub mod output;
 pub mod prelude;
 pub mod proto;
+pub mod services;
 pub mod share;
 pub mod tool;
+pub mod r#trait;
 pub mod ui;
 pub mod util;
+
+pub use event::*;
 pub use tool::*;
+pub use r#trait::*;
 pub use ui::*;
 
-pub(crate) use crate::app::event as e;
+pub mod app;
+pub use crate::app::event as e;
 
-// #[cfg(feature = "native")]
+#[cfg(feature = "native")]
+pub mod native;
+#[cfg(feature = "native")]
+pub use crate::services::native as s;
+
 // pub mod event;
-//
 //
 // pub mod services;
 //
@@ -46,3 +50,6 @@ pub(crate) use crate::app::event as e;
 // pub use crate::native::*;
 // }
 //
+
+#[cfg(feature = "web")]
+pub mod web;

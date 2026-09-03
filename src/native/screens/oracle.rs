@@ -18,7 +18,7 @@ impl<R: Runtime> Screen<R> for OracleScreen {
 	fn event(&mut self, event: &e::Event, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {}
 }
 impl OracleScreen {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, NativeRuntime>) {
+	fn draw<R: Runtime>(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>) {
 		self.draw_ui(ui, ctx);
 		self.draw_status_bar(ui);
 	}
@@ -37,17 +37,17 @@ impl OracleScreen {
 	// -------------------------------------------------------------------------
 	// INPUT
 	// -------------------------------------------------------------------------
-	fn inspect_trackpad(
+	fn inspect_trackpad<R: Runtime>(
 		&mut self,
 		ui: &mut egui::Ui,
-		ctx: &AppContext<'_, NativeRuntime>,
+		ctx: &AppContext<'_, R>,
 	) -> TrackpadState {
 		self.gesture.inspect(ui, &ctx.input)
 	}
 	// -------------------------------------------------------------------------
 	// UI
 	// -------------------------------------------------------------------------
-	fn draw_ui(&mut self, ui: &mut egui::Ui, ctx: &AppContext<'_, NativeRuntime>) {
+	fn draw_ui<R: Runtime>(&mut self, ui: &mut egui::Ui, ctx: &AppContext<'_, R>) {
 		self.draw_header(ui);
 
 		let trackpad = self.inspect_trackpad(ui, ctx);

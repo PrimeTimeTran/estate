@@ -20,26 +20,30 @@
 // pub use tool::*;
 use estate::{logger::*, prelude::*};
 
+fn main2() -> Result<()> {
+	// use estate::api::WasmApiClient;
+	// let state = EstateState::default();
+	// let runtime = WasmRuntime::new(state);
+	// let engine = EstateEngine::new(runtime)?;
+	// let api = Arc::new(WasmApiClient::new("http://localhost:3000"));
+	// let _app = AppRuntime::new(engine, api);
+	Ok(())
+}
+
 // #[cfg(feature = "native")]
 fn main() -> Result<()> {
-	let cli = Cli::parse();
-	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-	{
-		let mut config = LogConfig::load()?;
-		config.apply_cli(&cli)?;
-		logger::init_logging(&config)?;
-
-		return Ok(Self {
-			native: NativeApp::new()?,
-		});
-	}
+	use cli;
+	let parsed = cli::context::parse();
+	use estate::api::NativeApiClient;
+	let state = EstateState::default();
 	let mut config = LogConfig::load()?;
-	config.apply_cli(&cli)?;
+	config.apply_cli(&parsed)?;
 	logger::init_logging(&config)?;
-
 	let app = App::new()?;
-
-	NativeApp::new()?.run(app, cli)
+	app.run(parsed);
+	Ok(())
+	// NativeRuntime::new(handle)
+	// NativeApp::new()?.run(parsed)
 }
 
 // fn main() -> Result<()> {

@@ -1,3 +1,8 @@
+pub mod types {
+	include!(concat!(env!("OUT_DIR"), "/leetcode.types.rs"));
+}
+#[cfg(not(target_arch = "wasm32"))]
+tonic::include_proto!("leetcode");
 pub mod leetcode {
 	pub mod types {
 		include!(concat!(env!("OUT_DIR"), "/leetcode.types.rs"));
