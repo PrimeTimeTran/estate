@@ -23,12 +23,12 @@ impl<R: Runtime, E: Executor> ScreenInstance<R, E> {
 	pub fn new(kind: ViewType) -> Self {
 		tracing::debug!("📺 Screen Instance {:?}", kind);
 		let screen: Box<dyn Screen<R, E>> = match kind {
-			ViewType::DashboardScreen => Box::new(DashboardScreen::new()),
+			// ViewType::DashboardScreen => Box::new(DashboardScreen::new()),
+			ViewType::MarkdownView => Box::new(MarkdownScreen::new(crate::MARKDOWN)),
 			ViewType::ProblemScreen => Box::new(ProblemScreen::new()),
 			ViewType::ProblemsScreen => Box::new(ProblemsScreen::new()),
 			ViewType::TaskManagerScreen => Box::new(TaskManagerScreen::new()),
 			ViewType::WaterfallScreen => Box::new(WaterfallScreen::new()),
-			ViewType::MarkdownView => Box::new(MarkdownScreen::new(crate::MARKDOWN)),
 			_ => Box::new(MarkdownScreen::new(crate::MARKDOWN)),
 		};
 		Self {
