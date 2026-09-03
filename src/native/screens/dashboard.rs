@@ -28,7 +28,7 @@ pub struct DashboardScreen {
 	pub active_focus: FocusedPane,
 	pub secondary_scroll_offset: f32,
 }
-impl<R: Runtime, E> Screen<R, E> for DashboardScreen {
+impl<R: Runtime, E: Executor> Screen<R, E> for DashboardScreen {
 	fn configure(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
 		// Configure the regions this screen uses.
 	}

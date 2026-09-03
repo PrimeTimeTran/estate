@@ -17,7 +17,7 @@ pub struct WaterfallScreen {}
 impl WaterfallScreen {
 	pub fn new() {}
 }
-impl<R: Runtime, E> Screen<R, E> for WaterfallScreen {
+impl<R: Runtime, E: Executor> Screen<R, E> for WaterfallScreen {
 	fn configure(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
 		// Put TaskManagerView into the appropriate region/panel.
 	}
@@ -46,7 +46,7 @@ impl<R: Runtime, E> Screen<R, E> for WaterfallScreen {
 pub struct WaterfallChart {
 	jobs: Vec<&'static Job>,
 }
-impl<R: Runtime, E> ViewTrait<R, E> for WaterfallChart {
+impl<R: Runtime, E: Executor> ViewTrait<R, E> for WaterfallChart {
 	fn update(&mut self, ctx: &mut AppContext<'_, R, E>) {}
 	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R, E>) {}
 	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, R, E>) {

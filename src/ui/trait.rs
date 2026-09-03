@@ -13,11 +13,9 @@ use crate::{api::Api, e, prelude::*, ui::Layout};
 ///
 /// Screen-level state may be shared by multiple Views without being promoted
 /// to global application state.
-pub(crate) trait Screen<R: Runtime, E> {
+pub(crate) trait Screen<R: Runtime, E: Executor> {
 	fn configure(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>);
-
 	fn update(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>);
-
 	fn event(&mut self, event: &e::Event, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>);
 }
 
@@ -83,11 +81,10 @@ pub(crate) trait PanelTrait<R: Runtime, E> {
 ///
 /// Views may also share state with other Views when that state belongs to
 /// their shared screen or feature scope rather than global application state.
-pub(crate) trait ViewTrait<R: Runtime, E> {
+pub(crate) trait ViewTrait<R: Runtime, E: Executor> {
 	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R, E>);
 
 	fn update(&mut self, ctx: &mut AppContext<'_, R, E>);
-
 	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R, E>);
 }
 

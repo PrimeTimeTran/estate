@@ -7,19 +7,19 @@ use crate::{api::Api, e, prelude::*, ui::Layout};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::native::{DashboardScreen, WaterfallChart, prelude::*};
 
-pub(crate) struct ScreenInstance<R: Runtime, E> {
+pub(crate) struct ScreenInstance<R: Runtime, E: Executor> {
 	pub kind: ViewType,
 	pub screen: Box<dyn Screen<R, E>>,
 	pub layout: Layout<R, E>,
 }
 
-impl<R: Runtime, E> fmt::Debug for ScreenInstance<R, E> {
+impl<R: Runtime, E: Executor> fmt::Debug for ScreenInstance<R, E> {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		f.debug_struct("View").field("kind", &self.kind).finish()
 	}
 }
 
-impl<R: Runtime, E> ScreenInstance<R, E> {
+impl<R: Runtime, E: Executor> ScreenInstance<R, E> {
 	pub fn new(kind: ViewType) -> Self {
 		tracing::debug!("📺 Screen Instance {:?}", kind);
 		let screen: Box<dyn Screen<R, E>> = match kind {

@@ -23,6 +23,9 @@ pub use crate::{
 	server::{self, event::*},
 };
 
+#[cfg(all(feature = "web", target_arch = "wasm32"))]
+pub use crate::app::{app_web::*, *};
+
 #[cfg(not(target_arch = "wasm32"))]
 pub use cli::context::*;
 

@@ -135,7 +135,7 @@ pub struct Panel<R: Runtime, E> {
 	pub overlay: bool,
 	pub auto_hide: bool,
 }
-impl<R: Runtime, E> Panel<R, E> {
+impl<R: Runtime, E: Executor> Panel<R, E> {
 	pub fn draw(&mut self, ui: &mut egui::Ui, rect: egui::Rect, ctx: &mut AppContext<'_, R, E>) {
 		if !self.open {
 			return;
@@ -147,7 +147,7 @@ impl<R: Runtime, E> Panel<R, E> {
 		self.content.draw(&mut child_ui, ctx);
 	}
 }
-impl<R: Runtime, E> Panel<R, E> {
+impl<R: Runtime, E: Executor> Panel<R, E> {
 	pub fn new(content: impl ViewTrait<R, E> + 'static, region: Region) -> Self {
 		Self {
 			region,
@@ -189,7 +189,7 @@ impl<R: Runtime, E> Panel<R, E> {
 		self.open
 	}
 }
-impl<R: Runtime, E> ViewTrait<R, E> for Panel<R, E> {
+impl<R: Runtime, E: Executor> ViewTrait<R, E> for Panel<R, E> {
 	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R, E>) {
 		self.content.draw(ui, ctx);
 	}
@@ -260,7 +260,7 @@ impl ActivityBar {
 		Self { buttons: vec![] }
 	}
 }
-impl<R: Runtime, E> ViewTrait<R, E> for ActivityBar {
+impl<R: Runtime, E: Executor> ViewTrait<R, E> for ActivityBar {
 	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R, E>) {
 		ui.vertical(|ui| {
 			// buttons
@@ -274,7 +274,7 @@ impl<R: Runtime, E> ViewTrait<R, E> for ActivityBar {
 pub struct PrimaryBar {
 	buttons: Vec<&'static str>,
 }
-impl<R: Runtime, E> ViewTrait<R, E> for PrimaryBar {
+impl<R: Runtime, E: Executor> ViewTrait<R, E> for PrimaryBar {
 	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R, E>) {
 		ui.horizontal(|ui| {
 			// buttons

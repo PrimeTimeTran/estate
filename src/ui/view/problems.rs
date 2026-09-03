@@ -24,7 +24,7 @@ impl ProblemsScreen {
 	}
 }
 
-impl<R: Runtime, E> Screen<R, E> for ProblemsScreen {
+impl<R: Runtime, E: Executor> Screen<R, E> for ProblemsScreen {
 	fn configure(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
 		// Configure the regions this screen uses.
 	}

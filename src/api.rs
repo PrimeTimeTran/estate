@@ -1,6 +1,9 @@
 use crate::{
 	model::problem::StoredProblem,
-	proto::types::{SampleProblemRequest, *},
+	proto::{
+		self,
+		types::{SampleProblemRequest, *},
+	},
 };
 
 // ============================================================
@@ -39,7 +42,8 @@ pub struct ProblemState {
 // 	fn clone_box(&self) -> Box<dyn Api>;
 // }
 
-#[async_trait::async_trait(?Send)]
+#[cfg(not(target_arch = "wasm32"))]
+#[async_trait::async_trait]
 pub trait Api: std::fmt::Debug + 'static {
 	async fn load_problems(&self) -> anyhow::Result<Vec<StoredProblem>>;
 	async fn sample_problem(&self, request: SampleProblemRequest) -> anyhow::Result<StoredProblem>;
@@ -47,6 +51,15 @@ pub trait Api: std::fmt::Debug + 'static {
 	fn clone_box(&self) -> Box<dyn Api>;
 }
 
+#[cfg(target_arch = "wasm32")]
+#[async_trait::async_trait(?Send)]
+pub trait Api: std::fmt::Debug + 'static {
+	async fn load_problems(&self) -> anyhow::Result<Vec<StoredProblem>>;
+	async fn sample_problem(&self, request: SampleProblemRequest) -> anyhow::Result<StoredProblem>;
+	async fn load_problem(&self, id: i64) -> anyhow::Result<StoredProblem>;
+
+	fn clone_box(&self) -> Box<dyn Api>;
+}
 impl Clone for Box<dyn Api> {
 	fn clone(&self) -> Self {
 		self.clone_box()
@@ -100,7 +113,7 @@ impl NativeApiClient {
 }
 
 #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-#[async_trait::async_trait(?Send)]
+#[async_trait::async_trait]
 impl Api for NativeApiClient {
 	fn clone_box(&self) -> Box<dyn Api> {
 		Box::new(self.clone())
@@ -115,10 +128,18 @@ impl Api for NativeApiClient {
 	}
 
 	async fn sample_problem(&self, request: SampleProblemRequest) -> anyhow::Result<StoredProblem> {
-		todo!("NativeApiClient sample_problem")
+		println!("Native API Client sample_problem");
+		let request: proto::types::SampleProblemRequest = request.into();
+		let response = self
+			.problems
+			.clone()
+			.sample_problem(request)
+			.await?
+			.into_inner();
+
+		StoredProblem::try_from(response)
 	}
 }
-
 // ============================================================
 // WASM
 // ============================================================
@@ -137,7 +158,7 @@ impl WasmApiClient {
 	}
 }
 
-// #[cfg(target_arch = "wasm32")]
+#[cfg(target_arch = "wasm32")]
 #[async_trait::async_trait(?Send)]
 impl Api for WasmApiClient {
 	fn clone_box(&self) -> Box<dyn Api> {

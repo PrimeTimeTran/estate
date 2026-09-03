@@ -130,7 +130,7 @@ impl TaskManagerScreen {
 	}
 }
 
-impl<R: Runtime, E> Screen<R, E> for TaskManagerScreen {
+impl<R: Runtime, E: Executor> Screen<R, E> for TaskManagerScreen {
 	fn configure(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
 		// Put TaskManagerView into the appropriate region/panel.
 	}
@@ -422,7 +422,7 @@ impl TaskManagerView {
 		}
 	}
 }
-impl<R: Runtime, E> ViewTrait<R, E> for TaskManagerView {
+impl<R: Runtime, E: Executor> ViewTrait<R, E> for TaskManagerView {
 	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R, E>) {
 		// compose child views
 	}

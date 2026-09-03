@@ -16,7 +16,7 @@ pub mod state;
 #[path = "./app.native.rs"]
 pub mod app_native;
 
-#[cfg(feature = "web")]
+#[cfg(all(feature = "web", target_arch = "wasm32"))]
 #[path = "./app.web.rs"]
 pub mod app_web;
 

@@ -41,11 +41,20 @@ pub struct AppContext<'a, R: Runtime, E> {
 // ## 2. What the 'static constraint tells you
 // The + 'static on impl<'a, R: Runtime + 'static> AppContext<'a, R> tells
 // us that the underlying runtime implementation (R) must be completely free of short-lived borrows.
-// impl<'a, R: Runtime + 'static, E> AppContext<'a, R, E> {
-// 	pub fn load_problems(&mut self) {
-// 		self.app.load_problems();
-// 	}
-// }
+impl<'a, R: Runtime + 'static, E: Executor> AppContext<'a, R, E> {
+	pub fn load_problems(&mut self) {
+		tracing::info!("load_problems");
+		self.app.load_problems()
+	}
+	pub fn sample_problem(&mut self) {
+		tracing::info!("sample_problem");
+		self.app.sample_problem()
+	}
+	pub fn load_problem(&mut self) {
+		tracing::info!("sample_problem");
+		// self.app.load_problem()
+	}
+}
 
 impl<'a, R: Runtime, E> AppContext<'a, R, E> {
 	pub fn state(&self) -> std::sync::RwLockReadGuard<'_, EstateState> {

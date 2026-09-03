@@ -14,7 +14,7 @@ impl DebugPanel {
 		}
 	}
 }
-impl<R: Runtime, E> ViewTrait<R, E> for DebugPanel {
+impl<R: Runtime, E: Executor> ViewTrait<R, E> for DebugPanel {
 	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R, E>) {
 		ui.vertical_centered(|ui| {
 			ui.heading(&self.title);

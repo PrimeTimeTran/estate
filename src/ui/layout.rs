@@ -5,7 +5,7 @@ use crate::{e, prelude::*};
 
 use crate::LAYOUT as config;
 
-pub struct Layout<R: Runtime, E> {
+pub struct Layout<R: Runtime, E: Executor> {
 	pub activity_bar: Panel<R, E>,
 	pub dock_left: Panel<R, E>,
 	pub main: Panel<R, E>,
@@ -15,7 +15,7 @@ pub struct Layout<R: Runtime, E> {
 	pub status_bar: Panel<R, E>,
 	pub dock_right: Panel<R, E>,
 }
-impl<R: Runtime, E> Layout<R, E> {
+impl<R: Runtime, E: Executor> Layout<R, E> {
 	// Rust uses ownership,borrowing, and lifetimes to determine when values
 	// may be safely destroyed, allowing memory to be reclaimed deterministically
 	// without a garbage collector.
@@ -68,7 +68,7 @@ impl<R: Runtime, E> Layout<R, E> {
 		}
 	}
 }
-impl<R: Runtime, E> LayoutTrait<R, E> for Layout<R, E> {
+impl<R: Runtime, E: Executor> LayoutTrait<R, E> for Layout<R, E> {
 	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R, E>) {
 		let rect = ui.max_rect();
 		ui.painter()
@@ -153,7 +153,7 @@ impl<R: Runtime, E> LayoutTrait<R, E> for Layout<R, E> {
 	fn update(&mut self, _ctx: &mut AppContext<'_, R, E>) {}
 	fn event(&mut self, _event: &e::Event, _ctx: &mut AppContext<'_, R, E>) {}
 }
-impl<R: Runtime, E> Layout<R, E> {
+impl<R: Runtime, E: Executor> Layout<R, E> {
 	fn draw_view(
 		ui: &mut egui::Ui,
 		rect: egui::Rect,

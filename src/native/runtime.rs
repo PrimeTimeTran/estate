@@ -140,7 +140,7 @@ impl Runtime for NativeRuntime {
 		self.event_rx.lock().unwrap().try_recv().ok()
 	}
 	fn event_processed(&self) {
-		todo!("event_processed")
+		println!("event processed")
 	}
 	fn tasks(&self) -> &Arc<RwLock<TaskManager>> {
 		&self.tasks
@@ -151,32 +151,29 @@ impl Runtime for NativeRuntime {
 		let handle = runtime.handle.clone();
 		let mut receiver = runtime.events.subscribe();
 		let mut dispatcher = EventDispatcher::<NativeRuntime>::new();
-		// let mut dispatcher = EventDispatcher::new();
-
 		dispatcher.register(TaskHandler);
 		dispatcher.register(StateHandler);
 		dispatcher.register(CommandHandler);
 		dispatcher.register(FileWatcherHandler);
 		dispatcher.register(NavigationHandler);
 		dispatcher.register(AppHandler);
-
-		// handle.spawn(async move {
-		// 	loop {
-		// 		match receiver.recv().await {
-		// 			Ok(event) => {
-		// 				tracing::debug!("🔥 native::runtime::dispatcher {:?}", event.kind);
-		// 				dispatcher.dispatch(event, &runtime).await;
-		// 			}
-		// 			Err(broadcast::error::RecvError::Lagged(count)) => {
-		// 				tracing::warn!(count, "native::runtime::start_dispatcher lagged");
-		// 			}
-		// 			Err(broadcast::error::RecvError::Closed) => {
-		// 				tracing::warn!("native::runtime::start_dispatcher closed");
-		// 				break;
-		// 			}
-		// 		}
-		// 	}
-		// });
+		handle.spawn(async move {
+			loop {
+				match receiver.recv().await {
+					Ok(event) => {
+						tracing::debug!("🔥 native::runtime::dispatcher {:?}", event.kind);
+						dispatcher.dispatch(event, &runtime).await;
+					}
+					Err(broadcast::error::RecvError::Lagged(count)) => {
+						tracing::warn!(count, "native::runtime::start_dispatcher lagged");
+					}
+					Err(broadcast::error::RecvError::Closed) => {
+						tracing::warn!("native::runtime::start_dispatcher closed");
+						break;
+					}
+				}
+			}
+		});
 	}
 	fn state_service(&self) -> &Arc<StateService> {
 		&self.state_service

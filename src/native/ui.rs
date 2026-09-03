@@ -31,7 +31,7 @@ pub struct EguiVeable {
 	top_tab: DevTopTab,
 	side_tab: DevSideTab,
 }
-impl<R: Runtime, E> Screen<R, E> for EguiVeable {
+impl<R: Runtime, E: Executor> Screen<R, E> for EguiVeable {
 	fn configure(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
 		todo!("")
 	}
@@ -44,7 +44,7 @@ impl<R: Runtime, E> Screen<R, E> for EguiVeable {
 		todo!("")
 	}
 }
-impl<R: Runtime, E> ViewTrait<R, E> for EguiVeable {
+impl<R: Runtime, E: Executor> ViewTrait<R, E> for EguiVeable {
 	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R, E>) {
 		self.draw_ui(ui);
 	}
@@ -657,7 +657,7 @@ impl Sidebar {
 		}
 	}
 }
-impl<R: Runtime, E> Screen<R, E> for Sidebar {
+impl<R: Runtime, E: Executor> Screen<R, E> for Sidebar {
 	fn configure(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
 		// Configure the regions this screen uses.
 	}
