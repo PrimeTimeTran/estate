@@ -128,15 +128,15 @@ impl Region {
 	}
 }
 
-pub struct Panel<R: Runtime> {
+pub struct Panel<R: Runtime, E> {
 	pub region: Region,
-	pub content: Box<dyn ViewTrait<R>>,
+	pub content: Box<dyn ViewTrait<R, E>>,
 	pub open: bool,
 	pub overlay: bool,
 	pub auto_hide: bool,
 }
-impl<R: Runtime> Panel<R> {
-	pub fn draw(&mut self, ui: &mut egui::Ui, rect: egui::Rect, ctx: &mut AppContext<'_, R>) {
+impl<R: Runtime, E> Panel<R, E> {
+	pub fn draw(&mut self, ui: &mut egui::Ui, rect: egui::Rect, ctx: &mut AppContext<'_, R, E>) {
 		if !self.open {
 			return;
 		}
@@ -147,8 +147,8 @@ impl<R: Runtime> Panel<R> {
 		self.content.draw(&mut child_ui, ctx);
 	}
 }
-impl<R: Runtime> Panel<R> {
-	pub fn new(content: impl ViewTrait<R> + 'static, region: Region) -> Self {
+impl<R: Runtime, E> Panel<R, E> {
+	pub fn new(content: impl ViewTrait<R, E> + 'static, region: Region) -> Self {
 		Self {
 			region,
 			content: Box::new(content),
@@ -158,7 +158,7 @@ impl<R: Runtime> Panel<R> {
 		}
 	}
 	pub fn from_config(
-		content: impl ViewTrait<R> + 'static,
+		content: impl ViewTrait<R, E> + 'static,
 		region: Region,
 		config: &PanelState,
 	) -> Self {
@@ -189,12 +189,12 @@ impl<R: Runtime> Panel<R> {
 		self.open
 	}
 }
-impl<R: Runtime> ViewTrait<R> for Panel<R> {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>) {
+impl<R: Runtime, E> ViewTrait<R, E> for Panel<R, E> {
+	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R, E>) {
 		self.content.draw(ui, ctx);
 	}
-	fn update(&mut self, ctx: &mut AppContext<'_, R>) {}
-	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R>) {}
+	fn update(&mut self, ctx: &mut AppContext<'_, R, E>) {}
+	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R, E>) {}
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -260,27 +260,27 @@ impl ActivityBar {
 		Self { buttons: vec![] }
 	}
 }
-impl<R: Runtime> ViewTrait<R> for ActivityBar {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>) {
+impl<R: Runtime, E> ViewTrait<R, E> for ActivityBar {
+	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R, E>) {
 		ui.vertical(|ui| {
 			// buttons
 		});
 	}
-	fn update(&mut self, ctx: &mut AppContext<'_, R>) {}
+	fn update(&mut self, ctx: &mut AppContext<'_, R, E>) {}
 
-	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R>) {}
+	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R, E>) {}
 }
 
 pub struct PrimaryBar {
 	buttons: Vec<&'static str>,
 }
-impl<R: Runtime> ViewTrait<R> for PrimaryBar {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>) {
+impl<R: Runtime, E> ViewTrait<R, E> for PrimaryBar {
+	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R, E>) {
 		ui.horizontal(|ui| {
 			// buttons
 		});
 	}
-	fn update(&mut self, ctx: &mut AppContext<'_, R>) {}
+	fn update(&mut self, ctx: &mut AppContext<'_, R, E>) {}
 
-	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R>) {}
+	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R, E>) {}
 }

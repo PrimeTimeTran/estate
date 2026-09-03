@@ -130,24 +130,24 @@ impl TaskManagerScreen {
 	}
 }
 
-impl<R: Runtime> Screen<R> for TaskManagerScreen {
-	fn configure(&mut self, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {
+impl<R: Runtime, E> Screen<R, E> for TaskManagerScreen {
+	fn configure(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
 		// Put TaskManagerView into the appropriate region/panel.
 	}
 
-	fn update(&mut self, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {
+	fn update(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
 		// self.manager.poll_changes();
 		self.view.update(ctx);
 	}
 
-	fn event(&mut self, event: &e::Event, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {
+	fn event(&mut self, event: &e::Event, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
 		// Feature-level event handling.
 		//
 		// e.g. TaskCreated, TaskDeleted, etc.
 	}
 }
 // impl<R: Runtime> TaskManagerScreen {
-// 	fn event(&mut self, event: &e::Event, _ctx: &mut AppContext<'_, R>) {
+// 	fn event(&mut self, event: &e::Event, _ctx: &mut AppContext<'_, R, E>) {
 // 		if let e::EventKind::TaskCreated { .. } = event.kind {}
 // 	}
 // }
@@ -157,7 +157,7 @@ pub struct TaskManagerView {
 	waterfall: WaterfallChart,
 }
 impl TaskManagerView {
-	// 	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, R>) {
+	// 	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, R, E>) {
 	// 	ui.heading("Task Manager draw");
 	// 	if self.poll_changes() {
 	// 		ui.ctx().request_repaint();
@@ -422,13 +422,13 @@ impl TaskManagerView {
 		}
 	}
 }
-impl<R: Runtime> ViewTrait<R> for TaskManagerView {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>) {
+impl<R: Runtime, E> ViewTrait<R, E> for TaskManagerView {
+	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R, E>) {
 		// compose child views
 	}
-	fn update(&mut self, ctx: &mut AppContext<'_, R>) {}
+	fn update(&mut self, ctx: &mut AppContext<'_, R, E>) {}
 
-	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R>) {}
+	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R, E>) {}
 }
 
 fn render_graphs(

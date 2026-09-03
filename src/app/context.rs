@@ -30,8 +30,8 @@ use crate::{
 
 // Would you like to look at how to optimize the trait names alongside these lifetimes, or do you want to verify if AppRuntime<R> can be safely shared across your background threads?
 // impl<R: Runtime + 'static> AppRuntime<R> {
-pub struct AppContext<'a, R: Runtime> {
-	pub app: &'a mut AppRuntime<R>,
+pub struct AppContext<'a, R: Runtime, E> {
+	pub app: &'a mut AppRuntime<R, E>,
 	pub last_revision: u64,
 	pub event_rx: R::EventReceiver,
 	pub input: IOState,
@@ -41,13 +41,13 @@ pub struct AppContext<'a, R: Runtime> {
 // ## 2. What the 'static constraint tells you
 // The + 'static on impl<'a, R: Runtime + 'static> AppContext<'a, R> tells
 // us that the underlying runtime implementation (R) must be completely free of short-lived borrows.
-impl<'a, R: Runtime + 'static> AppContext<'a, R> {
-	pub fn load_problems(&mut self) {
-		self.app.load_problems();
-	}
-}
+// impl<'a, R: Runtime + 'static, E> AppContext<'a, R, E> {
+// 	pub fn load_problems(&mut self) {
+// 		self.app.load_problems();
+// 	}
+// }
 
-impl<'a, R: Runtime> AppContext<'a, R> {
+impl<'a, R: Runtime, E> AppContext<'a, R, E> {
 	pub fn state(&self) -> std::sync::RwLockReadGuard<'_, EstateState> {
 		self.app.state()
 	}

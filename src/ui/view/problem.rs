@@ -27,26 +27,26 @@ impl<R: Runtime> ProblemScreen<R> {
 	}
 }
 
-impl<R: Runtime> ViewTrait<R> for ProblemScreen<R> {
-	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, R>) {
+impl<R: Runtime, E> ViewTrait<R, E> for ProblemScreen<R> {
+	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, R, E>) {
 		// println!("Problem Screen view draw")
 	}
-	fn update(&mut self, ctx: &mut AppContext<'_, R>) {
+	fn update(&mut self, ctx: &mut AppContext<'_, R, E>) {
 		println!("Problem Screen view update")
 	}
-	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R>) {
+	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R, E>) {
 		println!("Problem Screen view event")
 	}
 }
-impl<R: Runtime> Screen<R> for ProblemScreen<R> {
-	fn configure(&mut self, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {
+impl<R: Runtime, E> Screen<R, E> for ProblemScreen<R> {
+	fn configure(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
 		println!("Problem Screen configure")
 		// Configure the regions this screen uses.
 	}
-	fn update(&mut self, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {
+	fn update(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
 		println!("Problem Screen update")
 	}
-	fn event(&mut self, event: &e::Event, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {
+	fn event(&mut self, event: &e::Event, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
 		println!("Problem Screen screen eventupdate")
 	}
 }
@@ -68,15 +68,15 @@ impl<R: Runtime> ProblemViewSidebar<R> {
 		}
 	}
 }
-impl<R: Runtime> ViewTrait<R> for ProblemViewSidebar<R> {
-	fn draw(&mut self, ui: &mut Ui, _ctx: &mut AppContext<'_, R>) {
+impl<R: Runtime, E> ViewTrait<R, E> for ProblemViewSidebar<R> {
+	fn draw(&mut self, ui: &mut Ui, _ctx: &mut AppContext<'_, R, E>) {
 		ui.heading("Problem");
 		ui.separator();
 		self.draw_solutions(ui);
 		self.draw_submissions(ui);
 	}
-	fn update(&mut self, _ctx: &mut AppContext<'_, R>) {}
-	fn event(&mut self, _event: &e::Event, _ctx: &mut AppContext<'_, R>) {}
+	fn update(&mut self, _ctx: &mut AppContext<'_, R, E>) {}
+	fn event(&mut self, _event: &e::Event, _ctx: &mut AppContext<'_, R, E>) {}
 }
 impl<R: Runtime> ProblemViewSidebar<R> {
 	fn draw_solutions(&self, ui: &mut Ui) {
@@ -215,10 +215,10 @@ impl<R: Runtime> ProblemViewBottomPanel<R> {
 		}
 	}
 }
-impl<R: Runtime> ViewTrait<R> for ProblemViewBottomPanel<R> {
-	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, R>) {}
-	fn update(&mut self, ctx: &mut AppContext<'_, R>) {}
-	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R>) {}
+impl<R: Runtime, E> ViewTrait<R, E> for ProblemViewBottomPanel<R> {
+	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, R, E>) {}
+	fn update(&mut self, ctx: &mut AppContext<'_, R, E>) {}
+	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R, E>) {}
 }
 #[derive(Debug, Default)]
 pub struct ProblemView<R: Runtime> {
@@ -231,8 +231,8 @@ impl<R: Runtime> ProblemView<R> {
 		}
 	}
 }
-impl<R: Runtime> ViewTrait<R> for ProblemView<R> {
-	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, R>) {
+impl<R: Runtime, E> ViewTrait<R, E> for ProblemView<R> {
+	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, R, E>) {
 		let (loading, error, problem) = {
 			let state = ctx.app.app_state();
 			(
@@ -260,7 +260,7 @@ impl<R: Runtime> ViewTrait<R> for ProblemView<R> {
 			);
 
 			if ui.button("Retry").clicked() {
-				ctx.app.sample_problem();
+				// ctx.app.sample_problem();
 			}
 
 			return;
@@ -272,20 +272,20 @@ impl<R: Runtime> ViewTrait<R> for ProblemView<R> {
 			ui.add_space(12.0);
 
 			if ui.button("Sample Another Problem").clicked() {
-				ctx.app.sample_problem();
+				// ctx.app.sample_problem();
 			}
 		} else {
 			ui.label("No problem loaded.");
 
 			if ui.button("Sample Problem").clicked() {
-				ctx.app.sample_problem();
+				// ctx.app.sample_problem();
 			}
 		}
 	}
 
-	fn update(&mut self, _ctx: &mut AppContext<'_, R>) {}
+	fn update(&mut self, _ctx: &mut AppContext<'_, R, E>) {}
 
-	fn event(&mut self, _event: &e::Event, _ctx: &mut AppContext<'_, R>) {}
+	fn event(&mut self, _event: &e::Event, _ctx: &mut AppContext<'_, R, E>) {}
 }
 
 impl<R: Runtime> ProblemView<R> {
@@ -301,7 +301,7 @@ impl<R: Runtime> ProblemView<R> {
 	}
 }
 impl<R: Runtime> ProblemView<R> {
-	fn draw<A: Api>(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, R>) {
+	fn draw<E>(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, R, E>) {
 		let (loading, error, problem) = {
 			let state = ctx.app.app_state();
 			(
@@ -324,7 +324,7 @@ impl<R: Runtime> ProblemView<R> {
 				format!("Failed to load problem: {error}"),
 			);
 			if ui.button("Retry").clicked() {
-				ctx.app.sample_problem();
+				// ctx.app.sample_problem();
 			}
 			return;
 		}
@@ -332,12 +332,12 @@ impl<R: Runtime> ProblemView<R> {
 			self.draw_problem(ui, &problem);
 			ui.add_space(12.0);
 			if ui.button("Sample Another Problem").clicked() {
-				ctx.app.sample_problem();
+				// ctx.app.sample_problem();
 			}
 		} else {
 			ui.label("No problem loaded.");
 			if ui.button("Sample Problem").clicked() {
-				ctx.app.sample_problem();
+				// ctx.app.sample_problem();
 			}
 		}
 	}

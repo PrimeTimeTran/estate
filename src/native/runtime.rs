@@ -73,16 +73,42 @@ impl NativeRuntime {
 	}
 }
 
-impl Runtime for NativeRuntime {
-	type EventReceiver = NativeEventReceiver;
-	// type Api = NativeApiClient;
-	// fn api(&self) -> &Self::Api {
-	// 	&self.api
-	// }
-
-	async fn sleep(&self, duration: std::time::Duration) {
-		tokio::time::sleep(duration).await;
+#[derive(Clone, Debug)]
+pub struct NativeExecutor {
+	pub handle: tokio::runtime::Handle,
+}
+impl NativeExecutor {
+	pub fn spawn<F>(&self, future: F)
+	where
+		F: Future<Output = ()> + Send + 'static,
+	{
+		println!("🔥 NativeRuntime::spawn CALLED");
+		tokio::spawn(async move {
+			println!("🔥 NativeRuntime task STARTED");
+			future.await;
+		});
 	}
+}
+impl Executor for NativeExecutor {
+	fn spawn(&self, future: impl Future<Output = ()> + Send + 'static) {
+		self.handle.spawn(future);
+	}
+}
+impl Executor for NativeRuntime {
+	fn spawn(&self, future: impl Future<Output = ()> + Send + 'static) {
+		tokio::spawn(future);
+	}
+}
+impl Runtime for NativeRuntime {
+	fn spawn(&self, future: impl Future<Output = ()> + 'static) {
+		// ...
+	}
+
+	fn sleep(&self, duration: std::time::Duration) -> impl Future<Output = ()> + Send {
+		tokio::time::sleep(duration)
+	}
+
+	type EventReceiver = NativeEventReceiver;
 
 	fn emit(&self, event: e::Event) {
 		tracing::debug!("NativeRuntime {:?}", event.kind.clone());
@@ -166,7 +192,7 @@ impl Runtime for NativeRuntime {
 }
 
 pub struct NativeAppContext<'a> {
-	pub base: AppContext<'a, NativeRuntime>,
+	pub base: AppContext<'a, NativeRuntime, NativeExecutor>,
 	pub monitor: &'a mut NativeMonitor,
 }
 impl<'a> NativeAppContext<'a> {
@@ -220,18 +246,6 @@ impl EventReceiver for NativeEventReceiver {
 // 	}
 // }
 
-#[derive(Clone, Debug)]
-pub struct NativeExecutor {
-	pub handle: tokio::runtime::Handle,
-}
-impl NativeExecutor {
-	pub fn spawn<F>(&self, future: F)
-	where
-		F: Future<Output = ()> + Send + 'static,
-	{
-		self.handle.spawn(future);
-	}
-}
 impl Drop for NativeRuntime {
 	fn drop(&mut self) {
 		tracing::info!("💀 NativeRuntime DROPPED");

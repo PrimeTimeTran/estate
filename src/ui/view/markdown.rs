@@ -21,8 +21,9 @@ impl MarkdownScreen {
 		CommonMarkViewer::new().show(ui, &mut self.cache, &mut self.markdown);
 	}
 }
-impl<R: Runtime> Screen<R> for MarkdownScreen {
-	fn configure(&mut self, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {}
-	fn update(&mut self, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {}
-	fn event(&mut self, event: &e::Event, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {}
+impl<R: Runtime, E> Screen<R, E> for MarkdownScreen {
+	fn configure(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {}
+	fn update(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {}
+	fn event(&mut self, event: &e::Event, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
+	}
 }

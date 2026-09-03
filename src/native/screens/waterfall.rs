@@ -17,28 +17,28 @@ pub struct WaterfallScreen {}
 impl WaterfallScreen {
 	pub fn new() {}
 }
-impl<R: Runtime> Screen<R> for WaterfallScreen {
-	fn configure(&mut self, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {
+impl<R: Runtime, E> Screen<R, E> for WaterfallScreen {
+	fn configure(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
 		// Put TaskManagerView into the appropriate region/panel.
 	}
 
-	fn update(&mut self, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {
+	fn update(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
 		// self.manager.poll_changes();
 		// self.view.update(ctx);
 	}
 
-	fn event(&mut self, event: &e::Event, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {
+	fn event(&mut self, event: &e::Event, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
 		// Feature-level event handling.
 		//
 		// e.g. TaskCreated, TaskDeleted, etc.
 	}
-	// fn configure(&mut self, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {
+	// fn configure(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
 	// 	// Configure the regions this screen uses.
 	// }
 
-	// fn update(&mut self, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {}
+	// fn update(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {}
 
-	// fn event(&mut self, event: &e::Event, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {}
+	// fn event(&mut self, event: &e::Event, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {}
 }
 
 // pub struct TaskManagerScreen<R: Runtime> {}
@@ -46,10 +46,10 @@ impl<R: Runtime> Screen<R> for WaterfallScreen {
 pub struct WaterfallChart {
 	jobs: Vec<&'static Job>,
 }
-impl<R: Runtime> ViewTrait<R> for WaterfallChart {
-	fn update(&mut self, ctx: &mut AppContext<'_, R>) {}
-	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R>) {}
-	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, R>) {
+impl<R: Runtime, E> ViewTrait<R, E> for WaterfallChart {
+	fn update(&mut self, ctx: &mut AppContext<'_, R, E>) {}
+	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R, E>) {}
+	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, R, E>) {
 		if ctx.state_changed() {
 			ui.ctx().request_repaint();
 		}

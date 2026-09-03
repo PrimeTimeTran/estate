@@ -1,5 +1,4 @@
 pub(crate) mod agent;
-pub(crate) mod app;
 pub(crate) mod backend;
 pub(crate) mod constants_native;
 pub(crate) mod core;

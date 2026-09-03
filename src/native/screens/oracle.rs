@@ -10,15 +10,16 @@ pub struct OracleScreen {
 	scroll_x: f32,
 	scroll_y: f32,
 }
-impl<R: Runtime> Screen<R> for OracleScreen {
-	fn configure(&mut self, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {
+impl<R: Runtime, E> Screen<R, E> for OracleScreen {
+	fn configure(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
 		// Configure the regions this screen uses.
 	}
-	fn update(&mut self, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {}
-	fn event(&mut self, event: &e::Event, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {}
+	fn update(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {}
+	fn event(&mut self, event: &e::Event, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
+	}
 }
 impl OracleScreen {
-	fn draw<R: Runtime>(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>) {
+	fn draw<R: Runtime, E>(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R, E>) {
 		self.draw_ui(ui, ctx);
 		self.draw_status_bar(ui);
 	}
@@ -37,17 +38,17 @@ impl OracleScreen {
 	// -------------------------------------------------------------------------
 	// INPUT
 	// -------------------------------------------------------------------------
-	fn inspect_trackpad<R: Runtime>(
+	fn inspect_trackpad<R: Runtime, E>(
 		&mut self,
 		ui: &mut egui::Ui,
-		ctx: &AppContext<'_, R>,
+		ctx: &AppContext<'_, R, E>,
 	) -> TrackpadState {
 		self.gesture.inspect(ui, &ctx.input)
 	}
 	// -------------------------------------------------------------------------
 	// UI
 	// -------------------------------------------------------------------------
-	fn draw_ui<R: Runtime>(&mut self, ui: &mut egui::Ui, ctx: &AppContext<'_, R>) {
+	fn draw_ui<R: Runtime, E>(&mut self, ui: &mut egui::Ui, ctx: &AppContext<'_, R, E>) {
 		self.draw_header(ui);
 
 		let trackpad = self.inspect_trackpad(ui, ctx);

@@ -29,7 +29,7 @@ use winit::{
 };
 
 pub struct NativeApp {
-	pub app: AppRuntime<NativeRuntime>,
+	pub app: AppRuntime<NativeRuntime, NativeExecutor>,
 	pub host: NativeHost,
 	pub runtime: NativeRuntime,
 
@@ -84,18 +84,20 @@ impl Context for NativeApp {
 impl NativeApp {
 	pub fn new() -> Result<Self> {
 		let tokio = tokio::runtime::Runtime::new()?;
+
 		let handle = tokio.handle().clone();
 
 		// Runtime owns all runtime infrastructure:
 		// services, executor, state, event bus, session, etc.
 		let runtime = tokio.block_on(NativeRuntime::new(handle.clone()))?;
 
-		// // Engine owns the domain/application engine and uses Runtime.
+		// Engine owns the domain/application engine and uses Runtime.
 		let engine = EstateEngine::new(runtime.clone())?;
-		// AppRuntime owns the application-level behavior/state.
-		let app = AppRuntime::new(engine.clone());
 
+		let app = AppRuntime::new(engine.clone(), runtime.executor.clone());
 		app.start();
+		app.start_services();
+		// Executor::spawn(&self, future);
 
 		let host = NativeHost::new();
 
@@ -149,6 +151,9 @@ impl NativeApp {
 		result
 	}
 	fn start_runtime(&mut self) -> Result<()> {
+		println!("App<NativeApp>.new calling AppRuntime<NativeRuntime>.start() before ");
+
+		println!("App<NativeApp>.new calling AppRuntime<NativeRuntime>.start() after");
 		// // App
 		// self.engine.runtime.spawn(future);       // ✅
 		// // NativeRuntime

@@ -5,17 +5,17 @@ use crate::{e, prelude::*};
 
 use crate::LAYOUT as config;
 
-pub struct Layout<R: Runtime> {
-	pub activity_bar: Panel<R>,
-	pub dock_left: Panel<R>,
-	pub main: Panel<R>,
-	pub primary_bar: Panel<R>,
-	pub secondary_bar: Panel<R>,
-	pub bottom_panel: Panel<R>,
-	pub status_bar: Panel<R>,
-	pub dock_right: Panel<R>,
+pub struct Layout<R: Runtime, E> {
+	pub activity_bar: Panel<R, E>,
+	pub dock_left: Panel<R, E>,
+	pub main: Panel<R, E>,
+	pub primary_bar: Panel<R, E>,
+	pub secondary_bar: Panel<R, E>,
+	pub bottom_panel: Panel<R, E>,
+	pub status_bar: Panel<R, E>,
+	pub dock_right: Panel<R, E>,
 }
-impl<R: Runtime> Layout<R> {
+impl<R: Runtime, E> Layout<R, E> {
 	// Rust uses ownership,borrowing, and lifetimes to determine when values
 	// may be safely destroyed, allowing memory to be reclaimed deterministically
 	// without a garbage collector.
@@ -68,8 +68,8 @@ impl<R: Runtime> Layout<R> {
 		}
 	}
 }
-impl<R: Runtime> LayoutTrait<R> for Layout<R> {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>) {
+impl<R: Runtime, E> LayoutTrait<R, E> for Layout<R, E> {
+	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R, E>) {
 		let rect = ui.max_rect();
 		ui.painter()
 			.rect_filled(rect, 0.0, egui::Color32::from_rgb(30, 30, 30));
@@ -150,15 +150,15 @@ impl<R: Runtime> LayoutTrait<R> for Layout<R> {
 			);
 		}
 	}
-	fn update(&mut self, _ctx: &mut AppContext<'_, R>) {}
-	fn event(&mut self, _event: &e::Event, _ctx: &mut AppContext<'_, R>) {}
+	fn update(&mut self, _ctx: &mut AppContext<'_, R, E>) {}
+	fn event(&mut self, _event: &e::Event, _ctx: &mut AppContext<'_, R, E>) {}
 }
-impl<R: Runtime> Layout<R> {
+impl<R: Runtime, E> Layout<R, E> {
 	fn draw_view(
 		ui: &mut egui::Ui,
 		rect: egui::Rect,
-		view: &mut dyn ViewTrait<R>,
-		ctx: &mut AppContext<'_, R>,
+		view: &mut dyn ViewTrait<R, E>,
+		ctx: &mut AppContext<'_, R, E>,
 	) {
 		while let Some(event) = ctx.next_event() {
 			view.event(&event, ctx);
@@ -172,9 +172,9 @@ impl<R: Runtime> Layout<R> {
 	}
 	fn draw_panel(
 		ui: &mut egui::Ui,
-		ctx: &mut AppContext<'_, R>,
+		ctx: &mut AppContext<'_, R, E>,
 		rect: egui::Rect,
-		panel: &mut Panel<R>,
+		panel: &mut Panel<R, E>,
 	) {
 		if !panel.open {
 			return;
@@ -499,18 +499,18 @@ pub enum FocusedPane {
 // 			});
 // 	}
 // }
-// impl<R, T> ViewTrait<R> for TabbedSidebar<T>
+// impl<R, T> ViewTrait<R, E> for TabbedSidebar<T>
 // where
 // 	R: Runtime,
 // 	T: Clone + PartialEq + 'static,
 // {
-// 	fn draw(&mut self, ui: &mut egui::Ui, _ctx: &mut AppContext<'_, R>) {
+// 	fn draw(&mut self, ui: &mut egui::Ui, _ctx: &mut AppContext<'_, R, E>) {
 // 		self.draw(ui, |ui, _tab| {
 // 			// content gets supplied by the owning view
 // 		});
 // 	}
-// 	fn update(&mut self, ctx: &mut AppContext<'_, R>) {}
-// 	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R>) {}
+// 	fn update(&mut self, ctx: &mut AppContext<'_, R, E>) {}
+// 	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R, E>) {}
 // }
 #[derive(Debug, Clone, PartialEq)]
 pub struct Sidebar<T> {

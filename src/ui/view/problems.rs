@@ -24,17 +24,18 @@ impl ProblemsScreen {
 	}
 }
 
-impl<R: Runtime> Screen<R> for ProblemsScreen {
-	fn configure(&mut self, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {
+impl<R: Runtime, E> Screen<R, E> for ProblemsScreen {
+	fn configure(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
 		// Configure the regions this screen uses.
 	}
 
-	fn update(&mut self, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {}
-	fn event(&mut self, event: &e::Event, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {}
+	fn update(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {}
+	fn event(&mut self, event: &e::Event, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
+	}
 }
 
 impl ProblemsScreen {
-	// fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, R>) {
+	// fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, R, E>) {
 	// 	let should_load = {
 	// 		let state = ctx.app.app_state();
 

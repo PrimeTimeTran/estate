@@ -13,12 +13,12 @@ use crate::{api::Api, e, prelude::*, ui::Layout};
 ///
 /// Screen-level state may be shared by multiple Views without being promoted
 /// to global application state.
-pub(crate) trait Screen<R: Runtime> {
-	fn configure(&mut self, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>);
+pub(crate) trait Screen<R: Runtime, E> {
+	fn configure(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>);
 
-	fn update(&mut self, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>);
+	fn update(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>);
 
-	fn event(&mut self, event: &e::Event, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>);
+	fn event(&mut self, event: &e::Event, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>);
 }
 
 /// The reusable spatial structure of an application UI.
@@ -31,12 +31,12 @@ pub(crate) trait Screen<R: Runtime> {
 /// into its regions.
 ///
 /// Not every Screen needs to use every region.
-pub(crate) trait LayoutTrait<R: Runtime> {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>);
+pub(crate) trait LayoutTrait<R: Runtime, E> {
+	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R, E>);
 
-	fn update(&mut self, ctx: &mut AppContext<'_, R>);
+	fn update(&mut self, ctx: &mut AppContext<'_, R, E>);
 
-	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R>);
+	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R, E>);
 }
 
 /// A logical location within a Layout.
@@ -48,12 +48,12 @@ pub(crate) trait LayoutTrait<R: Runtime> {
 /// Panel's screen-specific content or panel-level state.
 ///
 /// Regions belong to a Layout and may be unused by a particular Screen.
-pub(crate) trait RegionTrait<R: Runtime> {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>);
+pub(crate) trait RegionTrait<R: Runtime, E> {
+	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R, E>);
 
-	fn update(&mut self, ctx: &mut AppContext<'_, R>) {}
+	fn update(&mut self, ctx: &mut AppContext<'_, R, E>) {}
 
-	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R>) {}
+	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R, E>) {}
 }
 
 /// A presentation surface that hosts one or more Views.
@@ -67,12 +67,12 @@ pub(crate) trait RegionTrait<R: Runtime> {
 ///
 /// Panel-level state belongs to the Panel rather than global application
 /// state.
-pub(crate) trait PanelTrait<R: Runtime> {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>);
+pub(crate) trait PanelTrait<R: Runtime, E> {
+	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R, E>);
 
-	fn update(&mut self, ctx: &mut AppContext<'_, R>) {}
+	fn update(&mut self, ctx: &mut AppContext<'_, R, E>) {}
 
-	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R>) {}
+	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R, E>) {}
 }
 
 /// A reusable, stateful piece of UI that can be placed into a Region or Panel.
@@ -83,12 +83,12 @@ pub(crate) trait PanelTrait<R: Runtime> {
 ///
 /// Views may also share state with other Views when that state belongs to
 /// their shared screen or feature scope rather than global application state.
-pub(crate) trait ViewTrait<R: Runtime> {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>);
+pub(crate) trait ViewTrait<R: Runtime, E> {
+	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R, E>);
 
-	fn update(&mut self, ctx: &mut AppContext<'_, R>);
+	fn update(&mut self, ctx: &mut AppContext<'_, R, E>);
 
-	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R>);
+	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R, E>);
 }
 
 /// A smaller reusable UI unit composed inside a View.
@@ -97,10 +97,10 @@ pub(crate) trait ViewTrait<R: Runtime> {
 /// Components may be composed freely within Views and may themselves be
 /// stateful, without requiring their state to live in global application
 /// state.
-pub(crate) trait ComponentTrait<R: Runtime> {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>);
+pub(crate) trait ComponentTrait<R: Runtime, E> {
+	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R, E>);
 
-	fn update(&mut self, ctx: &mut AppContext<'_, R>) {}
+	fn update(&mut self, ctx: &mut AppContext<'_, R, E>) {}
 
-	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R>) {}
+	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R, E>) {}
 }

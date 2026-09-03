@@ -7,22 +7,22 @@ use crate::{api::Api, e, prelude::*, ui::Layout};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::native::{DashboardScreen, WaterfallChart, prelude::*};
 
-pub(crate) struct ScreenInstance<R: Runtime> {
+pub(crate) struct ScreenInstance<R: Runtime, E> {
 	pub kind: ViewType,
-	pub screen: Box<dyn Screen<R>>,
-	pub layout: Layout<R>,
+	pub screen: Box<dyn Screen<R, E>>,
+	pub layout: Layout<R, E>,
 }
 
-impl<R: Runtime> fmt::Debug for ScreenInstance<R> {
+impl<R: Runtime, E> fmt::Debug for ScreenInstance<R, E> {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		f.debug_struct("View").field("kind", &self.kind).finish()
 	}
 }
 
-impl<R: Runtime> ScreenInstance<R> {
+impl<R: Runtime, E> ScreenInstance<R, E> {
 	pub fn new(kind: ViewType) -> Self {
 		tracing::debug!("📺 Screen Instance {:?}", kind);
-		let screen: Box<dyn Screen<R>> = match kind {
+		let screen: Box<dyn Screen<R, E>> = match kind {
 			// ViewType::TaskManagerScreen => Box::new(TaskManagerScreen::new()),
 			// ViewType::DashboardScreen => Box::new(DashboardScreen::new()),
 			// ViewType::WaterfallScreen => Box::new(WaterfallScreen::new()),
@@ -37,7 +37,7 @@ impl<R: Runtime> ScreenInstance<R> {
 			layout: Layout::new(),
 		}
 	}
-	pub fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>) {
+	pub fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R, E>) {
 		self.layout.draw(ui, ctx);
 	}
 }
@@ -132,7 +132,7 @@ pub fn draw_tabbed_sidebar<T, F>(
 // 		Self { kind, content }
 // 	}
 
-// 	pub fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>) {
+// 	pub fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R, E>) {
 // 		self.content.draw(ui, ctx);
 // 	}
 // }

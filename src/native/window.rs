@@ -25,7 +25,7 @@ pub struct Window {
 	pending_textures: gui::TexturesDelta,
 	queue: wgpu::Queue,
 	renderer: gui::Renderer,
-	screen: ui::ScreenInstance<NativeRuntime>,
+	screen: ui::ScreenInstance<NativeRuntime, NativeExecutor>,
 }
 impl Window {
 	pub fn new(event_loop: &ActiveEventLoop, view: ViewType) -> Result<Self> {
@@ -58,7 +58,7 @@ impl Window {
 		// self.view = Ve::new(view);
 	}
 
-	pub fn draw(&mut self, ctx: &mut AppContext<'_, NativeRuntime>) -> Result<()> {
+	pub fn draw(&mut self, ctx: &mut AppContext<'_, NativeRuntime, NativeExecutor>) -> Result<()> {
 		self.begin_egui();
 		let output = self.build_ui(ctx);
 		let Some(surface_texture) = self.acquire_surface()? else {
@@ -70,7 +70,7 @@ impl Window {
 	}
 	fn build_ui(
 		&mut self,
-		ctx: &mut AppContext<'_, NativeRuntime>,
+		ctx: &mut AppContext<'_, NativeRuntime, NativeExecutor>,
 	) -> gui::FullOutput {
 		// tracing::info!("Window::build_ui");
 		let mut ui = gui::Ui::new(

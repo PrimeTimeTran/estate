@@ -28,14 +28,14 @@ pub struct DashboardScreen {
 	pub active_focus: FocusedPane,
 	pub secondary_scroll_offset: f32,
 }
-impl<R: Runtime> Screen<R> for DashboardScreen {
-	fn configure(&mut self, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {
+impl<R: Runtime, E> Screen<R, E> for DashboardScreen {
+	fn configure(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
 		// Configure the regions this screen uses.
 	}
 
-	fn update(&mut self, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {}
+	fn update(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {}
 
-	fn event(&mut self, event: &e::Event, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {
+	fn event(&mut self, event: &e::Event, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
 	}
 }
 impl DashboardScreen {
@@ -246,7 +246,7 @@ impl DashboardScreen {
 	}
 }
 impl DashboardScreen {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, NativeRuntime>) {
+	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, NativeRuntime, NativeExecutor>) {
 		// 1. Poll the channel for file changes on every frame render tick
 		#[cfg(not(target_arch = "wasm32"))]
 		self.check_for_changes(ui.ctx());

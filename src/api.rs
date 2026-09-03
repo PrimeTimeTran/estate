@@ -78,7 +78,6 @@ impl NativeApiClient {
 		problems: ProblemServiceClient<Channel>,
 		submissions: SubmissionServiceClient<Channel>,
 	) -> Self {
-		// let client = crate::proto::client::ProblemServiceClient::<tonic::transport::Channel>();
 		Self {
 			problems,
 			submissions,
@@ -108,15 +107,15 @@ impl Api for NativeApiClient {
 	}
 
 	async fn load_problems(&self) -> anyhow::Result<Vec<StoredProblem>> {
-		todo!()
+		todo!("NativeApiClient load_problems")
 	}
 
 	async fn load_problem(&self, id: i64) -> anyhow::Result<StoredProblem> {
-		todo!()
+		todo!("NativeApiClient load_problem")
 	}
 
 	async fn sample_problem(&self, request: SampleProblemRequest) -> anyhow::Result<StoredProblem> {
-		todo!()
+		todo!("NativeApiClient sample_problem")
 	}
 }
 
@@ -146,14 +145,14 @@ impl Api for WasmApiClient {
 	}
 
 	async fn load_problems(&self) -> anyhow::Result<Vec<StoredProblem>> {
-		todo!()
+		todo!("WasmApiClient load_problems")
 	}
 
 	async fn sample_problem(&self, request: SampleProblemRequest) -> anyhow::Result<StoredProblem> {
-		todo!()
+		todo!("WasmApiClient sample_problem")
 	}
 
 	async fn load_problem(&self, id: i64) -> anyhow::Result<StoredProblem> {
-		todo!()
+		todo!("WasmApiClient load_problem")
 	}
 }

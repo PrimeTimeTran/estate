@@ -1,8 +1,14 @@
 use crate::{e, prelude::*};
 
-// [Potential Renames]
-// App, AppPlatform, Host, AppHost, Engine, CoreEngine, AppContext, Environment
+/// [Potential Renames]
+/// App, AppPlatform, Host, AppHost, Engine, CoreEngine, AppContext, Environment
+//
 pub trait Runtime: Clone + Sync + std::marker::Send + 'static {
+	#[cfg(not(target_arch = "wasm32"))]
+	fn sleep(&self, duration: std::time::Duration) -> impl Future<Output = ()> + Send;
+
+	#[cfg(target_arch = "wasm32")]
+	fn sleep(&self, duration: std::time::Duration) -> impl Future<Output = ()>;
 	// type Api: Api;
 	// fn api(&self) -> &Self::Api;
 
@@ -20,7 +26,7 @@ pub trait Runtime: Clone + Sync + std::marker::Send + 'static {
 	fn state(&self) -> &RuntimeState;
 	fn save(&self, state: &EstateState) -> Result<()>;
 	fn session(&self) -> Session;
-	async fn sleep(&self, duration: std::time::Duration);
+
 	fn tasks(&self) -> &Arc<RwLock<TaskManager>>;
 	fn state_service(&self) -> &Arc<StateService>;
 	fn session_service(&self) -> &Arc<SessionService>;
@@ -31,6 +37,8 @@ pub trait Runtime: Clone + Sync + std::marker::Send + 'static {
 	// fn spawn<F>(&self, future: F)
 	// where
 	// 	F: std::future::Future<Output = ()> + Send + 'static;
+	// fn spawn(&self, future: impl Future<Output = ()> + 'static);
+	fn spawn(&self, future: impl Future<Output = ()> + 'static);
 }
 
 /// Context from runtime, host, platform
@@ -95,15 +103,13 @@ pub trait Clock {
 	fn now(&self) -> std::time::Instant;
 }
 
-pub trait Spawner: Clone + 'static {
-	fn spawn<F>(&self, future: F)
-	where
-		F: Future<Output = ()> + 'static;
-}
 pub trait Executor: Clone + 'static {
+	#[cfg(not(target_arch = "wasm32"))]
+	fn spawn(&self, future: impl Future<Output = ()> + Send + 'static);
+
+	#[cfg(target_arch = "wasm32")]
 	fn spawn(&self, future: impl Future<Output = ()> + 'static);
 }
-
 #[async_trait::async_trait]
 pub trait EventHandler<R: Runtime>: Send + Sync + 'static {
 	async fn handle(&self, event: &e::Event, runtime: &R);
@@ -111,6 +117,12 @@ pub trait EventHandler<R: Runtime>: Send + Sync + 'static {
 
 pub trait EventReceiver {
 	fn try_recv(&mut self) -> Option<e::Event>;
+}
+
+pub trait Spawner: Clone + 'static {
+	fn spawn<F>(&self, future: F)
+	where
+		F: Future<Output = ()> + 'static;
 }
 
 // pub trait SendSpawnRuntime: Runtime {

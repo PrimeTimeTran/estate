@@ -31,27 +31,27 @@ pub struct EguiVeable {
 	top_tab: DevTopTab,
 	side_tab: DevSideTab,
 }
-impl<R: Runtime> Screen<R> for EguiVeable {
-	fn configure(&mut self, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {
+impl<R: Runtime, E> Screen<R, E> for EguiVeable {
+	fn configure(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
 		todo!("")
 	}
 
-	fn update(&mut self, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {
+	fn update(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
 		todo!("")
 	}
 
-	fn event(&mut self, event: &e::Event, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {
+	fn event(&mut self, event: &e::Event, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
 		todo!("")
 	}
 }
-impl<R: Runtime> ViewTrait<R> for EguiVeable {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>) {
+impl<R: Runtime, E> ViewTrait<R, E> for EguiVeable {
+	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R, E>) {
 		self.draw_ui(ui);
 	}
 
-	fn update(&mut self, ctx: &mut AppContext<'_, R>) {}
+	fn update(&mut self, ctx: &mut AppContext<'_, R, E>) {}
 
-	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R>) {}
+	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R, E>) {}
 }
 impl EguiVeable {
 	pub fn new() -> Self {
@@ -657,15 +657,16 @@ impl Sidebar {
 		}
 	}
 }
-impl<R: Runtime> Screen<R> for Sidebar {
-	fn configure(&mut self, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {
+impl<R: Runtime, E> Screen<R, E> for Sidebar {
+	fn configure(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
 		// Configure the regions this screen uses.
 	}
 
-	fn update(&mut self, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {}
+	fn update(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {}
 
-	fn event(&mut self, event: &e::Event, layout: &mut Layout<R>, ctx: &mut AppContext<'_, R>) {}
-	// fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R>) {
+	fn event(&mut self, event: &e::Event, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
+	}
+	// fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R, E>) {
 	// 	ui.vertical(|ui| {
 	// 		for button in &self.buttons {
 	// 			if ui.button(*button).clicked() {

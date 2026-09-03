@@ -161,10 +161,25 @@ impl WebRuntime {
 	}
 }
 
+#[derive(Clone, Debug, Default)]
+pub struct WebExecutor;
+
+impl Executor for WebExecutor {
+	fn spawn(&self, future: impl Future<Output = ()> + 'static) {
+		wasm_bindgen_futures::spawn_local(future);
+	}
+}
 impl Runtime for WebRuntime {
-	// type Api = WasmApiClient;
-	// fn api(&self) -> &Self::Api {
-	// 	&self.api
+	fn spawn(&self, future: impl Future<Output = ()> + 'static) {
+		// ...
+	}
+	async fn sleep(&self, duration: std::time::Duration) {
+		gloo_timers::future::sleep(duration).await;
+	}
+	// fn sleep(&self, duration: std::time::Duration) -> impl Future<Output = ()> {
+	// 	async move {
+	// 		gloo_timers::future::sleep(duration).await;
+	// 	}
 	// }
 	type EventReceiver = WasmEventReceiver;
 	fn emit(&self, event: e::Event) {
@@ -190,9 +205,7 @@ impl Runtime for WebRuntime {
 	fn state(&self) -> &RuntimeState {
 		todo!("WebRuntime::state is not implemented");
 	}
-	async fn sleep(&self, duration: std::time::Duration) {
-		gloo_timers::future::sleep(duration).await;
-	}
+
 	fn event_processed(&self) {
 		let mut state = self.state.write();
 		// state.events_processed += 1;
