@@ -65,10 +65,6 @@ impl Context for NativeApp {
 		&self.runtime
 	}
 
-	// fn services(&self) -> &Self::Services {
-	// 	&self.services
-	// }
-
 	fn run(&mut self, cli: Self::Args) -> Result<()> {
 		NativeApp::run(self, cli)
 	}
@@ -97,12 +93,9 @@ impl NativeApp {
 		let app = AppRuntime::new(engine.clone(), runtime.executor.clone());
 		app.start();
 		app.start_services();
-		// Executor::spawn(&self, future);
 
 		let host = NativeHost::new();
-
 		let (daemon_tx, daemon_rx) = mpsc::channel(100);
-
 		Ok(Self {
 			app,
 			host,
@@ -151,9 +144,6 @@ impl NativeApp {
 		result
 	}
 	fn start_runtime(&mut self) -> Result<()> {
-		println!("App<NativeApp>.new calling AppRuntime<NativeRuntime>.start() before ");
-
-		println!("App<NativeApp>.new calling AppRuntime<NativeRuntime>.start() after");
 		// // App
 		// self.engine.runtime.spawn(future);       // ✅
 		// // NativeRuntime
@@ -194,37 +184,103 @@ impl NativeApp {
 		Ok(())
 	}
 	fn spawn_clock(&mut self, proxy: EventLoopProxy<AppEvent>) {
+		// EventLoopProxy wakes the winit event loop from this background task.
+		// It is needed when the event must be processed by winit itself rather
+		// than only through the application's Runtime event bus.
+
+		println!("Spawn Clock Start");
+
+		// Shared shutdown flag. The clock exits when NativeApp shuts down.
 		let running = Arc::clone(&self.is_clocking);
-		let runtime = self.runtime_old();
-		std::thread::spawn(move || {
+
+		// Tokio handle for spawning work directly onto the native async runtime.
+		// This is the native executor behind AppRuntime's Executor abstraction.
+		let handle: Handle = self.handle();
+
+		// Runtime access for emitting application events from the background task.
+		// let runtime: NativeRuntime = self.runtime.clone();
+
+		// Arc<NativeRuntime> gives the spawned task shared ownership of the
+		// runtime so it can outlive this call and safely access runtime services.
+		let task_runtime: Arc<NativeRuntime> = self.runtime_old().clone();
+		let executor = task_runtime.executor.clone();
+
+		executor.spawn(async move {
+			println!("Handle triggered executor");
+			let views = [
+				ViewType::ProblemScreen,
+				ViewType::DashboardScreen,
+				ViewType::MarkdownView,
+				ViewType::ProblemScreen,
+				ViewType::WaterfallScreen,
+				ViewType::ProblemScreen,
+				ViewType::TaskManagerScreen,
+				ViewType::ProblemsScreen,
+			];
+
 			let mut current_time = 10;
 			let mut view_index = 0;
+
 			while running.load(Ordering::Relaxed) {
-				let views = [
-					ViewType::ProblemScreen,
-					ViewType::DashboardScreen,
-					ViewType::MarkdownView,
-					ViewType::ProblemScreen,
-					ViewType::WaterfallScreen,
-					ViewType::ProblemScreen,
-					ViewType::TaskManagerScreen,
-					ViewType::ProblemsScreen,
-				];
+				println!("Native App Tick");
 				let _ = proxy.send_event(AppEvent::TickClock(format!(" {}s", current_time)));
-				tracing::debug!("NativeApp spawn_clock {}", current_time);
+
+				tracing::info!("NativeApp clock {}", current_time);
+
 				if current_time == 0 {
 					current_time = 10;
+
 					view_index = (view_index + 1) % views.len();
 					let view = views[view_index];
-					tracing::debug!("⏩ Native App Clock navigation → {:?}", view);
-					runtime.emit(e::Event::app(e::Klass::Navigate(view)));
+
+					tracing::info!("⏩ Native App Clock navigation → {:?}", view);
+
+					task_runtime.emit(e::Event::app(e::Klass::Navigate(view)));
+
 					let _ = proxy.send_event(AppEvent::RuntimeEvent);
 				} else {
 					current_time -= 1;
 				}
-				std::thread::sleep(std::time::Duration::from_secs(1));
+				// IMPORTANT: this must be an async sleep.
+				// std::thread::sleep() blocks the Tokio worker thread and can
+				// prevent other async tasks from running.
+				task_runtime.sleep(std::time::Duration::from_secs(1)).await;
 			}
 		});
+		// std::thread::spawn(move || {
+		// 	println!("Handle triggered executor");
+		// 	let views = [
+		// 		ViewType::ProblemScreen,
+		// 		ViewType::DashboardScreen,
+		// 		ViewType::MarkdownView,
+		// 		ViewType::ProblemScreen,
+		// 		ViewType::WaterfallScreen,
+		// 		ViewType::ProblemScreen,
+		// 		ViewType::TaskManagerScreen,
+		// 		ViewType::ProblemsScreen,
+		// 	];
+		// 	let mut current_time = 10;
+		// 	let mut view_index = 0;
+		// 	while running.load(Ordering::Relaxed) {
+		// 		// runtime.emit(e::Event::app(e::Klass::TickClock(format!(
+		// 		// 	" {}s",
+		// 		// 	current_time
+		// 		// ))));
+		// 		let _ = proxy.send_event(AppEvent::TickClock(format!(" {}s", current_time)));
+		// 		tracing::info!("NativeApp clock {}", current_time);
+		// 		if current_time == 0 {
+		// 			current_time = 10;
+		// 			view_index = (view_index + 1) % views.len();
+		// 			let view = views[view_index];
+		// 			tracing::info!("⏩ Native App Clock navigation → {:?}", view);
+		// 			runtime.emit(e::Event::app(e::Klass::Navigate(view)));
+		// 			let _ = proxy.send_event(AppEvent::RuntimeEvent);
+		// 		} else {
+		// 			current_time -= 1;
+		// 		}
+		// 		std::thread::sleep(std::time::Duration::from_secs(1));
+		// 	}
+		// });
 	}
 	fn spawn_cursor_daemon(&mut self, proxy: EventLoopProxy<AppEvent>) {
 		spawn_global_cursor_daemon(proxy)

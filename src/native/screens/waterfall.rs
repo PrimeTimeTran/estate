@@ -12,36 +12,25 @@ use egui_plot::{Bar, BarChart, Plot};
 use std::time::Duration;
 
 #[derive(Debug, Default, Clone, Copy)]
-pub struct WaterfallScreen {}
+pub struct WaterfallScreen;
 
 impl WaterfallScreen {
-	pub fn new() {}
+	pub fn new() -> Self {
+		Self
+	}
 }
+
 impl<R: Runtime, E: Executor> Screen<R, E> for WaterfallScreen {
 	fn configure(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
-		// Put TaskManagerView into the appropriate region/panel.
+		// Configure the regions this screen uses.
 	}
 
-	fn update(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
-		// self.manager.poll_changes();
-		// self.view.update(ctx);
-	}
+	fn update(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {}
 
 	fn event(&mut self, event: &e::Event, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
-		// Feature-level event handling.
-		//
-		// e.g. TaskCreated, TaskDeleted, etc.
 	}
-	// fn configure(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
-	// 	// Configure the regions this screen uses.
-	// }
-
-	// fn update(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {}
-
-	// fn event(&mut self, event: &e::Event, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {}
 }
 
-// pub struct TaskManagerScreen<R: Runtime> {}
 #[derive(Debug, Default, Clone)]
 pub struct WaterfallChart {
 	jobs: Vec<&'static Job>,

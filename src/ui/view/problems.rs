@@ -28,7 +28,6 @@ impl<R: Runtime, E: Executor> Screen<R, E> for ProblemsScreen {
 	fn configure(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
 		// Configure the regions this screen uses.
 	}
-
 	fn update(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {}
 	fn event(&mut self, event: &e::Event, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
 	}

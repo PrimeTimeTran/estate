@@ -10,11 +10,11 @@ use crate::{
 	ui::Layout,
 };
 
-#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-use crate::NativeRuntime;
+// #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+// use crate::NativeRuntime;
 
-#[cfg(all(feature = "web", target_arch = "wasm32"))]
-use crate::WebRuntime;
+// #[cfg(all(feature = "web", target_arch = "wasm32"))]
+// use crate::WebRuntime;
 
 #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 use crate::logger::{LogConfig, Tracer};
@@ -173,7 +173,6 @@ impl<R: Runtime + 'static, E: Executor> AppRuntime<R, E> {
 				if current_time == 0 {
 					current_time = 5;
 					view_idx = (view_idx + 1) % views.len();
-
 					task_runtime.emit(e::Event::app(e::Klass::Navigate(views[view_idx])));
 				} else {
 					current_time -= 1;
@@ -346,10 +345,8 @@ impl<R: Runtime + 'static, E: Executor> AppRuntime<R, E> {
 			tracing::info!("⚠️ problems already loading");
 			return false;
 		}
-
 		self.state.problems.loading = true;
 		self.state.problems.error = None;
-
 		true
 	}
 	fn start_problem_request(&mut self) -> bool {
@@ -357,22 +354,8 @@ impl<R: Runtime + 'static, E: Executor> AppRuntime<R, E> {
 			tracing::info!("⚠️ problem already loading");
 			return false;
 		}
-
 		self.state.problem.loading = true;
 		self.state.problem.error = None;
-
 		true
 	}
 }
-
-// impl<R: Runtime + 'static, E> Executor for AppRuntime<R, E> {
-// 	fn spawn(&self, future: impl Future<Output = ()> + 'static) {
-// 		self.engine.runtime.spawn(future);
-// 	}
-// }
-
-// impl<R: Runtime + 'static> Executor for AppRuntime<R> {
-// 	fn spawn(&self, future: impl Future<Output = ()> + 'static) {
-// 		self.engine.runtime.spawn(future);
-// 	}
-// }

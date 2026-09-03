@@ -65,8 +65,8 @@ impl VeConfig {
 			secondary_bar: PanelState::new(true, 48.0),
 			bottom_panel: PanelState::new(true, 240.0),
 			status_bar: PanelState::new(true, 24.0),
-			dock_left: PanelState::new(true, 280.0),
-			dock_right: PanelState::new(true, 320.0),
+			dock_left: PanelState::new(false, 280.0),
+			dock_right: PanelState::new(false, 320.0),
 		}
 	}
 	pub const fn zen() -> Self {

@@ -77,33 +77,249 @@ impl NativeRuntime {
 pub struct NativeExecutor {
 	pub handle: tokio::runtime::Handle,
 }
+// ============================================================
+// INHERENT METHOD
+// ============================================================
+//
+// This method belongs directly to the concrete `NativeExecutor`
+// type.
+//
+// It is NOT a trait implementation.
+//
+// Technical name:
+//   "inherent method" / "inherent impl"
+//
+// Called when Rust has a concrete `NativeExecutor` value and
+// method resolution selects this method.
+//
+// Example:
+//
+//   let executor: NativeExecutor = ...;
+//   executor.spawn(future);
+//
+// Because `spawn` exists directly on `NativeExecutor`, this
+// inherent method takes precedence over a trait method with the
+// same name when the receiver's concrete type is known.
+//
+// This is useful for functionality that is specifically owned
+// by the concrete type and doesn't need to participate in a
+// generic trait abstraction.
+//
 impl NativeExecutor {
 	pub fn spawn<F>(&self, future: F)
 	where
 		F: Future<Output = ()> + Send + 'static,
 	{
-		println!("🔥 NativeRuntime::spawn CALLED");
-		tokio::spawn(async move {
-			println!("🔥 NativeRuntime task STARTED");
+		println!("🔥 NativeExecutor::spawn CALLED");
+		// Nothing is actually spawned here yet.
+		//
+		// This is intentionally left as a case study.
+		//
+		// If we uncommented this:
+		//
+		// tokio::spawn(async move {
+		// 	println!("🔥 NativeRuntime task STARTED");
+		// 	future.await;
+		// });
+		//
+		// this would be a concrete NativeExecutor-specific
+		// implementation.
+	}
+}
+
+// ============================================================
+// TRAIT IMPLEMENTATION: NativeExecutor -> Executor
+// ============================================================
+//
+// This says:
+//
+//   "NativeExecutor satisfies the generic `Executor` contract."
+//
+// Technical name:
+//   "trait implementation"
+//   "`Executor` implementation for `NativeExecutor`"
+//
+// This is what allows generic code to say:
+//
+//   fn start<E: Executor>(executor: E) {
+//       executor.spawn(future);
+//   }
+//
+// without knowing that `E` is actually `NativeExecutor`.
+//
+// IMPORTANT:
+//
+// This `spawn` is a DIFFERENT method from the inherent
+// `NativeExecutor::spawn` above.
+//
+// It has the same name because the `Executor` trait requires
+// a method called `spawn`.
+//
+// The implementation is selected when the call is being made
+// through the `Executor` abstraction.
+//
+// In other words:
+//
+//   NativeExecutor
+//       │
+//       └── implements Executor
+//                   │
+//                   └── Executor::spawn()
+//
+impl Executor for NativeExecutor {
+	fn spawn(&self, future: impl Future<Output = ()> + Send + 'static) {
+		println!("🔥 Executor for NativeExecutor::spawn CALLED");
+
+		// NativeExecutor owns the Tokio Handle.
+		//
+		// Therefore this is the actual bridge between our
+		// platform-independent `Executor` abstraction and Tokio.
+		self.handle.spawn(async move {
+			println!("🔥 Executor for NativeExecutor::spawn moving");
 			future.await;
 		});
 	}
 }
-impl Executor for NativeExecutor {
-	fn spawn(&self, future: impl Future<Output = ()> + Send + 'static) {
-		self.handle.spawn(future);
-	}
-}
+
+// ============================================================
+// TRAIT IMPLEMENTATION: NativeRuntime -> Executor
+// ============================================================
+//
+// This is a SECOND relationship.
+//
+// Here we are saying:
+//
+//   "NativeRuntime ALSO satisfies the Executor contract."
+//
+// Therefore generic code like:
+//
+//   fn foo<E: Executor>(executor: E) {
+//       executor.spawn(future);
+//   }
+//
+// could receive either:
+//
+//   NativeExecutor
+//
+// OR:
+//
+//   NativeRuntime
+//
+// and both are valid `E` types.
+//
+// They are different concrete types implementing the same trait.
+//
+//
+// Conceptually:
+//
+//                    Executor
+//                    /      \
+//                   /        \
+//       NativeExecutor    NativeRuntime
+//              │               │
+//              ▼               ▼
+//         Tokio Handle      Tokio runtime
+//
+//
+//
+// IMPORTANT:
+//
+// This does NOT mean:
+//
+//   NativeRuntime::spawn()
+//          automatically calls
+//   NativeExecutor::spawn()
+//
+// There is no automatic delegation.
+//
+// These are two independent implementations of the same trait.
+//
 impl Executor for NativeRuntime {
 	fn spawn(&self, future: impl Future<Output = ()> + Send + 'static) {
+		println!("✅ Executor for NativeRuntime");
+
+		// This implementation chooses to use Tokio directly.
+		//
+		// Notice that it does NOT use:
+		//
+		//   self.executor.spawn(...)
+		//
+		// even though NativeRuntime may contain a NativeExecutor.
+		//
+		// That would be explicit delegation, which is a different
+		// architectural choice.
 		tokio::spawn(future);
 	}
 }
+
+// ============================================================
+// TRAIT IMPLEMENTATION: NativeRuntime -> Runtime
+// ============================================================
+//
+// This is yet ANOTHER relationship.
+//
+// NativeRuntime satisfies the `Runtime` trait.
+//
+// If `Runtime` contains a method named `spawn`, then
+// `NativeRuntime` must provide an implementation of that
+// contract.
+//
+// Technical name:
+//   "trait method implementation"
+//
+// This `spawn` is NOT the same method as:
+//
+//   NativeExecutor::spawn
+//
+// and NOT the same method as:
+//
+//   Executor::spawn
+//
+// It merely has the same method name.
+//
 impl Runtime for NativeRuntime {
 	fn spawn(&self, future: impl Future<Output = ()> + 'static) {
-		// ...
+		println!("✅ NativeRuntime::spawn");
+		// This is currently just a demonstration.
+		//
+		// Notice that Runtime::spawn has a different contract:
+		//
+		//     Future + 'static
+		//
+		// while native Executor::spawn requires:
+		//
+		//     Future + Send + 'static
+		//
+		// That difference matters enormously when generic code
+		// tries to move the future onto a native multithreaded
+		// executor.
 	}
-
+	// --------------------------------------------------------
+	// Another Runtime capability
+	// --------------------------------------------------------
+	//
+	// Runtime isn't necessarily "the thing that spawns".
+	//
+	// It can expose platform capabilities that application code
+	// needs without exposing Tokio or WASM implementation details.
+	//
+	// Native:
+	//
+	//     tokio::time::sleep()
+	//
+	// WASM:
+	//
+	//     gloo_timers::future::sleep()
+	//
+	// Application code can simply say:
+	//
+	//     runtime.sleep(duration).await;
+	//
+	// without caring which platform it is running on.
+	//
+	// fn sleep(&self, duration: std::time::Duration) -> impl Future<Output = ()> + Send {
+	// 	tokio::time::sleep(duration)
+	// }
 	fn sleep(&self, duration: std::time::Duration) -> impl Future<Output = ()> + Send {
 		tokio::time::sleep(duration)
 	}
