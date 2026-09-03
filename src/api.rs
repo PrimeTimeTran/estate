@@ -31,15 +31,19 @@ pub struct ProblemState {
 // Shared API Trait
 // ============================================================
 
+// #[async_trait::async_trait(?Send)]
+// pub trait Api: std::fmt::Debug + 'static {
+// 	async fn load_problems(&self) -> anyhow::Result<Vec<StoredProblem>>;
+// 	async fn sample_problem(&self, request: SampleProblemRequest) -> anyhow::Result<StoredProblem>;
+// 	async fn load_problem(&self, id: i64) -> anyhow::Result<StoredProblem>;
+// 	fn clone_box(&self) -> Box<dyn Api>;
+// }
+
 #[async_trait::async_trait(?Send)]
 pub trait Api: std::fmt::Debug + 'static {
 	async fn load_problems(&self) -> anyhow::Result<Vec<StoredProblem>>;
 	async fn sample_problem(&self, request: SampleProblemRequest) -> anyhow::Result<StoredProblem>;
 	async fn load_problem(&self, id: i64) -> anyhow::Result<StoredProblem>;
-
-	// async fn load_problems(&self) -> anyhow::Result<Vec<StoredProblem>>;
-	// async fn load_problem(&self, id: i64) -> anyhow::Result<StoredProblem>;
-	// async fn sample_problem(&self, query: SampleProblemRequest) -> anyhow::Result<StoredProblem>;
 	fn clone_box(&self) -> Box<dyn Api>;
 }
 
@@ -48,6 +52,7 @@ impl Clone for Box<dyn Api> {
 		self.clone_box()
 	}
 }
+
 // ============================================================
 // Native
 // ============================================================
@@ -103,35 +108,14 @@ impl Api for NativeApiClient {
 	}
 
 	async fn load_problems(&self) -> anyhow::Result<Vec<StoredProblem>> {
-		todo!("");
-		// let mut client = self.problems.clone();
-		// let response = client
-		// 	.list_problems(ListProblemsRequest {
-		// 		tags: vec![],
-		// 		search: String::new(),
-		// 		published_only: None,
-		// 		page: Some(PageRequest {
-		// 			page: 0,
-		// 			page_size: 100,
-		// 		}),
-		// 		difficulty: None,
-		// 	})
-		// 	.await?;
-
-		// response
-		// 	.into_inner()
-		// 	.problems
-		// 	.into_iter()
-		// 	.map(StoredProblem::try_from)
-		// 	.collect::<Result<Vec<_>, _>>()
-		// 	.map_err(Into::into)
+		todo!()
 	}
 
 	async fn load_problem(&self, id: i64) -> anyhow::Result<StoredProblem> {
 		todo!()
 	}
 
-	async fn sample_problem(&self, query: SampleProblemRequest) -> anyhow::Result<StoredProblem> {
+	async fn sample_problem(&self, request: SampleProblemRequest) -> anyhow::Result<StoredProblem> {
 		todo!()
 	}
 }
@@ -140,13 +124,12 @@ impl Api for NativeApiClient {
 // WASM
 // ============================================================
 
-#[cfg(target_arch = "wasm32")]
+// #[cfg(target_arch = "wasm32")]
 #[derive(Debug, Clone)]
 pub struct WasmApiClient {
 	base_url: String,
 }
-
-#[cfg(target_arch = "wasm32")]
+// #[cfg(target_arch = "wasm32")]
 impl WasmApiClient {
 	pub fn new(base_url: impl Into<String>) -> Self {
 		Self {
@@ -155,35 +138,22 @@ impl WasmApiClient {
 	}
 }
 
-#[cfg(target_arch = "wasm32")]
+// #[cfg(target_arch = "wasm32")]
 #[async_trait::async_trait(?Send)]
 impl Api for WasmApiClient {
 	fn clone_box(&self) -> Box<dyn Api> {
 		Box::new(self.clone())
 	}
+
 	async fn load_problems(&self) -> anyhow::Result<Vec<StoredProblem>> {
-		// fetch(...)
-		// deserialize response
-		// return Vec<StoredProblem>
 		todo!()
 	}
+
 	async fn sample_problem(&self, request: SampleProblemRequest) -> anyhow::Result<StoredProblem> {
-		// fetch(...)
 		todo!()
 	}
+
 	async fn load_problem(&self, id: i64) -> anyhow::Result<StoredProblem> {
-		// fetch(...)
 		todo!()
 	}
-	// async fn load_problems(&self) -> anyhow::Result<Vec<StoredProblem>> {
-	// 	todo!()
-	// }
-
-	// async fn load_problem(&self, id: i64) -> anyhow::Result<StoredProblem> {
-	// 	todo!()
-	// }
-
-	// async fn sample_problem(&self, query: SampleProblemRequest) -> anyhow::Result<StoredProblem> {
-	// 	todo!()
-	// }
 }

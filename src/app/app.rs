@@ -44,9 +44,9 @@ where
 	pub fn runtime(&self) -> &C::Runtime {
 		self.context.runtime()
 	}
-	pub fn services(&self) -> &C::Services {
-		self.context.services()
-	}
+	// pub fn services(&self) -> &C::Services {
+	// 	self.context.services()
+	// }
 }
 impl<C: Context> App<C> {
 	/// Initialize a new Estate App instance.
@@ -99,10 +99,10 @@ impl<C: Context> App<C> {
 	///
 	///   `cargo run --bin native --no-default-features --features native`
 	pub fn run(&mut self, args: C::Args) -> Result<()> {
+		// self.context.services().api().load_problem(1);
 		self.context.run(args)
 	}
 }
-
 impl<C: Context> App<C> {
 	// Outer App<C>
 	// pub fn runtime(&self) -> Arc<R> {
@@ -117,16 +117,13 @@ impl<C: Context> App<C> {
 pub struct AppRuntime<R: Runtime> {
 	pub(crate) engine: EstateEngine<R>,
 	pub(crate) view: ViewType,
-	pub(crate) api: Arc<dyn Api>,
 	pub(crate) state: AppState,
-	// pub(crate) executor: dyn Executor,
 	events: R::EventReceiver,
 }
 impl<R: Runtime> AppRuntime<R> {
-	pub fn new(engine: EstateEngine<R>, api: Arc<dyn Api>) -> Self {
+	pub fn new(engine: EstateEngine<R>) -> Self {
 		let events = engine.runtime.subscribe();
 		Self {
-			api,
 			engine,
 			events,
 			// executor,
@@ -155,9 +152,9 @@ impl<R: Runtime> AppRuntime<R> {
 	// fn runtime(&self) -> &Self::Runtime {
 	// 	self.runtime
 	// }
-	pub fn api(&self) -> Arc<dyn Api> {
-		Arc::clone(&self.api)
-	}
+	// pub fn api(&self) -> Arc<dyn Api> {
+	// 	Arc::clone(&self.api)
+	// }
 	/// # UI/application state
 	/// "We have two event consumers, and we need to decide which events belong to which execution domain."
 	// # Pull Based
@@ -280,22 +277,22 @@ impl<R: Runtime + 'static> AppRuntime<R> {
 }
 impl<R: Runtime + 'static> AppRuntime<R> {
 	pub fn start(&self) {
-		// if !crate::START_APP_CLOCK {
-		// 	return;
-		// }
-		// let views = [
-		// 	ViewType::ProblemScreen,
-		// 	ViewType::DashboardScreen,
-		// 	ViewType::MarkdownView,
-		// 	ViewType::ProblemScreen,
-		// 	ViewType::WaterfallScreen,
-		// 	ViewType::ProblemScreen,
-		// 	ViewType::TaskManagerScreen,
-		// 	ViewType::ProblemsScreen,
-		// ];
-		// let mut view_idx = 0;
-		// let mut current_time = 5;
-		// let runtime = self.engine.runtime.clone();
+		if !crate::START_APP_CLOCK {
+			return;
+		}
+		let views = [
+			ViewType::ProblemScreen,
+			ViewType::DashboardScreen,
+			ViewType::MarkdownView,
+			ViewType::ProblemScreen,
+			ViewType::WaterfallScreen,
+			ViewType::ProblemScreen,
+			ViewType::TaskManagerScreen,
+			ViewType::ProblemsScreen,
+		];
+		let mut view_idx = 0;
+		let mut current_time = 5;
+		let runtime = self.engine.runtime.clone();
 		// self.executor.spawn(async move {
 		// 	loop {
 		// 		runtime.sleep(std::time::Duration::from_secs(1)).await;
@@ -316,8 +313,7 @@ impl<R: Runtime + 'static> AppRuntime<R> {
 		if !self.start_problems_request() {
 			return;
 		}
-
-		let api = Arc::clone(&self.api);
+		// let api = Arc::clone(&self.api);
 		let runtime = self.engine.runtime.clone();
 		// self.executor.spawn(async move {
 		// 	match api
@@ -345,7 +341,7 @@ impl<R: Runtime + 'static> AppRuntime<R> {
 		if !self.start_problems_request() {
 			return;
 		}
-		let api = Arc::clone(&self.api);
+		// let api = Arc::clone(&self.api);
 		let runtime = self.engine.runtime.clone();
 		// self.executor.spawn(async move {
 		// 	match api.load_problems().await {

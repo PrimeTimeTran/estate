@@ -23,18 +23,16 @@ use estate::app::{app_native::*, *};
 
 #[cfg(feature = "web")]
 fn wasm_init_flow() -> Result<()> {
-	use estate::api::WasmApiClient;
-	let state = EstateState::default();
-	let runtime = WebRuntime::new(state);
-	let engine = EstateEngine::new(runtime)?;
-	let api = Arc::new(WasmApiClient::new("http://localhost:3000"));
-	let _app = AppRuntime::new(engine, api);
+	use estate::app::{App, app_web::WebApp};
+	let mut app = App::<WebApp>::new()?;
+	app.run(parsed)?;
 	Ok(())
 }
 
+#[cfg(feature = "native")]
 fn main() -> Result<()> {
 	use cli;
-	use estate::{api::NativeApiClient, logger::*};
+	use estate::logger::*;
 	let parsed = cli::context::parse();
 	let mut config = LogConfig::load()?;
 	config.apply_cli(&parsed)?;

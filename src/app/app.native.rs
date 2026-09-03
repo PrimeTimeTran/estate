@@ -32,7 +32,7 @@ pub struct NativeApp {
 	pub app: AppRuntime<NativeRuntime>,
 	pub host: NativeHost,
 	pub runtime: NativeRuntime,
-	pub services: NativeServices,
+
 	// Receiver channel for process/daemon
 	pub daemon_rx: Option<mpsc::Receiver<DaemonCommand>>,
 	// Sender channel for process/daemon
@@ -51,7 +51,6 @@ pub struct NativeApp {
 impl Context for NativeApp {
 	type Host = NativeHost;
 	type Runtime = NativeRuntime;
-	type Services = NativeServices;
 	type Args = Cli;
 
 	fn new() -> Result<Self> {
@@ -66,9 +65,9 @@ impl Context for NativeApp {
 		&self.runtime
 	}
 
-	fn services(&self) -> &Self::Services {
-		&self.services
-	}
+	// fn services(&self) -> &Self::Services {
+	// 	&self.services
+	// }
 
 	fn run(&mut self, cli: Self::Args) -> Result<()> {
 		NativeApp::run(self, cli)
@@ -86,25 +85,26 @@ impl NativeApp {
 	pub fn new() -> Result<Self> {
 		let tokio = tokio::runtime::Runtime::new()?;
 		let handle = tokio.handle().clone();
-		// 2. Give the handle to NativeRuntime.
-		let runtime = NativeRuntime::new(handle.clone())?;
-		// 3. Then construct the engine.
+
+		// Runtime owns all runtime infrastructure:
+		// services, executor, state, event bus, session, etc.
+		let runtime = tokio.block_on(NativeRuntime::new(handle.clone()))?;
+
+		// // Engine owns the domain/application engine and uses Runtime.
 		let engine = EstateEngine::new(runtime.clone())?;
-		let api = Arc::new(tokio.block_on(NativeApiClient::connect())?);
-		let executor = NativeExecutor {
-			handle: handle.clone(),
-		};
+		// AppRuntime owns the application-level behavior/state.
+		let app = AppRuntime::new(engine.clone());
+
+		app.start();
 
 		let host = NativeHost::new();
-		let services = NativeServices::default();
-		let app = AppRuntime::new(engine.clone(), api.clone());
-		app.start();
+
 		let (daemon_tx, daemon_rx) = mpsc::channel(100);
+
 		Ok(Self {
 			app,
 			host,
 			runtime,
-			services,
 			is_clocking: Arc::new(AtomicBool::new(true)),
 			daemon_rx: Some(daemon_rx),
 			daemon_tx,
@@ -233,38 +233,38 @@ impl NativeApp {
 		mut rx: mpsc::Receiver<DaemonCommand>,
 		ready_tx: std::sync::mpsc::SyncSender<Result<Arc<NativeApiClient>>>,
 	) {
-		let runtime = self.runtime();
-		// self.handle().spawn(async move {
-		// 	runtime.start_dispatcher();
-		// 	let daemon: Daemon<NativeRuntime> = Daemon::new(runtime.clone());
-		// 	let shutdown_token = daemon.shutdown_token.clone();
-		// 	let daemon_task = tokio::spawn(async move {
-		// 		let mut daemon = daemon;
-		// 		daemon.run_foreground().await
-		// 	});
-		// 	match rx.recv().await {
-		// 		Some(DaemonCommand::Stop) => {
-		// 			tracing::info!("daemon stop requested");
-		// 			shutdown_token.cancel();
-		// 			match daemon_task.await {
-		// 				Ok(Ok(())) => {
-		// 					tracing::info!("daemon stopped cleanly");
-		// 				}
-		// 				Ok(Err(error)) => {
-		// 					tracing::error!(%error, "daemon exited with error");
-		// 				}
-		// 				Err(error) => {
-		// 					tracing::error!(%error, "daemon task panicked");
-		// 				}
-		// 			}
-		// 		}
-		// 		None => {
-		// 			tracing::info!("daemon command channel closed");
-		// 			shutdown_token.cancel();
-		// 			let _ = daemon_task.await;
-		// 		}
-		// 	}
-		// });
+		let runtime = self.runtime_old();
+		self.handle().spawn(async move {
+			runtime.start_dispatcher();
+			let daemon: Daemon<NativeRuntime> = Daemon::new(runtime.clone());
+			let shutdown_token = daemon.shutdown_token.clone();
+			let daemon_task = tokio::spawn(async move {
+				let mut daemon = daemon;
+				daemon.run_foreground().await
+			});
+			match rx.recv().await {
+				Some(DaemonCommand::Stop) => {
+					tracing::info!("daemon stop requested");
+					shutdown_token.cancel();
+					match daemon_task.await {
+						Ok(Ok(())) => {
+							tracing::info!("daemon stopped cleanly");
+						}
+						Ok(Err(error)) => {
+							tracing::error!(%error, "daemon exited with error");
+						}
+						Err(error) => {
+							tracing::error!(%error, "daemon task panicked");
+						}
+					}
+				}
+				None => {
+					tracing::info!("daemon command channel closed");
+					shutdown_token.cancel();
+					let _ = daemon_task.await;
+				}
+			}
+		});
 	}
 	fn spawn_signal_handler(&mut self, proxy: EventLoopProxy<AppEvent>) {
 		std::thread::spawn(move || {
@@ -656,11 +656,11 @@ impl NativeHost {
 		Self::default()
 	}
 }
-#[derive(Default)]
+#[derive(Debug, Default, Clone)]
 pub struct NativeWindow;
-#[derive(Default)]
+#[derive(Debug, Default, Clone)]
 pub struct NativeStorage;
-#[derive(Default)]
+#[derive(Debug, Default, Clone)]
 pub struct NativeClock;
 
 impl Clock for NativeClock {
@@ -673,31 +673,42 @@ impl Host for NativeHost {
 	type Window = NativeWindow;
 	type Storage = NativeStorage;
 	type Clock = NativeClock;
-
 	fn window(&self) -> &Self::Window {
 		&self.window
 	}
-
 	fn storage(&self) -> &Self::Storage {
 		&self.storage
 	}
-
 	fn clock(&self) -> &Self::Clock {
 		&self.clock
 	}
 }
 
-#[derive(Default)]
+#[derive(Debug, Clone)]
 pub struct NativeServices {
 	persistance: NativePersistance,
 	network: NativeNetwork,
 	clock: NativeClock,
+	api: NativeApiClient,
+}
+
+impl NativeServices {
+	pub async fn connect() -> anyhow::Result<Self> {
+		let api = NativeApiClient::connect().await?;
+		Ok(Self {
+			persistance: NativePersistance::default(),
+			network: NativeNetwork::default(),
+			clock: NativeClock::default(),
+			api,
+		})
+	}
 }
 
 impl Services for NativeServices {
 	type Persistence = NativePersistance;
 	type Network = NativeNetwork;
 	type Clock = NativeClock;
+	type Client = NativeApiClient;
 
 	fn persistence(&self) -> &Self::Persistence {
 		todo!("");
@@ -708,8 +719,12 @@ impl Services for NativeServices {
 	fn clock(&self) -> &Self::Clock {
 		todo!("");
 	}
+	fn api(&self) -> &Self::Client {
+		&self.api
+	}
 }
-#[derive(Default)]
+
+#[derive(Debug, Default, Clone)]
 pub struct NativePersistance;
 
 impl Persistence for NativePersistance {
@@ -720,7 +735,7 @@ impl Persistence for NativePersistance {
 		todo!("")
 	}
 }
-#[derive(Default)]
+#[derive(Debug, Default, Clone)]
 pub struct NativeNetwork;
 
 impl Network for NativeNetwork {

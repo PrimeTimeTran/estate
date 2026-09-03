@@ -5,16 +5,6 @@ pub trait StateStore: Send + Sync {
 	fn save(&self, state: &EstateState) -> Result<()>;
 }
 
-// #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-// pub struct Event {
-// pub completed_at: u64,
-// pub created_at: u64,
-// pub id: String,
-// pub kind: String,
-// pub started_at: u64,
-// pub status: String,
-// pub task_id: String,
-// }
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(default)]
 pub struct EstateState {
@@ -28,9 +18,7 @@ pub struct EstateState {
 	pub tasks_created: u64,
 	pub files_indexed: u64,
 	pub session: Session,
-	// pub jobs: Vec<Job>,
 	pub jobs: VecDeque<Job>,
-	// #[cfg(feature = "native")]
 }
 
 impl Default for EstateState {
@@ -63,13 +51,3 @@ impl EstateState {
 			.as_secs()
 	}
 }
-
-// pub struct WebStateStore;
-// impl StateStore for WebStateStore {
-// 	fn load(&self) -> Result<EstateState> {
-// 		todo!("load")
-// 	}
-// 	fn save(&self, state: &EstateState) -> Result<()> {
-// 		todo!("save")
-// 	}
-// }

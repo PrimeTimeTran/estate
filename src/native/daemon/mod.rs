@@ -162,148 +162,133 @@ impl<R: Runtime> Daemon<R> {
 		}
 	}
 }
-// pub struct Daemon<R: Runtime> {
-// 	pub runtime: Arc<R>,
-// 	pub dispatcher: EventHandler<R>,
-// 	pub shutdown_token: CancellationToken,
-// }
 
-// impl<R: Runtime> Daemon<R> {
-// 	pub fn new(runtime: Arc<R>) -> Self {
-// 		Self {
-// 			runtime,
-// 			dispatcher: EventDispatcher::new(),
-// 			shutdown_token: CancellationToken::new(),
-// 		}
-// 	}
-// }
+impl<R: Runtime> Daemon<R> {
+	async fn run_background(&mut self) -> Result<DaemonResponse> {
+		tracing::debug!("Run Background");
+		let exe = std::env::current_exe()?;
+		let child = std::process::Command::new(exe)
+			.arg("tray")
+			.stdin(std::process::Stdio::inherit())
+			.stdout(std::process::Stdio::inherit())
+			.stderr(std::process::Stdio::inherit())
+			.spawn()?;
 
-// impl<R: Runtime> Daemon<R> {
-// 	async fn run_background(&mut self) -> Result<DaemonResponse> {
-// 		tracing::debug!("Run Background");
-// 		let exe = std::env::current_exe()?;
-// 		let child = std::process::Command::new(exe)
-// 			.arg("tray")
-// 			.stdin(std::process::Stdio::inherit())
-// 			.stdout(std::process::Stdio::inherit())
-// 			.stderr(std::process::Stdio::inherit())
-// 			.spawn()?;
+		let pid = child.id();
 
-// 		let pid = child.id();
+		Self::write_pid(pid)?;
+		eprintln!("Daemon started");
+		eprintln!("PID: {}", pid);
 
-// 		Self::write_pid(pid)?;
-// 		eprintln!("Daemon started");
-// 		eprintln!("PID: {}", pid);
+		Ok(DaemonResponse {
+			status: "ok".into(),
+			message: Some(format!("Daemon started with PID {}", pid)),
+			..Default::default()
+		})
+	}
 
-// 		Ok(DaemonResponse {
-// 			status: "ok".into(),
-// 			message: Some(format!("Daemon started with PID {}", pid)),
-// 			..Default::default()
-// 		})
-// 	}
+	pub async fn run_foreground(&mut self) -> Result<()> {
+		let pid = std::process::id();
+		Self::write_pid(pid)?;
+		tracing::info!(pid, "[Daemon] Foreground run");
+		self.runtime.emit(e::Event::daemon(e::Klass::DaemonStarted));
+		self.shutdown_token.cancelled().await;
+		tracing::info!(pid, "[Daemon] Foreground stop");
+		self.runtime.emit(e::Event::daemon(e::Klass::DaemonStopped));
+		Ok(())
+	}
 
-// 	pub async fn run_foreground(&mut self) -> Result<()> {
-// 		let pid = std::process::id();
-// 		Self::write_pid(pid)?;
-// 		tracing::info!(pid, "[Daemon] Foreground run");
-// 		self.runtime.emit(e::Event::daemon(e::Klass::DaemonStarted));
-// 		self.shutdown_token.cancelled().await;
-// 		tracing::info!(pid, "[Daemon] Foreground stop");
-// 		self.runtime.emit(e::Event::daemon(e::Klass::DaemonStopped));
-// 		Ok(())
-// 	}
+	fn write_pid(pid: u32) -> Result<()> {
+		std::fs::write(crate::data::PID_PATH, pid.to_string())?;
+		Ok(())
+	}
+}
 
-// 	fn write_pid(pid: u32) -> Result<()> {
-// 		std::fs::write(crate::data::PID_PATH, pid.to_string())?;
-// 		Ok(())
-// 	}
-// }
-
-// #[async_trait]
-// impl<R: Runtime> EstateDaemon for Daemon<R>
-// where
-// 	R: Runtime,
-// {
-// 	async fn execute(&mut self, action: ActionRequest) -> Result<DaemonResponse> {
-// 		match action {
-// 			ActionRequest::Analyze {
-// 				path,
-// 				line,
-// 				column,
-// 				mode,
-// 			} => self.analyze(path, line, column, mode),
-// 			ActionRequest::Metrics { path } => self.metrics(path),
-// 			ActionRequest::ScanWorkspace { path } => self.scan_workspace(path),
-// 			ActionRequest::InitializeEstate { path } => self.initialize_estate(path),
-// 		}
-// 	}
-// 	async fn start(&mut self, options: DaemonOptions) -> Result<DaemonResponse> {
-// 		if options.foreground {
-// 			self.run_foreground().await?;
-// 		} else {
-// 			self.run_background().await?;
-// 		}
-// 		Ok(DaemonResponse::default())
-// 	}
-// 	async fn shutdown(&mut self) -> Result<DaemonResponse> {
-// 		tracing::debug!("shutdown requested");
-// 		self.shutdown_token.cancel();
-// 		Ok(DaemonResponse::default())
-// 	}
-// }
-// impl<R: Runtime> Daemon<R> {
-// 	fn metrics(&mut self, path: PathBuf) -> Result<DaemonResponse> {
-// 		let request = Analyze {
-// 			target: AnalysisTarget::File(path),
-// 			subject: None,
-// 		};
-// 		let analyzer = RustAnalyzer;
-// 		let options = AnalyzerOptions::default();
-// 		let workspace = analyzer.analyze(request, &options)?;
-// 		let metrics = workspace.metrics();
-// 		Ok(DaemonResponse {
-// 			data: Some(serde_json::to_value(metrics)?),
-// 			..Default::default()
-// 		})
-// 	}
-// 	fn analyze(
-// 		&mut self,
-// 		path: PathBuf,
-// 		line: Option<u32>,
-// 		column: Option<u32>,
-// 		mode: Option<String>,
-// 	) -> Result<DaemonResponse> {
-// 		let options = AnalyzerOptions {
-// 			line,
-// 			column,
-// 			mode,
-// 			include_private: true,
-// 			include_tests: true,
-// 		};
-// 		let system_path = if let Some(s) = path.to_str() {
-// 			if s.starts_with("file://") {
-// 				url::Url::parse(s)?
-// 					.to_file_path()
-// 					.map_err(|_| anyhow::anyhow!("Invalid file URI"))?
-// 			} else {
-// 				path
-// 			}
-// 		} else {
-// 			path
-// 		};
-// 		let report = revelation::analyzer::Workspace::analyze(&system_path, &options)?;
-// 		Ok(DaemonResponse {
-// 			data: Some(serde_json::to_value(report)?),
-// 			..Default::default()
-// 		})
-// 	}
-// 	fn scan_workspace(&mut self, _path: PathBuf) -> Result<DaemonResponse> {
-// 		todo!("scan_workspace")
-// 	}
-// 	fn initialize_estate(&mut self, _path: PathBuf) -> Result<DaemonResponse> {
-// 		todo!("initialize_estate")
-// 	}
-// }
+#[async_trait]
+impl<R: Runtime> EstateDaemon for Daemon<R>
+where
+	R: Runtime,
+{
+	async fn execute(&mut self, action: ActionRequest) -> Result<DaemonResponse> {
+		match action {
+			ActionRequest::Analyze {
+				path,
+				line,
+				column,
+				mode,
+			} => self.analyze(path, line, column, mode),
+			ActionRequest::Metrics { path } => self.metrics(path),
+			ActionRequest::ScanWorkspace { path } => self.scan_workspace(path),
+			ActionRequest::InitializeEstate { path } => self.initialize_estate(path),
+		}
+	}
+	async fn start(&mut self, options: DaemonOptions) -> Result<DaemonResponse> {
+		if options.foreground {
+			self.run_foreground().await?;
+		} else {
+			self.run_background().await?;
+		}
+		Ok(DaemonResponse::default())
+	}
+	async fn shutdown(&mut self) -> Result<DaemonResponse> {
+		tracing::debug!("shutdown requested");
+		self.shutdown_token.cancel();
+		Ok(DaemonResponse::default())
+	}
+}
+impl<R: Runtime> Daemon<R> {
+	fn metrics(&mut self, path: PathBuf) -> Result<DaemonResponse> {
+		let request = Analyze {
+			target: AnalysisTarget::File(path),
+			subject: None,
+		};
+		let analyzer = RustAnalyzer;
+		let options = AnalyzerOptions::default();
+		let workspace = analyzer.analyze(request, &options)?;
+		let metrics = workspace.metrics();
+		Ok(DaemonResponse {
+			data: Some(serde_json::to_value(metrics)?),
+			..Default::default()
+		})
+	}
+	fn analyze(
+		&mut self,
+		path: PathBuf,
+		line: Option<u32>,
+		column: Option<u32>,
+		mode: Option<String>,
+	) -> Result<DaemonResponse> {
+		let options = AnalyzerOptions {
+			line,
+			column,
+			mode,
+			include_private: true,
+			include_tests: true,
+		};
+		let system_path = if let Some(s) = path.to_str() {
+			if s.starts_with("file://") {
+				url::Url::parse(s)?
+					.to_file_path()
+					.map_err(|_| anyhow::anyhow!("Invalid file URI"))?
+			} else {
+				path
+			}
+		} else {
+			path
+		};
+		let report = revelation::analyzer::Workspace::analyze(&system_path, &options)?;
+		Ok(DaemonResponse {
+			data: Some(serde_json::to_value(report)?),
+			..Default::default()
+		})
+	}
+	fn scan_workspace(&mut self, _path: PathBuf) -> Result<DaemonResponse> {
+		todo!("scan_workspace")
+	}
+	fn initialize_estate(&mut self, _path: PathBuf) -> Result<DaemonResponse> {
+		todo!("initialize_estate")
+	}
+}
 
 #[derive(Debug, Default)]
 pub struct DaemonOptions {

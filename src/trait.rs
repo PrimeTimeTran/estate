@@ -24,6 +24,10 @@ pub trait Runtime: Clone + Sync + std::marker::Send + 'static {
 	fn tasks(&self) -> &Arc<RwLock<TaskManager>>;
 	fn state_service(&self) -> &Arc<StateService>;
 	fn session_service(&self) -> &Arc<SessionService>;
+
+	type Services: Services;
+	fn services(&self) -> &Self::Services;
+
 	// fn spawn<F>(&self, future: F)
 	// where
 	// 	F: std::future::Future<Output = ()> + Send + 'static;
@@ -38,12 +42,12 @@ pub trait Context: Sized {
 	/// Runtime environment in which the app is running.
 	/// Multiple factor influence runtime such as plaftorm, host, config & more.
 	type Runtime: Runtime;
-	/// Services
-	type Services: Services;
+	/// Provide capabilities to the app
+	// type Services: Services;
+	// fn services(&self) -> &Self::Services;
 
 	fn host(&self) -> &Self::Host;
 	fn runtime(&self) -> &Self::Runtime;
-	fn services(&self) -> &Self::Services;
 
 	type Args;
 	/// Stuff about generic news
@@ -73,9 +77,12 @@ pub trait Services {
 	type Persistence: Persistence;
 	type Network: Network;
 	type Clock: Clock;
+	type Client: Api;
+
 	fn persistence(&self) -> &Self::Persistence;
 	fn network(&self) -> &Self::Network;
 	fn clock(&self) -> &Self::Clock;
+	fn api(&self) -> &Self::Client;
 }
 pub trait Persistence {
 	fn load(&self, key: &str) -> Result<Option<Vec<u8>>>;
@@ -97,6 +104,15 @@ pub trait Executor: Clone + 'static {
 	fn spawn(&self, future: impl Future<Output = ()> + 'static);
 }
 
+#[async_trait::async_trait]
+pub trait EventHandler<R: Runtime>: Send + Sync + 'static {
+	async fn handle(&self, event: &e::Event, runtime: &R);
+}
+
+pub trait EventReceiver {
+	fn try_recv(&mut self) -> Option<e::Event>;
+}
+
 // pub trait SendSpawnRuntime: Runtime {
 // 	fn spawn<F>(&self, future: F)
 // 	where
@@ -107,15 +123,6 @@ pub trait Executor: Clone + 'static {
 // 	where
 // 		F: Future<Output = ()> + 'static;
 // }
-
-#[async_trait::async_trait]
-pub trait EventHandler<R: Runtime>: 'static {
-	async fn handle(&self, event: &e::Event, runtime: &R);
-}
-
-pub trait EventReceiver {
-	fn try_recv(&mut self) -> Option<e::Event>;
-}
 
 // pub trait Platform {
 // 	type Input: Input;

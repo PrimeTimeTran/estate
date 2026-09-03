@@ -6,7 +6,7 @@ use crate::{
 };
 use async_broadcast::{Receiver, Sender, broadcast};
 
-struct WebApp {
+pub struct WebApp {
 	host: WebHost,
 	runtime: WebRuntime,
 	services: WebServices,
@@ -14,10 +14,13 @@ struct WebApp {
 
 impl WebApp {
 	fn new() -> Result<Self> {
+		let state = EstateState::default();
+		let runtime = WebRuntime::new(state)?;
+
 		Ok(Self {
 			host: WebHost::default(),
-			runtime: WebRuntime::default(),
-			services: WebServices::default(),
+			runtime,
+			services: WebServices::new()?,
 		})
 	}
 }
@@ -26,7 +29,7 @@ impl Context for WebApp {
 	// "For this implementation of Context, Host means WasmHost."
 	type Host = WebHost;
 	type Runtime = WebRuntime;
-	type Services = WebServices;
+	// type Services = WebServices;
 	type Args = String;
 
 	fn host(&self) -> &Self::Host {
@@ -37,17 +40,17 @@ impl Context for WebApp {
 		&self.runtime
 	}
 
-	fn services(&self) -> &Self::Services {
-		&self.services
-	}
+	// fn services(&self) -> &Self::Services {
+	// 	&self.services
+	// }
 
 	fn new() -> Result<Self> {
 		WebApp::new()
 	}
+
 	fn run(&mut self, cli: Self::Args) -> Result<()> {
 		self.run(cli)
 	}
-
 	fn foo(&self, args: String) -> Result<()> {
 		WebApp::foo(&self, args)
 	}
@@ -57,7 +60,7 @@ impl Context for WebApp {
 }
 
 #[derive(Default)]
-struct WebHost {
+pub struct WebHost {
 	window: BrowserWindow,
 	storage: WebStorage,
 	clock: WebClock,
@@ -79,19 +82,33 @@ impl Host for WebHost {
 	}
 }
 
+#[derive(Debug, Clone)]
+pub struct WebServices {
+	api: WasmApiClient,
+}
+
+impl WebServices {
+	pub fn new() -> anyhow::Result<Self> {
+		let api = WasmApiClient::new(String::from(""));
+		Ok(Self { api })
+	}
+}
 #[derive(Default)]
-struct WebServices;
+pub struct BrowserWindow;
 #[derive(Default)]
-struct BrowserWindow;
+pub struct WebStorage;
 #[derive(Default)]
-struct WebStorage;
-#[derive(Default)]
-struct WebClock;
+pub struct WebClock;
 
 impl Services for WebServices {
 	type Network = WebNetwork;
 	type Persistence = WebStorage;
 	type Clock = WebClock;
+	type Client = WasmApiClient;
+
+	fn api(&self) -> &Self::Client {
+		&self.api
+	}
 
 	fn persistence(&self) -> &Self::Persistence {
 		todo!("");
@@ -119,7 +136,7 @@ impl Clock for WebClock {
 	}
 }
 #[derive(Default)]
-struct WebNetwork {}
+pub struct WebNetwork {}
 impl Network for WebNetwork {
 	fn is_available(&self) -> bool {
 		todo!("")
@@ -128,26 +145,19 @@ impl Network for WebNetwork {
 
 #[derive(Clone, Debug)]
 pub struct WebRuntime {
-	// pub api: WasmApiClient,
+	pub services: WebServices,
 	state: Arc<RwLock<EstateState>>,
 	events: Sender<e::Event>,
 }
-
-impl Default for WebRuntime {
-	fn default() -> Self {
-		Self::new(EstateState::default())
-	}
-}
-
 impl WebRuntime {
-	pub fn new(state: EstateState) -> Self {
+	pub fn new(state: EstateState) -> anyhow::Result<Self> {
 		let (events, _) = broadcast::<e::Event>(256);
-
-		Self {
-			// api: WasmApiClient::new(),
+		let services = WebServices::new()?;
+		Ok(Self {
+			services,
 			state: Arc::new(RwLock::new(state)),
 			events,
-		}
+		})
 	}
 }
 
@@ -196,6 +206,12 @@ impl Runtime for WebRuntime {
 	}
 	fn session_service(&self) -> &Arc<SessionService> {
 		todo!("tasks")
+	}
+
+	type Services = WebServices;
+
+	fn services(&self) -> &Self::Services {
+		&self.services
 	}
 }
 

@@ -24,10 +24,11 @@ pub struct NativeRuntime {
 	// pub api: Box<dyn Api>,
 	pub session_service: Arc<SessionService>,
 	pub executor: NativeExecutor,
+	services: NativeServices,
 }
 
 impl NativeRuntime {
-	pub fn new(handle: tokio::runtime::Handle) -> Result<Self> {
+	pub async fn new(handle: tokio::runtime::Handle) -> anyhow::Result<Self> {
 		let store = NativeStateStore::new()?;
 		let state_service = Arc::new(StateService::new(crate::STATE_PATH));
 		let session_service = Arc::new(SessionService::new(Arc::clone(&state_service)));
@@ -35,6 +36,8 @@ impl NativeRuntime {
 		let runtime_state = RuntimeState::new(state);
 		let events = EventBus::new();
 		let event_rx = Arc::new(Mutex::new(events.subscribe()));
+		let services = NativeServices::connect().await?;
+
 		let executor = NativeExecutor {
 			handle: handle.clone(),
 		};
@@ -42,6 +45,7 @@ impl NativeRuntime {
 			event_rx,
 			events,
 			handle,
+			services,
 			// api: Box::new(NativeApiClient::new()),
 			proxy: Arc::new(Mutex::new(None)),
 			session: Session::default(),
@@ -72,7 +76,6 @@ impl NativeRuntime {
 impl Runtime for NativeRuntime {
 	type EventReceiver = NativeEventReceiver;
 	// type Api = NativeApiClient;
-
 	// fn api(&self) -> &Self::Api {
 	// 	&self.api
 	// }
@@ -154,6 +157,11 @@ impl Runtime for NativeRuntime {
 	}
 	fn session_service(&self) -> &Arc<SessionService> {
 		&self.session_service
+	}
+
+	type Services = NativeServices;
+	fn services(&self) -> &Self::Services {
+		&self.services
 	}
 }
 

@@ -17,21 +17,15 @@
 //
 // "rust-analyzer.cargo.target": "wasm32-unknown-unknown",
 
-use estate::{
-	app::state::EstateState,
-	app::{model::EstateEngine, *},
-};
+use estate::*;
 
 // Turning feature flag is not enough, must set rust analyzer feature as well for cmd+click
 #[cfg(all(feature = "web", target_arch = "wasm32"))]
 fn main() -> Result<()> {
-	use estate::{api::WasmApiClient, app::app_web::WebRuntime};
-
-	let state = EstateState::default();
-	let runtime = WebRuntime::new(state);
-	let engine = EstateEngine::new(runtime)?;
-	let api = Arc::new(WasmApiClient::new("http://localhost:3000"));
-	let _app = AppRuntime::new(engine, api);
+	use estate::app::{App, app_web::WebApp};
+	let mut app = App::<WebApp>::new()?;
+	let parsed = String::from("");
+	app.run(parsed)?;
 	Ok(())
 }
 
