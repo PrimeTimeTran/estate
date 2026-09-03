@@ -15,14 +15,14 @@ pub use crate::{
 
 pub use crate::data::*;
 
-#[cfg(feature = "native")]
+#[cfg(not(target_arch = "wasm32"))]
 pub use crate::{
 	data::*,
 	native::{app::*, prelude::*, *},
-	server::event::*,
+	server::{self, event::*},
 };
 
-#[cfg(feature = "native")]
+#[cfg(not(target_arch = "wasm32"))]
 pub use cli::context::*;
 
 pub use ::serde::{Deserialize, Serialize, de::DeserializeOwned};

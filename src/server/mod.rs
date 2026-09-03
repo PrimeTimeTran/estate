@@ -1,10 +1,16 @@
 pub mod event;
+pub mod json;
 pub mod native;
+pub mod problem;
+pub mod submission;
 pub use event::*;
+pub use json::*;
 pub use native::*;
+pub use problem::*;
+pub use submission::*;
 
-use crate::proto::types::*;
-use crate::server::native::*;
+pub use crate::proto::types::*;
+pub use crate::server::native::*;
 
 use tonic::{Request, Response, Status};
 

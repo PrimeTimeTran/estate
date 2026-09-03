@@ -5,7 +5,7 @@ use estate::{
 		problem_service_server::ProblemServiceServer,
 		submission_service_server::SubmissionServiceServer,
 	},
-	services::{
+	server::{
 		json::{problem::JsonProblemRepository, submission::JsonSubmissionRepository},
 		problem::ProblemServiceImpl,
 		problem::{ProblemQuery, ProblemRepository},

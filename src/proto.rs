@@ -1,4 +1,8 @@
 /// VSCode does not recognize this paths via cmd+click.
+/// Three different bins must build using proto defs found here.
+/// - Server:
+/// - Native:
+/// - Wasm:
 ///
 /// ## [Native]
 /// - Given default = ["native"] in Cargo.toml Zed does.

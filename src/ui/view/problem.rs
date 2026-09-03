@@ -1,6 +1,8 @@
 use crate::api::Api;
 use crate::model::{ProtoLanguage, StoredProblem, StoredSolution, StoredSubmission};
 
+use crate::proto::types::SubmissionStatus;
+
 use crate::{e, prelude::*, ui::Layout};
 use egui::{ScrollArea, Ui};
 

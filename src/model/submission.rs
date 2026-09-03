@@ -46,7 +46,6 @@ pub struct SubmissionState {
 	pub id: Option<String>,
 	pub error: Option<String>,
 }
-
 pub struct CreateSubmission {
 	pub user_id: String,
 	pub problem_id: String,

@@ -79,8 +79,8 @@ path = "src/bin/macros.rs"
 # default = []
 
 # [CHOOSE 1]
-# default = ["native"]
-default = ["web"]
+default = ["native"]
+# default = ["web"]
 # [DEFAULT to this]
 
 # default = []

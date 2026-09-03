@@ -18,9 +18,10 @@
 // lib.rs must have th efollowing for logger import here to use.
 // pub mod tool;
 // pub use tool::*;
-use estate::{logger::*, prelude::*};
 
-fn main2() -> Result<()> {
+use estate::{api::NativeApiClient, logger::*, prelude::*};
+
+fn wasm_init_flow() -> Result<()> {
 	// use estate::api::WasmApiClient;
 	// let state = EstateState::default();
 	// let runtime = WasmRuntime::new(state);
@@ -30,11 +31,10 @@ fn main2() -> Result<()> {
 	Ok(())
 }
 
-// #[cfg(feature = "native")]
 fn main() -> Result<()> {
 	use cli;
+
 	let parsed = cli::context::parse();
-	use estate::api::NativeApiClient;
 	let state = EstateState::default();
 	let mut config = LogConfig::load()?;
 	config.apply_cli(&parsed)?;
@@ -42,10 +42,4 @@ fn main() -> Result<()> {
 	let app = App::new()?;
 	app.run(parsed);
 	Ok(())
-	// NativeRuntime::new(handle)
-	// NativeApp::new()?.run(parsed)
 }
-
-// fn main() -> Result<()> {
-// 	App::new(cli::context::parse())?.run()
-// }

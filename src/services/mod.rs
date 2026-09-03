@@ -1,13 +1,23 @@
+/// [Goal]
+/// This guy should support all platforms and share agnostic api.
+///
 use crate::{
+	app::*,
 	model::{submission::*, *},
-	prelude::*,
+	proto::types::*,
 };
 
-use crate::proto::types::*;
-// use crate::services::prelude::*;
+pub mod prelude;
+pub use prelude::*;
+
+#[cfg(not(feature = "web"))]
+pub use crate::proto::{
+	problem_service_server::ProblemService, submission_service_server::SubmissionService,
+};
 
 #[derive(Debug)]
 pub struct JsonRepo<T> {
+	#[cfg(not(feature = "web"))]
 	pub path: PathBuf,
 	pub _marker: std::marker::PhantomData<T>,
 }
@@ -39,8 +49,3 @@ impl<T> Page<T> {
 		}
 	}
 }
-
-#[cfg(not(feature = "web"))]
-use crate::proto::{
-	problem_service_server::ProblemService, submission_service_server::SubmissionService,
-};
