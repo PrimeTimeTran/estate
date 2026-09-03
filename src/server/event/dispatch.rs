@@ -1,11 +1,9 @@
-use crate::{e, native::prelude::*, ui};
-
-pub(crate) mod channel;
-pub(crate) mod handler;
+use crate::{e, native::prelude::*, prelude::*, ui};
 
 pub struct EventDispatcher<R: Runtime> {
 	handlers: Vec<Box<dyn EventHandler<R>>>,
 }
+
 impl<R: Runtime> Default for EventDispatcher<R> {
 	fn default() -> Self {
 		Self::new()

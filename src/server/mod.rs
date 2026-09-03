@@ -1,4 +1,10 @@
 pub mod event;
+pub mod native;
+pub use event::*;
+pub use native::*;
+
+use crate::proto::types::*;
+use crate::server::native::*;
 
 use tonic::{Request, Response, Status};
 

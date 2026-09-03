@@ -13,6 +13,9 @@ use crate::{
 #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 use crate::logger::{LogConfig, Tracer};
 
+// $ cargo build --bin native --no-default-features --features native
+// $ cargo build --bin web --no-default-features --features="web" --target wasm32-unknown-unknown
+//
 pub struct App {
 	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 	native: NativeApp,

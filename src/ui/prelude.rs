@@ -35,8 +35,8 @@ pub use uuid::Uuid;
 #[cfg(not(target_arch = "wasm32"))]
 pub use crate::native::{app::*, prelude::*, *};
 
-#[cfg(not(target_arch = "wasm32"))]
-pub use crate::{data::*, event::*};
+// #[cfg(not(target_arch = "wasm32"))]
+// pub use crate::{data::*, event::*};
 #[cfg(not(target_arch = "wasm32"))]
 pub use cli::context::*;
 

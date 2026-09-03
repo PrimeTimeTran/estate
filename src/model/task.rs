@@ -16,9 +16,9 @@ pub struct Task {
 #[derive(Debug)]
 pub struct TaskManager {
 	#[cfg(feature = "native")]
-	runtime: TaskManagerRuntime,
+	pub runtime: TaskManagerRuntime,
 
-	state: TaskManagerState,
+	pub state: TaskManagerState,
 }
 
 #[derive(Debug, Default)]

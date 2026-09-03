@@ -29,9 +29,6 @@ pub mod web;
 #[cfg(feature = "native")]
 pub mod native;
 
-#[cfg(feature = "native")]
-pub mod server;
-
 // pub mod event;
 //
 // pub mod services;

@@ -8,18 +8,18 @@ use crate::proto::types::*;
 
 #[derive(Debug)]
 pub struct JsonRepo<T> {
-	path: PathBuf,
-	_marker: std::marker::PhantomData<T>,
+	pub path: PathBuf,
+	pub _marker: std::marker::PhantomData<T>,
 }
 
 #[derive(Clone, Debug)]
 pub struct SessionService {
-	state_service: Arc<StateService>,
+	pub state_service: Arc<StateService>,
 }
 
 #[derive(Debug)]
 pub struct StateService {
-	repo: JsonRepo<EstateState>,
+	pub repo: JsonRepo<EstateState>,
 }
 
 #[derive(Debug)]
