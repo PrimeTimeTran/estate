@@ -15,7 +15,10 @@
 /// cargo build --bin web --no-default-features --features="web" --target wasm32-unknown-unknown
 ///
 ///
-/// WIP: Add Native & Web builds without breaking each other. Latest, the
+/// WIP: Add Native & Web builds without breaking each other.
+/// - Native built. Web didn't
+/// - Web built. Native didn't.
+/// - Web & Native built. Server didnt'
 pub mod types {
 	include!(concat!(env!("OUT_DIR"), "/leetcode.types.rs"));
 }
