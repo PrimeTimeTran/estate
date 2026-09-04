@@ -1,7 +1,7 @@
-use crate::ui::{PanelState, *};
-
-use egui::Color32;
-use std::sync::atomic::AtomicI64;
+use crate::{
+	prelude::*,
+	ui::{PanelState, *},
+};
 
 pub static ROOT_DIR: &str = "/Users/future/KB/project/crates/estate";
 pub static HMR_CHART_JSON: &str = "/Users/future/kb/project/crates/estate/src/data/chart.json";
@@ -110,11 +110,7 @@ impl VeConfig {
 	}
 }
 
-pub(crate) const LAYOUT: VeConfig = VeConfig::default();
-
-use std::sync::atomic::AtomicU64;
-
-// pub static EVENT_ID: AtomicU64 = AtomicU64::new(1);
+pub const LAYOUT: VeConfig = VeConfig::default();
 pub static FILE_EXTENSIONS: &[&str] = &[
 	"rs", "loi", "estate", "html", "htm", "css", "js", "jsx", "ts", "tsx", "json", "jsonc", "md",
 	"mdx", "txt", "toml", "yaml", "yml", "ini", "conf", "sh", "bash", "zsh", "c", "h", "cpp", "hpp",

@@ -53,6 +53,8 @@ async fn run() -> anyhow::Result<()> {
 	let flow = trace.flow("execution");
 	let language = Language::from_arg(env::args().nth(1).as_deref())?;
 	let backend = env::var("RUNNER").unwrap_or_else(|_| "native".into());
+	tracing::info!("Language {:?}", language);
+	tracing::info!("Execution environment {:?}", backend);
 	let problem = Problem::load("two-sum", language).await?;
 	// let submission = Submission::for_success(&problem, language);
 	// let input = RunInput::new(submission.source, &problem)?;
@@ -589,11 +591,13 @@ pub struct TestResult {
 	pub status: TestStatus,
 	pub execution_ms: u128,
 }
+
 pub struct Submission<'p> {
 	pub id: Uuid,
 	pub problem: &'p Problem,
 	pub source: String,
 }
+
 impl<'p> Submission<'p> {
 	pub fn new(problem: &'p Problem, source: impl Into<String>) -> Self {
 		Self {

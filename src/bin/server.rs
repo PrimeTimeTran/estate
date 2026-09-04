@@ -7,8 +7,7 @@ use estate::{
 	},
 	server::{
 		json::{problem::JsonProblemRepository, submission::JsonSubmissionRepository},
-		problem::ProblemServiceImpl,
-		problem::{ProblemQuery, ProblemRepository},
+		problem::{ProblemQuery, ProblemRepository, ProblemServiceImpl},
 		submission::SubmissionServiceImpl,
 	},
 };
@@ -28,13 +27,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 		.await?;
 	println!("📚 Problems available: {}", page.total);
 	let submission_repository = JsonSubmissionRepository::new(estate::data::GRPC_SUBMISSIONS_PATH);
-
 	let problem_service = ProblemServiceImpl::new(problem_repository);
-
 	let submission_service = SubmissionServiceImpl::new(submission_repository);
-
 	println!("API listening on {addr}");
-
 	tonic::transport::Server::builder()
 		.add_service(ProblemServiceServer::new(problem_service))
 		.add_service(SubmissionServiceServer::new(submission_service))

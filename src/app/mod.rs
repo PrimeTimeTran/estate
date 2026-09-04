@@ -18,10 +18,15 @@
 /// ./src/web
 /// ./src/mobile
 //
+pub mod app;
+pub mod context;
 pub mod event;
+pub mod job;
 pub mod model;
+pub mod modules;
 pub mod prelude;
 pub mod state;
+pub mod task;
 
 /// Platform Gates
 #[cfg(feature = "native")]
@@ -42,12 +47,7 @@ pub use context::*;
 pub use event::*;
 pub use job::*;
 pub use state::*;
+pub use state::*;
 pub use task::*;
 
-// Crate exposed only
-pub(crate) mod app;
-pub(crate) mod context;
-pub(crate) mod job;
-pub(crate) mod modules;
-pub(crate) mod task;
-// pub(crate) use modules::*;
+// pub use modules::*;

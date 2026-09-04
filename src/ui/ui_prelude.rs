@@ -2,10 +2,9 @@
 // It is used to bring all the necessary dependencies into scope for the UI module.
 // The prelude file is used to manage dependencies in a centralized manner,
 // allowing for easier maintenance and updates.
-
-pub use egui::Color32;
+//
 pub use egui::{
-	Align, ClippedPrimitive, Context, Direction, Frame, FullOutput, Id, Margin, ScrollArea,
+	Align, ClippedPrimitive, Color32, Context, Direction, Frame, FullOutput, Id, Margin, ScrollArea,
 	TexturesDelta, Ui, UiBuilder, ViewportId, containers::Panel,
 };
 pub use egui_commonmark::{CommonMarkCache, CommonMarkViewer};

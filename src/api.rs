@@ -1,4 +1,4 @@
-use crate::{model::problem::StoredProblem, proto::types::SampleProblemRequest};
+use crate::{model::problem::StoredProblem, prelude::*, proto::types::SampleProblemRequest};
 
 // ============================================================
 // Shared application state
@@ -30,7 +30,7 @@ pub struct ProblemState {
 //
 #[cfg(not(target_arch = "wasm32"))]
 #[async_trait::async_trait]
-pub trait Api: std::fmt::Debug + 'static {
+pub trait Api: Debug + 'static {
 	async fn load_problems(&self) -> anyhow::Result<Vec<StoredProblem>>;
 	async fn sample_problem(&self, request: SampleProblemRequest) -> anyhow::Result<StoredProblem>;
 	async fn load_problem(&self, id: i64) -> anyhow::Result<StoredProblem>;
@@ -39,7 +39,7 @@ pub trait Api: std::fmt::Debug + 'static {
 
 #[cfg(target_arch = "wasm32")]
 #[async_trait::async_trait(?Send)]
-pub trait Api: std::fmt::Debug + 'static {
+pub trait Api: Debug + 'static {
 	async fn load_problems(&self) -> anyhow::Result<Vec<StoredProblem>>;
 	async fn sample_problem(&self, request: SampleProblemRequest) -> anyhow::Result<StoredProblem>;
 	async fn load_problem(&self, id: i64) -> anyhow::Result<StoredProblem>;
@@ -87,13 +87,13 @@ impl NativeApiClient {
 #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 impl NativeApiClient {
 	pub async fn connect() -> anyhow::Result<Self> {
-		let channel = Channel::from_static(crate::GRPC_SOCKET_CLIENT)
+		let chan = Channel::from_static(crate::GRPC_SOCKET_CLIENT)
 			.connect()
 			.await?;
 
 		Ok(Self {
-			problems: ProblemServiceClient::new(channel.clone()),
-			submissions: SubmissionServiceClient::new(channel),
+			problems: ProblemServiceClient::new(chan.clone()),
+			submissions: SubmissionServiceClient::new(chan),
 		})
 	}
 }

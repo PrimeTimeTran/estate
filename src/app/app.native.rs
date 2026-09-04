@@ -23,10 +23,6 @@ use winit::{
 	window::WindowId,
 };
 
-// macro_rules! doc {
-// 	($text:expr) => {{ $text }};
-// }
-
 pub struct NativeApp {
 	pub app: AppRuntime<NativeRuntime, NativeExecutor>,
 	pub host: NativeHost,

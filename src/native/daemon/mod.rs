@@ -38,7 +38,6 @@
 //! - **Shell integration** — interacting with the host environment.
 //! - **Linting** — running project and Estate-level lint operations.
 //!
-//!
 //! ## Lifecycle
 //!
 //! A typical daemon lifecycle is:
@@ -93,9 +92,6 @@ pub use lint::*;
 pub use shell::*;
 
 use crate::{
-	EventHandler,
-	app::state::EstateState,
-	e,
 	native::{daemon::DocCompiler, prelude::*},
 	prelude::*,
 };
@@ -379,7 +375,7 @@ impl DaemonServer {
 #[derive(Debug, Clone)]
 pub struct DaemonMetrics {
 	pub starts: u64,
-	pub uptime: Duration,
+	pub uptime: chrono::Duration,
 	pub tasks_total: usize,
 	pub tasks_running: usize,
 	pub tasks_completed: usize,

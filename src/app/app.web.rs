@@ -1,4 +1,4 @@
-use crate::{EventReceiver, RuntimeState, app::prelude::*, r#trait::Context};
+use crate::{RuntimeState, app::prelude::*, r#trait::Context};
 use async_broadcast::{Sender, broadcast};
 
 pub struct WebApp {
