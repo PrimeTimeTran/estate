@@ -36,6 +36,18 @@ pub static SOCKET_PATH: &str = "/tmp/estate-daemon.sock";
 pub static STATE_PATH: &str = "/Users/future/Library/Application Support/estate/state.json";
 pub static WORKSPACE_SETTINGS: &str = ".estate/settings.json";
 
+pub const TICK_ITEMS: [ViewType; 8] = [
+	ViewType::ProblemScreen,
+	ViewType::DashboardScreen,
+	ViewType::MarkdownView,
+	ViewType::ProblemScreen,
+	ViewType::WaterfallScreen,
+	ViewType::ProblemScreen,
+	ViewType::TaskManagerScreen,
+	ViewType::ProblemsScreen,
+];
+pub const TICK_ITEMS_LENGTH: usize = TICK_ITEMS.len();
+
 pub(crate) struct VeConfig {
 	pub bg: Color32,
 	pub surface: Color32,

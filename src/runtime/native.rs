@@ -235,18 +235,18 @@ impl Executor for NativeExecutor {
 impl Executor for NativeRuntime {
 	fn spawn(&self, future: impl Future<Output = ()> + Send + 'static) {
 		println!("✅ Executor for NativeRuntime");
-		// This implementation chooses to use Tokio directly.
-		//
-		// Notice that it does NOT use:
-		//
-		//   self.executor.spawn(...)
-		//
-		// even though NativeRuntime may contain a NativeExecutor.
-		//
-		// That would be explicit delegation, which is a different
-		// architectural choice.
 		tokio::spawn(future);
 	}
+	// This implementation chooses to use Tokio directly.
+	//
+	// Notice that it does NOT use:
+	//
+	//   self.executor.spawn(...)
+	//
+	// even though NativeRuntime may contain a NativeExecutor.
+	//
+	// That would be explicit delegation, which is a different
+	// architectural choice.
 }
 
 // ============================================================
@@ -277,20 +277,20 @@ impl Executor for NativeRuntime {
 impl Runtime for NativeRuntime {
 	fn spawn(&self, future: impl Future<Output = ()> + 'static) {
 		println!("✅ NativeRuntime::spawn");
-		// This is currently just a demonstration.
-		//
-		// Notice that Runtime::spawn has a different contract:
-		//
-		//     Future + 'static
-		//
-		// while native Executor::spawn requires:
-		//
-		//     Future + Send + 'static
-		//
-		// That difference matters enormously when generic code
-		// tries to move the future onto a native multithreaded
-		// executor.
 	}
+	// This is currently just a demonstration.
+	//
+	// Notice that Runtime::spawn has a different contract:
+	//
+	//     Future + 'static
+	//
+	// while native Executor::spawn requires:
+	//
+	//     Future + Send + 'static
+	//
+	// That difference matters enormously when generic code
+	// tries to move the future onto a native multithreaded
+	// executor.
 	// --------------------------------------------------------
 	// Another Runtime capability
 	// --------------------------------------------------------

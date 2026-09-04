@@ -24,7 +24,6 @@ use crate::{
 /// anchors (bookmarks), jobs (tasks), and more.
 ///
 /// Generic indirection adds complication but solves problems downstream.
-///
 
 pub struct App<C>
 where
@@ -118,3 +117,8 @@ impl<C: Context> App<C> {
 	// 	Arc::clone(&self.context.runtime().something)
 	// }
 }
+
+// impl<C: Context> App<C> {
+// 	fn goo(&self) {
+// 	}
+// }

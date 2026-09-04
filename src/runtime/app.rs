@@ -7,18 +7,22 @@ use crate::{
 	proto::types::SampleProblemRequest,
 	r#trait::EventReceiver,
 };
+// pub struct AppRuntime<R: Runtime, E> {}
+// pub struct NativeRuntime {}
+// pub struct WebRuntime {}
 
 #[derive(Debug, Clone)]
 pub struct AppRuntime<R: Runtime, E> {
-	pub(crate) engine: EstateEngine<R>,
-	pub(crate) view: ViewType,
-	pub(crate) state: AppState,
+	pub engine: EstateEngine<R>,
+	pub view: ViewType,
+	pub state: AppState,
 	events: R::EventReceiver,
 	pub executor: E,
 }
 impl<R: Runtime, E> AppRuntime<R, E> {
 	pub fn new(engine: EstateEngine<R>, executor: E) -> Self {
 		let events = engine.runtime.subscribe();
+		// engine.
 		Self {
 			engine,
 			events,
@@ -247,3 +251,40 @@ impl<R: Runtime + 'static, E: Executor> AppRuntime<R, E> {
 		true
 	}
 }
+
+// use std::marker::PhantomData;
+// // Compile-time states
+// struct Disconnected;
+// struct Connected;
+// // struct Connection<State> {
+// // 	address: String,
+// // 	_state: PhantomData<State>,
+// // }
+
+// // impl Connection<Disconnected> {
+// // 	fn connect(self) -> Connection<Connected> {
+// // 		Connection {
+// // 			address: self.address,
+// // 			_state: PhantomData,
+// // 		}
+// // 	}
+// // }
+
+// impl Connection<Connected> {
+// 	// fn foo(self)       // consumes/owns self
+// 	// fn foo(&self)      // borrows self immutably
+// 	// fn foo(&mut self)  // borrows self mutably
+// 	fn read(&self) {}
+// 	fn send_data(&self, data: &str) {
+// 		println!("Sending: {}", data);
+// 	}
+// 	fn bandwidth(&self) {
+// 		println!("Bandwidth is a good thing");
+// 	}
+// 	fn disconnect(self) -> Connection<Disconnected> {
+// 		Connection {
+// 			address: self.address,
+// 			_state: PhantomData,
+// 		}
+// 	}
+// }

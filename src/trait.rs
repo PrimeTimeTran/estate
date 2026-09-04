@@ -81,6 +81,8 @@ pub trait Host {
 }
 
 pub trait Services {
+	// type Connection:
+	// type status: Connection<State>;
 	/// What capabilities are available?
 	type Persistence: Persistence;
 	type Network: Network;

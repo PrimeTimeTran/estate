@@ -146,6 +146,8 @@ where
 // Here:
 //
 //     Container::Item: Display
+// 		 "Container(Item<type>):"
+// 		 T(Container<type>)
 //
 // means:
 //
@@ -163,7 +165,7 @@ pub fn nested_bounds() {
 	print_items(numbers);
 }
 
-struct Numbers(Vec<i32>);
+struct Numbers(Vec<i32>); // Container(Item<type>): Display
 
 impl IntoIterator for Numbers {
 	type Item = i32;
@@ -176,7 +178,9 @@ impl IntoIterator for Numbers {
 
 fn print_items<T>(items: T)
 where
+	// The container type must be an iterator.
 	T: IntoIterator,
+	// It's items must implement display
 	T::Item: std::fmt::Display,
 {
 	for item in items {
@@ -231,7 +235,6 @@ where
 // The type itself can exist for ANY T,
 // while specific behavior only exists for T satisfying
 // additional requirements.
-//
 
 pub fn bounds_on_associated_items() {
 	println!("\n6. Bounds on Associated Items");

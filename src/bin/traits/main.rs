@@ -1,8 +1,20 @@
 fn main() {
-	// # Introduction to Traits in Rust
+	// # Traits of Rust
 	//
-	// Traits are Rust's way of describing behavior independently
-	// from the concrete types that implement that behavior.
+	// Rust's way of describing behavior independently
+	// from the concrete types that implement that behavior are
+	// encapsulated with trait.
+	//
+	// 1. Capability
+	// 2. Constraints
+	// 3. Generic Abstraction
+	// 4. Dispatch
+	// 5. Associated Types
+	// 6. Composition
+	// 7. Dynamic Abstraction
+	// 8. Resolution
+	// 9. Coherence
+	// 10. Advanced Trait Systems
 
 	// 1. Capability
 	// "What can this type do?"
