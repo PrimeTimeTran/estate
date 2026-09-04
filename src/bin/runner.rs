@@ -26,7 +26,7 @@ use estate::{
 ///
 /// RUNNER=native cargo -q run --bin runner -- python
 ///
-/// ## Dockeriz Run
+/// ## Docker Run
 ///
 /// RUNNER=docker cargo -q run --bin runner -- python
 #[cfg(target_arch = "wasm32")]
