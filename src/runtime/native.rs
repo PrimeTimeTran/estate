@@ -1,4 +1,4 @@
-pub use crate::native::{monitor::NativeMonitor, prelude::*, state::NativeStateStore};
+pub use crate::native::prelude::*;
 use crate::{
 	EventReceiver,
 	app::{
@@ -10,6 +10,8 @@ use crate::{
 use std::sync::Mutex;
 use winit::event_loop::EventLoopProxy;
 
+/// ## NativeRuntime
+///
 #[derive(Clone, Debug)]
 pub struct NativeRuntime {
 	event_rx: Arc<Mutex<broadcast::Receiver<e::Event>>>,

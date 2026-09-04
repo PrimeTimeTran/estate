@@ -6,11 +6,13 @@ use crate::{RuntimeState, e, prelude::*};
 /// App, AppPlatform, Host, AppHost, Engine, CoreEngine, AppContext, Environment
 ///
 /// ### Types
+///
 /// - [EventReceiver](`crate::r#trait::EventReceiver`).
+///
 /// ### Methods
+///
 /// - [spawn](`Runtime::spawn`): Create background jobs/tasks/workers
 /// - [services](`Runtime::services`): Exposes capabilities
-///
 ///
 pub trait Runtime: Clone + Sync + std::marker::Send + 'static {
 	#[cfg(not(target_arch = "wasm32"))]
