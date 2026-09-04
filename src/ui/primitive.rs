@@ -1,3 +1,9 @@
+pub enum ScreenPosition {
+	Left,
+	Center,
+	Right,
+}
+
 pub struct Size {
 	pub value: f32,
 	pub min: f32,

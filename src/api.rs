@@ -33,15 +33,7 @@ pub struct ProblemState {
 // ============================================================
 // Shared API Trait
 // ============================================================
-
-// #[async_trait::async_trait(?Send)]
-// pub trait Api: std::fmt::Debug + 'static {
-// 	async fn load_problems(&self) -> anyhow::Result<Vec<StoredProblem>>;
-// 	async fn sample_problem(&self, request: SampleProblemRequest) -> anyhow::Result<StoredProblem>;
-// 	async fn load_problem(&self, id: i64) -> anyhow::Result<StoredProblem>;
-// 	fn clone_box(&self) -> Box<dyn Api>;
-// }
-
+//
 #[cfg(not(target_arch = "wasm32"))]
 #[async_trait::async_trait]
 pub trait Api: std::fmt::Debug + 'static {
@@ -57,9 +49,9 @@ pub trait Api: std::fmt::Debug + 'static {
 	async fn load_problems(&self) -> anyhow::Result<Vec<StoredProblem>>;
 	async fn sample_problem(&self, request: SampleProblemRequest) -> anyhow::Result<StoredProblem>;
 	async fn load_problem(&self, id: i64) -> anyhow::Result<StoredProblem>;
-
 	fn clone_box(&self) -> Box<dyn Api>;
 }
+
 impl Clone for Box<dyn Api> {
 	fn clone(&self) -> Self {
 		self.clone_box()
@@ -144,12 +136,11 @@ impl Api for NativeApiClient {
 // WASM
 // ============================================================
 
-// #[cfg(target_arch = "wasm32")]
+// Native Build needs client too.
 #[derive(Debug, Clone)]
 pub struct WasmApiClient {
 	base_url: String,
 }
-// #[cfg(target_arch = "wasm32")]
 impl WasmApiClient {
 	pub fn new(base_url: impl Into<String>) -> Self {
 		Self {

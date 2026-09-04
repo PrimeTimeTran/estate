@@ -1,24 +1,4 @@
-use core_graphics::display::{CGPoint, CGRect};
-
-use crate::native::prelude::{ScrollRedirectState, *};
-
-pub static CURSOR_INSET: f64 = 0.125;
-pub static TELEPORT_RIGHT: AtomicBool = AtomicBool::new(false);
-pub static HOTKEY_INITIALIZED: AtomicBool = AtomicBool::new(false);
-pub static REDIRECTING_SCROLL: AtomicBool = AtomicBool::new(false);
-pub static SCROLL_STATE: OnceLock<Mutex<ScrollRedirectState>> = OnceLock::new();
-pub static SHIFT_HELD: AtomicBool = AtomicBool::new(false);
-
-pub fn target_position(bounds: CGRect, target: ScreenPosition, y: f64) -> CGPoint {
-	let inset = CURSOR_INSET;
-	let inset = inset.clamp(0.0, 0.5);
-	let x = match target {
-		ScreenPosition::Left => bounds.origin.x + bounds.size.width * inset,
-		ScreenPosition::Right => bounds.origin.x + bounds.size.width * (1.0 - inset),
-		ScreenPosition::Center => bounds.origin.x + bounds.size.width * 0.5,
-	};
-	CGPoint { x, y }
-}
+use crate::prelude::*;
 
 pub const PROBES_MINIMAL: ProbeSet = &[
 	Probe {

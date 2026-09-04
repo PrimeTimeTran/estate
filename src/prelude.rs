@@ -10,7 +10,7 @@ pub use crate::{
 	theme::*,
 	tool::{time::*, *},
 	r#trait::*,
-	ui::{r#trait::*, *},
+	ui::{config::*, r#trait::*, *},
 };
 
 pub use crate::data::*;

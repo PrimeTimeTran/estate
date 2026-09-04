@@ -32,7 +32,6 @@ pub struct NativeApp {
 	pub app: AppRuntime<NativeRuntime, NativeExecutor>,
 	pub host: NativeHost,
 	pub runtime: NativeRuntime,
-
 	// Receiver channel for process/daemon
 	pub daemon_rx: Option<mpsc::Receiver<DaemonCommand>>,
 	// Sender channel for process/daemon
@@ -52,23 +51,18 @@ impl Context for NativeApp {
 	type Host = NativeHost;
 	type Runtime = NativeRuntime;
 	type Args = Cli;
-
 	fn new() -> Result<Self> {
 		NativeApp::new()
 	}
-
 	fn host(&self) -> &Self::Host {
 		&self.host
 	}
-
 	fn runtime(&self) -> &Self::Runtime {
 		&self.runtime
 	}
-
 	fn run(&mut self, cli: Self::Args) -> Result<()> {
 		NativeApp::run(self, cli)
 	}
-
 	fn foo(&self, args: String) -> Result<()> {
 		NativeApp::foo(&self, args)
 	}
@@ -80,9 +74,7 @@ impl Context for NativeApp {
 impl NativeApp {
 	pub fn new() -> Result<Self> {
 		let tokio = tokio::runtime::Runtime::new()?;
-
 		let handle = tokio.handle().clone();
-
 		// Runtime owns all runtime infrastructure:
 		// services, executor, state, event bus, session, etc.
 		let runtime = tokio.block_on(NativeRuntime::new(handle.clone()))?;
@@ -187,7 +179,6 @@ impl NativeApp {
 		// EventLoopProxy wakes the winit event loop from this background task.
 		// It is needed when the event must be processed by winit itself rather
 		// than only through the application's Runtime event bus.
-
 		println!("Spawn Clock Start");
 
 		// Shared shutdown flag. The clock exits when NativeApp shuts down.
@@ -351,7 +342,6 @@ impl NativeApp {
 		self.runtime().save(&snapshot);
 		self.is_clocking.store(false, Ordering::Relaxed);
 		self.hotkey_manager.shutdown();
-
 		match self.daemon_tx.try_send(DaemonCommand::Stop) {
 			Ok(()) => tracing::info!(">>> daemon stop sent"),
 			Err(error) => tracing::error!(%error, ">>> daemon stop failed"),

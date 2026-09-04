@@ -28,8 +28,6 @@ impl Default for EstateState {
 			files_indexed: 0,
 			longest_run: 0,
 			jobs: VecDeque::new(),
-			// #[cfg(feature = "native")]
-			// jobs: vec![],
 			revision: 0,
 			started_at: 0,
 			starts: 0,
