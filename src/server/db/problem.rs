@@ -1,4 +1,4 @@
-use crate::proto::leetcode::*;
+use crate::proto::*;
 use crate::{repo::problem::*, services::*};
 
 pub struct DbProblemRepository {

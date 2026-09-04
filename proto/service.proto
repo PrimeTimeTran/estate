@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package prototypes;
+
+import "type.proto";
+
+service ProblemService {
+  rpc CreateProblem(types.CreateProblemRequest) returns (types.Problem);
+  rpc GetProblem(types.GetProblemRequest) returns (types.Problem);
+  rpc UpdateProblem(types.UpdateProblemRequest) returns (types.Problem);
+  rpc DeleteProblem(types.DeleteProblemRequest) returns (types.Empty);
+  rpc ListProblems(types.ListProblemsRequest) returns (types.ListProblemsResponse);
+  rpc SampleProblem(types.SampleProblemRequest) returns (types.Problem);
+}
+
+service SubmissionService {
+  rpc CreateSubmission(types.CreateSubmissionRequest) returns (types.Submission);
+  rpc GetSubmission(types.GetSubmissionRequest) returns (types.Submission);
+  rpc UpdateSubmission(types.UpdateSubmissionRequest) returns (types.Submission);
+  rpc DeleteSubmission(types.DeleteSubmissionRequest) returns (types.Empty);
+  rpc ListSubmissions(types.ListSubmissionsRequest) returns (types.ListSubmissionsResponse);
+  rpc RunSubmission(types.RunSubmissionRequest) returns (types.Submission);
+}
+
+service SolutionService {
+  rpc CreateSolution(types.CreateSolutionRequest
+  ) returns (types.Solution);
+
+  rpc GetSolution(types.GetSolutionRequest
+  ) returns (types.Solution);
+
+  rpc UpdateSolution(types.UpdateSolutionRequest
+  ) returns (types.Solution);
+
+  rpc DeleteSolution(types.DeleteSolutionRequest
+  ) returns (types.Empty);
+
+  rpc ListSolutions(types.ListSolutionsRequest
+  ) returns (types.ListSolutionsResponse);
+
+}
+
+service CommentService {
+  rpc CreateComment(types.CreateCommentRequest
+  ) returns (types.Comment);
+
+  rpc GetComment(types.GetCommentRequest
+  ) returns (types.Comment);
+
+  rpc UpdateComment(types.UpdateCommentRequest
+  ) returns (types.Comment);
+
+  rpc DeleteComment(types.DeleteCommentRequest
+  ) returns (types.Empty);
+
+  rpc ListComments(types.ListCommentsRequest
+  ) returns (types.ListCommentsResponse);
+
+  rpc ListReplies(types.ListRepliesRequest
+  ) returns (types.ListCommentsResponse);
+}

@@ -21,17 +21,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 		&mut pixmap.as_mut(),
 	);
 	pixmap.save_png(output).unwrap();
-	println!("cargo:rerun-if-changed=proto/main.proto");
-	println!("cargo:rerun-if-changed=proto/leetcode/type.proto");
-	println!("cargo:rerun-if-changed=proto/leetcode/service.proto");
 	// Shared types: native + WASM
-	prost_build::compile_protos(&["proto/leetcode/type.proto"], &["proto"])?;
-	// gRPC services: native only
+	prost_build::compile_protos(&["proto/type.proto"], &["proto"])?;
 	let target = std::env::var("TARGET").unwrap();
-
 	if target != "wasm32-unknown-unknown" {
-		tonic_build::configure().compile_protos(&["proto/leetcode/service.proto"], &["proto"])?;
+		tonic_build::configure().compile_protos(&["proto/main.proto"], &["proto"])?;
 	}
-
 	Ok(())
 }
