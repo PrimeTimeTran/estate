@@ -1,11 +1,8 @@
-use crate::{
-	EventHandler, e,
-	e::{Event, Klass},
-	native::{core::EstateDiscovery, prelude::*},
-	prelude::*,
-	session::Session,
-};
+use crate::prelude::*;
 
+/// ## TaskHandler
+///
+/// Background job handler
 pub struct TaskHandler;
 #[async_trait::async_trait]
 impl<R: Runtime> EventHandler<R> for TaskHandler {

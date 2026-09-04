@@ -11,6 +11,10 @@ pub use core_graphics::{
 	geometry::CGPoint,
 };
 pub use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
+pub use rmcp::{
+	handler::server::wrapper::Parameters,
+	model::{PromptMessage, PromptMessageContent},
+};
 pub use signal_hook::{consts::SIGINT, iterator::Signals};
 pub use tokio::runtime::Handle;
 pub use tokio::{
@@ -47,7 +51,7 @@ pub use winit::{
 /// cause compilation errors or runtime issues in the native platform targets.
 pub use crate::{
 	native::{
-		self, core::*, daemon::*, discovery::*, job::*, monitor::*, state::*, ui::*, window::*,
+		self, daemon::*, discovery::*, job::*, lint::*, monitor::*, state::*, ui::*, window::*,
 	},
 	runtime::*,
 	server::*,

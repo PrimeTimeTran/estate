@@ -1,9 +1,9 @@
 pub mod agent;
 pub mod backend;
-pub mod core;
 pub mod daemon;
 pub mod discovery;
 pub mod job;
+pub mod lint;
 pub mod monitor;
 pub mod poc;
 pub mod prelude;

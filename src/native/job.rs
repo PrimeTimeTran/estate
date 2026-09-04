@@ -6,21 +6,18 @@
 // | Individual background execution | `Job`          | Has lifecycle/state           |
 // | UI representation               | `Task` / `Job` | Shows pending/running/etc.    |
 
-use crate::{
-	app::*,
-	native::{agent::AgentContext, prelude::*},
-};
+use crate::{app::*, native::agent::AgentContext, prelude::*};
 
 use notify::{Event, EventKind};
 
 #[derive(Debug)]
 pub struct TaskManagerRuntime {
 	watcher: notify::RecommendedWatcher,
-	pub rx: tokio::sync::mpsc::Receiver<()>,
+	pub rx: mpsc::Receiver<()>,
 }
 impl TaskManagerRuntime {
 	pub fn new(path: &Path) -> Result<Self> {
-		let (tx, rx) = tokio::sync::mpsc::channel::<()>(1);
+		let (tx, rx) = mpsc::channel::<()>(1);
 		let mut watcher = RecommendedWatcher::new(
 			move |res: Result<Event, notify::Error>| {
 				if let Ok(event) = res {

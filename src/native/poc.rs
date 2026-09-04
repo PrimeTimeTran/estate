@@ -1,8 +1,3 @@
-use rmcp::{
-	handler::server::wrapper::Parameters,
-	model::{PromptMessage, PromptMessageContent},
-};
-
 use crate::{
 	app::*,
 	native::backend::server::{CodeReviewArgs, MyServer},

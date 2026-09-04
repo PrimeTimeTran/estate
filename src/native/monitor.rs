@@ -90,13 +90,13 @@ impl Monitor for StateMonitor {
 }
 #[derive(Debug)]
 pub struct NativeMonitor {
-	watcher: notify::RecommendedWatcher,
-	rx: tokio::sync::mpsc::Receiver<()>,
+	watcher: RecommendedWatcher,
+	rx: mpsc::Receiver<()>,
 }
 
 impl NativeMonitor {
 	pub fn new() -> Result<Self> {
-		let (tx, rx) = tokio::sync::mpsc::channel(1);
+		let (tx, rx) = mpsc::channel(1);
 		let mut watcher = RecommendedWatcher::new(
 			move |result: Result<Event, notify::Error>| {
 				let Ok(event) = result else {
