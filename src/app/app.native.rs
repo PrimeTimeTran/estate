@@ -678,69 +678,6 @@ impl NativeApp {
 		event_loop.exit();
 	}
 }
-
-fn fun_name1() -> &'static str {
-	r#"
-          -------------------------------------------------------------
-					`task_runtime` is an Arc<NativeRuntime>.
-
-					Method lookup can automatically dereference the Arc and find
-					methods implemented on NativeRuntime.
-
-					So:
-
-					    task_runtime.emit(...)
-
-					is conceptually:
-
-					    NativeRuntime::emit(...)
-
-					through the Arc.
-
-					This is different from the earlier `executor.spawn(...)`
-					problem because here we're deliberately calling a method
-					belonging to the runtime object.
-					-------------------------------------------------------------
-"#
-}
-
-fn fun_name() {
-	// =================================================================
-	// ASYNC YIELD POINT
-	// =================================================================
-	//
-	// THIS is what turns the loop into an asynchronous clock.
-	//
-	// `sleep(...).await` does not block the Tokio worker thread.
-	//
-	// Instead:
-	//
-	//     clock task
-	//         │
-	//         ▼
-	//     sleep future
-	//         │
-	//         ▼
-	//     `.await`
-	//         │
-	//         ▼
-	//     task yields to Tokio
-	//
-	// Tokio can now execute other tasks while this clock is waiting.
-	//
-	// When the timer expires, Tokio wakes the task and eventually polls
-	// this future again. Execution resumes after `.await`.
-	//
-	// This is why the local variables above survive across the sleep:
-	// they are part of the state stored inside the future.
-	//
-	// Contrast this with:
-	//
-	//     std::thread::sleep(...)
-	//
-	// which would block the actual OS thread running the Tokio worker.
-	// =================================================================
-}
 impl NativeApp {
 	fn bootstrap() -> Result<(TrayMenu, TrayIcon)> {
 		bootstrap()
@@ -787,6 +724,7 @@ impl NativeApp {
 				tracing::info!(" open window end, new window");
 				window.instance.set_title(self.app.view().name().into());
 				self.windows.push(AppWindow {
+					runtime: self.runtime.clone(),
 					kind,
 					view: self.app.view(),
 					window,
@@ -1085,7 +1023,6 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 		}
 	}
 }
-
 #[derive(Default)]
 pub struct NativeHost {
 	window: NativeWindow,
@@ -1110,7 +1047,6 @@ impl Clock for NativeClock {
 		todo!("now")
 	}
 }
-
 impl Host for NativeHost {
 	type Window = NativeWindow;
 	type Storage = NativeStorage;
@@ -1151,7 +1087,6 @@ impl Services for NativeServices {
 	type Network = NativeNetwork;
 	type Clock = NativeClock;
 	type Client = NativeApiClient;
-
 	fn persistence(&self) -> &Self::Persistence {
 		todo!("");
 	}

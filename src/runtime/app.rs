@@ -3,13 +3,9 @@ use crate::{
 	api::{Api, AppState},
 	app::{prelude::*, state::EstateState},
 	e,
-	// model::StoredProblem,
 	proto::types::SampleProblemRequest,
 	r#trait::EventReceiver,
 };
-// pub struct AppRuntime<R: Runtime, E> {}
-// pub struct NativeRuntime {}
-// pub struct WebRuntime {}
 
 #[derive(Debug, Clone)]
 pub struct AppRuntime<R: Runtime, E> {
@@ -42,20 +38,9 @@ impl<R: Runtime, E> AppRuntime<R, E> {
 }
 impl<R: Runtime + 'static, E: Executor> AppRuntime<R, E> {
 	pub fn start(&self) {
-		println!("start");
-		if !crate::START_APP_CLOCK {
+		if !START_APP_CLOCK {
 			return;
 		}
-		let views = [
-			ViewType::ProblemScreen,
-			ViewType::DashboardScreen,
-			ViewType::MarkdownView,
-			ViewType::ProblemScreen,
-			ViewType::WaterfallScreen,
-			ViewType::ProblemScreen,
-			ViewType::TaskManagerScreen,
-			ViewType::ProblemsScreen,
-		];
 		let runtime = self.engine.runtime.clone();
 		let task_runtime = runtime.clone();
 		self.executor.spawn(async move {
@@ -65,8 +50,8 @@ impl<R: Runtime + 'static, E: Executor> AppRuntime<R, E> {
 				task_runtime.sleep(std::time::Duration::from_secs(1)).await;
 				if current_time == 0 {
 					current_time = 5;
-					view_idx = (view_idx + 1) % views.len();
-					task_runtime.emit(e::Event::app(e::Klass::Navigate(views[view_idx])));
+					view_idx = (view_idx + 1) % TICK_ITEMS_LENGTH;
+					task_runtime.emit(e::Event::app(e::Klass::Navigate(TICK_ITEMS[view_idx])));
 				} else {
 					current_time -= 1;
 					println!("⏰ AppRuntime CLOCK TICK: {current_time}");
@@ -120,20 +105,20 @@ impl<R: Runtime + 'static, E: Executor> AppRuntime<R, E> {
 	}
 }
 impl<R: Runtime, E> AppRuntime<R, E> {
+	/// Runtime Reference
+	///
+	/// "Borrow a reference to the runtime."
+	pub fn runtime(&self) -> &R {
+		&self.engine.runtime
+	}
 	/// Outer App<C>
 	///
 	/// "Here's a thread-safe shared handle to the runtime. You can keep this."
-	pub fn runtime(&self) -> Arc<R> {
+	pub fn runtime_handle(&self) -> Arc<R> {
 		Arc::clone(&self.engine.runtime)
 	}
-	/// "Here's my runtime while I'm borrowing this context."
-	///
-	// fn runtime(&self) -> &Self::Runtime {
-	// 	self.runtime
-	// }
-	// pub fn api(&self) -> Arc<dyn Api> {
-	// 	Arc::clone(&self.api)
-	// }
+	// "Here's my runtime while I'm borrowing this context."
+	//
 	/// # UI/application state
 	/// "We have two event consumers, and we need to decide which events belong to which execution domain."
 	// # Pull Based
@@ -153,7 +138,6 @@ impl<R: Runtime, E> AppRuntime<R, E> {
 					self.view = view;
 				}
 				e::Klass::ProblemsLoaded(problems) => {
-					println!("ProblemsLoaded ProblemsLoaded");
 					self.state.problem.value = problems.into_iter().next();
 					self.state.problem.loading = false;
 					self.state.problem.error = None;
@@ -217,10 +201,11 @@ impl<R: Runtime, E> AppRuntime<R, E> {
 	}
 	pub fn show_tasks(&mut self) {
 		self.show_view(ViewType::TaskManagerScreen);
+		// e::create::app();
 		self
 			.engine
 			.runtime
-			.emit(e::Event::app(e::Klass::CommandExecuted {
+			.emit(e::create::app(e::Klass::CommandExecuted {
 				command: "task_list".into(),
 			}));
 	}
@@ -251,40 +236,3 @@ impl<R: Runtime + 'static, E: Executor> AppRuntime<R, E> {
 		true
 	}
 }
-
-// use std::marker::PhantomData;
-// // Compile-time states
-// struct Disconnected;
-// struct Connected;
-// // struct Connection<State> {
-// // 	address: String,
-// // 	_state: PhantomData<State>,
-// // }
-
-// // impl Connection<Disconnected> {
-// // 	fn connect(self) -> Connection<Connected> {
-// // 		Connection {
-// // 			address: self.address,
-// // 			_state: PhantomData,
-// // 		}
-// // 	}
-// // }
-
-// impl Connection<Connected> {
-// 	// fn foo(self)       // consumes/owns self
-// 	// fn foo(&self)      // borrows self immutably
-// 	// fn foo(&mut self)  // borrows self mutably
-// 	fn read(&self) {}
-// 	fn send_data(&self, data: &str) {
-// 		println!("Sending: {}", data);
-// 	}
-// 	fn bandwidth(&self) {
-// 		println!("Bandwidth is a good thing");
-// 	}
-// 	fn disconnect(self) -> Connection<Disconnected> {
-// 		Connection {
-// 			address: self.address,
-// 			_state: PhantomData,
-// 		}
-// 	}
-// }

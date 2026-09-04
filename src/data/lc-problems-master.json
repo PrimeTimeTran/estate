@@ -1,5 +1,35 @@
 [
   {
+    "number": 3903,
+    "normalized-name": "smallest-stable-index-i",
+    "title": "Smallest Stable Index I",
+    "difficulty": "easy",
+    "description": "You are given an integer array nums of length n and an integer k.\n\nFor each index i, define its instability score as max(nums[0..i]) - min(nums[i..n - 1]).",
+    "url": "https://leetcode.com/problems/smallest-stable-index-i/",
+    "filename": "3903-smallest-stable-index-i.py",
+    "description-raw": "<p>You are given an integer array <code>nums</code> of length <code>n</code> and an integer <code>k</code>.</p>\n<p>For each index <code>i</code>, define its <strong>instability score</strong> as <code>max(nums[0..i]) - min(nums[i..n - 1])</code>.</p>",
+    "test-cases": [
+      {
+        "index": 0,
+        "input": "nums = [5,0,1,4], k = 3",
+        "output": "3",
+        "explanation": "At index 0: The maximum in [5] is 5, and the minimum in [5, 0, 1, 4] is 0, so the instability score is 5 - 0 = 5. At index 1: The maximum in [5, 0] is 5, and the minimum in [0, 1, 4] is 0, so the instability score is 5 - 0 = 5. At index 2: The maximum in [5, 0, 1] is 5, and the minimum in [1, 4] is 1, so the instability score is 5 - 1 = 4. At index 3: The maximum in [5, 0, 1, 4] is 5, and the minimum in [4] is 4, so the instability score is 5 - 4 = 1. This is the first index with an instability score less than or equal to k = 3. Thus, the answer is 3."
+      },
+      {
+        "index": 0,
+        "input": "nums [3,2,1], k = 1",
+        "output": "-1",
+        "explanation": "At index 0, the instability score is 3 - 1 = 2. At index 1, the instability score is 3 - 1 = 2. At index 2, the instability score is 3 - 1 = 2. None of these values is less than or equal to k = 1, so the answer is -1."
+      },
+      {
+        "index": 0,
+        "input": "nums = [0], k = 0",
+        "output": "0",
+        "explanation": "At index 0, the instability score is 0 - 0 = 0, which is less than or equal to k = 0. Therefore, the answer is 0."
+      }
+    ]
+  },
+  {
     "number": 3876,
     "normalized-name": "construct-uniform-parity-array-ii",
     "title": "Construct Uniform Parity Array II",
@@ -185,5 +215,4 @@
       }
     ]
   }
-
 ]

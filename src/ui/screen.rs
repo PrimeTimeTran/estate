@@ -8,6 +8,9 @@ pub struct ScreenInstance<R: Runtime, E: Executor> {
 	pub kind: ViewType,
 	pub screen: Box<dyn Screen<R, E>>,
 	pub layout: Layout<R, E>,
+	// pub kind: ViewType,
+	// pub screen: Box<dyn Screen<R, E>>,
+	// pub layout: Layout<R, E>,
 }
 
 impl<R: Runtime, E: Executor> fmt::Debug for ScreenInstance<R, E> {

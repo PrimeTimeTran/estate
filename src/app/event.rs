@@ -1,5 +1,10 @@
+/// Event System
+///
 pub use crate::prelude::*;
 
+// pub fn create() {}
+
+/// Event Structure
 #[derive(Debug, Clone, Deserialize, Hash, Serialize)]
 pub struct Event {
 	pub id: u64,
@@ -8,13 +13,14 @@ pub struct Event {
 	pub timestamp: u64,
 }
 impl Event {
-	pub fn new(source: EventSource, kind: EventKind) -> Self {
+	fn new(source: EventSource, kind: EventKind) -> Self {
 		tracing::debug!("new Event {:?}", source);
 		// let trace = Tracer::new("event");
 		// let mut flow = trace.flow("new");
 		// let flow = flow.info("Event::new").unwrap();
 		Self {
-			id: crate::data::EVENT_ID.fetch_add(1, Ordering::Relaxed),
+			id: EVENT_ID.fetch_add(1, Ordering::Relaxed),
+
 			kind,
 			source,
 			timestamp: crate::util::now(),
@@ -37,6 +43,32 @@ impl Event {
 	}
 }
 
+/// # Create Events
+///
+///
+pub mod create {
+	use crate::app::event::*;
+	pub fn daemon(kind: EventKind) -> Event {
+		Event::daemon(kind)
+	}
+	pub fn cli(kind: EventKind) -> Event {
+		Event::cli(kind)
+	}
+	pub fn fs(kind: EventKind) -> Event {
+		Event::filesystem(kind)
+	}
+	pub fn editor(kind: EventKind) -> Event {
+		Event::editor(kind)
+	}
+
+	/// # Create App Type Events
+	///
+	/// Events related to application wide state
+	pub fn app(kind: EventKind) -> Event {
+		Event::app(kind)
+	}
+}
+
 #[derive(Debug, Clone, Hash, Deserialize, Serialize)]
 
 pub enum EventKind {
@@ -52,7 +84,15 @@ pub enum EventKind {
 	FileModified { inode: Inode, path: String },
 	IndexUpdated { files_changed: u64 },
 	Navigate(ViewType),
+	ProblemLoaded(StoredProblem),
+	ProblemLoadFailed(String),
+	ProblemSampled(StoredProblem),
+	ProblemSampleFailed(String),
 	ProblemsLoaded(Vec<StoredProblem>),
+	ProblemsLoadFailed(String),
+	SampleProblemsError(String),
+	SampleProblemsLoaded(Vec<StoredProblem>),
+	SampleProblemsLoading,
 	SessionStart,
 	SessionStop { session: Session },
 	StatusRequested,
@@ -65,15 +105,11 @@ pub enum EventKind {
 	TaskStarted { task_id: TaskId },
 	TaskStopped { task_id: TaskId },
 	WorkspaceIndexed { duration: u64 },
-	ProblemsLoadFailed(String),
-	ProblemLoaded(StoredProblem),
-	ProblemSampled(StoredProblem),
-	ProblemLoadFailed(String),
-	ProblemSampleFailed(String),
-	SampleProblemsLoading,
-	SampleProblemsLoaded(Vec<StoredProblem>),
-	SampleProblemsError(String),
 }
+/// # [Event Kind] (Kind Alias)
+///
+/// Represents full event lifecycle for representing initial, pending,
+/// failed, repeated when necessary.
 pub type Klass = EventKind;
 #[derive(Debug, Clone, Deserialize, Hash, Serialize)]
 pub enum EventSource {

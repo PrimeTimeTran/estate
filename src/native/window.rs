@@ -198,7 +198,6 @@ impl Window {
 			.render(&mut render_pass, primitives, screen_descriptor);
 	}
 	fn egui_view(&mut self, ctx: &egui::Context) {
-		todo!("");
 		doc!(
 			r#"
      	Estate UI Container
@@ -718,6 +717,7 @@ impl Window {
 	}
 }
 pub struct AppWindow {
+	pub runtime: NativeRuntime,
 	pub kind: WindowType,
 	pub view: ViewType,
 	pub window: Window,

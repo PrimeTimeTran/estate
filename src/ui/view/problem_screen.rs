@@ -7,16 +7,21 @@ use egui::{ScrollArea, Ui};
 
 #[derive(Debug, Default)]
 pub struct ProblemScreen<R: Runtime> {
+	idx: i32,
 	source: String,
 	submission_status: Option<SubmissionStatus>,
 	solutions: Vec<StoredSolution>,
 	submissions: Vec<StoredSubmission>,
+	ticker: usize,
+
 	_marker: std::marker::PhantomData<R>,
 }
 impl<R: Runtime> ProblemScreen<R> {
 	pub fn new() -> Self {
 		tracing::debug!("ProblemScreen new");
 		Self {
+			idx: 0,
+			ticker: 0,
 			source: String::new(),
 			submission_status: None,
 			solutions: Vec::new(),
@@ -221,67 +226,170 @@ impl<R: Runtime, E: Executor> ViewTrait<R, E> for ProblemViewBottomPanel<R> {
 }
 #[derive(Debug, Default)]
 pub struct ProblemView<R: Runtime> {
+	ticker: usize,
 	_marker: std::marker::PhantomData<R>,
 }
 impl<R: Runtime> ProblemView<R> {
 	pub fn new() -> Self {
 		Self {
+			ticker: 0,
 			_marker: std::marker::PhantomData,
 		}
 	}
 }
 impl<R: Runtime, E: Executor> ViewTrait<R, E> for ProblemView<R> {
 	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, R, E>) {
-		let (loading, error, problem) = {
-			let state = ctx.app.app_state();
-			(
-				state.problem.loading,
-				state.problem.error.clone(),
-				state.problem.value.clone(),
-			)
-		};
+		ui.vertical_centered(|ui| {
+			ui.add_space(16.0);
 
-		ui.add_space(8.0);
+			ui.heading("Problem View");
 
-		if loading {
-			ui.horizontal(|ui| {
-				ui.spinner();
-				ui.label("Loading problem...");
-			});
+			ui.add_space(16.0);
 
-			return;
-		}
+			// ============================================================
+			// TICKER
+			// ============================================================
 
-		if let Some(error) = error {
-			ui.colored_label(
-				egui::Color32::RED,
-				format!("Failed to load problem: {error}"),
-			);
-
-			if ui.button("Retry").clicked() {
-				ctx.app.sample_problem();
-			}
-
-			return;
-		}
-
-		if let Some(problem) = problem {
-			self.draw_problem(ui, &problem);
+			ui.heading(format!("Step {}", self.ticker));
 
 			ui.add_space(12.0);
 
-			if ui.button("Sample Another Problem").clicked() {
-				tracing::info!("sampel click;");
-				ctx.app.sample_problem();
-			}
-		} else {
-			ui.label("No problem loaded.");
+			ui.horizontal(|ui| {
+				// Keep the whole control group centered.
+				ui.add_space((ui.available_width() - 420.0).max(0.0) / 2.0);
 
-			if ui.button("Sample Problem").clicked() {
-				tracing::info!("sampel click;");
-				ctx.app.sample_problem();
-			}
-		}
+				if ui
+					.add_sized([120.0, 48.0], egui::Button::new("◀ Previous"))
+					.clicked()
+				{
+					// 0 -> 5 -> 4 -> 3...
+					self.ticker = (self.ticker + 5) % 6;
+				}
+
+				if ui
+					.add_sized([100.0, 48.0], egui::Button::new("Reset"))
+					.clicked()
+				{
+					self.ticker = 0;
+				}
+
+				if ui
+					.add_sized([120.0, 48.0], egui::Button::new("Next ▶"))
+					.clicked()
+				{
+					// 0 -> 1 -> 2 -> ... -> 5 -> 0
+					self.ticker = (self.ticker + 1) % 6;
+				}
+			});
+
+			ui.add_space(20.0);
+
+			// ============================================================
+			// TIMELINE
+			// ============================================================
+
+			ui.horizontal(|ui| {
+				let width = ui.available_width();
+
+				ui.add_space((width - 500.0).max(0.0) / 2.0);
+
+				for i in 0..=5 {
+					let active = i == self.ticker;
+
+					let label = if active {
+						format!("● {}", i)
+					} else {
+						format!("○ {}", i)
+					};
+
+					let button = egui::Button::new(label);
+
+					if ui.add_sized([60.0, 36.0], button).clicked() {
+						self.ticker = i;
+					}
+
+					if i < 5 {
+						ui.label("──");
+					}
+				}
+			});
+
+			ui.add_space(20.0);
+
+			ui.label(format!("Position: {} / 5", self.ticker));
+
+			ui.add_space(16.0);
+
+			// ============================================================
+			// CODE AREA
+			// ============================================================
+
+			ui.separator();
+
+			ui.add_space(12.0);
+
+			ui.heading("Code");
+
+			ui.add_space(8.0);
+
+			egui::Frame::group(ui.style()).show(ui, |ui| {
+				ui.set_min_height(300.0);
+				ui.set_min_width(ui.available_width());
+
+				ui.vertical(|ui| {
+					ui.label(
+						egui::RichText::new(format!(
+							"// Step {}\n\nfn solution() {{\n    // code goes here\n}}",
+							self.ticker
+						))
+						.monospace()
+						.size(16.0),
+					);
+				});
+			});
+
+			ui.add_space(20.0);
+
+			// ============================================================
+			// API
+			// ============================================================
+
+			ui.separator();
+
+			ui.add_space(12.0);
+
+			ui.heading("API");
+
+			ui.add_space(8.0);
+
+			let api = ctx.app.runtime().services().api();
+
+			ui.horizontal_wrapped(|ui| {
+				if ui
+					.add_sized([150.0, 40.0], egui::Button::new("Load Problems"))
+					.clicked()
+				{
+					tracing::info!("UI → api.load_problems");
+				}
+
+				if ui
+					.add_sized([150.0, 40.0], egui::Button::new("Load Problem"))
+					.clicked()
+				{
+					tracing::info!("UI → api.load_problem");
+				}
+
+				if ui
+					.add_sized([150.0, 40.0], egui::Button::new("Sample Problem"))
+					.clicked()
+				{
+					tracing::info!("UI → api.sample_problem");
+				}
+			});
+
+			// Prevent unused-variable warning until the API calls are wired.
+			let _ = api;
+		});
 	}
 	fn update(&mut self, _ctx: &mut AppContext<'_, R, E>) {}
 	fn event(&mut self, _event: &e::Event, _ctx: &mut AppContext<'_, R, E>) {}
@@ -301,47 +409,67 @@ impl<R: Runtime> ProblemView<R> {
 }
 impl<R: Runtime> ProblemView<R> {
 	fn draw<E: Executor>(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, R, E>) {
-		let (loading, error, problem) = {
-			let state = ctx.app.app_state();
-			(
-				state.problem.loading,
-				state.problem.error.clone(),
-				state.problem.value.clone(),
-			)
-		};
-		ui.add_space(8.0);
-		if loading {
-			ui.horizontal(|ui| {
-				ui.spinner();
-				ui.label("Loading problem...");
-			});
-			return;
-		}
-		if let Some(error) = error {
-			ui.colored_label(
-				egui::Color32::RED,
-				format!("Failed to load problem: {error}"),
-			);
-			if ui.button("Retry").clicked() {
-				println!("Retry");
-				ctx.app.sample_problem();
+		ui.heading("Problem View");
+
+		ui.horizontal(|ui| {
+			ui.label(format!("Ticker: {}", self.ticker));
+
+			if ui.button("−").clicked() {
+				self.ticker = self.ticker.saturating_sub(1);
 			}
-			return;
-		}
-		if let Some(problem) = problem {
-			self.draw_problem(ui, &problem);
-			ui.add_space(12.0);
-			if ui.button("Sample Another Problem").clicked() {
-				println!("Sample Problem");
-				ctx.app.sample_problem();
+
+			if ui.button("Reset").clicked() {
+				self.ticker = 0;
 			}
-		} else {
-			ui.label("No problem loaded.");
-			if ui.button("Sample Problem").clicked() {
-				println!("Load Problems");
-				ctx.app.load_problems();
+
+			if ui.button("+").clicked() {
+				self.ticker = (self.ticker + 1).min(5);
 			}
-		}
+		});
+
+		ui.add_space(10.0);
+
+		ui.horizontal(|ui| {
+			for i in 0..=5 {
+				if i > 0 {
+					ui.label("──");
+				}
+
+				let label = if i == self.ticker {
+					format!("● {}", i)
+				} else {
+					format!("○ {}", i)
+				};
+
+				if ui.button(label).clicked() {
+					self.ticker = i;
+				}
+			}
+		});
+
+		ui.label(format!("Position: {} / 5", self.ticker));
+
+		ui.separator();
+
+		// Direct service access, as you intended.
+		let api = ctx.app.runtime().services().api();
+
+		ui.horizontal_wrapped(|ui| {
+			if ui.button("load_problems").clicked() {
+				tracing::info!("UI → api.load_problems");
+				// api.load_problems(...)
+			}
+
+			if ui.button("load_problem").clicked() {
+				tracing::info!("UI → api.load_problem");
+				// api.load_problem(...)
+			}
+
+			if ui.button("sample_problem").clicked() {
+				tracing::info!("UI → api.sample_problem");
+				// api.sample_problem(...)
+			}
+		});
 	}
 }
 // impl<R: Runtime> ProblemView<R> {
