@@ -1,22 +1,16 @@
-use crate::{app::AppContext, doc, native::prelude::*, prelude::anyhow::anyhow, ui};
-
-use global_hotkey::{
-	GlobalHotKeyEvent, GlobalHotKeyManager,
-	hotkey::{Code, HotKey, Modifiers},
+use crate::{
+	app::AppContext, doc, native::prelude::*, prelude::anyhow::anyhow, ui, ui_prelude as gui,
 };
-use objc2_app_kit::{NSApplication, NSApplicationActivationPolicy};
-use objc2_foundation::MainThreadMarker;
-use tray_icon::menu::{MenuItem, Submenu};
-use winit::{
-	dpi::{PhysicalPosition, PhysicalSize},
-	event_loop::ActiveEventLoop,
-};
+pub use egui_winit::State;
+pub use objc2_app_kit::{NSApplication, NSApplicationActivationPolicy};
+pub use objc2_foundation::MainThreadMarker;
+pub use tray_icon::menu::{MenuItem, Submenu};
 
 pub struct Window {
 	pub config: gui::wgpu::SurfaceConfiguration,
 	pub device: wgpu::Device,
 	pub gui_ctx: gui::Context,
-	pub gui_state: gui::State,
+	pub gui_state: egui_winit::State,
 	pub instance: Arc<winit::window::Window>,
 	pub kind: WindowType,
 	pub needs_resize: bool,
@@ -103,7 +97,7 @@ impl Window {
 				self.reconfigure_surface();
 				Ok(None)
 			}
-			wgpu::CurrentSurfaceTexture::Validation => Err(anyhow!("surface validation error")),
+			wgpu::CurrentSurfaceTexture::Validation => Err(anyhow::anyhow!("surface validation error")),
 		}
 	}
 	fn reconfigure_surface(&mut self) {
@@ -539,7 +533,7 @@ impl Window {
 		// │              │                              │
 		// └──────────────┴──────────────────────────────┘
 		gui::Panel::top(ui.id()).show(ui, |ui| {
-			let layout = gui::Layout {
+			let layout = egui::Layout {
 				main_dir: gui::Direction::LeftToRight,
 				main_wrap: false,
 				main_align: gui::Align::Center,
@@ -554,7 +548,7 @@ impl Window {
 			top.label("RUNTIME");
 		});
 		gui::Panel::left(ui.id()).show(ui, |ui| {
-			let layout = gui::Layout {
+			let layout = egui::Layout {
 				main_dir: gui::Direction::TopDown,
 				main_wrap: false,
 				main_align: gui::Align::Min,
@@ -569,7 +563,7 @@ impl Window {
 			sidebar.label("Engine");
 			sidebar.label("Workspace");
 		});
-		let layout = gui::Layout {
+		let layout = egui::Layout {
 			main_dir: gui::Direction::TopDown,
 			main_wrap: false,
 			main_align: gui::Align::Min,
@@ -592,7 +586,7 @@ impl Window {
 		// │                   FOOTER                    │
 		// └─────────────────────────────────────────────┘
 		gui::Panel::top(ui.id()).show(ui, |ui| {
-			let layout = gui::Layout {
+			let layout = egui::Layout {
 				main_dir: gui::Direction::LeftToRight,
 				main_wrap: false,
 				main_align: gui::Align::Center,
@@ -606,7 +600,7 @@ impl Window {
 			top.label("COMMANDS");
 		});
 		gui::Panel::bottom(ui.id()).show(ui, |ui| {
-			let layout = gui::Layout {
+			let layout = egui::Layout {
 				main_dir: gui::Direction::LeftToRight,
 				main_wrap: false,
 				main_align: gui::Align::Center,
@@ -619,7 +613,7 @@ impl Window {
 			footer.label("v0.1.0");
 		});
 		gui::Panel::left(ui.id()).show(ui, |ui| {
-			let layout = gui::Layout {
+			let layout = egui::Layout {
 				main_dir: gui::Direction::TopDown,
 				main_wrap: false,
 				main_align: gui::Align::Min,
@@ -633,7 +627,7 @@ impl Window {
 			sidebar.label("Resources");
 		});
 		gui::Panel::right(ui.id()).show(ui, |ui| {
-			let layout = gui::Layout {
+			let layout = egui::Layout {
 				main_dir: gui::Direction::TopDown,
 				main_wrap: false,
 				main_align: gui::Align::Min,
@@ -646,7 +640,7 @@ impl Window {
 			aside.label("Properties");
 			aside.label("Details");
 		});
-		let layout = gui::Layout {
+		let layout = egui::Layout {
 			main_dir: gui::Direction::TopDown,
 			main_wrap: false,
 			main_align: gui::Align::Min,
@@ -674,7 +668,7 @@ impl Window {
 		// │                   FOOTER                    │
 		// └─────────────────────────────────────────────┘
 		gui::Panel::top(ui.id()).show(ui, |ui| {
-			let layout = gui::Layout {
+			let layout = egui::Layout {
 				main_dir: gui::Direction::LeftToRight,
 				main_wrap: false,
 				main_align: gui::Align::Center,
@@ -688,7 +682,7 @@ impl Window {
 			top.label("FILTER");
 		});
 		gui::Panel::bottom(ui.id()).show(ui, |ui| {
-			let layout = gui::Layout {
+			let layout = egui::Layout {
 				main_dir: gui::Direction::LeftToRight,
 				main_wrap: false,
 				main_align: gui::Align::Center,
@@ -704,7 +698,7 @@ impl Window {
 			.id_salt("infinite_content")
 			.auto_shrink([false, false])
 			.show(ui, |ui| {
-				let layout = gui::Layout {
+				let layout = egui::Layout {
 					main_dir: gui::Direction::TopDown,
 					main_wrap: false,
 					main_align: gui::Align::Min,
@@ -774,14 +768,4 @@ pub struct TrayMenu {
 	pub problem_screen: MenuItem,
 	pub tasks: Submenu,
 	pub oracle: MenuItem,
-}
-
-pub mod gui {
-	pub use egui::{
-		Align, ClippedPrimitive, Context, Direction, Frame, FullOutput, Id, Layout, Margin, ScrollArea,
-		TexturesDelta, Ui, UiBuilder, ViewportId, containers::Panel,
-	};
-	pub use egui_wgpu::{Renderer, RendererOptions, wgpu};
-	pub use egui_winit::State;
-	pub use wgpu::{Adapter, Device, SurfaceColorSpace};
 }

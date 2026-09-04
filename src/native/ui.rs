@@ -1,14 +1,4 @@
-use crate::{app::state::EstateState, e, native::prelude::*, ui::Layout};
-use core_graphics::{
-	display::CGDisplay,
-	event::*,
-	event_source::{CGEventSource, CGEventSourceStateID},
-	geometry::CGPoint,
-};
-use tray_icon::{
-	Icon, TrayIcon, TrayIconBuilder,
-	menu::{Menu, MenuItem, Submenu},
-};
+use crate::{app::state::EstateState, e, native::prelude::*, ui::*, ui_prelude::*};
 
 // The first concrete implementation of Veable is here.
 //

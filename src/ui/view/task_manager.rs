@@ -1,7 +1,5 @@
-use crate::{app::state::EstateState, e, prelude::*, theme::palette, ui::Layout};
-use egui::Ui;
-use egui_extras::{Column, TableBuilder};
-use egui_plot::{Bar, BarChart, Plot};
+use crate::{app::state::EstateState, e, prelude::*, theme::palette, ui::Layout, ui_prelude::*};
+
 use std::time::Duration;
 
 #[derive(Debug)]

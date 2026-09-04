@@ -1,6 +1,4 @@
 use crate::{app::state::EstateState, e, prelude::*, theme::palette, ui::Layout};
-use egui::Ui;
-use egui_plot::{Bar, BarChart, Plot};
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct WaterfallScreen;

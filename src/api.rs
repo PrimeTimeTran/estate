@@ -132,10 +132,10 @@ impl Api for NativeApiClient {
 
 // Native Build needs client too.
 #[derive(Debug, Clone)]
-pub struct WasmApiClient {
+pub struct WebApiClient {
 	base_url: String,
 }
-impl WasmApiClient {
+impl WebApiClient {
 	pub fn new(base_url: impl Into<String>) -> Self {
 		Self {
 			base_url: base_url.into(),
@@ -145,20 +145,20 @@ impl WasmApiClient {
 
 #[cfg(target_arch = "wasm32")]
 #[async_trait::async_trait(?Send)]
-impl Api for WasmApiClient {
+impl Api for WebApiClient {
 	fn clone_box(&self) -> Box<dyn Api> {
 		Box::new(self.clone())
 	}
 
 	async fn load_problems(&self) -> anyhow::Result<Vec<StoredProblem>> {
-		todo!("WasmApiClient load_problems")
+		todo!("WebApiClient load_problems")
 	}
 
 	async fn sample_problem(&self, request: SampleProblemRequest) -> anyhow::Result<StoredProblem> {
-		todo!("WasmApiClient sample_problem")
+		todo!("WebApiClient sample_problem")
 	}
 
 	async fn load_problem(&self, id: i64) -> anyhow::Result<StoredProblem> {
-		todo!("WasmApiClient load_problem")
+		todo!("WebApiClient load_problem")
 	}
 }

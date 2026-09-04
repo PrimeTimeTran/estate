@@ -79,12 +79,12 @@ impl Host for WebHost {
 
 #[derive(Debug, Clone)]
 pub struct WebServices {
-	api: WasmApiClient,
+	api: WebApiClient,
 }
 
 impl WebServices {
 	pub fn new() -> anyhow::Result<Self> {
-		let api = WasmApiClient::new(String::from(""));
+		let api = WebApiClient::new(String::from(""));
 		Ok(Self { api })
 	}
 }
@@ -99,7 +99,7 @@ impl Services for WebServices {
 	type Network = WebNetwork;
 	type Persistence = WebStorage;
 	type Clock = WebClock;
-	type Client = WasmApiClient;
+	type Client = WebApiClient;
 
 	fn api(&self) -> &Self::Client {
 		&self.api

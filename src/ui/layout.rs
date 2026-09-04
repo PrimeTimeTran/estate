@@ -1,4 +1,4 @@
-use crate::{e, prelude::*};
+use crate::{e, prelude::*, region::Panel};
 
 use crate::LAYOUT as config;
 

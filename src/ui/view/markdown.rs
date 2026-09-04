@@ -1,7 +1,4 @@
-use egui::Ui;
-use egui_commonmark::{CommonMarkCache, CommonMarkViewer};
-
-use crate::{app::*, e, ui::Layout};
+use crate::{app::*, prelude::*};
 
 pub struct MarkdownScreen {
 	markdown: String,
