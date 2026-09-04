@@ -9,7 +9,7 @@ use crate::{
 use egui::Ui;
 use egui_extras::{Column, TableBuilder};
 use egui_plot::{Bar, BarChart, Plot};
-use std::time::Duration;
+use Duration;
 
 impl TaskManager {
 	pub fn new() -> Self {

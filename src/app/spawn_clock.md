@@ -417,7 +417,7 @@ fn spawn_clock(&mut self, proxy: EventLoopProxy<AppEvent>) {
 			// =================================================================
 
 			task_runtime
-				.sleep(std::time::Duration::from_secs(1))
+				.sleep(Duration::from_secs(1))
 				.await;
 		}
 

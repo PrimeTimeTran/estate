@@ -324,12 +324,12 @@ impl Runtime for NativeRuntime {
 	//
 	// without caring which platform it is running on.
 	//
-	// fn sleep(&self, duration: std::time::Duration) -> impl Future<Output = ()> + Send {
+	// fn sleep(&self, duration: Duration) -> impl Future<Output = ()> + Send {
 	// 	tokio::time::sleep(duration)
 	// }
 	//
 
-	fn sleep(&self, duration: std::time::Duration) -> impl Future<Output = ()> + Send {
+	fn sleep(&self, duration: Duration) -> impl Future<Output = ()> + Send {
 		tokio::time::sleep(duration)
 	}
 

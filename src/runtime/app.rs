@@ -52,7 +52,7 @@ impl<R: Runtime + 'static, E: Executor> AppRuntime<R, E> {
 			let mut view_idx = 0;
 			let mut current_time = 5;
 			loop {
-				task_runtime.sleep(std::time::Duration::from_secs(1)).await;
+				task_runtime.sleep(Duration::from_secs(1)).await;
 				if current_time == 0 {
 					current_time = 5;
 					view_idx = (view_idx + 1) % TICK_ITEMS_LENGTH;

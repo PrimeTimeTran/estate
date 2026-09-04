@@ -126,7 +126,7 @@ impl Persistence for WebStorage {
 }
 
 impl Clock for WebClock {
-	fn now(&self) -> std::time::Instant {
+	fn now(&self) -> Instant {
 		todo!("now")
 	}
 }
@@ -168,10 +168,10 @@ impl Runtime for WebRuntime {
 	fn spawn(&self, future: impl Future<Output = ()> + 'static) {
 		// ...
 	}
-	async fn sleep(&self, duration: std::time::Duration) {
+	async fn sleep(&self, duration: Duration) {
 		gloo_timers::future::sleep(duration).await;
 	}
-	// fn sleep(&self, duration: std::time::Duration) -> impl Future<Output = ()> {
+	// fn sleep(&self, duration: Duration) -> impl Future<Output = ()> {
 	// 	async move {
 	// 		gloo_timers::future::sleep(duration).await;
 	// 	}

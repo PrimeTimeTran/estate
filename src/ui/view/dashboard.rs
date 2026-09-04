@@ -286,7 +286,7 @@ impl DashboardScreen {
 			}
 			// Request a continuous repaint so the timer increments live every second
 			ui.ctx()
-				.request_repaint_after(std::time::Duration::from_secs(1));
+				.request_repaint_after(Duration::from_secs(1));
 		});
 	}
 }

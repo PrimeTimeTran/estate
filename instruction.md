@@ -9,7 +9,7 @@ Do not merely describe or suggest code.
 
 ---
 
-# Primary Goal
+## Primary Goal
 
 Implement the UI in:
 
@@ -36,11 +36,11 @@ The resulting UI should have:
 
 ---
 
-# Existing Architecture
+## Existing Architecture
 
 Before making changes, inspect these files:
 
-## UI trait
+### UI trait
 
 ./src/ui/view/ve.rs
 
@@ -56,7 +56,7 @@ Pay particular attention to:
 
 These define how UI views are rendered and interacted with in this application.
 
-## Target view
+### Target view
 
 ./src/ui/view/problem.rs
 
@@ -64,13 +64,13 @@ This is the primary file to modify.
 
 Inspect the existing implementation and integrate the new UI into its existing architecture rather than replacing the architecture unnecessarily.
 
-## Problem model
+### Problem model
 
 ./src/model/problem.rs
 
 Use this to understand the available problem data and types.
 
-## Submission model
+### Submission model
 
 ./src/model/submission.rs
 
@@ -78,7 +78,7 @@ Use this to understand submission-related data and types.
 
 ---
 
-## Requirements
+### Requirements
 
 - Use the existing Rust/egui architecture.
 - Use idiomatic Rust.
@@ -92,7 +92,7 @@ Use this to understand submission-related data and types.
 
 ---
 
-# Visual Direction
+## Visual Direction
 
 Use a layout inspired by LeetCode and VS Code:
 
@@ -124,7 +124,7 @@ Prioritize:
 
 ---
 
-# Workflow
+## Workflow
 
 1. Inspect the relevant files and surrounding UI architecture.
 2. Determine how `ProblemView` currently receives and stores its state.
@@ -152,7 +152,7 @@ Your job is to inspect, implement, build/check, and fix the code.
 
 The filesystem is the deliverable. Apply the implementation directly to the repository. Your final response should briefly summarize what you changed and any build/test result. Do not paste the implementation into the response.
 
-# Scope
+## Scope
 
 Implement the requested UI without redesigning unrelated parts of the application.
 
@@ -169,7 +169,7 @@ If the existing architecture prevents the requested UI, make the smallest reason
 
 ---
 
-# Task: Implement Problem UI
+## Task: Implement Problem UI
 
 You are working directly in this repository:
 

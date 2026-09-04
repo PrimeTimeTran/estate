@@ -395,7 +395,7 @@ pub async fn worker(mut rx: mpsc::Receiver<DiscoveryTask>) {
 				// Create an index of something....
 				// println!("Indexing {:?}", path);
 				// simulate work
-				tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+				tokio::time::sleep(Duration::from_secs(2)).await;
 				println!("Finished {:?}", path);
 			}
 			DiscoveryTask::GenerateConfig(path) => {

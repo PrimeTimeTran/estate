@@ -578,7 +578,7 @@ impl NativeApp {
         		// =================================================================
           "#
 				);
-				task_runtime.sleep(std::time::Duration::from_secs(1)).await;
+				task_runtime.sleep(Duration::from_secs(1)).await;
 			}
 			doc!(
 				r#"
@@ -1040,7 +1040,7 @@ pub struct NativeStorage;
 pub struct NativeClock;
 
 impl Clock for NativeClock {
-	fn now(&self) -> std::time::Instant {
+	fn now(&self) -> Instant {
 		todo!("now")
 	}
 }

@@ -14,7 +14,7 @@ pub use std::{
 		Arc, Mutex, OnceLock, RwLock,
 		atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering},
 	},
-	time::{Instant, SystemTime},
+	time::{Duration, Instant, SystemTime},
 };
 pub use uuid::Uuid;
 

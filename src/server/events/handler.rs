@@ -3,10 +3,32 @@ use crate::prelude::*;
 /// ## TaskHandler
 ///
 /// Background job handler
+///
+/// ### Implements
+///
+/// - [EventHandler]
+///
+/// ### Trait handle
+///
+/// - [EventHandler::handle] — resolve to trait contract
+/// - [TaskHandler::handle] — resolves to trait contract (not the trait implementation....)
+///
+/// ### Concrete handle
+///
+/// - [TaskHandler::handle_task] — trait implementation (work around for cmd+click accuracy)
+///
 pub struct TaskHandler;
+
 #[async_trait::async_trait]
 impl<R: Runtime> EventHandler<R> for TaskHandler {
 	async fn handle(&self, event: &e::Event, runtime: &R) {
+		self.handle_task(event, runtime).await;
+	}
+}
+
+impl TaskHandler {
+	async fn handle_task<R: Runtime>(&self, event: &e::Event, runtime: &R) {
+		// ALL your current handle() implementation
 		// # Push/async-based
 		//
 		// EventBus
@@ -91,6 +113,7 @@ impl<R: Runtime> EventHandler<R> for TaskHandler {
 		});
 	}
 }
+
 pub struct LogHandler;
 #[async_trait::async_trait]
 impl<R: Runtime> EventHandler<R> for LogHandler {
@@ -298,11 +321,11 @@ impl TaskRunner {
 			}
 			TaskKind::LoadMaster => {
 				tracing::debug!("LoadMaster");
-				tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+				tokio::time::sleep(Duration::from_secs(1)).await;
 				tracing::debug!("✅ LoadMaster complete");
 			}
 			TaskKind::IndexWorkspace => {
-				let started = std::time::Instant::now();
+				let started = Instant::now();
 				tracing::info!("Index Timer Start 🏁 {:?}ms", started);
 
 				let mut discovery = tokio::task::spawn_blocking(EstateDiscovery::init)
@@ -323,23 +346,23 @@ impl TaskRunner {
 			}
 			TaskKind::RebuildIndex => {
 				tracing::info!("🔨 rebuilding index");
-				tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+				tokio::time::sleep(Duration::from_secs(2)).await;
 				tracing::info!("✅ index rebuild complete");
 			}
 			TaskKind::GenerateView(name) => {
 				tracing::info!("👁️ generating view: {name}");
-				tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+				tokio::time::sleep(Duration::from_secs(2)).await;
 				tracing::info!("✅ view generated: {name}");
 			}
 			TaskKind::SyncBookmarks => {
 				tracing::info!("🔖 TaskKind::SyncBookmarks {:?}", task);
-				tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+				tokio::time::sleep(Duration::from_secs(2)).await;
 				tracing::info!("✅ bookmark sync complete {:?}", task.id);
 			}
 			TaskKind::BuildEstatePrototype => {
 				tracing::info!("🚧 starting BuildEstatePrototype");
 				for i in 1..=10 {
-					tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+					tokio::time::sleep(Duration::from_secs(1)).await;
 					tracing::info!("🚧 prototype task: {i}/10");
 				}
 				tracing::info!("✅ BuildEstatePrototype complete");

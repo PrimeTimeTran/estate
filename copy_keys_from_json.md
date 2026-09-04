@@ -19,6 +19,6 @@ Use VS Code's built-in Regex Find and Replace:
 
 ## 3. Copy items with wrapping "" and comma deliinator
 
-```
+```regex
 ^\s*"([^"]+)"\s*:.*$
 ```

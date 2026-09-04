@@ -1,8 +1,9 @@
 use chrono::{DateTime, Utc};
+use std::time::Duration;
 
 pub fn format_timestamp(timestamp: f64) -> String {
 	let timestamp = timestamp as u64;
-	let datetime = std::time::UNIX_EPOCH + std::time::Duration::from_secs(timestamp);
+	let datetime = std::time::UNIX_EPOCH + Duration::from_secs(timestamp);
 	let datetime: chrono::DateTime<chrono::Local> = datetime.into();
 	datetime.format("%H:%M:%S").to_string()
 }

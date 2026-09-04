@@ -1,5 +1,13 @@
 use crate::{e, native::prelude::*, prelude::*, ui};
 
+/// ## [EventDispatcher]
+///
+/// Works with an event bus to handle background job system.
+///
+/// ### Methods
+///
+/// - [EventDispatcher::new]
+///
 pub struct EventDispatcher<R: Runtime> {
 	handlers: Vec<Box<dyn EventHandler<R>>>,
 }
@@ -12,13 +20,14 @@ impl<R: Runtime> Default for EventDispatcher<R> {
 
 impl<R: Runtime> EventDispatcher<R> {
 	pub fn new() -> Self {
-		// # Fan Out
-		// One event → Many handlers
-		//                  ┌──> Handler A
-		//                  │
-		// Event           ─┼──> Handler B
-		//                  │
-		//                  └──> Handler C
+		/// ## [new]
+		///
+		/// One event → Many handlers
+		///                  ┌──> Handler A
+		///                  │
+		/// Event           ─┼──> Handler B
+		///                  │
+		///                  └──> Handler C
 		Self {
 			handlers: Vec::new(),
 		}
@@ -42,6 +51,9 @@ impl<R: Runtime> EventDispatcher<R> {
 	}
 }
 
+/// [EventBus]
+///
+/// Handles Sending
 #[derive(Debug, Clone)]
 pub struct EventBus {
 	sender: broadcast::Sender<e::Event>,

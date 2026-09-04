@@ -1,13 +1,13 @@
 use crate::{RuntimeState, e, prelude::*};
 
-/// ## Runtime
+/// ## [Runtime]
 ///
 /// Can hold resources that in other environments are thought of as
 /// App, AppPlatform, Host, AppHost, Engine, CoreEngine, AppContext, Environment
 ///
-/// ### Types
+/// ### Traits
 ///
-/// - [EventReceiver](`crate::r#trait::EventReceiver`).
+/// - [EventReceiver](`EventReceiver`).
 ///
 /// ### Methods
 ///
@@ -16,15 +16,15 @@ use crate::{RuntimeState, e, prelude::*};
 ///
 pub trait Runtime: Clone + Sync + std::marker::Send + 'static {
 	#[cfg(not(target_arch = "wasm32"))]
-	fn sleep(&self, duration: std::time::Duration) -> impl Future<Output = ()> + Send;
+	fn sleep(&self, duration: Duration) -> impl Future<Output = ()> + Send;
 
 	#[cfg(target_arch = "wasm32")]
-	fn sleep(&self, duration: std::time::Duration) -> impl Future<Output = ()>;
+	fn sleep(&self, duration: Duration) -> impl Future<Output = ()>;
 
 	fn emit(&self, event: e::Event);
 	fn event_processed(&self);
 
-	/// ## EventReceiver
+	/// ## [EventReceiver]
 	///
 	/// Enables clients to subscribe to events
 	///
@@ -64,7 +64,7 @@ pub trait Runtime: Clone + Sync + std::marker::Send + 'static {
 	fn spawn(&self, future: impl Future<Output = ()> + 'static);
 }
 
-/// ## Context
+/// ## [Context]
 ///
 /// from runtime, host, platform
 ///
@@ -73,6 +73,7 @@ pub trait Runtime: Clone + Sync + std::marker::Send + 'static {
 /// - [`Runtime`](Context::Runtime): Platform specific runtime
 ///
 /// ### Methods
+///
 /// - [`runtime`](Context::runtime) to [`spawn`](Executor::spawn).
 ///
 pub trait Context: Sized {
@@ -152,10 +153,10 @@ pub trait Network {
 	fn is_available(&self) -> bool;
 }
 pub trait Clock {
-	fn now(&self) -> std::time::Instant;
+	fn now(&self) -> Instant;
 }
 
-/// ## Executor
+/// ## [Executor]
 ///
 /// Enables platform specific APIs for starting background tasks at the generic [app] layer.
 ///
@@ -166,8 +167,9 @@ pub trait Clock {
 /// This abstraction enables the app to create futures without worrying about how the future
 /// is handled from an infrastructure perspective.
 ///
-/// [`Executor::spawn`]
-/// The runtime used by [`crate::app::App`].
+/// [Executor::spawn]
+/// The runtime used by [crate::app::App].
+///
 pub trait Executor: Clone + 'static {
 	#[cfg(not(target_arch = "wasm32"))]
 	fn spawn(&self, future: impl Future<Output = ()> + Send + 'static);
@@ -175,6 +177,14 @@ pub trait Executor: Clone + 'static {
 	#[cfg(target_arch = "wasm32")]
 	fn spawn(&self, future: impl Future<Output = ()> + 'static);
 }
+
+// Broken Link. Why? Others using same structure work
+// Probably the static.
+//
+/// ## [EventHandler]
+///
+/// ### [EventHandler]
+///
 #[async_trait::async_trait]
 pub trait EventHandler<R: Runtime>: Send + Sync + 'static {
 	async fn handle(&self, event: &e::Event, runtime: &R);

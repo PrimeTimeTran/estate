@@ -1,3 +1,5 @@
+# Docs
+
 ```sh
 cargo doc -p estate --open
 cargo doc --bin estate --open
