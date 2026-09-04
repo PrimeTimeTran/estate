@@ -1,10 +1,11 @@
 use crate::{
-	app::{Runtime, model, *},
+	app::{model, *},
 	data,
 	native::*,
 	prelude::*,
 };
 use revelation::analyzer::{Workspace, *};
+
 impl<R: Runtime> model::EstateEngine<R> {
 	pub async fn format(self, args: &FormatArgs) -> Result<String, Error> {
 		daemon::LintDaemon.run(&args).await;

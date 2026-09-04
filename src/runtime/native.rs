@@ -209,7 +209,6 @@ impl Executor for NativeExecutor {
 //
 // They are different concrete types implementing the same trait.
 //
-//
 // Conceptually:
 //
 //                    Executor
@@ -219,7 +218,6 @@ impl Executor for NativeExecutor {
 //              │               │
 //              ▼               ▼
 //         Tokio Handle      Tokio runtime
-//
 //
 //
 // IMPORTANT:
@@ -237,7 +235,6 @@ impl Executor for NativeExecutor {
 impl Executor for NativeRuntime {
 	fn spawn(&self, future: impl Future<Output = ()> + Send + 'static) {
 		println!("✅ Executor for NativeRuntime");
-
 		// This implementation chooses to use Tokio directly.
 		//
 		// Notice that it does NOT use:
@@ -320,6 +317,8 @@ impl Runtime for NativeRuntime {
 	// fn sleep(&self, duration: std::time::Duration) -> impl Future<Output = ()> + Send {
 	// 	tokio::time::sleep(duration)
 	// }
+	//
+
 	fn sleep(&self, duration: std::time::Duration) -> impl Future<Output = ()> + Send {
 		tokio::time::sleep(duration)
 	}
@@ -361,7 +360,6 @@ impl Runtime for NativeRuntime {
 	fn tasks(&self) -> &Arc<RwLock<TaskManager>> {
 		&self.tasks
 	}
-
 	fn start_dispatcher(self: &Arc<Self>) {
 		let runtime = Arc::clone(self);
 		let handle = runtime.handle.clone();
@@ -403,6 +401,18 @@ impl Runtime for NativeRuntime {
 		&self.services
 	}
 }
+
+/// [Review]
+/// 4 different spawn methods exist in the runtime namespace of the app.
+/// Each of them was added at some time for some reason.
+///
+/// The code compiles on all targetted platforms, web, server, native.
+///
+///
+/// 1: NativeExecutor inherent method
+/// 2: NativeExecutor trait tmplementation.
+/// 3: NativeRuntime runtime trait implementation
+/// 3: NativeRuntime executor trait implementation
 
 pub struct NativeAppContext<'a> {
 	pub base: AppContext<'a, NativeRuntime, NativeExecutor>,

@@ -77,7 +77,7 @@ path = "src/bin/macros.rs"
 # cargo build --bin web --no-default-features --features="web" --target wasm32-unknown-unknown
 # default = []
 # [CHOOSE 1]
-# default = ["native"]
+default = ["native"]
 # default = ["web"]
 # [DEFAULT to this]
 
