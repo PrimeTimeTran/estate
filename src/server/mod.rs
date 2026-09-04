@@ -1,9 +1,9 @@
-pub mod event;
+pub mod events;
 pub mod json;
 pub mod native;
 pub mod problem;
 pub mod submission;
-pub use event::*;
+pub use events::*;
 pub use json::*;
 pub use native::*;
 pub use problem::*;

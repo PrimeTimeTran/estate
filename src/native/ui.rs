@@ -1,11 +1,4 @@
-use crate::{
-	app,
-	app::{Runtime, state::EstateState},
-	e,
-	native::prelude::*,
-	ui::{Layout, ViewType, scroll::*, r#trait::*, *},
-};
-use core_foundation::runloop::{CFRunLoop, kCFRunLoopCommonModes};
+use crate::{app::state::EstateState, e, native::prelude::*, ui::Layout};
 use core_graphics::{
 	display::CGDisplay,
 	event::*,
@@ -16,7 +9,6 @@ use tray_icon::{
 	Icon, TrayIcon, TrayIconBuilder,
 	menu::{Menu, MenuItem, Submenu},
 };
-use winit::event_loop::EventLoopProxy;
 
 // The first concrete implementation of Veable is here.
 //

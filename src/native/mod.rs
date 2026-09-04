@@ -1,34 +1,32 @@
-pub(crate) mod agent;
-pub(crate) mod backend;
-pub(crate) mod core;
-pub(crate) mod daemon;
-pub(crate) mod job;
-pub(crate) mod mac;
-pub(crate) mod monitor;
-pub(crate) mod poc;
-pub(crate) mod prelude;
-pub(crate) mod resolver;
-pub(crate) mod router;
-pub(crate) mod runtime;
-pub(crate) mod screens;
-pub(crate) mod scroll;
-pub(crate) mod state;
-pub(crate) mod task;
-// pub(crate) mod task_manager;
-pub(crate) mod ui;
-pub(crate) mod ve;
-pub(crate) mod window;
+pub mod agent;
+pub mod backend;
+pub mod core;
+pub mod daemon;
+pub mod discovery;
+pub mod job;
+pub mod monitor;
+pub mod poc;
+pub mod prelude;
+pub mod resolver;
+pub mod router;
+pub mod screens;
+pub mod scroll;
+pub mod state;
+pub mod task;
+// pub mod task_manager;
+pub mod ui;
+pub mod window;
 
-pub(crate) use crate::native::scroll::*;
-pub(crate) use crate::native::task::*;
-pub(crate) use runtime::*;
-pub(crate) use screens::*;
+pub use crate::native::scroll::*;
+// pub use crate::native::task::*;
+
+pub use screens::*;
 
 #[cfg(target_os = "linux")]
-pub(crate) mod linux;
+pub mod linux;
 
 #[cfg(target_os = "windows")]
-pub(crate) mod windows;
+pub mod windows;
 
 #[cfg(target_os = "macos")]
-pub(crate) mod macos;
+pub mod macos;

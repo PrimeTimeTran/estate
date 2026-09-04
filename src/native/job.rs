@@ -7,9 +7,8 @@
 // | UI representation               | `Task` / `Job` | Shows pending/running/etc.    |
 
 use crate::{
-	app::{state::EstateState, *},
+	app::*,
 	native::{agent::AgentContext, prelude::*},
-	ui::TaskManagerScreen,
 };
 
 use notify::{Event, EventKind};

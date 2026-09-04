@@ -1,6 +1,7 @@
 use super::{
-	AgentBus, AgentRegistry, AgentRuntime,
+	AgentBus,
 	agent_event::{AgentEvent, RuntimeEvent},
+	agent_runtime::{AgentRegistry, AgentRuntime},
 };
 use crate::{native::job::AgentTask, prelude::*};
 

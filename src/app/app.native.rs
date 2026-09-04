@@ -1,18 +1,14 @@
 use crate::{app::prelude::*, r#trait::Context};
 
 use crate::{
-	AppEvent,
-	DaemonCommand,
-	NativeExecutor,
+	AppEvent, DaemonCommand, NativeExecutor,
 	api::NativeApiClient,
-	// app::App,
 	app::{Runtime, model::EstateEngine},
 	e,
 	native::router,
-	// runtime::NativeRuntime,
-	// prelude::*,
 	spawn_global_cursor_daemon,
 };
+
 use tokio::runtime::Handle;
 use tray_icon::{
 	TrayIcon, TrayIconBuilder,

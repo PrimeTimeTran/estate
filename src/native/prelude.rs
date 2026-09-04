@@ -2,8 +2,10 @@
 //! Centralized internal dependency management for native platform targets like MacOS, Windows, Linux.
 //!
 //! 'pub use' enables external users of this crate to access the public dependencies.
+//! The double prelude is done to manage native dependencies in a centralized manner, allowing for easier maintenance and updates.
+//! 
 pub use crate::{
-	native::{self, core::*, daemon::*, job::*, mac::*, monitor::*, ui::*, window::*},
+	native::{self, core::*, daemon::*, discovery::*, job::*, monitor::*, ui::*, window::*},
 	runtime::*,
 	server::*,
 };
@@ -12,6 +14,12 @@ pub use crate::{
 /// Centralized external dependency management for native platform targets like MacOS, Windows, Linux.
 ///
 /// pub enables downstream deps, "crate::native::*", to access the deps without importing again.
+/// 
+/// Warning: Do not remove items from here without running test suite passes without the removed items. 
+/// This is a central dependency management file for native platform targets like MacOS, Windows, Linux.
+/// The items here are necessary to bring dependencies into scope for the native platform targets. Removing items may 
+/// cause compilation errors or runtime issues in the native platform targets.
+/// 
 pub use cli::prelude::*;
 pub use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 pub use signal_hook::{consts::SIGINT, iterator::Signals};

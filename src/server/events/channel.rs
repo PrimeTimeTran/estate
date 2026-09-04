@@ -59,12 +59,12 @@ impl<T> EventReceiver<T> {
 	}
 }
 
-pub struct NativeEventReceiver {
-	rx: tokio::sync::broadcast::Receiver<e::Event>,
-}
+// pub struct NativeEventReceiver {
+// 	rx: tokio::sync::broadcast::Receiver<e::Event>,
+// }
 
-impl NativeEventReceiver {
-	pub fn try_recv(&mut self) -> Result<e::Event, tokio::sync::broadcast::error::TryRecvError> {
-		self.rx.try_recv()
-	}
-}
+// impl NativeEventReceiver {
+// 	pub fn try_recv(&mut self) -> Result<e::Event, tokio::sync::broadcast::error::TryRecvError> {
+// 		self.rx.try_recv()
+// 	}
+// }
