@@ -2,8 +2,6 @@
 ///
 pub use crate::prelude::*;
 
-// pub fn create() {}
-
 /// Event Structure
 #[derive(Debug, Clone, Deserialize, Hash, Serialize)]
 pub struct Event {
@@ -45,7 +43,6 @@ impl Event {
 
 /// # Create Events
 ///
-///
 pub mod create {
 	use crate::app::event::*;
 	pub fn daemon(kind: EventKind) -> Event {
@@ -60,7 +57,6 @@ pub mod create {
 	pub fn editor(kind: EventKind) -> Event {
 		Event::editor(kind)
 	}
-
 	/// # Create App Type Events
 	///
 	/// Events related to application wide state
@@ -106,11 +102,13 @@ pub enum EventKind {
 	TaskStopped { task_id: TaskId },
 	WorkspaceIndexed { duration: u64 },
 }
-/// # [Event Kind] (Kind Alias)
+
+/// # [Klass] (Alias of EventKind)
 ///
 /// Represents full event lifecycle for representing initial, pending,
 /// failed, repeated when necessary.
 pub type Klass = EventKind;
+
 #[derive(Debug, Clone, Deserialize, Hash, Serialize)]
 pub enum EventSource {
 	App,

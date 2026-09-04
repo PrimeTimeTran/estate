@@ -2,19 +2,22 @@ use crate::{RuntimeState, e, prelude::*};
 
 /// ## [Runtime]
 ///
-/// Can hold resources that in other environments are thought of as
+/// Can hold resources that other environments think of as
 /// App, AppPlatform, Host, AppHost, Engine, CoreEngine, AppContext, Environment
 ///
-/// ### Traits
+/// ### [Trait](https://doc.rust-lang.org/rust-by-example/trait.html)
 ///
-/// - [EventReceiver](`EventReceiver`).
+/// - [EventReceiver]
 ///
 /// ### Methods
 ///
-/// - [spawn](`Runtime::spawn`): Create background jobs/tasks/workers
-/// - [services](`Runtime::services`): Exposes capabilities
+/// - [spawn](Runtime::spawn): Spawn background threads
+/// - [services](Runtime::services): Exposes capabilities
+/// - [subscribe](Runtime::subscribe): Subscribe to event broadcasts using a [event bus](crate::server::events::EventBus)
 ///
 pub trait Runtime: Clone + Sync + std::marker::Send + 'static {
+	fn session(&self) -> Session;
+
 	#[cfg(not(target_arch = "wasm32"))]
 	fn sleep(&self, duration: Duration) -> impl Future<Output = ()> + Send;
 
@@ -26,7 +29,7 @@ pub trait Runtime: Clone + Sync + std::marker::Send + 'static {
 
 	/// ## [EventReceiver]
 	///
-	/// Enables clients to subscribe to events
+	/// Enables clients to [subscribe](Self::subscribe) to events
 	///
 	type EventReceiver: EventReceiver;
 
@@ -39,7 +42,6 @@ pub trait Runtime: Clone + Sync + std::marker::Send + 'static {
 	fn start_dispatcher(self: &Arc<Self>);
 	fn state(&self) -> &RuntimeState;
 	fn save(&self, state: &EstateState) -> Result<()>;
-	fn session(&self) -> Session;
 
 	fn tasks(&self) -> &Arc<RwLock<TaskManager>>;
 	fn state_service(&self) -> &Arc<StateService>;
@@ -47,7 +49,9 @@ pub trait Runtime: Clone + Sync + std::marker::Send + 'static {
 
 	type Services: Services;
 
-	/// ## Services: own long-lived responsibilities and their concurrency/lifecycle;
+	/// ## [Services]
+	///
+	/// Own long-lived responsibilities and their concurrency/lifecycle;
 	///
 	/// Events are the standardized mechanism by which those services expose meaningful
 	/// changes to the rest of the application; the Runtime owns the services and EventBus,
@@ -70,30 +74,30 @@ pub trait Runtime: Clone + Sync + std::marker::Send + 'static {
 ///
 /// ### [`Traits`](https://doc.rust-lang.org/rust-by-example/trait.html)
 ///
-/// - [`Runtime`](Context::Runtime): Platform specific runtime
+/// - [Runtime](Context::Runtime): Platform specific runtime
 ///
 /// ### Methods
 ///
-/// - [`runtime`](Context::runtime) to [`spawn`](Executor::spawn).
+/// - [runtime](Context::runtime) to [`spawn`](Executor::spawn).
 ///
 pub trait Context: Sized {
 	/// The host on which the application is running.
 	///
 	/// An associated type whose concrete implementation is selected by
-	/// the [`Context`] implementor.
+	/// the [Context] implementor.
 	type Host: Host;
 
 	/// The runtime environment in which the application is running.
 	///
-	/// The concrete runtime implementation is selected by the [`Context`]
+	/// The concrete runtime implementation is selected by the [Context]
 	/// implementor and can vary based on the platform, host, configuration,
 	/// and other runtime factors.
 	type Runtime: Runtime;
 
-	/// Returns a reference to the concrete [`Host`] associated with this context.
+	/// Returns a reference to the concrete [Host] associated with this context.
 	///
-	/// The returned type is [`Self::Host`], i.e. the associated type selected
-	/// by the concrete [`Context`] implementation.
+	/// The returned type is [Self::Host], i.e. the associated type selected
+	/// by the concrete [Context] implementation.
 	fn host(&self) -> &Self::Host;
 
 	/// Returns a reference to the concrete [`Runtime`] associated with this context.
@@ -160,9 +164,9 @@ pub trait Clock {
 ///
 /// Enables platform specific APIs for starting background tasks at the generic [app] layer.
 ///
-/// Required abstraction because a native spawn using [Tokio](https://docs.rs/tokio/latest/tokio/)
-/// requires [Send](https://doc.rust-lang.org/nomicon/send-and-sync.html) whereas Web/Wasm
-/// builds wont compile with the [Tokio] dep.
+/// Required abstraction because a native spawn using [tokio]
+/// requires [Send] whereas Web/Wasm
+/// builds wont compile with the [tokio] dep.
 ///
 /// This abstraction enables the app to create futures without worrying about how the future
 /// is handled from an infrastructure perspective.
@@ -178,13 +182,9 @@ pub trait Executor: Clone + 'static {
 	fn spawn(&self, future: impl Future<Output = ()> + 'static);
 }
 
-// Broken Link. Why? Others using same structure work
-// Probably the static.
-//
 /// ## [EventHandler]
 ///
-/// ### [EventHandler]
-///
+// Broken Link. Why? Others using same structure work
 #[async_trait::async_trait]
 pub trait EventHandler<R: Runtime>: Send + Sync + 'static {
 	async fn handle(&self, event: &e::Event, runtime: &R);
@@ -199,20 +199,6 @@ pub trait Spawner: Clone + 'static {
 	where
 		F: Future<Output = ()> + 'static;
 }
-
-/// This struct is not [Bar]
-pub struct Foo1;
-
-/// This struct is also not [bar](Bar)
-pub struct Foo2;
-
-/// This struct is also not [bar][b]
-///
-/// [b]: Bar
-pub struct Foo3;
-
-/// This struct is also not [`Bar`]
-pub struct Foo4;
 
 // pub trait SendSpawnRuntime: Runtime {
 // 	fn spawn<F>(&self, future: F)

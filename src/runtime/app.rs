@@ -206,7 +206,6 @@ impl<R: Runtime, E> AppRuntime<R, E> {
 	}
 	pub fn show_tasks(&mut self) {
 		self.show_view(ViewType::TaskManagerScreen);
-		// e::create::app();
 		self
 			.engine
 			.runtime
