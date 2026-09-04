@@ -457,6 +457,7 @@ impl<R: Runtime> ProblemView<R> {
 		ui.horizontal_wrapped(|ui| {
 			if ui.button("load_problems").clicked() {
 				tracing::info!("UI → api.load_problems");
+				// ctx.app.executor.spawn();
 				// api.load_problems(...)
 			}
 

@@ -23,7 +23,8 @@ use crate::{
 /// anchors (bookmarks), jobs (tasks), and more.
 ///
 /// Generic indirection adds complication but solves problems downstream.
-
+/// Uses Runtime [Runtime](`crate::r#trait::Runtime`).
+///
 pub struct App<C>
 where
 	C: Context,
@@ -39,7 +40,7 @@ impl<C> App<C>
 where
 	C: Context,
 {
-	/// Bounded implementation of App.
+	/// ## Generic App which bounds a context wrapped App Instance
 	///
 	/// "Everything in this impl block only exists for App<C> where C implements Context."
 	pub fn host(&self) -> &C::Host {
@@ -48,9 +49,6 @@ where
 	pub fn runtime(&self) -> &C::Runtime {
 		self.context.runtime()
 	}
-	// pub fn services(&self) -> &C::Services {
-	// 	self.context.services()
-	// }
 }
 impl<C: Context> App<C> {
 	/// Initialize a new Estate App instance.
@@ -103,21 +101,6 @@ impl<C: Context> App<C> {
 	///
 	///   `cargo run --bin native --no-default-features --features native`
 	pub fn run(&mut self, args: C::Args) -> Result<()> {
-		// self.context.services().api().load_problem(1);
 		self.context.run(args)
 	}
 }
-impl<C: Context> App<C> {
-	// Outer App<C>
-	// pub fn runtime(&self) -> Arc<R> {
-	// 	Arc::clone(&self.engine.runtime)
-	// }
-	// pub fn runtime(&self) -> Arc<C::Runtime> {
-	// 	Arc::clone(&self.context.runtime().something)
-	// }
-}
-
-// impl<C: Context> App<C> {
-// 	fn goo(&self) {
-// 	}
-// }

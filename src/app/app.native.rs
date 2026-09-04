@@ -23,6 +23,14 @@ use winit::{
 	window::WindowId,
 };
 
+/// ## NativeApp (Laptop/Desktop Environment)
+///
+/// The platforms we've tested builds for
+///
+/// - [MacOS]
+/// - [Linux]
+/// - [Windows]
+///
 pub struct NativeApp {
 	pub app: AppRuntime<NativeRuntime, NativeExecutor>,
 	pub host: NativeHost,
@@ -31,6 +39,8 @@ pub struct NativeApp {
 	pub daemon_rx: Option<mpsc::Receiver<DaemonCommand>>,
 	// Sender channel for process/daemon
 	pub daemon_tx: mpsc::Sender<DaemonCommand>,
+
+	/// Manages listeners for hotkey events
 	pub hotkey_manager: GlobalHotkeys,
 	pub is_clocking: Arc<AtomicBool>,
 	pub menu: Option<TrayMenu>,
@@ -39,6 +49,10 @@ pub struct NativeApp {
 	pub tokio: tokio::runtime::Runtime,
 	pub tray_clock: Option<TrayIcon>,
 	pub tray_cursor: Option<TrayIcon>,
+
+	/// ### Native Desktop Windows
+	///
+	/// Control Desktop Windows through this API
 	pub windows: Vec<AppWindow>,
 }
 
@@ -106,7 +120,7 @@ impl NativeApp {
 	fn bar(&self, cli: String) -> Result<()> {
 		todo!("run")
 	}
-	// Inner NativeApp
+	/// Inner NativeApp
 	fn runtime_old(&self) -> Arc<NativeRuntime> {
 		// [Flexibility]
 		// Decide later if theres any bad things that can happen from enabling app runtime

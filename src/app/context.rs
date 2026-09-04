@@ -23,6 +23,12 @@ use crate::{Executor, app::*, e, prelude::*, r#trait::EventReceiver};
 
 // Would you like to look at how to optimize the trait names alongside these lifetimes, or do you want to verify if AppRuntime<R> can be safely shared across your background threads?
 // impl<R: Runtime + 'static> AppRuntime<R> {
+/// ## AppContext
+///
+/// Exposes runtime capabilities
+///
+/// ## Methods
+/// - [app](`crate::runtime::app_runtime`)
 pub struct AppContext<'a, R: Runtime, E> {
 	pub app: &'a mut AppRuntime<R, E>,
 	pub last_revision: u64,

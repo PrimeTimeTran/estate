@@ -7,6 +7,11 @@ use crate::{
 	r#trait::EventReceiver,
 };
 
+/// ## AppRuntime
+///
+/// Wraps concrete Web & Native to expose runtime implementation to shared capabilities
+/// on both platforms more easily making the architecture more robust to changes.
+///
 #[derive(Debug, Clone)]
 pub struct AppRuntime<R: Runtime, E> {
 	pub engine: EstateEngine<R>,
@@ -234,5 +239,11 @@ impl<R: Runtime + 'static, E: Executor> AppRuntime<R, E> {
 		self.state.problem.loading = true;
 		self.state.problem.error = None;
 		true
+	}
+}
+
+impl<R: Runtime, E> Drop for AppRuntime<R, E> {
+	fn drop(&mut self) {
+		tracing::info!("💀 AppRuntime Drop");
 	}
 }

@@ -66,45 +66,52 @@ impl NativeRuntime {
 		let mut state = self.state.write();
 		state.events_processed += 1;
 	}
-
+	/// ## Start Services
+	///
+	/// Starts Platform agnostic Services
 	pub fn start_services(&self) {
 		println!("NativeRuntime start_services");
 		tracing::info!("NativeRuntime start_services")
 	}
 }
 
+/// ## NativeExecutor
+///
+/// Concrete implementation of the
+///
+/// Required executor to kick off background tasks using the [`tokio`]
 #[derive(Clone, Debug)]
 pub struct NativeExecutor {
 	pub handle: tokio::runtime::Handle,
 }
-// ============================================================
-// INHERENT METHOD
-// ============================================================
-//
-// This method belongs directly to the concrete `NativeExecutor`
-// type.
-//
-// It is NOT a trait implementation.
-//
-// Technical name:
-//   "inherent method" / "inherent impl"
-//
-// Called when Rust has a concrete `NativeExecutor` value and
-// method resolution selects this method.
-//
-// Example:
-//
-//   let executor: NativeExecutor = ...;
-//   executor.spawn(future);
-//
-// Because `spawn` exists directly on `NativeExecutor`, this
-// inherent method takes precedence over a trait method with the
-// same name when the receiver's concrete type is known.
-//
-// This is useful for functionality that is specifically owned
-// by the concrete type and doesn't need to participate in a
-// generic trait abstraction.
-//
+
+/// INHERENT METHOD
+/// ============================================================
+///
+/// This method belongs directly to the concrete `NativeExecutor`
+/// type.
+///
+/// It is NOT a trait implementation.
+///
+/// Technical name:
+///   "inherent method" / "inherent impl"
+///
+/// Called when Rust has a concrete `NativeExecutor` value and
+/// method resolution selects this method.
+///
+/// Example:
+///
+///   let executor: NativeExecutor = ...;
+///   executor.spawn(future);
+///
+/// Because `spawn` exists directly on `NativeExecutor`, this
+/// inherent method takes precedence over a trait method with the
+/// same name when the receiver's concrete type is known.
+///
+/// This is useful for functionality that is specifically owned
+/// by the concrete type and doesn't need to participate in a
+/// generic trait abstraction.
+///
 impl NativeExecutor {
 	pub fn spawn<F>(&self, future: F)
 	where
@@ -127,17 +134,15 @@ impl NativeExecutor {
 	}
 }
 
-// ============================================================
-// TRAIT IMPLEMENTATION: NativeExecutor -> Executor
-// ============================================================
-//
-// This says:
+/// TRAIT IMPLEMENTATION: [NativeExecutor] -> [Executor]
+/// ============================================================
+/// This says:
 //
 //   "NativeExecutor satisfies the generic `Executor` contract."
 //
 // Technical name:
 //   "trait implementation"
-//   "`Executor` implementation for `NativeExecutor`"
+//   "`[Executor]` implementation for `NativeExecutor`"
 //
 // This is what allows generic code to say:
 //
@@ -181,7 +186,6 @@ impl Executor for NativeExecutor {
 	}
 }
 
-// ============================================================
 // TRAIT IMPLEMENTATION: NativeRuntime -> Executor
 // ============================================================
 //
@@ -249,7 +253,6 @@ impl Executor for NativeRuntime {
 	// architectural choice.
 }
 
-// ============================================================
 // TRAIT IMPLEMENTATION: NativeRuntime -> Runtime
 // ============================================================
 //
