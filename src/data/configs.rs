@@ -20,29 +20,24 @@ pub static START_WINDOW: WindowType = WindowType::ProblemScreen;
 pub static START_VIEW: ViewType = ViewType::ProblemScreen;
 // Unsafe territory
 // pub static mut START_VIEW: ViewType = ...;
-pub static DEFAULT_VIEW: ViewType = ViewType::ProblemScreen;
-pub static ESTATE_VERSION: &str = env!("CARGO_PKG_VERSION");
-pub const GRPC_SOCKET_CLIENT: &str = "http://127.0.0.1:50051";
 pub const GRPC_SOCKET: &str = "127.0.0.1:50051";
+pub const GRPC_SOCKET_CLIENT: &str = "http://127.0.0.1:50051";
+
+pub static AGENT_GEN_URL: &str = "http://localhost:11434/api/generate";
+pub static DEFAULT_PROBLEM: &str = "../data/problems/two-sum";
+pub static ESTATE_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub static GRPC_PROBLEMS_PATH: &str = "src/data/problems";
 pub static GRPC_SUBMISSIONS_PATH: &str = "src/data/submissions";
 pub static HOME_DIR: &str = ".config/estate";
-pub static DEFAULT_PROBLEM: &str = "../data/problems/two-sum";
 pub static INDEX_PATH: &str = ".config/estate/master.json";
 pub static INTRINSIC_FILES: [&str; 3] = ["default.settings.json", "settings.json", "key-map.json"];
-pub static PID_PATH: &str = "/tmp/estate-daemon.pid";
 pub static NEXT_PROBLEM_ID: AtomicI64 = AtomicI64::new(1);
+pub static PID_PATH: &str = "/tmp/estate-daemon.pid";
 pub static SCHEMA_VERSION: u32 = 1;
 pub static SERVER_URL: &str = "http://localhost:50051";
 pub static SOCKET_PATH: &str = "/tmp/estate-daemon.sock";
 pub static STATE_PATH: &str = "/Users/future/Library/Application Support/estate/state.json";
 pub static WORKSPACE_SETTINGS: &str = ".estate/settings.json";
-
-// pub static START_WINDOW: WindowType = WindowType::Dashboard;
-// pub static START_WINDOW: WindowType = WindowType::TelemetryInspector;
-// pub static START_WINDOW: WindowType = WindowType::EguiVeable;
-// pub static START_WINDOW: WindowType = WindowType::WaterfallChart;
-// pub static START_WINDOW: WindowType = WindowType::MarkdownView;
 
 pub(crate) struct VeConfig {
 	pub bg: Color32,
@@ -125,35 +120,3 @@ pub static FILE_NAMES: &[&str] = &[
 	"Cargo.toml",
 	"package.json",
 ];
-
-// pub fn hmr_chart_json() -> PathBuf {
-// Path::new(ROOT_DIR).join("src/data/chart.json")
-// }
-//
-// pub fn markdown() -> PathBuf {
-// Path::new(ROOT_DIR).join("src/data/corpus.md")
-// }
-//
-// pub fn pipeline_diagram() -> PathBuf {
-// Path::new(ROOT_DIR).join("estate/1-estate-diagram.md")
-// }
-//
-// pub fn pipeline_estate_workspace() -> PathBuf {
-// Path::new(ROOT_DIR).join("estate/1-estate-workspace-with-persona.md")
-// }
-//
-// pub fn template_path() -> PathBuf {
-// Path::new(ROOT_DIR).join("template")
-// }
-//
-// pub static HMR_CHART_JSON: LazyLock<PathBuf> =
-// LazyLock::new(|| PathBuf::from(ROOT_DIR).join("src/data/chart.json"));
-//
-// pub static MARKDOWN: LazyLock<PathBuf> =
-// LazyLock::new(|| PathBuf::from(ROOT_DIR).join("src/data/corpus.md"));
-//
-// pub static PIPELINE_DIAGRAM: LazyLock<PathBuf> =
-// LazyLock::new(|| PathBuf::from(ROOT_DIR).join("estate/1-estate-diagram.md"));
-//
-// pub static TEMPLATE_PATH: LazyLock<PathBuf> =
-// LazyLock::new(|| PathBuf::from(ROOT_DIR).join("template"));

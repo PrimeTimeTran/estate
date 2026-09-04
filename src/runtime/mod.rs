@@ -11,6 +11,10 @@ pub use web::*;
 
 use crate::{app::state::EstateState, prelude::*};
 
+#[path = "./app.rs"]
+pub mod app_runtime;
+pub use app_runtime::*;
+
 #[derive(Debug)]
 pub struct RuntimeState {
 	state: Arc<RwLock<EstateState>>,

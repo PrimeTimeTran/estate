@@ -261,7 +261,7 @@ async fn build_action(prompt: &str) -> Result<LlmAction> {
 	});
 
 	let res = client
-		.post("http://localhost:11434/api/generate")
+		.post(crate::AGENT_GEN_URL)
 		.json(&payload)
 		.send()
 		.await?
@@ -328,7 +328,7 @@ pub async fn ollama_generate(prompt: &str, system: Option<&str>, json: bool) -> 
 		payload["format"] = serde_json::json!("json");
 	}
 	let response = client
-		.post("http://localhost:11434/api/generate")
+		.post(crate::AGENT_GEN_URL)
 		.json(&payload)
 		.send()
 		.await?;
