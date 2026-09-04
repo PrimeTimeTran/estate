@@ -1,5 +1,15 @@
 #![allow(warnings)]
 
+/// Leetcode Module
+///
+/// Proof of concept/Dry run for testing the entire suite of tools needed to
+/// provision resources to execute runtime code and evaluate the results in a consistent
+/// manner
+///
+/// - [Rust]
+/// - [Docker]
+/// - [Bash/Shell]
+///
 use anyhow::Context;
 
 use estate::{
@@ -9,9 +19,16 @@ use estate::{
 	problem_source,
 };
 
-// cargo -q run --bin runner -- python
-// RUNNER=native cargo -q run --bin runner -- python
-// RUNNER=docker cargo -q run --bin runner -- python
+/// ## Host/Local Run
+/// cargo -q run --bin runner -- python
+///
+/// ## Host/Local Run
+///
+/// RUNNER=native cargo -q run --bin runner -- python
+///
+/// ## Dockeriz Run
+///
+/// RUNNER=docker cargo -q run --bin runner -- python
 #[cfg(target_arch = "wasm32")]
 fn main() {}
 #[cfg(not(target_arch = "wasm32"))]
