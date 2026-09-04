@@ -1,10 +1,4 @@
-use crate::{
-	model::problem::StoredProblem,
-	proto::{
-		self,
-		types::{SampleProblemRequest, *},
-	},
-};
+use crate::{model::problem::StoredProblem, proto::types::SampleProblemRequest};
 
 // ============================================================
 // Shared application state

@@ -1,8 +1,9 @@
 use crate::{app::*, prelude::anyhow::anyhow};
 
 use super::{
-	ACTION_PROMPT, AgentEvent, AgentTools, DECIDE_PROMPT, JSON_PROMPT, RuntimeEvent,
-	WorkspaceContext, build_sys_action, build_sys_prompt,
+	ACTION_PROMPT, AgentTools, DECIDE_PROMPT, JSON_PROMPT, WorkspaceContext,
+	agent_event::{AgentEvent, RuntimeEvent},
+	build_sys_action, build_sys_prompt,
 };
 
 #[derive(Debug, Clone)]

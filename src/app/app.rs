@@ -1,13 +1,12 @@
 use crate::{
 	Executor,
 	api::{Api, AppState},
-	app::{prelude::*, state::EstateState, *},
+	app::{prelude::*, state::EstateState},
 	e,
 	model::StoredProblem,
-	prelude::*,
+	// prelude::*,
 	proto::types::{ListProblemsRequest, PageRequest, SampleProblemRequest},
 	r#trait::{Context, EventReceiver},
-	ui::Layout,
 };
 
 // #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
@@ -16,8 +15,8 @@ use crate::{
 // #[cfg(all(feature = "web", target_arch = "wasm32"))]
 // use crate::WebRuntime;
 
-#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-use crate::logger::{LogConfig, Tracer};
+// #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+// use crate::logger::{LogConfig, Tracer};
 
 /// # App
 /// We have 3 primary target platforms which we're developing for. They access resources in similar yet
@@ -26,6 +25,7 @@ use crate::logger::{LogConfig, Tracer};
 ///
 /// Generic indirection adds complication but solves problems downstream.
 ///
+
 pub struct App<C>
 where
 	C: Context,

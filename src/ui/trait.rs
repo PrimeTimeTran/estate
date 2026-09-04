@@ -1,6 +1,6 @@
 // use crate::{LAYOUT as config, e, prelude::*, theme::palette, ui::Layout};
 
-use crate::{api::Api, e, prelude::*, ui::Layout};
+use crate::{e, prelude::*, ui::Layout};
 
 /// A screen-level coordinator.
 ///
@@ -13,7 +13,7 @@ use crate::{api::Api, e, prelude::*, ui::Layout};
 ///
 /// Screen-level state may be shared by multiple Views without being promoted
 /// to global application state.
-pub(crate) trait Screen<R: Runtime, E: Executor> {
+pub trait Screen<R: Runtime, E: Executor> {
 	fn configure(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>);
 	fn update(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>);
 	fn event(&mut self, event: &e::Event, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>);

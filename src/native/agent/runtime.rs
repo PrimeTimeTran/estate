@@ -1,4 +1,7 @@
-use super::{Agent, AgentEvent, RuntimeEvent, SystemEvent};
+use super::{
+	Agent, SystemEvent,
+	agent_event::{AgentEvent, RuntimeEvent},
+};
 use crate::native::{job, prelude::*};
 
 #[derive(Debug, Default)]

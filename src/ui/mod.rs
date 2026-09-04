@@ -6,18 +6,15 @@ mod prelude;
 pub(crate) mod primitive;
 pub(crate) mod region;
 pub(crate) mod screen;
-// pub(crate) mod scroll;
 pub(crate) mod theme;
 pub(crate) mod r#trait;
 pub(crate) mod view;
-pub use crate::ui::{config::*, layout::*, primitive::*, screen::*, view::*};
-use crate::{
-	e,
-	ui::r#trait::{LayoutTrait, Screen, ViewTrait},
-};
+
 pub use crate::{
 	prelude::*,
-	ui::{panel::*, region::*, theme::palette::*},
+	ui::{
+		config::*, layout::*, panel::*, primitive::*, region::*, screen::*, theme::palette::*, view::*,
+	},
 };
 
 pub const TRAY_ICON: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/estate-tray.png"));

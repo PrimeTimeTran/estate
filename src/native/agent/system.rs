@@ -1,4 +1,7 @@
-use super::{AgentBus, AgentEvent, AgentRegistry, AgentRuntime, RuntimeEvent};
+use super::{
+	AgentBus, AgentRegistry, AgentRuntime,
+	agent_event::{AgentEvent, RuntimeEvent},
+};
 use crate::{native::job::AgentTask, prelude::*};
 
 #[derive(Debug, Clone)]

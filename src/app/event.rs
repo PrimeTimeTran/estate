@@ -1,7 +1,7 @@
-pub use crate::{app::*, prelude::*};
+pub use crate::prelude::*;
 
 #[derive(Debug, Clone, Deserialize, Hash, Serialize)]
-pub(crate) struct Event {
+pub struct Event {
 	pub id: u64,
 	pub kind: EventKind,
 	pub source: EventSource,

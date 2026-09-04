@@ -2,12 +2,12 @@ use egui::{ScrollArea, Ui};
 use std::fmt;
 use strum::IntoStaticStr;
 
-use crate::{api::Api, e, prelude::*, ui::Layout};
+use crate::{prelude::*, ui::Layout};
 
 #[cfg(not(target_arch = "wasm32"))]
-use crate::native::{DashboardScreen, WaterfallChart, prelude::*};
+use crate::native::{DashboardScreen, prelude::*};
 
-pub(crate) struct ScreenInstance<R: Runtime, E: Executor> {
+pub struct ScreenInstance<R: Runtime, E: Executor> {
 	pub kind: ViewType,
 	pub screen: Box<dyn Screen<R, E>>,
 	pub layout: Layout<R, E>,
@@ -43,7 +43,7 @@ impl<R: Runtime, E: Executor> ScreenInstance<R, E> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, IntoStaticStr)]
-pub(crate) enum WindowType {
+pub enum WindowType {
 	EguiVeable,
 	DashboardScreen,
 	WaterfallScreen,
@@ -62,7 +62,7 @@ impl WindowType {
 #[derive(
 	Debug, Copy, Default, Clone, Hash, Deserialize, Serialize, Eq, PartialEq, IntoStaticStr,
 )]
-pub(crate) enum ViewType {
+pub enum ViewType {
 	#[default]
 	DashboardScreen,
 	MarkdownScreen,

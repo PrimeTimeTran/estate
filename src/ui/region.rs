@@ -5,7 +5,7 @@ use strum::IntoStaticStr;
 use crate::{api::Api, e, prelude::*, ui::Layout};
 
 #[cfg(feature = "native")]
-use crate::native::{DashboardScreen, WaterfallChart, prelude::*};
+use crate::native::prelude::*;
 
 // View
 //   │
