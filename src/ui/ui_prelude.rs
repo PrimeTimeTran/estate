@@ -5,7 +5,7 @@
 //
 pub use egui::{
 	Align, ClippedPrimitive, Color32, Context, Direction, Frame, FullOutput, Id, Margin, ScrollArea,
-	TexturesDelta, Ui, UiBuilder, ViewportId, containers::Panel,
+	TexturesDelta, Ui, UiBuilder, ViewportId, containers::Panel as EguiPanel,
 };
 pub use egui_commonmark::{CommonMarkCache, CommonMarkViewer};
 pub use egui_extras::{Column, TableBuilder};
@@ -25,6 +25,7 @@ pub use winit::{
 
 pub use crate::{
 	app::*,
+	panel::*,
 	proto::{
 		types::{self, *},
 		*,

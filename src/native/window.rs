@@ -531,7 +531,7 @@ impl Window {
 		// │   SIDEBAR    │             MAIN             │
 		// │              │                              │
 		// └──────────────┴──────────────────────────────┘
-		gui::Panel::top(ui.id()).show(ui, |ui| {
+		gui::EguiPanel::top(ui.id()).show(ui, |ui| {
 			let layout = egui::Layout {
 				main_dir: gui::Direction::LeftToRight,
 				main_wrap: false,
@@ -546,7 +546,7 @@ impl Window {
 			top.label("REGISTRY");
 			top.label("RUNTIME");
 		});
-		gui::Panel::left(ui.id()).show(ui, |ui| {
+		gui::EguiPanel::left(ui.id()).show(ui, |ui| {
 			let layout = egui::Layout {
 				main_dir: gui::Direction::TopDown,
 				main_wrap: false,
@@ -584,7 +584,7 @@ impl Window {
 		// ├──────────┴─────────────────────┴────────────┤
 		// │                   FOOTER                    │
 		// └─────────────────────────────────────────────┘
-		gui::Panel::top(ui.id()).show(ui, |ui| {
+		gui::EguiPanel::top(ui.id()).show(ui, |ui| {
 			let layout = egui::Layout {
 				main_dir: gui::Direction::LeftToRight,
 				main_wrap: false,
@@ -598,7 +598,7 @@ impl Window {
 			top.label("PROJECT");
 			top.label("COMMANDS");
 		});
-		gui::Panel::bottom(ui.id()).show(ui, |ui| {
+		gui::EguiPanel::bottom(ui.id()).show(ui, |ui| {
 			let layout = egui::Layout {
 				main_dir: gui::Direction::LeftToRight,
 				main_wrap: false,
@@ -611,7 +611,7 @@ impl Window {
 			footer.label("Connected");
 			footer.label("v0.1.0");
 		});
-		gui::Panel::left(ui.id()).show(ui, |ui| {
+		gui::EguiPanel::left(ui.id()).show(ui, |ui| {
 			let layout = egui::Layout {
 				main_dir: gui::Direction::TopDown,
 				main_wrap: false,
@@ -625,7 +625,7 @@ impl Window {
 			sidebar.label("Registry");
 			sidebar.label("Resources");
 		});
-		gui::Panel::right(ui.id()).show(ui, |ui| {
+		gui::EguiPanel::right(ui.id()).show(ui, |ui| {
 			let layout = egui::Layout {
 				main_dir: gui::Direction::TopDown,
 				main_wrap: false,
@@ -666,7 +666,7 @@ impl Window {
 		// ├─────────────────────────────────────────────┤
 		// │                   FOOTER                    │
 		// └─────────────────────────────────────────────┘
-		gui::Panel::top(ui.id()).show(ui, |ui| {
+		gui::EguiPanel::top(ui.id()).show(ui, |ui| {
 			let layout = egui::Layout {
 				main_dir: gui::Direction::LeftToRight,
 				main_wrap: false,
@@ -680,7 +680,7 @@ impl Window {
 			top.label("SEARCH");
 			top.label("FILTER");
 		});
-		gui::Panel::bottom(ui.id()).show(ui, |ui| {
+		gui::EguiPanel::bottom(ui.id()).show(ui, |ui| {
 			let layout = egui::Layout {
 				main_dir: gui::Direction::LeftToRight,
 				main_wrap: false,

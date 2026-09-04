@@ -118,8 +118,8 @@ pub enum EventSource {
 	Filesystem,
 }
 
-use crate::model::problem::StoredProblem;
-use crate::proto::types::Problem as ProtoProblem;
+// use crate::model::problem::StoredProblem;
+// use crate::proto::types::Problem as ProtoProblem;
 
 pub type Problem = ProtoProblem;
 

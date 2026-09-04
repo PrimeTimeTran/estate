@@ -1,4 +1,4 @@
-use crate::{app::*, prelude::*};
+use crate::prelude::*;
 
 #[derive(Debug, Clone, Eq, Deserialize, PartialEq, Serialize)]
 pub struct Job {

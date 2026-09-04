@@ -10,11 +10,11 @@ pub mod r#trait;
 pub mod ui_prelude;
 pub mod view;
 
-pub use crate::{
-	ui::{
-		config::*, layout::*, panel::*, primitive::*, region::*, screen::*, theme::palette::*, view::*,
-	},
-	ui_prelude::*,
+// pub use crate::ui::ui_prelude::*;
+
+pub use crate::ui::{
+	config::*, layout::*, primitive::*, region::*, screen::*, theme::palette::*, ui_prelude::*,
+	view::*,
 };
 
 pub const TRAY_ICON: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/estate-tray.png"));
