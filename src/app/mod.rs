@@ -37,6 +37,10 @@ pub mod app_native;
 #[path = "./app.web.rs"]
 pub mod app_web;
 
+#[cfg(not(all(feature = "web", target_arch = "wasm32")))]
+#[path = "./app.web.stub.rs"]
+pub mod app_web;
+
 #[cfg(feature = "mobile")]
 #[path = "./app.mobile.rs"]
 pub mod app_mobile;

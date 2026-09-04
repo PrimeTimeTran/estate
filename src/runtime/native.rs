@@ -12,6 +12,11 @@ use winit::event_loop::EventLoopProxy;
 
 /// ## NativeRuntime
 ///
+/// Runtime of laptop/desktop instances of the application.
+///
+/// Differs from [`WebRuntime`](`crate::app::app_web`) in how background
+/// tasks are implemented by the underlying infrastructure.
+///
 #[derive(Clone, Debug)]
 pub struct NativeRuntime {
 	event_rx: Arc<Mutex<broadcast::Receiver<e::Event>>>,

@@ -1,13 +1,13 @@
 use crate::doc;
-use crate::{app::prelude::*, r#trait::Context};
 
 use crate::{
 	AppEvent, DaemonCommand, NativeExecutor,
 	api::NativeApiClient,
-	app::{Runtime, model::EstateEngine},
+	app::{Runtime, model::EstateEngine, prelude::*},
 	e,
 	native::router,
 	spawn_global_cursor_daemon,
+	r#trait::Context,
 };
 
 use tokio::runtime::Handle;
@@ -185,6 +185,7 @@ impl NativeApp {
 		Ok(())
 	}
 	fn spawn_clock(&mut self, proxy: EventLoopProxy<AppEvent>) {
+		println!("Spawn Clock Start");
 		doc!(
 			r#"
         =========================================================================
@@ -223,7 +224,7 @@ impl NativeApp {
     		=========================================================================
       "#
 		);
-		println!("Spawn Clock Start");
+
 		doc!(
 			r#"
         =========================================================================
