@@ -277,7 +277,7 @@ pub struct Viewed {
 	pub id: Uuid,
 	pub name: String,
 	pub filters: Vec<ViewFilter>,
-	pub layout: Layout,
+	pub layout: LayoutType,
 }
 #[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum ViewFilter {
@@ -292,7 +292,7 @@ pub enum ViewFilter {
 	CreatedAfter(DateTime<Utc>),
 }
 #[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
-pub enum Layout {
+pub enum LayoutType {
 	#[default]
 	List,
 	Tree,

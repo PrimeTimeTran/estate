@@ -1,5 +1,5 @@
 # Prelude
-  
+
 Estate is a workspace analysis and knowledge engine for understanding,
 indexing, and navigating software projects.
 
@@ -13,12 +13,12 @@ Estate provides:
 
 - **Workspace discovery** — discovers files, directories, and projects.
 - **Source analysis** — analyzes source code and extracts symbols and
-relationships.
+  relationships.
 - **Project graphs** — models nodes and relationships between project
-entities.
+  entities.
 - **Indexing and search** — maintains indexes for efficient lookup.
 - **Virtual filesystems** — provides filesystem access through the
-[`vfs`] abstraction.
+  [`vfs`] abstraction.
 - **Wikilinks** — resolves Obsidian-style `[[Wikilinks]]` between resources.
 
 ## Architecture
@@ -81,10 +81,10 @@ to form part of Estate's public API.
 Estate is designed around a few principles:
 
 - **One project model** — frontends should consume the same Estate model
-rather than implementing their own project representations.
+  rather than implementing their own project representations.
 - **Stable identities** — domain entities use UUID-based identities so
-references remain stable across filesystem and application boundaries.
+  references remain stable across filesystem and application boundaries.
 - **Backend independence** — filesystem access and persistence should be
-replaceable without changing the domain model.
+  replaceable without changing the domain model.
 - **Frontend independence** — the CLI, daemon, LSP, and IDE integrations
-should operate on the same underlying engine and domain abstractions.
+  should operate on the same underlying engine and domain abstractions.

@@ -509,44 +509,45 @@ pub enum FocusedPane {
 // 	fn update(&mut self, ctx: &mut AppContext<'_, R, E>) {}
 // 	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R, E>) {}
 // }
-#[derive(Debug, Clone, PartialEq)]
-pub struct Sidebar<T> {
-	pub active_tab: T,
-	pub tabs: Vec<(T, String)>,
-}
-impl<T> Sidebar<T>
-where
-	T: Clone + PartialEq,
-{
-	pub fn new(active_tab: T, tabs: Vec<(T, impl Into<String>)>) -> Self {
-		Self {
-			active_tab,
-			tabs: tabs
-				.into_iter()
-				.map(|(tab, label)| (tab, label.into()))
-				.collect(),
-		}
-	}
-	pub fn draw<F>(&mut self, ui: &mut egui::Ui, mut content: F)
-	where
-		F: FnMut(&mut egui::Ui, &T),
-	{
-		ui.horizontal(|ui| {
-			for (tab, label) in &self.tabs {
-				if ui
-					.selectable_label(self.active_tab == *tab, label)
-					.clicked()
-				{
-					self.active_tab = tab.clone();
-				}
-			}
-		});
-		ui.separator();
-		egui::ScrollArea::vertical().show(ui, |ui| {
-			content(ui, &self.active_tab);
-		});
-	}
-}
+
+// #[derive(Debug, Clone, PartialEq)]
+// pub struct Sidebar<T> {
+// 	pub active_tab: T,
+// 	pub tabs: Vec<(T, String)>,
+// }
+// impl<T> Sidebar<T>
+// where
+// 	T: Clone + PartialEq,
+// {
+// 	pub fn new(active_tab: T, tabs: Vec<(T, impl Into<String>)>) -> Self {
+// 		Self {
+// 			active_tab,
+// 			tabs: tabs
+// 				.into_iter()
+// 				.map(|(tab, label)| (tab, label.into()))
+// 				.collect(),
+// 		}
+// 	}
+// 	pub fn draw<F>(&mut self, ui: &mut egui::Ui, mut content: F)
+// 	where
+// 		F: FnMut(&mut egui::Ui, &T),
+// 	{
+// 		ui.horizontal(|ui| {
+// 			for (tab, label) in &self.tabs {
+// 				if ui
+// 					.selectable_label(self.active_tab == *tab, label)
+// 					.clicked()
+// 				{
+// 					self.active_tab = tab.clone();
+// 				}
+// 			}
+// 		});
+// 		ui.separator();
+// 		egui::ScrollArea::vertical().show(ui, |ui| {
+// 			content(ui, &self.active_tab);
+// 		});
+// 	}
+// }
 #[derive(Debug, Default, Clone, PartialEq)]
 pub enum Tab {
 	#[default]

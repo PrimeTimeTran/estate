@@ -2,7 +2,7 @@ use crate::{
 	app::*,
 	e,
 	native::{OracleScreen, monitor::StateMonitor},
-	ui::{Component, Layout, chart::*},
+	ui::{Component, chart::*},
 };
 
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};

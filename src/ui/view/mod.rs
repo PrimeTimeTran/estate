@@ -1,10 +1,10 @@
 pub mod markdown;
-pub mod problem;
-pub mod problems;
+pub mod problem_screen;
+pub mod problems_screen;
 pub mod task_manager;
 pub mod waterfall;
 pub use markdown::*;
-pub use problem::*;
-pub use problems::*;
+pub use problem_screen::*;
+pub use problems_screen::*;
 pub use task_manager::*;
 pub use waterfall::*;

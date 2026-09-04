@@ -1,4 +1,4 @@
-// #![allow(warnings)]
+#![allow(warnings)]
 
 pub mod api;
 pub mod data;
@@ -21,7 +21,7 @@ pub use crate::data::*;
 pub use crate::runtime::*;
 pub use crate::tool::*;
 pub use crate::r#trait::*;
-pub use crate::ui::{theme::*, *};
+pub use crate::ui::{theme::*, ui_prelude::*, *};
 
 #[cfg(all(feature = "web", target_arch = "wasm32"))]
 pub mod web;

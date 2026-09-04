@@ -1,7 +1,6 @@
 use crate::ui::{PanelState, *};
 
 use egui::Color32;
-use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicI64;
 
 pub static ROOT_DIR: &str = "/Users/future/KB/project/crates/estate";
@@ -12,8 +11,6 @@ pub static PIPELINE_DIAGRAM: &str =
 pub static PIPELINE_ESTATE_WORKSPACE: &str =
 	"/Users/future/KB/project/crates/estate/estate/1-estate-workspace-with-persona.md";
 pub static TEMPLATE_PATH: &str = "/Users/future/KB/project/crates/estate/template";
-
-use std::sync::LazyLock;
 
 pub static START_APP_CLOCK: bool = true;
 pub static START_WINDOW: WindowType = WindowType::ProblemScreen;

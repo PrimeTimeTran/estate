@@ -4,9 +4,6 @@ use strum::IntoStaticStr;
 
 use crate::{prelude::*, ui::Layout};
 
-#[cfg(not(target_arch = "wasm32"))]
-use crate::native::{DashboardScreen, prelude::*};
-
 pub struct ScreenInstance<R: Runtime, E: Executor> {
 	pub kind: ViewType,
 	pub screen: Box<dyn Screen<R, E>>,

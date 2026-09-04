@@ -30,7 +30,7 @@ pub use crate::{
 	theme::*,
 	tool::{time::*, *},
 	r#trait::*,
-	ui::{config::*, r#trait::*, *},
+	ui::{config::*, r#trait::*, ui_prelude::*, *},
 };
 
 #[cfg(all(feature = "web", target_arch = "wasm32"))]
