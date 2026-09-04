@@ -1,5 +1,3 @@
-// use crate::{LAYOUT as config, e, prelude::*, theme::palette, ui::Layout};
-
 use crate::{e, prelude::*, ui::Layout};
 
 /// A screen-level coordinator.

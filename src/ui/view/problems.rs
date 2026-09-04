@@ -1,10 +1,4 @@
-use crate::{
-	api::Api,
-	model::problem::StoredProblem,
-	ui::{Component, r#trait::Screen},
-	*,
-};
-use egui::Ui;
+use crate::{model::problem::StoredProblem, ui::r#trait::Screen, *};
 
 #[derive(Debug, Default)]
 pub struct ProblemsScreen;

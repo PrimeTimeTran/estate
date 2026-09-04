@@ -1,14 +1,6 @@
-use crate::{
-	app::{state::EstateState, *},
-	e,
-	prelude::*,
-	theme::palette,
-	ui::{Component, Layout},
-};
+use crate::{app::state::EstateState, e, prelude::*, theme::palette, ui::Layout};
 use egui::Ui;
-use egui_extras::{Column, TableBuilder};
 use egui_plot::{Bar, BarChart, Plot};
-use std::time::Duration;
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct WaterfallScreen;

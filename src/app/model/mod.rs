@@ -17,7 +17,7 @@ pub struct EstateEngine<R: Runtime> {
 	// Infrastructure
 	pub vfs: EstateVfs,
 	pub index: EstateIndex,
-	pub workspace: Workspace,
+	// pub workspace: Workspace,
 
 	// pub index: OnceCell<EstateIndex>,
 	// pub search: OnceCell<SearchService>,
@@ -45,7 +45,7 @@ impl<R: Runtime> EstateEngine<R> {
 			// state_monitor,
 			runtime: Arc::new(runtime),
 			estate: Estate::default(),
-			workspace: Workspace::new(),
+			// workspace: Workspace::new(),
 			registry: EstateRegistry::default(),
 			index: EstateIndex::default(),
 			resolver: EstateResolver::default(),

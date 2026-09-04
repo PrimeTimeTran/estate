@@ -1,8 +1,4 @@
-use egui::{ScrollArea, Ui};
-use std::fmt;
-use strum::IntoStaticStr;
-
-use crate::{api::Api, e, prelude::*, ui::Layout};
+use crate::{e, prelude::*};
 
 #[cfg(feature = "native")]
 use crate::native::prelude::*;

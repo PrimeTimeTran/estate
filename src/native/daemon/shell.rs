@@ -1,5 +1,6 @@
 pub use crate::{native::prelude::*, prelude::*};
 pub use comfy_table::{Cell, Table, presets::UTF8_FULL};
+use revelation::analyzer::{Workspace, *};
 
 ///--------------------------------------------------------------------------------
 /// CLI Tools

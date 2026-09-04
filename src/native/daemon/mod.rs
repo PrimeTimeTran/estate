@@ -99,8 +99,8 @@ use crate::{
 	native::{daemon::DocCompiler, prelude::*},
 	prelude::*,
 };
-
 use cli::prelude::Context as CliContext;
+use revelation::analyzer::{Workspace, *};
 
 #[async_trait]
 pub trait EstateDaemon {

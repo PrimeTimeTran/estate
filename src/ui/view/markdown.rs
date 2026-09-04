@@ -1,8 +1,7 @@
 use egui::Ui;
 use egui_commonmark::{CommonMarkCache, CommonMarkViewer};
-use std::path::PathBuf;
 
-use crate::{api::Api, app::*, e, ui::Layout};
+use crate::{app::*, e, ui::Layout};
 
 pub struct MarkdownScreen {
 	markdown: String,

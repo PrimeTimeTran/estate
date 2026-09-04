@@ -1,6 +1,3 @@
-use egui::Pos2;
-
-use crate::api::Api;
 use crate::{e, prelude::*};
 
 use crate::LAYOUT as config;
