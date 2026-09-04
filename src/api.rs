@@ -129,7 +129,7 @@ impl Api for NativeApiClient {
 
 	async fn sample_problem(&self, request: SampleProblemRequest) -> anyhow::Result<StoredProblem> {
 		println!("Native API Client sample_problem");
-		let request: proto::types::SampleProblemRequest = request.into();
+		let request: crate::proto::types::SampleProblemRequest = request.into();
 		let response = self
 			.problems
 			.clone()

@@ -12,10 +12,14 @@ pub(crate) mod router;
 pub(crate) mod runtime;
 pub(crate) mod screens;
 pub(crate) mod state;
+pub(crate) mod task;
+// pub(crate) mod task_manager;
 pub(crate) mod ui;
 pub(crate) mod ve;
 pub(crate) mod window;
 
+pub(crate) use crate::native::task::*;
+// pub(crate) use crate::native::task_manager::*;
 pub(crate) use runtime::*;
 pub(crate) use screens::*;
 
