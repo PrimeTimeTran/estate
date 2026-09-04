@@ -12,6 +12,7 @@ pub use core_graphics::{
 };
 pub use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 pub use signal_hook::{consts::SIGINT, iterator::Signals};
+pub use tokio::runtime::Handle;
 pub use tokio::{
 	io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
 	net::{TcpListener, UnixListener, UnixStream},
@@ -25,7 +26,14 @@ pub use tokio_util::sync::CancellationToken;
 pub use tonic::transport::Channel;
 pub use tray_icon::{
 	Icon, TrayIcon, TrayIconBuilder,
-	menu::{Menu, MenuItem, Submenu},
+	menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu},
+};
+pub use winit::{
+	application::ApplicationHandler,
+	event::WindowEvent,
+	event_loop::{ActiveEventLoop, EventLoop, EventLoopProxy},
+	platform::macos::{ActivationPolicy, EventLoopBuilderExtMacOS},
+	window::WindowId,
 };
 
 /// # Description

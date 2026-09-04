@@ -4,23 +4,9 @@ use crate::{
 	AppEvent, DaemonCommand, NativeExecutor,
 	api::NativeApiClient,
 	app::{Runtime, model::EstateEngine, prelude::*},
-	e,
-	native::router,
+	prelude::*,
 	spawn_global_cursor_daemon,
 	r#trait::Context,
-};
-
-use tokio::runtime::Handle;
-use tray_icon::{
-	TrayIcon, TrayIconBuilder,
-	menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu},
-};
-use winit::{
-	application::ApplicationHandler,
-	event::WindowEvent,
-	event_loop::{ActiveEventLoop, EventLoop, EventLoopProxy},
-	platform::macos::{ActivationPolicy, EventLoopBuilderExtMacOS},
-	window::WindowId,
 };
 
 /// ## NativeApp (Laptop/Desktop Environment)
