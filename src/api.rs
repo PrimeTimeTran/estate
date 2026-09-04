@@ -1,9 +1,7 @@
 use crate::{model::problem::StoredProblem, prelude::*, proto::types::SampleProblemRequest};
 
+// # Shared application state
 // ============================================================
-// Shared application state
-// ============================================================
-
 #[derive(Debug, Default, Clone)]
 pub struct AppState {
 	pub problems: ProblemListState,
@@ -24,8 +22,7 @@ pub struct ProblemState {
 	pub error: Option<String>,
 }
 
-// ============================================================
-// Shared API Trait
+// # Shared API Trait
 // ============================================================
 //
 #[cfg(not(target_arch = "wasm32"))]
@@ -52,17 +49,13 @@ impl Clone for Box<dyn Api> {
 	}
 }
 
+// # Native
 // ============================================================
-// Native
-// ============================================================
-
+//
 #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 use crate::proto::{
 	problem_service_client::ProblemServiceClient, submission_service_client::SubmissionServiceClient,
 };
-
-#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-use tonic::transport::Channel;
 
 #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 #[derive(Debug, Clone)]
@@ -126,10 +119,9 @@ impl Api for NativeApiClient {
 		StoredProblem::try_from(response)
 	}
 }
-// ============================================================
-// WASM
-// ============================================================
 
+// # WASM
+// ============================================================
 // Native Build needs client too.
 #[derive(Debug, Clone)]
 pub struct WebApiClient {

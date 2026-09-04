@@ -40,6 +40,7 @@ pub use tokio::{
 	},
 };
 pub use tokio_util::sync::CancellationToken;
+pub use tonic::transport::Channel;
 pub use tray_icon::{
 	Icon, TrayIcon, TrayIconBuilder,
 	menu::{Menu, MenuItem, Submenu},
