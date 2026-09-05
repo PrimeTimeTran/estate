@@ -9,12 +9,6 @@ pub struct Connected {
 	task_tx: mpsc::Sender<DiscoveryTask>,
 }
 
-#[derive(Clone, Debug)]
-pub struct EstateDiscovery<State = Disconnected> {
-	pub store: DiscoveryStore,
-	state: State,
-}
-
 impl Default for EstateDiscovery<Disconnected> {
 	fn default() -> Self {
 		Self {
