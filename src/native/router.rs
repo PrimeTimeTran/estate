@@ -43,7 +43,7 @@
 /// ```
 use crate::{
 	app::{model, *},
-	doc,
+	doc, native,
 	native::daemon::projection::command,
 };
 

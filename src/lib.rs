@@ -18,7 +18,7 @@
 //!
 //! [^1]: https://chatgpt.com/c/6a9a72bb-76d4-83ea-99b9-5b33b75c008c
 //! [^2]: This is the text of the first footnote.
-// #![allow(warnings)]
+#![allow(warnings)]
 
 // Disables unused input variables
 // #![allow(unused_variables)]
@@ -41,10 +41,6 @@ pub mod ui;
 pub mod util;
 
 pub use crate::app::event as e;
-pub use crate::data::*;
-pub use crate::runtime::*;
-pub use crate::tool::*;
-pub use crate::r#trait::{Context, *};
 pub use crate::ui::{theme::*, ui_prelude::*, *};
 
 #[cfg(all(feature = "web", target_arch = "wasm32"))]
