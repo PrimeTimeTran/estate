@@ -33,6 +33,8 @@ use crate::{Executor, app::*, e, prelude::*, r#trait::EventReceiver};
 /// - [app](`crate::runtime::app_runtime`)
 ///
 pub struct AppContext<'a, R: Runtime, E> {
+	// This is about a particular borrow.
+	// These three 'static/'as are not the same thing.
 	pub app: &'a mut AppRuntime<R, E>,
 	pub last_revision: u64,
 	pub event_rx: R::EventReceiver,
@@ -59,6 +61,9 @@ impl<'a, R: Runtime + 'static, E: Executor> AppContext<'a, R, E> {
 }
 
 impl<'a, R: Runtime, E> AppContext<'a, R, E> {
+	// pub fn api(&self) -> Option<&dyn Api> {
+	// 	self.app.api()
+	// }
 	pub fn state(&self) -> std::sync::RwLockReadGuard<'_, EstateState> {
 		self.app.state()
 	}

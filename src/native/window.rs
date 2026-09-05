@@ -6,6 +6,9 @@ pub use objc2_foundation::MainThreadMarker;
 pub use tray_icon::menu::{MenuItem, Submenu};
 
 pub struct Window {
+	screen: ui::ScreenInstance<NativeRuntime, NativeExecutor>,
+	// This Surface contains/borrows something that is guaranteed to be valid for the 'static lifetime.
+	pub surface: gui::wgpu::Surface<'static>,
 	pub config: gui::wgpu::SurfaceConfiguration,
 	pub device: wgpu::Device,
 	pub gui_ctx: gui::Context,
@@ -14,12 +17,28 @@ pub struct Window {
 	pub kind: WindowType,
 	pub needs_resize: bool,
 	pub occluded: bool,
-	pub surface: gui::wgpu::Surface<'static>,
+
 	pending_textures: gui::TexturesDelta,
 	queue: wgpu::Queue,
 	renderer: gui::Renderer,
-	screen: ui::ScreenInstance<NativeRuntime, NativeExecutor>,
 }
+// pub struct Window<State: 'static> {
+// 	screen: ui::ScreenInstance<NativeRuntime, NativeExecutor>,
+// 	// This Surface contains/borrows something that is guaranteed to be valid for the 'static lifetime.
+// 	pub surface: gui::wgpu::Surface<'static>,
+// 	pub config: gui::wgpu::SurfaceConfiguration,
+// 	pub device: wgpu::Device,
+// 	pub gui_ctx: gui::Context,
+// 	pub gui_state: egui_winit::State,
+// 	pub instance: Arc<winit::window::Window>,
+// 	pub kind: WindowType,
+// 	pub needs_resize: bool,
+// 	pub occluded: bool,
+
+// 	pending_textures: gui::TexturesDelta,
+// 	queue: wgpu::Queue,
+// 	renderer: gui::Renderer,
+// }
 impl Window {
 	pub fn new(event_loop: &ActiveEventLoop, view: ViewType) -> Result<Self> {
 		let (gui_ctx, gui_state) = build_egui(event_loop);
@@ -310,7 +329,7 @@ fn create_gpu_surface(
 	Ok((window, instance, surface))
 }
 // WIP: Self Activating Select
-fn build_egui(event_loop: &ActiveEventLoop) -> (gui::Context, gui::State) {
+fn build_egui(event_loop: &ActiveEventLoop) -> (gui::Context, egui_winit::State) {
 	let ctx = gui::Context::default();
 	ctx.global_style_mut(|style| {
 		style.interaction.selectable_labels = true;
@@ -321,7 +340,7 @@ fn build_egui(event_loop: &ActiveEventLoop) -> (gui::Context, gui::State) {
 	// ctx.memory_mut(|memory| {
 	// 	memory.surrender_focus();
 	// });
-	let state = gui::State::new(
+	let state = egui_winit::State::new(
 		ctx.clone(),
 		gui::ViewportId::ROOT,
 		event_loop,
@@ -715,12 +734,19 @@ impl Window {
 			});
 	}
 }
+
 pub struct AppWindow {
 	pub runtime: NativeRuntime,
 	pub kind: WindowType,
 	pub view: ViewType,
 	pub window: Window,
 }
+// pub struct AppWindow {
+// 	pub runtime: NativeRuntime,
+// 	pub kind: WindowType,
+// 	pub view: ViewType,
+// 	pub window: Window,
+// }
 pub struct GlobalHotkeys {
 	hotkey_id: u32,
 	manager: GlobalHotKeyManager,

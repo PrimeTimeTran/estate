@@ -120,7 +120,7 @@ pub fn scroll_state() -> &'static Mutex<ScrollRedirectState> {
 		})
 	})
 }
-pub fn spawn_global_cursor_daemon(proxy: EventLoopProxy<AppEvent>) {
+pub fn spawn_global_cursor_daemon(proxy: EventLoopProxy<AppEvent>) -> Result<()> {
 	std::thread::spawn(move || {
 		// May need to grant permissions multiple times if the user runs the app from a different tool?
 		// When I run from Zed/VSCode it runs fine. But Ghosty it doesn't The scroll tracker doesn't activate
@@ -286,6 +286,8 @@ pub fn spawn_global_cursor_daemon(proxy: EventLoopProxy<AppEvent>) {
 			CFRunLoop::run_current();
 		}
 	});
+
+	Ok(())
 }
 pub fn target_position(bounds: CGRect, target: ScreenPosition, y: f64) -> CGPoint {
 	let inset = CURSOR_INSET;

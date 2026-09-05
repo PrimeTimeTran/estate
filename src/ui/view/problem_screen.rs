@@ -452,7 +452,7 @@ impl<R: Runtime> ProblemView<R> {
 		ui.separator();
 
 		// Direct service access, as you intended.
-		let api = ctx.app.runtime().services().api();
+		// let api = ctx.app.runtime().services().api();
 
 		ui.horizontal_wrapped(|ui| {
 			if ui.button("load_problems").clicked() {

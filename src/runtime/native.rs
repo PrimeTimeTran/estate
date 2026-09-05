@@ -11,6 +11,7 @@ use winit::event_loop::EventLoopProxy;
 /// Differs from [`WebRuntime`](`crate::app::app_web`) in how background
 /// tasks are implemented by the underlying infrastructure.
 ///
+
 #[derive(Clone, Debug)]
 pub struct NativeRuntime {
 	event_rx: Arc<Mutex<broadcast::Receiver<e::Event>>>,
@@ -37,8 +38,9 @@ impl NativeRuntime {
 		let runtime_state = RuntimeState::new(state);
 		let events = EventBus::new();
 		let event_rx = Arc::new(Mutex::new(events.subscribe()));
+		// let services = NativeServices::default();
 		let services = NativeServices::connect().await?;
-
+		// let runtime = services.clone().connect().await?;
 		let executor = NativeExecutor {
 			handle: handle.clone(),
 		};
@@ -57,7 +59,38 @@ impl NativeRuntime {
 			tasks: Arc::new(RwLock::new(TaskManager::new())),
 		})
 	}
+	// pub async fn connect(self) -> anyhow::Result<NativeRuntime<Connected>> {
+	// 	let NativeRuntime {
+	// 		event_rx,
+	// 		handle,
+	// 		proxy,
+	// 		events,
+	// 		session,
+	// 		state,
+	// 		store,
+	// 		tasks,
+	// 		state_service,
+	// 		session_service,
+	// 		executor,
+	// 		services,
+	// 	} = self;
+	// 	let services = services.connect().await?;
 
+	// 	Ok(NativeRuntime {
+	// 		event_rx,
+	// 		handle,
+	// 		proxy,
+	// 		events,
+	// 		session,
+	// 		state,
+	// 		store,
+	// 		tasks,
+	// 		state_service,
+	// 		session_service,
+	// 		executor,
+	// 		services,
+	// 	})
+	// }
 	pub fn attach_event_proxy(&self, proxy: EventLoopProxy<AppEvent>) {
 		*self.proxy.lock().unwrap() = Some(proxy);
 	}
@@ -239,8 +272,7 @@ impl Executor for NativeExecutor {
 //
 impl Executor for NativeRuntime {
 	fn spawn(&self, future: impl Future<Output = ()> + Send + 'static) {
-		println!("✅ Executor for NativeRuntime");
-		tokio::spawn(future);
+		println!("✅ NativeRuntime::spawn");
 	}
 	// This implementation chooses to use Tokio directly.
 	//
@@ -279,6 +311,16 @@ impl Executor for NativeRuntime {
 // It merely has the same method name.
 //
 impl Runtime for NativeRuntime {
+	type EventReceiver = NativeEventReceiver;
+	fn subscribe(&self) -> Self::EventReceiver {
+		NativeEventReceiver {
+			rx: self.events.subscribe(),
+		}
+	}
+	type Services = NativeServices;
+	fn services(&self) -> &Self::Services {
+		&self.services
+	}
 	fn spawn(&self, future: impl Future<Output = ()> + 'static) {
 		println!("✅ NativeRuntime::spawn");
 	}
@@ -323,11 +365,14 @@ impl Runtime for NativeRuntime {
 	// }
 	//
 
-	fn sleep(&self, duration: Duration) -> impl Future<Output = ()> + Send {
+	fn sleep(&self, duration: Duration) -> impl Future<Output = ()> + Send + 'static {
 		tokio::time::sleep(duration)
 	}
-
-	type EventReceiver = NativeEventReceiver;
+	// fn sleep(duration: Duration) -> impl Future<Output = ()> + Send {
+	// 	async move {
+	// 		tokio::time::sleep(duration).await;
+	// 	}
+	// }
 
 	fn emit(&self, event: e::Event) {
 		tracing::debug!("NativeRuntime {:?}", event.kind.clone());
@@ -347,12 +392,6 @@ impl Runtime for NativeRuntime {
 
 	fn session(&self) -> Session {
 		self.session.clone()
-	}
-
-	fn subscribe(&self) -> Self::EventReceiver {
-		NativeEventReceiver {
-			rx: self.events.subscribe(),
-		}
 	}
 
 	fn try_recv(&self) -> Option<e::Event> {
@@ -399,11 +438,6 @@ impl Runtime for NativeRuntime {
 	fn session_service(&self) -> &Arc<SessionService> {
 		&self.session_service
 	}
-
-	type Services = NativeServices;
-	fn services(&self) -> &Self::Services {
-		&self.services
-	}
 }
 
 /// [Review]
@@ -418,19 +452,22 @@ impl Runtime for NativeRuntime {
 /// 3: NativeRuntime runtime trait implementation
 /// 3: NativeRuntime executor trait implementation
 
-pub struct NativeAppContext<'a> {
-	pub base: AppContext<'a, NativeRuntime, NativeExecutor>,
-	pub monitor: &'a mut NativeMonitor,
-}
-impl<'a> NativeAppContext<'a> {
-	pub fn state(&self) -> std::sync::RwLockReadGuard<'_, EstateState> {
-		self.base.state()
-	}
-	#[cfg(not(target_arch = "wasm32"))]
-	pub fn poll_state(&mut self) -> bool {
-		todo!("Unused for not.")
-	}
-}
+// pub struct NativeAppContext<'a, State>
+// where
+// 	State: 'a + Send,
+// {
+// 	pub base: AppContext<'a, NativeRuntime, NativeExecutor>,
+// 	pub monitor: &'a mut NativeMonitor,
+// }
+// impl<'a> NativeAppContext<'a, State> {
+// 	pub fn state(&self) -> std::sync::RwLockReadGuard<'_, EstateState> {
+// 		self.base.state()
+// 	}
+// 	#[cfg(not(target_arch = "wasm32"))]
+// 	pub fn poll_state(&mut self) -> bool {
+// 		todo!("Unused for not.")
+// 	}
+// }
 
 // impl SendSpawnRuntime for NativeRuntime {
 // 	fn spawn<F>(&self, future: F)
@@ -473,8 +510,8 @@ impl EventReceiver for NativeEventReceiver {
 // 	}
 // }
 
-impl Drop for NativeRuntime {
-	fn drop(&mut self) {
-		tracing::info!("💀 NativeRuntime DROPPED");
-	}
-}
+// impl Drop for NativeRuntime {
+// 	fn drop(&mut self) {
+// 		tracing::info!("💀 NativeRuntime DROPPED");
+// 	}
+// }

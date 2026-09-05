@@ -17,9 +17,9 @@ long_description = "Estate development environment"
 icon = ["assets/icon.icns"]
 
 
-[[bin]]
-name = "daemon"
-path = "src/bin/daemon.rs"
+# [[bin]]
+# name = "daemon"
+# path = "src/bin/daemon.rs"
 
 [[bin]]
 name = "web"

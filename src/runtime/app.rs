@@ -58,51 +58,67 @@ impl<R: Runtime + 'static, E: Executor> AppRuntime<R, E> {
 			}
 		});
 	}
+	pub fn api(&self) -> Option<&<R::Services as Services>::Client> {
+		self.engine.runtime.services().api().as_ref()
+	}
 	pub fn sample_problem(&mut self) {
 		if !self.start_problems_request() {
 			return;
 		}
 		let runtime = self.engine.runtime.clone();
 		// let task_runtime = runtime.clone();
-		self.executor.spawn(async move {
-			let query = SampleProblemRequest {
-				page: None,
-				difficulty: None,
-				tags: vec![],
-				search: String::new(),
-				published_only: None,
-			};
-			let problems = runtime.services().api().sample_problem(query).await;
-			println!("App Runtime After problems click {:?}", problems);
-			match problems {
-				Ok(problems) => {
-					println!("App Runtime emiting success");
-					runtime.emit(e::Event::app(e::Klass::ProblemsLoaded(vec![problems])));
-				}
-				Err(error) => {
-					runtime.emit(e::Event::app(e::Klass::ApiError(error.to_string())));
-				}
-			}
-		});
+		// self.executor.spawn(async move {
+		// 	let query = SampleProblemRequest {
+		// 		page: None,
+		// 		difficulty: None,
+		// 		tags: vec![],
+		// 		search: String::new(),
+		// 		published_only: None,
+		// 	};
+		// 	let problems = runtime.services().api().sample_problem(query).await;
+		// 	// let problems = runtime.services()
+		// 	println!("App Runtime After problems click {:?}", problems);
+		// 	match problems {
+		// 		Ok(problems) => {
+		// 			println!("App Runtime emiting success");
+		// 			runtime.emit(e::Event::app(e::Klass::ProblemsLoaded(vec![problems])));
+		// 		}
+		// 		Err(error) => {
+		// 			runtime.emit(e::Event::app(e::Klass::ApiError(error.to_string())));
+		// 		}
+		// 	}
+		// });
 	}
 	pub fn load_problems(&mut self) {
 		if !self.start_problems_request() {
 			return;
 		}
 		let runtime = self.engine.runtime.clone();
-		self.executor.spawn(async move {
-			let problems = runtime.services().api().load_problems().await;
-			match problems {
-				Ok(problems) => {
-					runtime.emit(e::Event::app(e::Klass::ProblemsLoaded(problems)));
-				}
-				Err(error) => {
-					runtime.emit(e::Event::app(e::Klass::ApiError(error.to_string())));
-				}
-			}
-		});
+		// self.executor.spawn(async move {
+		// 	let problems = runtime.services().api().load_problems().await;
+		// 	match problems {
+		// 		Ok(problems) => {
+		// 			runtime.emit(e::Event::app(e::Klass::ProblemsLoaded(problems)));
+		// 		}
+		// 		Err(error) => {
+		// 			runtime.emit(e::Event::app(e::Klass::ApiError(error.to_string())));
+		// 		}
+		// 	}
+		// });
 	}
 }
+// impl<R: Runtime + 'static, E: Executor> AppRuntime<R, E> {
+// 	fn start_problem_request(&mut self) -> bool {
+// 		if self.state.problem.loading {
+// 			tracing::info!("⚠️ problem already loading");
+// 			return false;
+// 		}
+// 		self.state.problem.loading = true;
+// 		self.state.problem.error = None;
+// 		true
+// 	}
+// }
+
 impl<R: Runtime, E> AppRuntime<R, E> {
 	/// Runtime Reference
 	///
@@ -214,6 +230,7 @@ impl<R: Runtime, E> AppRuntime<R, E> {
 		self.view = view;
 	}
 }
+
 impl<R: Runtime + 'static, E: Executor> AppRuntime<R, E> {
 	fn start_problems_request(&mut self) -> bool {
 		if self.state.problems.loading {

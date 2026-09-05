@@ -15,14 +15,21 @@ use crate::{RuntimeState, e, prelude::*};
 /// - [services](Runtime::services): Exposes capabilities
 /// - [subscribe](Runtime::subscribe): Subscribe to event broadcasts using a [event bus](crate::server::events::EventBus)
 ///
+/// ## Note
+///
+/// A type implementing Runtime cannot contain non-'static borrowed references.
+///
 pub trait Runtime: Clone + Sync + std::marker::Send + 'static {
-	fn session(&self) -> Session;
-
 	#[cfg(not(target_arch = "wasm32"))]
 	fn sleep(&self, duration: Duration) -> impl Future<Output = ()> + Send;
+	// fn sleep(&self, duration: Duration) -> impl Future<Output = ()> + Send + 'static;
+
+	/// [RPIT](https://doc.rust-lang.org/edition-guide/rust-2024/rpit-lifetime-capture.html)
 
 	#[cfg(target_arch = "wasm32")]
 	fn sleep(&self, duration: Duration) -> impl Future<Output = ()>;
+
+	fn session(&self) -> Session;
 
 	fn emit(&self, event: e::Event);
 	fn event_processed(&self);
@@ -86,20 +93,17 @@ pub trait Context: Sized {
 	/// An associated type whose concrete implementation is selected by
 	/// the [Context] implementor.
 	type Host: Host;
-
+	/// Returns a reference to the concrete [Host] associated with this context.
+	///
+	/// The returned type is [Self::Host], i.e. the associated type selected
+	/// by the concrete [Context] implementation.
+	fn host(&self) -> &Self::Host;
 	/// The runtime environment in which the application is running.
 	///
 	/// The concrete runtime implementation is selected by the [Context]
 	/// implementor and can vary based on the platform, host, configuration,
 	/// and other runtime factors.
 	type Runtime: Runtime;
-
-	/// Returns a reference to the concrete [Host] associated with this context.
-	///
-	/// The returned type is [Self::Host], i.e. the associated type selected
-	/// by the concrete [Context] implementation.
-	fn host(&self) -> &Self::Host;
-
 	/// Returns a reference to the concrete [`Runtime`] associated with this context.
 	///
 	/// The returned type is [`Self::Runtime`], i.e. the associated type selected
@@ -147,8 +151,23 @@ pub trait Services {
 	///
 	/// Has [`Native`] & [`Web`] implementations
 	///
-	fn api(&self) -> &Self::Client;
+	fn api(&self) -> &Option<Self::Client>;
 }
+// pub trait ApiServices: Services {
+// 	type Client: Api;
+// 	/// ## Platform Generic API
+// 	///
+// 	/// Exposes capabilities for business logic to access server side resources
+///
+/// - [GRPC]
+///
+// 	/// Has [`Native`] & [`Web`] implementations
+// 	///
+// 	// fn api(&self) -> Option<&Self::Client>;
+// 	// fn api(&self) -> &Self::Client;
+// 	fn api(&self) -> &Self::Client;
+// }
+
 pub trait Persistence {
 	fn load(&self, key: &str) -> Result<Option<Vec<u8>>>;
 	fn save(&self, key: &str, value: &[u8]) -> Result<()>;

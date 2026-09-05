@@ -285,8 +285,7 @@ impl DashboardScreen {
 				ui.label("Not loaded yet");
 			}
 			// Request a continuous repaint so the timer increments live every second
-			ui.ctx()
-				.request_repaint_after(Duration::from_secs(1));
+			ui.ctx().request_repaint_after(Duration::from_secs(1));
 		});
 	}
 }

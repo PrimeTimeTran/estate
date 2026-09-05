@@ -91,7 +91,6 @@ pub enum ReferenceKind {
 	Link,
 	Embed,
 	Relative,
-	// potentially:
 	Anchor,
 	Asset,
 }
