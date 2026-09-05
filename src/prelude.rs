@@ -47,5 +47,6 @@ pub use cli::context::*;
 pub use crate::{
 	app::{app_native::*, context::*, *},
 	native::{prelude::*, *},
+	native_state::*,
 	server::{self, events::*},
 };

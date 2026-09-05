@@ -52,10 +52,9 @@ pub use winit::{
 /// This is a central dependency management file for native platform targets like MacOS, Windows, Linux.
 /// The items here are necessary to bring dependencies into scope for the native platform targets. Removing items may
 /// cause compilation errors or runtime issues in the native platform targets.
+pub use crate::native::state as native_state;
 pub use crate::{
-	native::{
-		self, daemon::*, discovery::*, lint::*, monitor::*, native_job::*, state::*, ui::*, window::*,
-	},
+	native::{self, daemon::*, discovery::*, lint::*, monitor::*, native_job::*, ui::*, window::*},
 	runtime::*,
 	server::*,
 };

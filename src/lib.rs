@@ -18,14 +18,15 @@
 //!
 //! [^1]: https://chatgpt.com/c/6a9a72bb-76d4-83ea-99b9-5b33b75c008c
 //! [^2]: This is the text of the first footnote.
-// #![allow(warnings)]
+#![allow(warnings)]
 
 // Disables unused input variables
-#![allow(unused_variables)]
+// #![allow(unused_variables)]
 // Disables unused input variables
-#![allow(unused_results)]
+// #![allow(unused_results)]
 
 pub mod api;
+pub mod app;
 pub mod data;
 pub mod helpers;
 pub mod model;
@@ -38,8 +39,6 @@ pub mod tool;
 pub mod r#trait;
 pub mod ui;
 pub mod util;
-
-pub mod app;
 
 pub use crate::app::event as e;
 pub use crate::data::*;
@@ -56,3 +55,5 @@ pub mod server;
 
 #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 pub mod native;
+#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+pub use crate::native::state as native_state;
