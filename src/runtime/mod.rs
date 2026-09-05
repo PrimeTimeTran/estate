@@ -9,7 +9,7 @@ pub mod web;
 #[cfg(all(feature = "web", target_arch = "wasm32"))]
 pub use web::*;
 
-use crate::{app::state::EstateState, prelude::*};
+use crate::prelude::*;
 
 #[path = "./app.rs"]
 pub mod app_runtime;

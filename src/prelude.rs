@@ -18,6 +18,13 @@ pub use std::{
 };
 pub use uuid::Uuid;
 
+/// ## Warning
+///
+/// Disabling lint supression in lib.rs makes this blow up.
+///
+/// Don't touch this unless all 3 platforms have been built & run using the following script.
+///
+/// [../script/git-precommit-hook.sh]
 pub use crate::{
 	api::*,
 	app::*,
