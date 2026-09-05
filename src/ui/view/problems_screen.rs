@@ -1,6 +1,6 @@
 use crate::{
 	// app::context::AppContext,
-	model::problem::StoredProblem,
+	model::problem_model::StoredProblem,
 	prelude::*,
 	ui::ui_trait::Screen,
 	*,

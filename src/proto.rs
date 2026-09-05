@@ -22,7 +22,7 @@
 /// WIP: Add Native & Web builds without breaking each other.
 /// - Native built. Web didn't
 /// - Web built. Native didn't.
-/// - Web & Native built. Server didnt'
+/// - Web & Native built. Server didn't
 pub mod types {
 	include!(concat!(env!("OUT_DIR"), "/types.rs"));
 }

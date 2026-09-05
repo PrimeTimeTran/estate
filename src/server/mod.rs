@@ -9,9 +9,9 @@ pub use native::*;
 pub use problem::*;
 pub use submission::*;
 
-pub use crate::proto::types::*;
 pub use crate::server::native::*;
 
+use crate::proto::types::*;
 use tonic::{Request, Response, Status};
 
 pub fn internal_error(error: anyhow::Error) -> Status {

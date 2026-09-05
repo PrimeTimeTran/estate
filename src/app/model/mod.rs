@@ -1,8 +1,5 @@
 use crate::api::Api;
 
-#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-pub use crate::app::session::Session;
-
 pub use crate::prelude::*;
 
 mod estate;
@@ -58,7 +55,6 @@ impl<R: Runtime> EstateEngine<R> {
 		})
 	}
 
-	#[cfg(feature = "native")]
 	pub fn session(&mut self) -> Session {
 		self.runtime.session()
 	}

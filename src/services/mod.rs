@@ -1,14 +1,10 @@
 /// [Goal]
 /// This guy should support all platforms and share agnostic api.
 ///
-use crate::{
-	app::*,
-	model::{submission::*, *},
-	proto::types::*,
-};
+use crate::{app::*, model::*, proto::types::*};
 
-pub mod prelude;
-pub use prelude::*;
+pub mod service_prelude;
+pub use service_prelude::*;
 
 #[cfg(not(feature = "web"))]
 pub use crate::proto::{

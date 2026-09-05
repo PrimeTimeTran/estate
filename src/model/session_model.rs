@@ -98,7 +98,6 @@ pub enum FileParticipantAction {
 	OpenAndRead,
 	Edited,
 }
-
 #[derive(Debug, Clone, Hash, Serialize, Deserialize, Eq, PartialEq)]
 pub struct IndexSession {
 	pub start: Option<DateTime<Utc>>,

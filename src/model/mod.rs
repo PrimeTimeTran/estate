@@ -7,20 +7,20 @@ pub use crate::proto::types::{
 pub mod common;
 pub use common::*;
 
-pub mod problem;
-pub use problem::*;
+pub mod problem_model;
+pub use problem_model::*;
 
-pub mod solution;
-pub use solution::*;
+pub mod solution_model;
+pub use solution_model::*;
 
-pub mod submission;
-pub use submission::*;
+pub mod submission_model;
+pub use submission_model::*;
 
-pub mod session;
-pub use session::*;
+pub mod session_model;
+pub use session_model::*;
 
-pub mod task;
-pub use task::*;
+pub mod task_model;
+pub use task_model::*;
 
 pub mod discover_model;
-// pub use crate::model::discover_model as discover_model;
+pub use discover_model::*;

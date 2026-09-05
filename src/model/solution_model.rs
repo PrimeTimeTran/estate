@@ -1,7 +1,4 @@
-use crate::{
-	model::{common::Language, *},
-	prelude::*,
-};
+use crate::{model::*, prelude::*};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StoredSolution {

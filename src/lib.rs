@@ -8,17 +8,15 @@
 //! Obsidian with a code editor.
 //!
 //! - [App]: Core business logic
+//! - [AppRuntime]: Platform specific capabilities.
+//! - [EstateEngine]: Estate Paradigm business logic utilities including vfs, resolvers,
 //!
-//! ## Targets
-//! - Native:
-//! - Web:
+//! ## Build Targets
 //!
+//! - [Laptop/Desktop](NativeApp)
+//! - [Web/Browser](WebApp)
 //!
-//! [`dot repo`]: This is the text of the first footnote.
-//!
-//! [^1]: https://chatgpt.com/c/6a9a72bb-76d4-83ea-99b9-5b33b75c008c
-//! [^2]: This is the text of the first footnote.
-// #![allow(warnings)]
+#![allow(warnings)]
 
 // Disables unused input variables
 // #![allow(unused_variables)]
