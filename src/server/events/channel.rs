@@ -1,6 +1,6 @@
 use tokio::sync::mpsc::error::TryRecvError;
 
-use crate::{e, prelude::*};
+use crate::prelude::*;
 
 pub fn channel<T>(capacity: usize) -> (EventSender<T>, EventReceiver<T>) {
 	// EventSender<T> ─┐

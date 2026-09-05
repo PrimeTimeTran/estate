@@ -1,4 +1,4 @@
-use crate::{e, native::prelude::*, prelude::*, ui};
+use crate::prelude::*;
 
 /// ## [EventDispatcher]
 ///
@@ -20,14 +20,14 @@ impl<R: Runtime> Default for EventDispatcher<R> {
 
 impl<R: Runtime> EventDispatcher<R> {
 	pub fn new() -> Self {
-		/// ## [new]
-		///
-		/// One event → Many handlers
-		///                  ┌──> Handler A
-		///                  │
-		/// Event           ─┼──> Handler B
-		///                  │
-		///                  └──> Handler C
+		// ## [new]
+		//
+		// One event → Many handlers
+		//                  ┌──> Handler A
+		//                  │
+		// Event           ─┼──> Handler B
+		//                  │
+		//                  └──> Handler C
 		Self {
 			handlers: Vec::new(),
 		}

@@ -10,10 +10,7 @@ pub mod ui_prelude;
 pub mod ui_trait;
 pub mod view;
 
-pub use crate::ui::{
-	config::*, layout::*, primitive::*, region::*, screen::*, theme::palette::*, ui_prelude::*,
-	view::*,
-};
+pub use crate::ui::ui_prelude::*;
 
 pub const TRAY_ICON: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/estate-tray.png"));
 pub const TRAY_SCROLL_ICON: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/estate-tray.png"));

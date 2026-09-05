@@ -1,4 +1,4 @@
-use crate::{app::state::EstateState, e, native::prelude::*, ui::*, ui_prelude::*};
+use crate::{app::state::EstateState, e, native::prelude::*, prelude::*};
 
 // The first concrete implementation of Veable is here.
 //
@@ -322,27 +322,4 @@ impl<R: Runtime, E: Executor> Screen<R, E> for Sidebar {
 
 	fn event(&mut self, event: &e::Event, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
 	}
-	// fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R, E>) {
-	// 	ui.vertical(|ui| {
-	// 		for button in &self.buttons {
-	// 			if ui.button(*button).clicked() {
-	// 				match *button {
-	// 					"New Task" => ctx.app.new_task(),
-	// 					"Show Tasks" => ctx.app.show_tasks(),
-	// 					"Clear Tasks" => ctx.app.clear_tasks(),
-	// 					"Stop Session" => {
-	// 						ctx
-	// 							.app
-	// 							.engine
-	// 							.runtime
-	// 							.emit(e::Event::app(e::EventKind::SessionStop {
-	// 								session: ctx.app.engine.runtime.session(),
-	// 							}));
-	// 					}
-	// 					_ => {}
-	// 				}
-	// 			}
-	// 		}
-	// 	});
-	// }
 }
