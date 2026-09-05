@@ -55,6 +55,7 @@ pub use cli::context::*;
 #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 pub use crate::{
 	app::{app_native::*, context::*, *},
+	logger::*,
 	native::{native_prelude::*, *},
 	native_state::*,
 	server::{self, events::*},

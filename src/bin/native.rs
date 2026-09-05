@@ -15,7 +15,7 @@
 // estate fmt path/to/file.rs
 // ```
 
-// lib.rs must have th efollowing for logger import here to use.
+// lib.rs must have the following for logger import here to use.
 // pub mod tool;
 // pub use tool::*;
 

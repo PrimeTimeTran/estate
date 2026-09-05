@@ -99,48 +99,85 @@ use revelation::analyzer::{Workspace, *};
 /// ## [EstateDaemon]
 ///
 /// Daemon process which watches package management files to sync with IDE settings files.
+///
+/// ### Methods
+///
+/// - [EstateDaemon::start]
+/// - [EstateDaemon::execute]
+/// - [EstateDaemon::shutdown]
+///
 #[async_trait]
 pub trait EstateDaemon {
 	async fn execute(&mut self, action: ActionRequest) -> Result<DaemonResponse>;
 	/// ## [EstateDaemon::start]
+	///	After starting the process you'll need to manage it's lifecycle.
 	///
-	/// ### Examples
-	/// Set PID
+	/// Once you start the daemon you should see a PID print.
+	///
+	/// ### Lifecycle
+	///
+	/// Paths are dynamic by platform. These paths are on MacOS
+	///
+	/// #### Set PID
+	///
+	/// Enable easier debugging of Daemon by setting a shell environment variable named `PID`.
+	///
+	/// ```sh
 	/// PID=$(cat /tmp/estate-daemon.pid)
+	/// ```
 	///
-	/// ### Check Process Alive
-	///
-	/// Confirm the process is alive and running
+	/// #### Check Confirm process is running.
 	///
 	///	```sh
 	/// ps -p "$PID" -o pid,ppid,stat,lstart,etime,command
 	/// ```
 	///
-	///  pgrep -af 'estate.*daemon'
-	///  ps aux | grep '[e]state.*daemon'
+	/// #### Check
 	///
-	/// ### Example:
+	/// pgrep searches the process list by name/command line.
 	///
 	/// ```sh
-	/// ps -p "$PID" -o pid,ppid,stat,lstart,etime,command
-	///  PID  PPID STAT COMMAND
-	/// 79461 11424 S+   /Users/future/kb/project/target/debug/native
-	///	```
+	/// pgrep -af 'estate.*daemon'
+	/// ```
+	///
+	/// - `-a` → show the full command line
+	/// - `-f` → match against the entire command line, not just the process name
+	/// - 'estate.*daemon' → regex matching something like estate ... daemon
+	///
+	/// ```sh
+	/// ps aux | grep '[e]state.*daemon'
+	/// ```
+	///
 	/// #### Inspect PID File
 	///
+	/// ```sh
 	/// ps -p "$(cat /tmp/estate-daemon.pid)" -o pid,ppid,stat,command
+	/// ```
 	///
 	/// #### Check Unix socket exists:
+	///
+	/// ```sh
 	/// ls -l /tmp/estate-daemon.sock
+	/// ```
 	///
-	/// Check which process owns the socket:
+	/// #### Check which process owns the socket:
+	///
+	/// ```sh
 	/// lsof /tmp/estate-daemon.sock
+	/// ```
 	///
-	/// Inspect the process's open files:
+	/// ### Inspect Process Resources
+	///
+	/// Show files, libraries, sockets, and other resources currently held open
+	/// by the process.
+	///
+	/// ```sh
 	/// lsof -p "$PID"
+	/// ```
 	///
 	async fn start(&mut self, options: DaemonOptions) -> Result<DaemonResponse>;
 	// ## Inspect hanging process
+	//
 	// kill -0 "$PID"
 	//
 	// - Doesn't terminate the process; it only checks

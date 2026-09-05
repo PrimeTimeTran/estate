@@ -25,13 +25,14 @@ impl<R: Runtime, E> AppRuntime<R, E> {
 			view: crate::START_VIEW,
 		}
 	}
-	pub fn start_services(&self) {
+	pub fn start_services(&self) -> Result<()> {
 		println!("AppRuntime start_services");
 		// self
 		// 	.engine
 		// 	.runtime
 		// 	.emit(e::Event::app(e::Klass::SessionStart {}));
 		// tracing::info!("AppRuntime start_services");
+		Ok(())
 	}
 }
 impl<R: Runtime + 'static, E: Executor> AppRuntime<R, E> {

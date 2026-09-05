@@ -18,6 +18,10 @@ icon = ["assets/icon.icns"]
 
 
 [[bin]]
+name = "daemon"
+path = "src/bin/daemon.rs"
+
+[[bin]]
 name = "web"
 path = "src/bin/web.rs"
 required-features = ["web"]
@@ -57,7 +61,6 @@ required-features = ["native"]
 [[bin]]
 name = "threads"
 path = "src/bin/threads.rs"
-
 
 [[bin]]
 name = "lifetime"

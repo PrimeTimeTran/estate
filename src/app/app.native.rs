@@ -36,11 +36,15 @@ pub struct NativeApp {
 }
 
 impl Context for NativeApp {
+	type Args = Cli;
 	type Host = NativeHost;
 	type Runtime = NativeRuntime;
-	type Args = Cli;
+
 	fn new() -> Result<Self> {
 		NativeApp::new()
+	}
+	fn run(&mut self, cli: Self::Args) -> Result<()> {
+		NativeApp::run(self, cli)
 	}
 	fn host(&self) -> &Self::Host {
 		&self.host
@@ -48,9 +52,7 @@ impl Context for NativeApp {
 	fn runtime(&self) -> &Self::Runtime {
 		&self.runtime
 	}
-	fn run(&mut self, cli: Self::Args) -> Result<()> {
-		NativeApp::run(self, cli)
-	}
+
 	fn foo(&self, args: String) -> Result<()> {
 		NativeApp::foo(&self, args)
 	}
@@ -60,7 +62,82 @@ impl Context for NativeApp {
 }
 
 impl NativeApp {
+	pub fn start(&mut self) -> Result<()> {
+		self.runtime.start_services()?;
+		self.app.start_services()?;
+		self.start_daemon()?;
+		self.start_signal_handler()?;
+		Ok(())
+	}
+
+	pub fn run_foreground(&mut self) -> Result<()> {
+		self.wait_for_shutdown()
+	}
+
+	pub fn run_tray(&mut self) -> Result<()> {
+		self.start_tray()?;
+		self.run_event_loop()
+	}
+
+	pub fn run_window(&mut self) -> Result<()> {
+		self.start_window()?;
+		self.run_event_loop()
+	}
+
+	pub fn run_event_loop(&mut self) -> Result<()> {
+		Ok(())
+	}
+
+	pub fn start_tray(&mut self) -> Result<()> {
+		Ok(())
+	}
+	pub fn start_window(&mut self) -> Result<()> {
+		Ok(())
+	}
+	pub fn start_daemon(&mut self) -> Result<()> {
+		Ok(())
+	}
+	pub fn start_signal_handler(&mut self) -> Result<()> {
+		Ok(())
+	}
+	pub fn wait_for_shutdown(&mut self) -> Result<()> {
+		Ok(())
+	}
+
+	// fn request_shutdown(&mut self, event_loop: &ActiveEventLoop) {
+	// 	self.shutdown()?;
+	// 	event_loop.exit();
+	// }
+
+	// pub fn shutdown(&mut self) -> Result<()> {
+	// 	// orderly teardown
+	// }
 	pub fn new() -> Result<Self> {
+		// new, start, run matrix
+		// I want the code base to support
+		//
+		// 1:[DaemonProcess]
+		// Fire & Forget
+		// - Starts daemon in either foreground or background, do work, edit when done.
+		//
+		// 2:[CLIProcess]
+		// Active, like a server start command.
+		// - Starts daemon in foreground and is in "watch mode" printing updates to UI.
+		//
+		// 3:[OSMenuProcess]
+		// Native App with OS Menu bar icon
+		//
+		// - Starts app as daemon process, exits the CLI, leaves app 'on' in the menubar.
+		// - May or may not keep CLI process on in the background
+		//
+		// 4:[OSAppProcess]
+		// Native App with OS Window
+		//
+		// - Starts the app as an Active window in the foreground.
+		// - May or may not keep CLI process on in the background
+		//
+		//
+		// - Run
 		let tokio = tokio::runtime::Runtime::new()?;
 		let handle = tokio.handle().clone();
 		// Runtime owns all runtime infrastructure:
@@ -75,6 +152,7 @@ impl NativeApp {
 		app.start_services();
 
 		let host = NativeHost::new();
+
 		let (daemon_tx, daemon_rx) = mpsc::channel(100);
 		Ok(Self {
 			app,
@@ -93,6 +171,62 @@ impl NativeApp {
 			windows: vec![],
 		})
 	}
+
+	// pub fn start(&mut self) -> Result<()> {
+	// 	self.runtime.start_services();
+	// 	// EstateEngineRuntime
+	// 	self.runtime().start_services();
+	// 	let daemon_rx = self.daemon_rx.take().expect("daemon already started");
+	// 	let (ready_tx, ready_rx) = std::sync::mpsc::sync_channel::<Result<Arc<NativeApiClient>>>(1);
+	// 	self.spawn_daemon(daemon_rx, ready_tx);
+	// 	self.spawn_global_hotkey_daemon()?;
+	// 	let event_loop = EventLoop::<AppEvent>::with_user_event()
+	// 		.with_activation_policy(ActivationPolicy::Regular)
+	// 		.build()?;
+	// 	if let Some(menu) = &self.menu_bar {
+	// 		menu.init_for_nsapp();
+	// 	}
+	// 	let proxy = event_loop.create_proxy();
+	// 	self.spawn_clock(proxy.clone());
+	// 	self.spawn_cursor_daemon(proxy.clone());
+	// 	self.spawn_signal_handler(proxy.clone());
+	// 	self.runtime_old().attach_event_proxy(proxy);
+	// 	self
+	// 		.runtime_old()
+	// 		.emit(e::Event::app(e::Klass::SessionStart));
+	// 	event_loop.run_app(self)?;
+	// 	tracing::info!(">>> NativeApp::start_runtime returning");
+	// 	Ok(())
+	// }
+
+	pub fn shutdown(&mut self, event_loop: &ActiveEventLoop) -> Result<()> {
+		tracing::info!(">>> shutting down runtime");
+		let snapshot = {
+			let runtime = self.runtime();
+			let mut state = runtime.state.write();
+			state.session.end();
+			state.clone()
+		};
+		self.runtime().save(&snapshot);
+		self.is_clocking.store(false, Ordering::Relaxed);
+		self.hotkey_manager.shutdown();
+		match self.daemon_tx.try_send(DaemonCommand::Stop) {
+			Ok(()) => tracing::info!(">>> daemon stop sent"),
+			Err(error) => tracing::error!(%error, ">>> daemon stop failed"),
+		}
+		tracing::info!(">>> runtime shutdown complete");
+		event_loop.exit();
+		Ok(())
+	}
+	// pub fn shutdown(&mut self) -> Result<()> {
+	// 	// self.runtime.shutdown()
+	// 	Ok(())
+	// }
+}
+
+impl NativeApp {
+	// self.runtime.start_services();
+
 	fn foo(&self, _cli: String) -> Result<()> {
 		todo!("run")
 	}
@@ -111,6 +245,10 @@ impl NativeApp {
 	}
 }
 impl NativeApp {
+	/// [NativeApp::run]
+	///
+	/// Entry for Estate tasks/commands.
+	///
 	pub fn run(&mut self, cli: Cli) -> Result<()> {
 		tracing::debug!(">>> NativeApp::run entered");
 		let result = match cli.command {
@@ -635,6 +773,7 @@ impl NativeApp {
 			}
 		});
 	}
+
 	fn spawn_signal_handler(&mut self, proxy: EventLoopProxy<AppEvent>) {
 		std::thread::spawn(move || {
 			tracing::info!("SIGNAL: thread started");
@@ -647,24 +786,6 @@ impl NativeApp {
 			}
 			tracing::info!("SIGNAL: thread exiting");
 		});
-	}
-	fn shutdown(&mut self, event_loop: &ActiveEventLoop) {
-		tracing::info!(">>> shutting down runtime");
-		let snapshot = {
-			let runtime = self.runtime();
-			let mut state = runtime.state.write();
-			state.session.end();
-			state.clone()
-		};
-		self.runtime().save(&snapshot);
-		self.is_clocking.store(false, Ordering::Relaxed);
-		self.hotkey_manager.shutdown();
-		match self.daemon_tx.try_send(DaemonCommand::Stop) {
-			Ok(()) => tracing::info!(">>> daemon stop sent"),
-			Err(error) => tracing::error!(%error, ">>> daemon stop failed"),
-		}
-		tracing::info!(">>> runtime shutdown complete");
-		event_loop.exit();
 	}
 }
 impl NativeApp {

@@ -45,17 +45,16 @@ impl NativeRuntime {
 		Ok(Self {
 			event_rx,
 			events,
+			executor,
 			handle,
-			services,
-			// api: Box::new(NativeApiClient::new()),
 			proxy: Arc::new(Mutex::new(None)),
+			services,
+			session_service,
 			session: Session::default(),
+			state_service,
 			state: Arc::new(runtime_state),
 			store,
 			tasks: Arc::new(RwLock::new(TaskManager::new())),
-			state_service,
-			session_service,
-			executor,
 		})
 	}
 
@@ -70,9 +69,10 @@ impl NativeRuntime {
 	/// ## Start Services
 	///
 	/// Starts Platform agnostic Services
-	pub fn start_services(&self) {
+	pub fn start_services(&self) -> Result<()> {
 		println!("NativeRuntime start_services");
-		tracing::info!("NativeRuntime start_services")
+		tracing::info!("NativeRuntime start_services");
+		Ok(())
 	}
 }
 

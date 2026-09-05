@@ -47,7 +47,7 @@ use crate::{
 	native::daemon::projection::command,
 };
 
-pub(crate) async fn execute<R: Runtime>(
+pub async fn execute<R: Runtime>(
 	parsed_cli: Cli,
 	ctx: cli::context::Context,
 	engine: model::EstateEngine<R>,

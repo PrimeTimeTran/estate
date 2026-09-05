@@ -231,7 +231,10 @@ impl TraceFlow {
 	pub fn debug(&self, message: impl std::fmt::Display) {
 		self.event(LogLevel::Debug, message);
 	}
-
+	/// [info]
+	///
+	/// "Always on" level
+	///
 	pub fn info(&self, message: impl std::fmt::Display) {
 		self.event(LogLevel::Info, message);
 	}
