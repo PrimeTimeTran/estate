@@ -382,7 +382,7 @@ pub struct Probe {
 pub type ProbeSet = &'static [Probe];
 
 #[derive(Debug)]
-///      Async tasks triggerable by events
+/// Async tasks triggered by events
 pub enum DiscoveryTask {
 	Index(PathBuf),
 	GenerateConfig(PathBuf),

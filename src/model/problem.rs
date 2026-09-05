@@ -1,7 +1,6 @@
 use crate::{
-	model::{ProtoProblem, common::Language, *},
+	model::{common::Language, *},
 	prelude::*,
-	proto::types::Example,
 };
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, Hash)]

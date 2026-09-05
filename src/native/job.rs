@@ -6,7 +6,7 @@
 // | Individual background execution | `Job`          | Has lifecycle/state           |
 // | UI representation               | `Task` / `Job` | Shows pending/running/etc.    |
 
-use crate::{app::*, native::agent::AgentContext, prelude::*};
+use crate::{native::agent::AgentContext, prelude::*};
 
 use notify::{Event, EventKind};
 

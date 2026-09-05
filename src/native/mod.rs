@@ -16,6 +16,8 @@ pub mod task;
 pub mod ui;
 pub mod window;
 
+pub use discovery::*;
+
 pub use crate::native::scroll::*;
 
 pub use screens::*;
