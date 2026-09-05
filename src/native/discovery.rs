@@ -2,11 +2,24 @@ use crate::{data, prelude::*};
 
 use revelation::analyzer::Workspace;
 
-impl Default for EstateDiscovery {
+#[derive(Clone, Debug)]
+pub struct Disconnected;
+#[derive(Clone, Debug)]
+pub struct Connected {
+	task_tx: mpsc::Sender<DiscoveryTask>,
+}
+
+#[derive(Clone, Debug)]
+pub struct EstateDiscovery<State = Disconnected> {
+	pub store: DiscoveryStore,
+	state: State,
+}
+
+impl Default for EstateDiscovery<Disconnected> {
 	fn default() -> Self {
 		Self {
-			task_tx: Self::prepare(),
 			store: DiscoveryStore::default(),
+			state: Disconnected,
 		}
 	}
 }
@@ -30,6 +43,7 @@ impl EstateDiscovery {
 	}
 }
 impl EstateDiscovery {
+	// #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 	pub fn init() -> std::io::Result<DiscoveryStore> {
 		let cwd = std::env::current_dir()?;
 		let mut discovery = Self::default();

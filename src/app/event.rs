@@ -2,7 +2,8 @@
 ///
 pub use crate::prelude::*;
 
-/// Event Structure
+/// [Event]
+///
 #[derive(Debug, Clone, Deserialize, Hash, Serialize)]
 pub struct Event {
 	pub id: u64,

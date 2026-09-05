@@ -1,7 +1,4 @@
-use crate::{
-	prelude::*,
-	r#trait::{Context, EventReceiver},
-};
+use crate::{prelude::*, r#trait::Context};
 
 // #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 // use crate::NativeRuntime;
@@ -12,7 +9,7 @@ use crate::{
 // #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 // use crate::logger::{LogConfig, Tracer};
 
-/// # App
+/// # [App]
 /// We have 3 primary target platforms which we're developing for. They access resources in similar yet
 /// unique ways. Native (Desktop/Laptop), Web (Browser/Client/WASM), Server (Api/Backend) all want access to user,
 /// anchors (bookmarks), jobs (tasks), and more.

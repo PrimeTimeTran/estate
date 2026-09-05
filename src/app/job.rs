@@ -1,5 +1,7 @@
 use crate::prelude::*;
 
+/// [Job]
+///
 #[derive(Debug, Clone, Eq, Deserialize, PartialEq, Serialize)]
 pub struct Job {
 	pub id: Uuid,
