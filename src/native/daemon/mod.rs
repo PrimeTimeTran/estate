@@ -96,36 +96,49 @@ use crate::{native::daemon::DocCompiler, prelude::*};
 use cli::prelude::Context as CliContext;
 use revelation::analyzer::{Workspace, *};
 
+/// ## [EstateDaemon]
+///
+/// Daemon process which watches package management files to sync with IDE settings files.
 #[async_trait]
 pub trait EstateDaemon {
-	// # [Troubleshoot Daemon]
-	// Set PID
-	// PID=$(cat /tmp/estate-daemon.pid)
-	//
-	// ## Check Process Alive
-	// ps -p "$PID" -o pid,ppid,stat,lstart,etime,command
-	//  pgrep -af 'estate.*daemon'
-	//  ps aux | grep '[e]state.*daemon'
-	//
-	// ### Example:
-	// ps -p "$PID" -o pid,ppid,stat,lstart,etime,command
-	//  PID  PPID STAT COMMAND
-	// 79461 11424 S+   /Users/future/kb/project/target/debug/native
-	//
-	// ## Inspect PID File
-	// ps -p "$(cat /tmp/estate-daemon.pid)" -o pid,ppid,stat,command
-	//
-	//
-	// ## Check Unix socket exists:
-	// ls -l /tmp/estate-daemon.sock
-	//
-	// Check which process owns the socket:
-	// lsof /tmp/estate-daemon.sock
-	//
-	// Inspect the process's open files:
-	// lsof -p "$PID"
-	//
 	async fn execute(&mut self, action: ActionRequest) -> Result<DaemonResponse>;
+	/// ## [EstateDaemon::start]
+	///
+	/// ### Examples
+	/// Set PID
+	/// PID=$(cat /tmp/estate-daemon.pid)
+	///
+	/// ### Check Process Alive
+	///
+	/// Confirm the process is alive and running
+	///
+	///	```sh
+	/// ps -p "$PID" -o pid,ppid,stat,lstart,etime,command
+	/// ```
+	///
+	///  pgrep -af 'estate.*daemon'
+	///  ps aux | grep '[e]state.*daemon'
+	///
+	/// ### Example:
+	///
+	/// ```sh
+	/// ps -p "$PID" -o pid,ppid,stat,lstart,etime,command
+	///  PID  PPID STAT COMMAND
+	/// 79461 11424 S+   /Users/future/kb/project/target/debug/native
+	///	```
+	/// #### Inspect PID File
+	///
+	/// ps -p "$(cat /tmp/estate-daemon.pid)" -o pid,ppid,stat,command
+	///
+	/// #### Check Unix socket exists:
+	/// ls -l /tmp/estate-daemon.sock
+	///
+	/// Check which process owns the socket:
+	/// lsof /tmp/estate-daemon.sock
+	///
+	/// Inspect the process's open files:
+	/// lsof -p "$PID"
+	///
 	async fn start(&mut self, options: DaemonOptions) -> Result<DaemonResponse>;
 	// ## Inspect hanging process
 	// kill -0 "$PID"
@@ -133,10 +146,11 @@ pub trait EstateDaemon {
 	// - Doesn't terminate the process; it only checks
 	// whether the process exists and is accessible.
 	//
-	// ## Graceful stop (handle cleanup, flush files, release resources, remove PID file, etc)
+	// #### Graceful stop (handle cleanup, flush files, release resources, remove PID file, etc)
 	// kill "$PID"
 	//
 	// ## Force-stop only if necessary:
+	//
 	// kill -9 "$PID"
 	async fn shutdown(&mut self) -> Result<DaemonResponse>;
 }
