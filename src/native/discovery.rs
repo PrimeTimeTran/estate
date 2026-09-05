@@ -17,6 +17,18 @@ impl Default for EstateDiscovery<Disconnected> {
 		}
 	}
 }
+impl EstateDiscovery<Disconnected> {
+	pub fn connect(self, handle: &tokio::runtime::Handle) -> EstateDiscovery<Connected> {
+		let (task_tx, rx) = mpsc::channel::<DiscoveryTask>(100);
+
+		handle.spawn(worker(rx));
+
+		EstateDiscovery {
+			store: self.store,
+			state: Connected { task_tx },
+		}
+	}
+}
 impl EstateDiscovery {
 	fn discover_files(&mut self, root: &Path) -> std::io::Result<()> {
 		self.walk_files(root)
