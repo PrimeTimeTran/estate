@@ -1,12 +1,7 @@
-use crate::prelude::*;
 use crate::{data, prelude::*};
+
 use revelation::analyzer::Workspace;
 
-#[derive(Clone, Debug)]
-pub struct EstateDiscovery {
-	pub store: DiscoveryStore,
-	pub task_tx: mpsc::Sender<DiscoveryTask>,
-}
 impl Default for EstateDiscovery {
 	fn default() -> Self {
 		Self {

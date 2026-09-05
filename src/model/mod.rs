@@ -24,5 +24,5 @@ pub use session::*;
 pub mod task;
 pub use task::*;
 
-// pub mod discovery;
-// pub use discovery::*;
+pub mod discovery;
+pub use discovery::*;
