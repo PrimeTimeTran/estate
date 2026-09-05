@@ -31,7 +31,7 @@ pub use crate::{
 	theme::*,
 	tool::{time::*, *},
 	r#trait::*,
-	ui::{config::*, r#trait::*, ui_prelude::*, *},
+	ui::{config::*, ui_prelude::*, ui_trait::*, *},
 };
 
 #[cfg(all(feature = "web", target_arch = "wasm32"))]
@@ -45,7 +45,7 @@ pub use cli::context::*;
 
 #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 pub use crate::{
-	app::{app_native::*, *},
+	app::{app_native::*, context::*, *},
 	native::{prelude::*, *},
 	server::{self, events::*},
 };

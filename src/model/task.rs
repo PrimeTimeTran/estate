@@ -3,7 +3,7 @@ use std::time::SystemTime;
 use crate::prelude::*;
 
 #[cfg(feature = "native")]
-use crate::native::job::*;
+use crate::native::native_job::*;
 
 #[derive(Debug, Clone, Eq, Deserialize, PartialEq, Serialize)]
 pub struct Task {

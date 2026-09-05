@@ -51,7 +51,7 @@ pub use winit::{
 /// cause compilation errors or runtime issues in the native platform targets.
 pub use crate::{
 	native::{
-		self, daemon::*, discovery::*, job::*, lint::*, monitor::*, state::*, ui::*, window::*,
+		self, daemon::*, discovery::*, lint::*, monitor::*, native_job::*, state::*, ui::*, window::*,
 	},
 	runtime::*,
 	server::*,

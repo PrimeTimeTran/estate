@@ -1,4 +1,4 @@
-use crate::{app::*, prelude::*};
+use crate::prelude::*;
 
 pub struct MarkdownScreen {
 	markdown: String,
