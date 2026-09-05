@@ -1,11 +1,4 @@
 use crate::native::prelude::*;
-use core_foundation::runloop::{CFRunLoop, kCFRunLoopCommonModes};
-use core_graphics::{
-	display::{CGDisplay, CGPoint, CGRect},
-	event::*,
-	event_source::{CGEventSource, CGEventSourceStateID},
-};
-use winit::event_loop::EventLoopProxy;
 
 pub static SCROLL_STATE: OnceLock<Mutex<ScrollRedirectState>> = OnceLock::new();
 

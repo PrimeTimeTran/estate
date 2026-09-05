@@ -18,7 +18,12 @@
 //!
 //! [^1]: https://chatgpt.com/c/6a9a72bb-76d4-83ea-99b9-5b33b75c008c
 //! [^2]: This is the text of the first footnote.
-#![allow(warnings)]
+// #![allow(warnings)]
+
+// Disables unused input variables
+#![allow(unused_variables)]
+// Disables unused input variables
+#![allow(unused_results)]
 
 pub mod api;
 pub mod data;

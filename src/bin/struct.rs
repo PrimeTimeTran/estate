@@ -93,7 +93,7 @@ fn unit_struct() {
 	let conn: Connection<Connected> = conn.connect();
 	conn.send_data("hello");
 	conn.bandwidth();
-	let conn = conn.disconnect();
+	let _conn = conn.disconnect();
 }
 
 fn main() {

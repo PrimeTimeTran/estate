@@ -1,15 +1,12 @@
 use crate::{
-	api::Api,
-	app::{state::EstateState, *},
-	e,
+	// app::{state::EstateState, *},
+	// e,
 	prelude::*,
-	theme::palette,
-	ui::{Component, Layout},
 };
-use egui::Ui;
-use egui_extras::{Column, TableBuilder};
-use egui_plot::{Bar, BarChart, Plot};
-use Duration;
+// use egui::Ui;
+// use egui_extras::{Column, TableBuilder};
+// use egui_plot::{Bar, BarChart, Plot};
+// use Duration;
 
 impl TaskManager {
 	pub fn new() -> Self {

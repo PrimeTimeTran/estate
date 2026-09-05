@@ -100,10 +100,10 @@ impl NativeApp {
 			windows: vec![],
 		})
 	}
-	fn foo(&self, cli: String) -> Result<()> {
+	fn foo(&self, _cli: String) -> Result<()> {
 		todo!("run")
 	}
-	fn bar(&self, cli: String) -> Result<()> {
+	fn bar(&self, _cli: String) -> Result<()> {
 		todo!("run")
 	}
 	/// Inner NativeApp

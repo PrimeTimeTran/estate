@@ -4,12 +4,14 @@
 //! 'pub use' enables external users of this crate to access the public dependencies.
 //! The double prelude is done to manage native dependencies in a centralized manner, allowing for easier maintenance and updates.
 //!
+pub use core_foundation::runloop::{CFRunLoop, kCFRunLoopCommonModes};
 pub use core_graphics::{
-	display::CGDisplay,
+	display::{CGDisplay, CGPoint, CGRect},
 	event::*,
 	event_source::{CGEventSource, CGEventSourceStateID},
-	geometry::CGPoint,
+	geometry,
 };
+
 pub use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 pub use rmcp::{
 	handler::server::wrapper::Parameters,
@@ -32,6 +34,7 @@ pub use tray_icon::{
 	Icon, TrayIcon, TrayIconBuilder,
 	menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu},
 };
+// pub use winit::event_loop::EventLoopProxy;
 pub use winit::{
 	application::ApplicationHandler,
 	event::WindowEvent,

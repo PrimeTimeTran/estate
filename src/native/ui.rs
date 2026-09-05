@@ -254,7 +254,7 @@ pub fn move_cursor_to(pos: ScreenPosition) {
 		ScreenPosition::Right => bounds.origin.x + bounds.size.width * 0.875,
 	};
 	let y = bounds.origin.y + bounds.size.height * 0.5;
-	let point = CGPoint { x, y };
+	let point = geometry::CGPoint { x, y };
 	if let Ok(source) = CGEventSource::new(CGEventSourceStateID::CombinedSessionState) {
 		if let Ok(event) =
 			CGEvent::new_mouse_event(source, CGEventType::MouseMoved, point, CGMouseButton::Left)

@@ -17,7 +17,7 @@
 //
 // "rust-analyzer.cargo.target": "wasm32-unknown-unknown",
 
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use estate::*;
 
 // Turning feature flag is not enough, must set rust analyzer feature as well for cmd+click
