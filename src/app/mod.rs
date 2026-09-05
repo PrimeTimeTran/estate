@@ -28,6 +28,10 @@ pub mod prelude;
 pub mod state;
 pub mod task;
 
+pub use crate::app::prelude as app_prelude;
+pub use crate::app::state as app_state;
+pub use app_prelude::*;
+
 /// Platform Gates
 #[cfg(feature = "native")]
 #[path = "./app.native.rs"]
@@ -44,6 +48,3 @@ pub mod app_web;
 #[cfg(feature = "mobile")]
 #[path = "./app.mobile.rs"]
 pub mod app_mobile;
-
-pub use crate::app::prelude as app_prelude;
-pub use app_prelude::*;

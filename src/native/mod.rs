@@ -5,8 +5,8 @@ pub mod discovery;
 pub mod lint;
 pub mod monitor;
 pub mod native_job;
+pub mod native_prelude;
 pub mod poc;
-pub mod prelude;
 pub mod resolver;
 pub mod router;
 pub mod screens;
@@ -16,10 +16,9 @@ pub mod task;
 pub mod ui;
 pub mod window;
 
-pub use discovery::*;
-
+pub use crate::native::discovery::*;
+pub use crate::native::native_prelude::*;
 pub use crate::native::scroll::*;
-
 pub use screens::*;
 
 #[cfg(target_os = "linux")]

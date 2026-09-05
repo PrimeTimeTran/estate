@@ -1,4 +1,4 @@
-pub use crate::{native::prelude::*, prelude::*};
+pub use crate::prelude::*;
 
 use comfy_table::{Cell, Table, presets::UTF8_FULL};
 use revelation::analyzer::{Workspace, *};

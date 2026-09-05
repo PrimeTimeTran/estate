@@ -1,6 +1,5 @@
-use crate::{
-	app::AppContext, doc, native::prelude::*, prelude::anyhow::anyhow, ui, ui_prelude as gui,
-};
+use crate::{app::AppContext, doc, prelude::anyhow::anyhow, prelude::*, ui, ui_prelude as gui};
+
 pub use egui_winit::State;
 pub use objc2_app_kit::{NSApplication, NSApplicationActivationPolicy};
 pub use objc2_foundation::MainThreadMarker;

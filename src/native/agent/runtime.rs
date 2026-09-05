@@ -2,7 +2,7 @@ use super::{
 	Agent, SystemEvent,
 	agent_event::{AgentEvent, RuntimeEvent},
 };
-use crate::native::{native_job, prelude::*};
+use crate::{native::native_job, prelude::*};
 
 #[derive(Debug, Default)]
 pub struct AgentRegistry;

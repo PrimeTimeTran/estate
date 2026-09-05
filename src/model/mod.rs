@@ -4,8 +4,6 @@ pub use crate::proto::types::{
 	SolutionStatus as ProtoSolutionStatus, SubmissionStatus as ProtoSubmissionStatus,
 };
 
-use crate::proto::types as P;
-
 pub mod common;
 pub use common::*;
 
@@ -25,4 +23,4 @@ pub mod task;
 pub use task::*;
 
 pub mod discovery;
-pub use discovery::*;
+pub use crate::model::discovery as discover_model;

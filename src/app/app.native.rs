@@ -1,13 +1,6 @@
 use crate::doc;
 
-use crate::{
-	AppEvent, DaemonCommand, NativeExecutor,
-	api::NativeApiClient,
-	app::{Runtime, model::EstateEngine, prelude::*},
-	prelude::*,
-	spawn_global_cursor_daemon,
-	r#trait::Context,
-};
+use crate::{prelude::*, spawn_global_cursor_daemon, r#trait::Context};
 
 /// ## NativeApp (Laptop/Desktop Environment)
 ///

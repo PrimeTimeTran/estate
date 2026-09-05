@@ -1,4 +1,4 @@
-use crate::native::prelude::*;
+use crate::prelude::*;
 
 pub static SCROLL_STATE: OnceLock<Mutex<ScrollRedirectState>> = OnceLock::new();
 

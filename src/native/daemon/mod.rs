@@ -91,10 +91,7 @@ pub mod shell;
 pub use lint::*;
 pub use shell::*;
 
-use crate::{
-	native::{daemon::DocCompiler, prelude::*},
-	prelude::*,
-};
+use crate::{native::daemon::DocCompiler, prelude::*};
 
 use cli::prelude::Context as CliContext;
 use revelation::analyzer::{Workspace, *};
