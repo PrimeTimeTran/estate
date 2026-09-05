@@ -21,6 +21,7 @@ pub use uuid::Uuid;
 pub use crate::{
 	api::*,
 	app::*,
+	app_prelude::*,
 	app_runtime::*,
 	app_state::*,
 	data::*,

@@ -19,16 +19,15 @@
 /// ./src/mobile
 //
 pub mod app;
+pub mod app_prelude;
 pub mod context;
 pub mod event;
 pub mod job;
 pub mod model;
 pub mod modules;
-pub mod prelude;
 pub mod state;
 pub mod task;
 
-pub use crate::app::prelude as app_prelude;
 pub use crate::app::state as app_state;
 pub use app_prelude::*;
 

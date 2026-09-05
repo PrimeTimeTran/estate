@@ -22,5 +22,5 @@ pub use session::*;
 pub mod task;
 pub use task::*;
 
-pub mod discovery;
-pub use crate::model::discovery as discover_model;
+pub mod discover_model;
+// pub use crate::model::discover_model as discover_model;
