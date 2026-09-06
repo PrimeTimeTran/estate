@@ -11,6 +11,7 @@ use tracing_subscriber::{
 	EnvFilter, Layer, filter::LevelFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt,
 };
 
+/// ## [LogLevel]
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum LogLevel {
@@ -217,7 +218,6 @@ impl Tracer {
 		FLOW_ID.fetch_add(1, Ordering::Relaxed) + 1
 	}
 }
-
 impl TraceFlow {
 	fn event(&self, level: LogLevel, message: impl std::fmt::Display) {
 		let id = Tracer::next_flow_id();
@@ -256,12 +256,15 @@ impl TraceFlow {
 	}
 }
 
+/// ## [CargoConfig]
 #[derive(Debug, Deserialize)]
 struct CargoConfig {
 	#[serde(default)]
 	logging: LogConfig,
 }
-/// Minimal representation of a Estate.toml manifest used by Estate.
+/// ## [CargoManifest]
+///
+/// Minimal representation of a estate.toml manifest used by Estate.
 /// This intentionally models only the fields Estate needs rather than
 ///
 /// depending on Cargo's complete manifest schema.
@@ -270,6 +273,7 @@ struct CargoManifest {
 	#[serde(default)]
 	logging: Option<LogConfig>,
 }
+/// ## [LogConfig]
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(default)]
 pub struct LogConfig {
@@ -280,11 +284,14 @@ pub struct LogConfig {
 	// pub fields: LogFields,
 	// pub window: OutputConfig,
 }
+/// ## [LogFieldConfig]
+///
+/// Fields which are configured by the CLI tracer	
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct LogFieldConfig {
 	pub enabled: bool,
 }
-
+/// ## [LogFields]
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct LogFields {
 	pub file: bool,
@@ -294,6 +301,7 @@ pub struct LogFields {
 	pub thread_id: bool,
 	pub timestamp: bool,
 }
+/// ## [OutputConfig]
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default)]
 pub struct OutputConfig {
@@ -308,7 +316,7 @@ impl Default for OutputConfig {
 		}
 	}
 }
-
+/// ## [LogOptions]
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct LogOptions {
 	pub file: Option<OutputOptions>,
@@ -316,15 +324,19 @@ pub struct LogOptions {
 	pub targets: Option<HashMap<String, LogLevel>>,
 	pub terminal: Option<OutputOptions>,
 }
-
+/// ## [OutputOptions]
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct OutputOptions {}
-
+/// ## [Tracer]
+/// 
+/// The object used to trace logs and flow through the app's lifecycle.
+/// 
+/// 
 #[derive(Clone)]
 pub struct Tracer {
 	namespace: String,
 }
-
+/// ## [TraceFlow]
 #[derive(Debug)]
 pub struct TraceFlow {
 	namespace: String,
