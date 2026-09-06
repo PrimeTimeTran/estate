@@ -13,6 +13,12 @@ pub trait Clock {
 	fn run_background(&self, interval: Duration);
 }
 
+fn time_now() -> String {
+	use chrono::Utc;
+	let now = Utc::now();
+	let format = "%B %-d, %Y at %-I:%M:%S %p UTC";
+	now.format(format).to_string()
+}
 pub struct HostClock;
 
 impl Clock for HostClock {
@@ -25,15 +31,7 @@ impl Clock for HostClock {
 
 		#[cfg(not(target_arch = "wasm32"))]
 		{
-			use chrono::Utc;
-			let now = Utc::now();
-			let format = "%B %-d, %Y at %-I:%M:%S %p UTC";
-			// println!(now.format(format).to_string());
-			now.format(format).to_string()
-			// SystemTime::now()
-			// 	.duration_since(UNIX_EPOCH)
-			// 	.unwrap()
-			// 	.as_secs()
+			time_now()
 		}
 	}
 
@@ -81,7 +79,10 @@ pub trait Worker {
 }
 
 fn task() {
-	println!("it's currently.")
+	println!(
+		"The task asts the time that's used by the clock. {}",
+		time_now()
+	)
 }
 pub struct HostWorker;
 
@@ -123,7 +124,7 @@ trait Renderer {
 	fn render(&mut self);
 }
 
-struct HostRenderer;
+pub struct HostRenderer;
 
 impl Renderer for HostRenderer {
 	#[cfg(target_arch = "wasm32")]
@@ -180,22 +181,54 @@ impl Provide for Host {
 	// }
 }
 
-struct App {
-	host: Host,
+pub struct App {
+	pub host: Host,
 }
 
 impl App {
-	fn new() -> Self {
+	pub fn new() -> Self {
 		Self { host: Host::new() }
 	}
+	pub fn run(&self, cli: Cli) -> Result<()> {
+		Ok(())
+	}
 
-	fn clock(&self) -> &impl Clock {
+	pub fn clock(&self) -> &impl Clock {
 		self.host.clock()
 	}
 
-	fn worker(&self) -> &impl Worker {
+	pub fn worker(&self) -> &impl Worker {
 		self.host.worker()
 	}
+}
+
+fn append_to_file(str: String) {}
+fn sleep(str: String) {}
+pub fn test_main() {
+	let clock = HostClock;
+	let worker = HostWorker;
+
+	worker.run_background(move || {
+		loop {
+			println!("background tick: {}", clock.now());
+			std::thread::sleep(Duration::from_secs(1));
+		}
+	});
+
+	loop {
+		// println!("foreground");
+		task();
+		std::thread::sleep(Duration::from_secs(3));
+	}
+	// worker.run_background(|| {
+	// 	loop {
+	// 		let now = clock.now();
+
+	// 		append_to_file(now);
+
+	// 		sleep(Duration::from_secs(1));
+	// 	}
+	// });
 }
 
 // fn main() {
@@ -211,32 +244,3 @@ impl App {
 
 // 	std::thread::sleep(std::time::Duration::from_millis(100));
 // }
-
-fn append_to_file(str: String) {}
-fn sleep(str: String) {}
-fn main() {
-	let clock = HostClock;
-	let worker = HostWorker;
-
-	worker.run_background(move || {
-		loop {
-			println!("background tick: {}", clock.now());
-			std::thread::sleep(Duration::from_secs(1));
-		}
-	});
-
-	// worker.run_background(|| {
-	// 	loop {
-	// 		let now = clock.now();
-
-	// 		append_to_file(now);
-
-	// 		sleep(Duration::from_secs(1));
-	// 	}
-	// });
-
-	loop {
-		println!("foreground");
-		std::thread::sleep(Duration::from_secs(5));
-	}
-}

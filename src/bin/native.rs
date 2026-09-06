@@ -37,7 +37,10 @@ fn main() -> Result<()> {
 	let mut config = LogConfig::load()?;
 	config.apply_cli(&parsed)?;
 	logger::init_logging(&config)?;
-	let mut app = App::<NativeApp>::new()?;
+	let mut app = App::new();
+	// let mut app = App::<NativeApp>::new()?;
 	app.run(parsed)?;
+
+	estate::app::test_main();
 	Ok(())
 }

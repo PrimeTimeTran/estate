@@ -440,7 +440,6 @@ pub enum DaemonCommand {
 	// Disable,
 	// Status,
 }
-#[derive(Clone)]
 pub struct DaemonHandle {
 	runtime: NativeRuntime,
 }

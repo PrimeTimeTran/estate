@@ -52,9 +52,9 @@ pub async fn execute<R: Runtime>(
 	ctx: cli::context::Context,
 	engine: model::EstateEngine<R>,
 ) -> Result<(), Error> {
-	let command = parsed_cli.command.unwrap_or(Command::Start { tail: false });
+	let command = parsed_cli.command.unwrap_or(Command::Start { foreground: false, tail: false });
 	match command {
-		Command::Start { tail: false } => {
+		Command::Start { foreground: false, tail: false } => {
 			// app::App::spawn_tray_process();
 		}
 		Command::Tray => {
@@ -122,9 +122,9 @@ pub async fn execute<R: Runtime>(
 				}
 			}
 		}
-		Command::DaemonServer => {
-			native::daemon::DaemonServer::run().await;
-		}
+		// Command::DaemonServer => {
+		// 	native::daemon::DaemonServer::run().await;
+		// }
 		Command::Capabilities(args) => match AnalyzeDaemon.run(&ctx, &args).await {
 			Ok(result) => {
 				MetricsRenderer::render(&result);
@@ -135,14 +135,14 @@ pub async fn execute<R: Runtime>(
 			}
 		},
 		Command::Status => StatusDaemon.run(&ctx).await,
-		Command::Bookmark => command::ViewList.run(&ctx).await,
-		Command::Bookmarks => command::ViewList.run(&ctx).await,
-		Command::Explain => command::Explain.run(&ctx).await,
-		Command::ExplainDoc => command::ExplainDoc.run(&ctx).await,
+		// Command::Bookmark => command::ViewList.run(&ctx).await,
+		// Command::Bookmarks => command::ViewList.run(&ctx).await,
+		// Command::Explain => command::Explain.run(&ctx).await,
+		// Command::ExplainDoc => command::ExplainDoc.run(&ctx).await,
 		Command::View { name } => (command::View { name }).run(&ctx).await,
 		Command::ViewFork { name } => (command::ViewFork { name }).run(&ctx).await,
 		Command::ViewList => command::ViewList.run(&ctx).await,
-		Command::Deps { name } => (command::Deps { name }).run(&ctx).await,
+		// Command::Deps { name } => (command::Deps { name }).run(&ctx).await,
 		Command::Foo(_args) => {
 			let _ = EstateDiscovery::init();
 		}

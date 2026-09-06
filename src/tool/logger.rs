@@ -75,7 +75,10 @@ impl LogConfig {
 	#[cfg(feature = "native")]
 	pub fn apply_cli(&mut self, cli: &cli::context::Cli) -> Result<()> {
 		match &cli.command {
-			Some(cli::context::Command::Start { tail }) => {
+			Some(cli::context::Command::Start {
+				tail,
+				foreground: false,
+			}) => {
 				if *tail {
 					self.terminal.enabled = true;
 				}

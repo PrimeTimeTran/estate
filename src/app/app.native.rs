@@ -39,7 +39,7 @@ pub struct NativeApp {
 
 impl Context for NativeApp {
 	type Args = Cli;
-	type Host = NativeHost;
+	// type Host = NativeHost;
 	type Runtime = NativeRuntime;
 
 	fn new() -> Result<Self> {
@@ -48,9 +48,9 @@ impl Context for NativeApp {
 	fn run(&mut self, cli: Self::Args) -> Result<()> {
 		NativeApp::run(self, cli)
 	}
-	fn host(&self) -> &Self::Host {
-		&self.host
-	}
+	// fn host(&self) -> &Self::Host {
+	// 	&self.host
+	// }
 	fn runtime(&self) -> &Self::Runtime {
 		&self.runtime
 	}
@@ -1216,7 +1216,7 @@ impl ApplicationHandler<AppEvent> for NativeApp {
 pub struct NativeHost {
 	window: NativeWindow,
 	storage: NativeStorage,
-	clock: NativeClock,
+	// clock: NativeClock,
 }
 
 impl NativeHost {
@@ -1228,34 +1228,32 @@ impl NativeHost {
 pub struct NativeWindow;
 #[derive(Debug, Default, Clone)]
 pub struct NativeStorage;
-#[derive(Debug, Default, Clone)]
-pub struct NativeClock;
+// #[derive(Debug, Default, Clone)]
+// pub struct NativeClock;
 
-impl Clock for NativeClock {
-	fn now(&self) -> Instant {
-		todo!("now")
-	}
-}
-impl Host for NativeHost {
-	type Window = NativeWindow;
-	type Storage = NativeStorage;
-	type Clock = NativeClock;
-	fn window(&self) -> &Self::Window {
-		&self.window
-	}
-	fn storage(&self) -> &Self::Storage {
-		&self.storage
-	}
-	fn clock(&self) -> &Self::Clock {
-		&self.clock
-	}
-}
+// impl Clock for NativeClock {
+
+// }
+// impl Host for NativeHost {
+// 	type Window = NativeWindow;
+// 	type Storage = NativeStorage;
+// 	type Clock = NativeClock;
+// 	fn window(&self) -> &Self::Window {
+// 		&self.window
+// 	}
+// 	fn storage(&self) -> &Self::Storage {
+// 		&self.storage
+// 	}
+// 	fn clock(&self) -> &Self::Clock {
+// 		&self.clock
+// 	}
+// }
 
 #[derive(Debug, Clone)]
 pub struct NativeServices {
 	persistence: NativePersistence,
 	network: NativeNetwork,
-	clock: NativeClock,
+	// clock: NativeClock,
 	api: Option<NativeApiClient>,
 }
 
@@ -1265,7 +1263,7 @@ impl NativeServices {
 		Ok(Self {
 			persistence: NativePersistence::default(),
 			network: NativeNetwork::default(),
-			clock: NativeClock::default(),
+			// clock: NativeClock::default(),
 			api: Some(api),
 		})
 	}
@@ -1273,7 +1271,7 @@ impl NativeServices {
 impl Services for NativeServices {
 	type Persistence = NativePersistence;
 	type Network = NativeNetwork;
-	type Clock = NativeClock;
+	// type Clock = NativeClock;
 	type Client = NativeApiClient;
 	fn persistence(&self) -> &Self::Persistence {
 		todo!("");
@@ -1281,9 +1279,9 @@ impl Services for NativeServices {
 	fn network(&self) -> &Self::Network {
 		todo!("")
 	}
-	fn clock(&self) -> &Self::Clock {
-		todo!("");
-	}
+	// fn clock(&self) -> &Self::Clock {
+	// 	todo!("");
+	// }
 	fn api(&self) -> &Option<Self::Client> {
 		&self.api
 	}
@@ -1307,7 +1305,7 @@ impl Default for NativeServices {
 			api: None,
 			persistence: NativePersistence::default(),
 			network: NativeNetwork::default(),
-			clock: NativeClock::default(),
+			// clock: NativeClock::default(),
 		}
 	}
 }

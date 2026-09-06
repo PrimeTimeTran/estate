@@ -92,12 +92,12 @@ pub trait Context: Sized {
 	///
 	/// An associated type whose concrete implementation is selected by
 	/// the [Context] implementor.
-	type Host: Host;
+	// type Host: Host;
 	/// Returns a reference to the concrete [Host] associated with this context.
 	///
 	/// The returned type is [Self::Host], i.e. the associated type selected
 	/// by the concrete [Context] implementation.
-	fn host(&self) -> &Self::Host;
+	// fn host(&self) -> &Self::Host;
 	/// The runtime environment in which the application is running.
 	///
 	/// The concrete runtime implementation is selected by the [Context]
@@ -125,23 +125,23 @@ pub trait Host {
 	/// The concrete environment providing the resources through which the application runs.
 	type Window;
 	type Storage;
-	type Clock;
+	// type Clock;
 
 	// fn platform(&self) -> &Self::Platform;
 	fn window(&self) -> &Self::Window;
 	fn storage(&self) -> &Self::Storage;
-	fn clock(&self) -> &Self::Clock;
+	// fn clock(&self) -> &Self::Clock;
 }
 
 pub trait Services {
 	type Persistence: Persistence;
 	type Network: Network;
-	type Clock: Clock;
+	// type Clock: Clock;
 	type Client: Api;
 
 	fn persistence(&self) -> &Self::Persistence;
 	fn network(&self) -> &Self::Network;
-	fn clock(&self) -> &Self::Clock;
+	// fn clock(&self) -> &Self::Clock;
 
 	/// ## Platform Generic API
 	///
@@ -175,9 +175,9 @@ pub trait Persistence {
 pub trait Network {
 	fn is_available(&self) -> bool;
 }
-pub trait Clock {
-	fn now(&self) -> Instant;
-}
+// pub trait Clock {
+// 	fn now(&self) -> Instant;
+// }
 
 /// ## [Executor]
 ///
