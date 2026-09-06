@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-/// [Job]
+/// ## [Job]
 ///
 #[derive(Debug, Clone, Eq, Deserialize, PartialEq, Serialize)]
 pub struct Job {
@@ -13,6 +13,22 @@ pub struct Job {
 	pub started_at: Option<u64>,
 	pub completed_at: Option<u64>,
 }
+
+
+/// ## [JobStatus]
+/// 
+/// 
+/// 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+pub enum JobStatus {
+	Pending,
+	Running,
+	Completed,
+	Failed,
+	Cancelled,
+	Interrupted,
+}
+
 impl JobStatus {
 	pub fn label(self) -> &'static str {
 		match self {
@@ -36,15 +52,6 @@ impl JobStatus {
 	}
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
-pub enum JobStatus {
-	Pending,
-	Running,
-	Completed,
-	Failed,
-	Cancelled,
-	Interrupted,
-}
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TaskStatus {
 	Pending,

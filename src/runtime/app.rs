@@ -1,6 +1,6 @@
-use crate::{app::app_prelude::*, app::app_state::EstateState};
+use crate::{app::app_state::EstateState, prelude::*};
 
-/// ## AppRuntime
+/// ## [AppRuntime]
 ///
 /// Wraps concrete Web & Native to expose runtime implementation to shared capabilities
 /// on both platforms more easily making the architecture more robust to changes.

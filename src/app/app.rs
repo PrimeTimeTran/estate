@@ -1,16 +1,13 @@
 use crate::prelude::*;
+// https://github.com/rust-lang/rust/issues/41517
+// https://github.com/rust-lang/rust/issues/55628
+// https://github.com/rust-lang/rfcs/pull/1733
 
-pub trait Clock {
-	fn now(&self) -> String;
-
-	/// Run once and return.
-	fn run_once(&self);
-
-	/// Run repeatedly in the foreground.
-	fn run_foreground(&self, interval: Duration);
-
-	/// Spawn the clock as a background process/task.
-	fn run_background(&self, interval: Duration);
+fn task() {
+	println!(
+		"The task asts the time that's used by the clock. {}",
+		time_now()
+	)
 }
 
 fn time_now() -> String {
@@ -19,7 +16,6 @@ fn time_now() -> String {
 	let format = "%B %-d, %Y at %-I:%M:%S %p UTC";
 	now.format(format).to_string()
 }
-pub struct HostClock;
 
 impl Clock for HostClock {
 	fn now(&self) -> String {
@@ -68,25 +64,22 @@ impl Clock for HostClock {
 	}
 }
 
-pub trait Worker {
-	fn run_foreground<F>(&self, task: F)
-	where
-		F: Fn() + Send + 'static;
-
-	fn run_background<F>(&self, task: F)
-	where
-		F: Fn() + Send + 'static;
-}
-
-fn task() {
-	println!(
-		"The task asts the time that's used by the clock. {}",
-		time_now()
-	)
-}
-pub struct HostWorker;
-
 impl Worker for HostWorker {
+	// 	#[cfg(target_arch = "wasm32")]
+	// 	fn spawn(&self, task: Box<dyn FnOnce() + Send>) {
+	// 		// Later:
+	// 		// wasm_bindgen_futures::spawn_local(async move {
+	// 		//     task();
+	// 		// });
+	// 		println!("WASM worker");
+	// 	}
+
+	// 	#[cfg(not(target_arch = "wasm32"))]
+	// 	fn spawn(&self, task: Box<dyn FnOnce() + Send>) {
+	// 		std::thread::spawn(move || {
+	// 			task();
+	// 		});
+	// 	}
 	fn run_foreground<F>(&self, task: F)
 	where
 		F: Fn() + Send + 'static,
@@ -103,107 +96,21 @@ impl Worker for HostWorker {
 		std::thread::spawn(task);
 	}
 }
-// impl Worker for HostWorker {
-// 	#[cfg(target_arch = "wasm32")]
-// 	fn spawn(&self, task: Box<dyn FnOnce() + Send>) {
-// 		// Later:
-// 		// wasm_bindgen_futures::spawn_local(async move {
-// 		//     task();
-// 		// });
-// 		println!("WASM worker");
-// 	}
 
-// 	#[cfg(not(target_arch = "wasm32"))]
-// 	fn spawn(&self, task: Box<dyn FnOnce() + Send>) {
-// 		std::thread::spawn(move || {
-// 			task();
-// 		});
-// 	}
-// }
-trait Renderer {
-	fn render(&mut self);
-}
-
-pub struct HostRenderer;
-
-impl Renderer for HostRenderer {
+impl crate::r#trait::Renderer for HostRenderer {
 	#[cfg(target_arch = "wasm32")]
 	fn render(&mut self) {
 		// wasm rendering
 	}
-
 	#[cfg(not(target_arch = "wasm32"))]
 	fn render(&mut self) {
 		// native rendering
 	}
 }
 
-trait Provide {
-	type Clock: Clock;
-	type Worker: Worker;
-	// type Renderer: Renderer;
-
-	fn clock(&self) -> &Self::Clock;
-	fn worker(&self) -> &Self::Worker;
-	// fn renderer(&mut self) -> &mut Self::Renderer;
-}
-
-pub struct Host {
-	worker: HostWorker,
-	clock: HostClock,
-	// renderer: HostRenderer,
-}
-
-impl Host {
-	fn new() -> Self {
-		Self {
-			clock: HostClock,
-			worker: HostWorker,
-		}
-	}
-}
-
-impl Provide for Host {
-	type Clock = HostClock;
-	type Worker = HostWorker;
-	// type Renderer = HostRenderer;
-
-	fn clock(&self) -> &Self::Clock {
-		&self.clock
-	}
-
-	fn worker(&self) -> &Self::Worker {
-		&self.worker
-	}
-
-	// fn renderer(&mut self) -> &mut Self::Renderer {
-	// 	&mut self.renderer
-	// }
-}
-
-pub struct App {
-	pub host: Host,
-}
-
-impl App {
-	pub fn new() -> Self {
-		Self { host: Host::new() }
-	}
-	pub fn run(&self, cli: Cli) -> Result<()> {
-		Ok(())
-	}
-
-	pub fn clock(&self) -> &impl Clock {
-		self.host.clock()
-	}
-
-	pub fn worker(&self) -> &impl Worker {
-		self.host.worker()
-	}
-}
-
-fn append_to_file(str: String) {}
 fn sleep(str: String) {}
+fn append_to_file(str: String) {}
+
 pub fn test_main() {
 	let clock = HostClock;
 	let worker = HostWorker;
@@ -244,3 +151,22 @@ pub fn test_main() {
 
 // 	std::thread::sleep(std::time::Duration::from_millis(100));
 // }
+
+pub struct App {
+	pub host: Host,
+}
+
+impl App {
+	pub fn new() -> Self {
+		Self { host: Host::new() }
+	}
+	pub fn run(&self, cli: Cli) -> Result<()> {
+		Ok(())
+	}
+	pub fn clock(&self) -> &impl Clock {
+		self.host.clock()
+	}
+	pub fn worker(&self) -> &impl Worker {
+		self.host.worker()
+	}
+}

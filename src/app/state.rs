@@ -55,6 +55,7 @@ impl Default for EstateState {
 		}
 	}
 }
+
 impl EstateState {
 	pub fn save_workspace(path: &PathBuf) {
 		println!("💾 save_workspace not implemented yet: {:?}", path);

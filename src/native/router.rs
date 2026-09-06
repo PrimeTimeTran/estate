@@ -41,20 +41,22 @@
 /// estate fmt path/to/file.rs
 /// estate format path/to/file.rs
 /// ```
-use crate::{
-	app::{model, *},
-	doc, native,
-	native::daemon::projection::command,
-};
+use crate::{app::*, doc, native, native::daemon::projection::command, prelude::*};
 
 pub async fn execute<R: Runtime>(
 	parsed_cli: Cli,
 	ctx: cli::context::Context,
-	engine: model::EstateEngine<R>,
+	engine: EstateEngine<R>,
 ) -> Result<(), Error> {
-	let command = parsed_cli.command.unwrap_or(Command::Start { foreground: false, tail: false });
+	let command = parsed_cli.command.unwrap_or(Command::Start {
+		foreground: false,
+		tail: false,
+	});
 	match command {
-		Command::Start { foreground: false, tail: false } => {
+		Command::Start {
+			foreground: false,
+			tail: false,
+		} => {
 			// app::App::spawn_tray_process();
 		}
 		Command::Tray => {
@@ -135,8 +137,8 @@ pub async fn execute<R: Runtime>(
 			}
 		},
 		Command::Status => StatusDaemon.run(&ctx).await,
+		Command::Bookmarks => command::ViewList.run(&ctx).await,
 		// Command::Bookmark => command::ViewList.run(&ctx).await,
-		// Command::Bookmarks => command::ViewList.run(&ctx).await,
 		// Command::Explain => command::Explain.run(&ctx).await,
 		// Command::ExplainDoc => command::ExplainDoc.run(&ctx).await,
 		Command::View { name } => (command::View { name }).run(&ctx).await,

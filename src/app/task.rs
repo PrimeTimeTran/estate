@@ -11,6 +11,7 @@ pub enum TaskRequest {
 	Stop(TaskId),
 	Delete(TaskId),
 }
+
 #[derive(Debug, Clone, Eq, PartialEq, Deserialize, Hash, Serialize, IntoStaticStr)]
 pub enum TaskKind {
 	SessionStart,

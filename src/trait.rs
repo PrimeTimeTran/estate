@@ -22,7 +22,6 @@ use crate::{RuntimeState, e, prelude::*};
 pub trait Runtime: Clone + Sync + std::marker::Send + 'static {
 	#[cfg(not(target_arch = "wasm32"))]
 	fn sleep(&self, duration: Duration) -> impl Future<Output = ()> + Send;
-	// fn sleep(&self, duration: Duration) -> impl Future<Output = ()> + Send + 'static;
 
 	/// [RPIT](https://doc.rust-lang.org/edition-guide/rust-2024/rpit-lifetime-capture.html)
 
@@ -119,18 +118,6 @@ pub trait Context: Sized {
 	fn foo(&self, args: String) -> Result<()>;
 
 	fn bar(&self, args: String) -> Result<()>;
-}
-
-pub trait Host {
-	/// The concrete environment providing the resources through which the application runs.
-	type Window;
-	type Storage;
-	// type Clock;
-
-	// fn platform(&self) -> &Self::Platform;
-	fn window(&self) -> &Self::Window;
-	fn storage(&self) -> &Self::Storage;
-	// fn clock(&self) -> &Self::Clock;
 }
 
 pub trait Services {
@@ -244,3 +231,85 @@ pub trait Spawner: Clone + 'static {
 // 	fn has_pointer(&self) -> bool;
 // 	fn has_touch(&self) -> bool;
 // }
+
+use crate::prelude::*;
+// https://github.com/rust-lang/rust/issues/41517
+// https://github.com/rust-lang/rust/issues/55628
+// https://github.com/rust-lang/rfcs/pull/1733
+
+pub trait Renderer {
+	fn render(&mut self);
+}
+
+pub trait Clock {
+	fn now(&self) -> String;
+
+	/// Run once and return.
+	fn run_once(&self);
+
+	/// Run repeatedly in the foreground.
+	fn run_foreground(&self, interval: Duration);
+
+	/// Spawn the clock as a background process/task.
+	fn run_background(&self, interval: Duration);
+}
+
+pub trait Worker {
+	fn run_foreground<F>(&self, task: F)
+	where
+		F: Fn() + Send + 'static;
+
+	fn run_background<F>(&self, task: F)
+	where
+		F: Fn() + Send + 'static;
+}
+
+pub trait Provide {
+	type Clock: Clock;
+	type Worker: Worker;
+	// type Renderer: Renderer;
+	fn clock(&self) -> &Self::Clock;
+	fn worker(&self) -> &Self::Worker;
+	// fn renderer(&mut self) -> &mut Self::Renderer;
+}
+
+pub trait Engine {
+	// IDE anchors/bookmarks
+	fn upsert() -> Result<(), Error>;
+	fn read() -> Result<(), Error>;
+	fn delete() -> Result<(), Error>;
+	// .estate workspace (initial personal and then public/repo)
+	// fn upsert() -> Result<(), Error>;
+	// fn read() -> Result<(), Error>;
+	// fn delete() -> Result<(), Error>;
+
+	// CRUD .estate registry for IDE/discovery services
+	// fn upsert() -> Result<(), Error>;
+	// fn read() -> Result<(), Error>;
+	// fn delete() -> Result<(), Error>;
+
+	// CRUD .estate index for IDE/discovery services
+	// fn upsert() -> Result<(), Error>;
+	// fn read() -> Result<(), Error>;
+	// fn delete() -> Result<(), Error>;
+}
+/// Registry = authoritative knowledge.
+pub trait Registry {
+	fn get(&self, id: Uuid) -> Option<Resource>;
+	fn upsert(&mut self, resource: Resource);
+	fn remove(&mut self, id: Uuid);
+}
+/// Index = derived structure optimized for finding that knowledge.
+pub trait Index {
+	fn generation(&self) -> u64;
+	fn lookup(&self, query: &Query) -> Vec<Uuid>;
+	fn invalidate(&mut self, change: &Change);
+}
+/// I have foo but I want bar
+/// - Inline IDE Anchor -> FS file for preview
+/// - Inline wikilink -> FS asset for embed
+/// Resolver
+///     "What does C mean?"
+pub trait Resolver {
+	fn resolve(&self, reference: &Reference, context: &ResolveContext) -> Vec<Resolution>;
+}
