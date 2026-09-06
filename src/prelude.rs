@@ -30,8 +30,6 @@ pub use uuid::Uuid;
 pub use crate::{
 	api::*,
 	app::*,
-	// app_prelude::*,
-	// app_runtime::*,
 	app_state::*,
 	data::*,
 	e,
@@ -41,6 +39,7 @@ pub use crate::{
 	share::{share_prelude::*, *},
 	tool::{time::*, *},
 	r#trait::{Context, EventReceiver, *},
+	r#trait as traits,
 	ui::{config::*, theme::*, ui_prelude::*, ui_trait::*, *},
 };
 

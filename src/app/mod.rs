@@ -12,7 +12,7 @@
 //! - ./src/web
 //! - ./src/mobile
 //!
-/// Generic traits should exist inside of ./src/app module
+/// Generic traits defined in ./src/trait module
 /// Platform implementations for native, mobile, web should exist in their own respective namespaces
 ///
 /// ./src/native

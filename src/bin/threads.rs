@@ -1,6 +1,7 @@
 // https://www.youtube.com/watch?v=SbcYv5EQGNM&t=32s
 // https://www.youtube.com/watch?v=rNhfQimiwEs
 // https://www.youtube.com/watch?v=8gNKE5jVqYY
+
 #![allow(warnings)]
 use std::{
 	sync::{

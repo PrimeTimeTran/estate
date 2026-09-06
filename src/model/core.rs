@@ -1,5 +1,7 @@
 //! Core domain types and workspace discovery.
+//!
 //! # Description
+//!
 //! This module contains:
 //!
 //! - [`Estate`]
@@ -7,15 +9,20 @@
 //! - [`Resource`]
 //! - [`Relation`]
 //! - [`EstateDiscovery`]
+//!
+//! Core business logic for resolving links, workspace indexing, namespace resolution, package management.
+//!
 
 use crate::prelude::*;
 
-/// Represents an Estate and its complete project state.
+/// ## [Estate]
 ///
-/// An [`Estate`] is the root entity for a project. It owns the project's
+/// Represents an estate instance and its complete project state.
+///
+/// An [Estate] is the root entity for a project. It owns the project's
 /// identity, scope, nodes, resources, relations, and bindings.
 ///
-/// Each Estate has a globally unique [`Uuid`] and may optionally have a
+/// Each Estate has a globally unique [Uuid] and may optionally have a
 /// parent Estate, allowing Estates to be organized hierarchically.
 ///
 /// # Resources
@@ -62,9 +69,6 @@ impl Estate {
 			scope,
 		}
 	}
-}
-
-impl Estate {
 	/// Adds a resource to the Estate and returns its identifier.
 	///
 	/// The resource's existing [`Resource::id`] is preserved.

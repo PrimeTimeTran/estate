@@ -4,8 +4,8 @@ pub use crate::proto::types::{
 	SolutionStatus as ProtoSolutionStatus, SubmissionStatus as ProtoSubmissionStatus,
 };
 
-pub mod estate_core;
-pub use estate_core::*;
+pub mod core;
+pub use core::*;
 
 pub mod engine;
 pub use engine::*;

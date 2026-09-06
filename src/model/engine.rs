@@ -6,8 +6,6 @@ use crate::api::Api;
 
 pub use crate::prelude::*;
 
-// use estate::Estate;
-
 #[derive(Clone, Debug)]
 pub struct EstateEngine<R: Runtime> {
 	// Domain
@@ -41,11 +39,8 @@ impl<R: Runtime> EstateEngine<R> {
 		// let state = EstateState::load_from_disk().unwrap();
 		// let state_monitor = StateMonitor::new(&state_path)?;
 		Ok(Self {
-			// state,
-			// state_monitor,
 			runtime: Arc::new(runtime),
 			estate: Estate::default(),
-			// workspace: Workspace::new(),
 			registry: EstateRegistry::default(),
 			index: EstateIndex::default(),
 			resolver: EstateResolver::default(),
@@ -57,7 +52,6 @@ impl<R: Runtime> EstateEngine<R> {
 			analysis: AnalysisService::default(),
 		})
 	}
-
 	pub fn session(&mut self) -> Session {
 		self.runtime.session()
 	}

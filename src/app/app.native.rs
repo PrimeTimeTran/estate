@@ -2,39 +2,169 @@ use crate::doc;
 
 use crate::{prelude::*, spawn_global_cursor_daemon, r#trait::Context};
 
-/// ## NativeApp (Laptop/Desktop Environment)
-///
-/// The platforms we've tested builds for
-///
-/// - [MacOS]
-/// - [Linux]
-/// - [Windows]
-///
-pub struct NativeApp {
-	pub app: AppRuntime<NativeRuntime, NativeExecutor>,
-	pub host: NativeHost,
-	pub runtime: NativeRuntime,
-	// Receiver channel for process/daemon
-	pub daemon_rx: Option<mpsc::Receiver<DaemonCommand>>,
-	// Sender channel for process/daemon
-	pub daemon_tx: mpsc::Sender<DaemonCommand>,
+impl ApplicationHandler<AppEvent> for NativeApp {
+	fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+		if self.menu_bar.is_none() {
+			let menu = Self::menu_bar(true);
+			menu.init_for_nsapp();
+			self.menu_bar = Some(menu);
+		}
+		if self.windows.is_empty() {
+			self.open_window(event_loop, crate::START_WINDOW);
+		}
+		if self.tray_clock.is_none() {
+			let (menu, tray) = match Self::bootstrap() {
+				Ok(value) => value,
+				Err(error) => {
+					tracing::error!(%error, "failed to bootstrap tray");
+					return;
+				}
+			};
+			self.menu = Some(menu);
+			self.tray_clock = Some(tray);
+			tracing::debug!("🔥 main tray initialized");
+		}
+		if self.tray_cursor.is_none() {
+			match TrayIconBuilder::new()
+				.with_icon(scroll_tray_icon())
+				.with_tooltip("Estate Scroll Controller")
+				.build()
+			{
+				Ok(tray) => {
+					self.tray_cursor = Some(tray);
+					tracing::debug!("🔥 scroll tray initialized");
+				}
+				Err(error) => {
+					tracing::error!(%error, "failed to create scroll tray");
+				}
+			}
+		}
+	}
+	fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+		self.app.update();
+		while let Ok(event) = MenuEvent::receiver().try_recv() {
+			self.handle_event(event, event_loop);
+		}
+	}
+	fn window_event(
+		&mut self,
+		event_loop: &ActiveEventLoop,
+		window_id: WindowId,
+		event: WindowEvent,
+	) {
+		let Some(window) = self
+			.windows
+			.iter_mut()
+			.find(|window| window.window.instance.id() == window_id)
+		else {
+			return;
+		};
+		let response = window
+			.window
+			.gui_state
+			.on_window_event(&window.window.instance, &event);
+		if response.repaint {
+			window.window.instance.request_redraw();
+		}
+		match event {
+			WindowEvent::CloseRequested => {
+				tracing::info!("🛑 Window close requested for id: {:?}", window_id);
+				self
+					.windows
+					.retain(|window| window.window.instance.id() != window_id);
+				return;
+			}
+			WindowEvent::RedrawRequested => {
+				if window.window.occluded {
+					return;
+				}
+				let menu = {
+					let event_rx = self.app.engine.runtime().subscribe();
+					let mut ctx = AppContext {
+						app: &mut self.app,
+						input: IOState::default(),
+						event_rx,
+						last_revision: 0,
+					};
+					if let Err(e) = window.window.draw(&mut ctx) {
+						tracing::error!("DEV >>> draw failed: {e:#}");
+					}
+				};
+			}
+			WindowEvent::Focused(true) => {
+				window.window.instance.request_redraw();
+			}
+			WindowEvent::Occluded(occluded) => {
+				window.window.occluded = occluded;
+				if !occluded {
+					window.window.instance.request_redraw();
+				}
+			}
+			WindowEvent::Resized(size) => {
+				if size.width == 0 || size.height == 0 {
+					return;
+				}
+				window.window.config.width = size.width;
+				window.window.config.height = size.height;
+				window
+					.window
+					.surface
+					.configure(&window.window.device, &window.window.config);
+				window.window.needs_resize = false;
+				window.window.instance.request_redraw();
+			}
+			_ => {}
+		}
+	}
+	fn user_event(&mut self, event_loop: &ActiveEventLoop, event: AppEvent) {
+		match event {
+			AppEvent::RuntimeEvent => {
+				self.app.update();
+				self.sync_views();
+			}
+			AppEvent::Navigate(view) => {
+				self.runtime().emit(e::Event::app(e::Klass::Navigate(view)));
+				self.app.update();
+				self.sync_views();
+			}
+			AppEvent::Shutdown => {
+				tracing::info!(">>> shutdown event received");
+				self.shutdown();
 
-	/// Manages listeners for hotkey events
-	pub hotkey_manager: GlobalHotkeys,
-	pub is_clocking: Arc<AtomicBool>,
-	pub menu: Option<TrayMenu>,
-	pub menu_bar: Option<Menu>,
-	pub monitor: NativeMonitor,
-	pub tokio: tokio::runtime::Runtime,
-	pub tray_clock: Option<TrayIcon>,
-	pub tray_cursor: Option<TrayIcon>,
-	// pub event_loop: ActiveEventLoop,
-	pub event_proxy: Option<EventLoopProxy<AppEvent>>,
-
-	/// ### Native Desktop Windows
-	///
-	/// Control Desktop Windows through this API
-	pub windows: Vec<AppWindow>,
+				tracing::info!(">>> event_loop.exit() called");
+			}
+			AppEvent::CursorPosition { x, y } => {
+				// let text = format!("↖ {:.0}  {:.0}", x, y);
+				// let text = format!("← {:.0}  {:.0}", x, y);
+				// let text = format!("→ {:.0}  {:.0}", x, y);
+				// let text = format!("↑ {:.0}  {:.0}", x, y);
+				// let text = format!("● {:.0}, {:.0}", x, y);
+				// let text = format!("◉ {:.0}, {:.0}", x, y);
+				let text = format!("⌖ {:.0}, {:.0}", x, y);
+				// let text = format!("🟢 {:.0}, {:.0}", x, y);
+				// let text = format!("🔵 {:.0}, {:.0}", x, y);
+				// let text = format!("🟡 {:.0}, {:.0}", x, y);
+				// let text = format!("🔴 {:.0}, {:.0}", x, y);
+				// let region = if x < 960.0 { "← LEFT" } else { "RIGHT →" };
+				if let Some(tray) = &self.tray_cursor {
+					let _ = tray.set_title(Some(text));
+				}
+			}
+			AppEvent::TickClock(text) => {
+				if let Some(tray) = &self.tray_clock {
+					let _ = tray.set_title(Some(text));
+				}
+				self.sync_views();
+			}
+			AppEvent::ModifiersChanged {
+				alt,
+				command,
+				ctrl,
+				shift,
+			} => {}
+			_ => {}
+		}
+	}
 }
 
 impl Context for NativeApp {
@@ -62,49 +192,17 @@ impl Context for NativeApp {
 		NativeApp::bar(&self, args)
 	}
 }
-// impl NativeApp {
-// 	pub fn start(&mut self) -> Result<()> {
-// 		self.runtime.start_services()?;
-// 		self.app.start_services()?;
-// 		self.start_daemon()?;
-// 		self.start_signal_handler()?;
-// 		Ok(())
-// 	}
 
-// 	pub fn run_foreground(&mut self) -> Result<()> {
-// 		self.wait_for_shutdown()
-// 	}
-
-// 	pub fn run_tray(&mut self) -> Result<()> {
-// 		self.start_tray()?;
-// 		self.run_event_loop()
-// 	}
-
-// 	pub fn run_window(&mut self) -> Result<()> {
-// 		self.start_window()?;
-// 		self.run_event_loop()
-// 	}
-
-// 	pub fn run_event_loop(&mut self) -> Result<()> {
-// 		Ok(())
-// 	}
-
-// 	pub fn start_tray(&mut self) -> Result<()> {
-// 		Ok(())
-// 	}
-// 	pub fn start_window(&mut self) -> Result<()> {
-// 		Ok(())
-// 	}
-// 	pub fn start_daemon(&mut self) -> Result<()> {
-// 		Ok(())
-// 	}
-// 	pub fn start_signal_handler(&mut self) -> Result<()> {
-// 		Ok(())
-// 	}
-// 	pub fn wait_for_shutdown(&mut self) -> Result<()> {
-// 		Ok(())
-// 	}
-// }
+impl Default for NativeServices {
+	fn default() -> Self {
+		Self {
+			api: None,
+			persistence: NativePersistence::default(),
+			network: NativeNetwork::default(),
+			// clock: NativeClock::default(),
+		}
+	}
+}
 
 impl NativeApp {
 	pub fn new() -> Result<Self> {
@@ -293,7 +391,6 @@ impl NativeApp {
 		Ok(())
 	}
 }
-
 impl NativeApp {
 	fn runtime_old(&self) -> Arc<NativeRuntime> {
 		// [Flexibility]
@@ -362,7 +459,6 @@ impl NativeApp {
 	// 	spawn_global_cursor_daemon(proxy)
 	// }
 }
-
 impl NativeApp {
 	fn open_window(&mut self, event_loop: &ActiveEventLoop, kind: WindowType) {
 		tracing::info!(" open window start");
@@ -1047,214 +1143,11 @@ impl NativeApp {
 		menu
 	}
 }
-impl ApplicationHandler<AppEvent> for NativeApp {
-	fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-		if self.menu_bar.is_none() {
-			let menu = Self::menu_bar(true);
-			menu.init_for_nsapp();
-			self.menu_bar = Some(menu);
-		}
-		if self.windows.is_empty() {
-			self.open_window(event_loop, crate::START_WINDOW);
-		}
-		if self.tray_clock.is_none() {
-			let (menu, tray) = match Self::bootstrap() {
-				Ok(value) => value,
-				Err(error) => {
-					tracing::error!(%error, "failed to bootstrap tray");
-					return;
-				}
-			};
-			self.menu = Some(menu);
-			self.tray_clock = Some(tray);
-			tracing::debug!("🔥 main tray initialized");
-		}
-		if self.tray_cursor.is_none() {
-			match TrayIconBuilder::new()
-				.with_icon(scroll_tray_icon())
-				.with_tooltip("Estate Scroll Controller")
-				.build()
-			{
-				Ok(tray) => {
-					self.tray_cursor = Some(tray);
-					tracing::debug!("🔥 scroll tray initialized");
-				}
-				Err(error) => {
-					tracing::error!(%error, "failed to create scroll tray");
-				}
-			}
-		}
-	}
-	fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
-		self.app.update();
-		while let Ok(event) = MenuEvent::receiver().try_recv() {
-			self.handle_event(event, event_loop);
-		}
-	}
-	fn window_event(
-		&mut self,
-		event_loop: &ActiveEventLoop,
-		window_id: WindowId,
-		event: WindowEvent,
-	) {
-		let Some(window) = self
-			.windows
-			.iter_mut()
-			.find(|window| window.window.instance.id() == window_id)
-		else {
-			return;
-		};
-		let response = window
-			.window
-			.gui_state
-			.on_window_event(&window.window.instance, &event);
-		if response.repaint {
-			window.window.instance.request_redraw();
-		}
-		match event {
-			WindowEvent::CloseRequested => {
-				tracing::info!("🛑 Window close requested for id: {:?}", window_id);
-				self
-					.windows
-					.retain(|window| window.window.instance.id() != window_id);
-				return;
-			}
-			WindowEvent::RedrawRequested => {
-				if window.window.occluded {
-					return;
-				}
-				let menu = {
-					let event_rx = self.app.engine.runtime().subscribe();
-					let mut ctx = AppContext {
-						app: &mut self.app,
-						input: IOState::default(),
-						event_rx,
-						last_revision: 0,
-					};
-					if let Err(e) = window.window.draw(&mut ctx) {
-						tracing::error!("DEV >>> draw failed: {e:#}");
-					}
-				};
-			}
-			WindowEvent::Focused(true) => {
-				window.window.instance.request_redraw();
-			}
-			WindowEvent::Occluded(occluded) => {
-				window.window.occluded = occluded;
-				if !occluded {
-					window.window.instance.request_redraw();
-				}
-			}
-			WindowEvent::Resized(size) => {
-				if size.width == 0 || size.height == 0 {
-					return;
-				}
-				window.window.config.width = size.width;
-				window.window.config.height = size.height;
-				window
-					.window
-					.surface
-					.configure(&window.window.device, &window.window.config);
-				window.window.needs_resize = false;
-				window.window.instance.request_redraw();
-			}
-			_ => {}
-		}
-	}
-	fn user_event(&mut self, event_loop: &ActiveEventLoop, event: AppEvent) {
-		match event {
-			AppEvent::RuntimeEvent => {
-				self.app.update();
-				self.sync_views();
-			}
-			AppEvent::Navigate(view) => {
-				self.runtime().emit(e::Event::app(e::Klass::Navigate(view)));
-				self.app.update();
-				self.sync_views();
-			}
-			AppEvent::Shutdown => {
-				tracing::info!(">>> shutdown event received");
-				self.shutdown();
-
-				tracing::info!(">>> event_loop.exit() called");
-			}
-			AppEvent::CursorPosition { x, y } => {
-				// let text = format!("↖ {:.0}  {:.0}", x, y);
-				// let text = format!("← {:.0}  {:.0}", x, y);
-				// let text = format!("→ {:.0}  {:.0}", x, y);
-				// let text = format!("↑ {:.0}  {:.0}", x, y);
-				// let text = format!("● {:.0}, {:.0}", x, y);
-				// let text = format!("◉ {:.0}, {:.0}", x, y);
-				let text = format!("⌖ {:.0}, {:.0}", x, y);
-				// let text = format!("🟢 {:.0}, {:.0}", x, y);
-				// let text = format!("🔵 {:.0}, {:.0}", x, y);
-				// let text = format!("🟡 {:.0}, {:.0}", x, y);
-				// let text = format!("🔴 {:.0}, {:.0}", x, y);
-				// let region = if x < 960.0 { "← LEFT" } else { "RIGHT →" };
-				if let Some(tray) = &self.tray_cursor {
-					let _ = tray.set_title(Some(text));
-				}
-			}
-			AppEvent::TickClock(text) => {
-				if let Some(tray) = &self.tray_clock {
-					let _ = tray.set_title(Some(text));
-				}
-				self.sync_views();
-			}
-			AppEvent::ModifiersChanged {
-				alt,
-				command,
-				ctrl,
-				shift,
-			} => {}
-			_ => {}
-		}
-	}
-}
-
-#[derive(Debug, Default)]
-pub struct NativeHost {
-	window: NativeWindow,
-	storage: NativeStorage,
-	// clock: NativeClock,
-}
 
 impl NativeHost {
 	fn new() -> Self {
 		Self::default()
 	}
-}
-#[derive(Debug, Default, Clone)]
-pub struct NativeWindow;
-#[derive(Debug, Default, Clone)]
-pub struct NativeStorage;
-// #[derive(Debug, Default, Clone)]
-// pub struct NativeClock;
-
-// impl Clock for NativeClock {
-
-// }
-// impl Host for NativeHost {
-// 	type Window = NativeWindow;
-// 	type Storage = NativeStorage;
-// 	type Clock = NativeClock;
-// 	fn window(&self) -> &Self::Window {
-// 		&self.window
-// 	}
-// 	fn storage(&self) -> &Self::Storage {
-// 		&self.storage
-// 	}
-// 	fn clock(&self) -> &Self::Clock {
-// 		&self.clock
-// 	}
-// }
-
-#[derive(Debug, Clone)]
-pub struct NativeServices {
-	persistence: NativePersistence,
-	network: NativeNetwork,
-	// clock: NativeClock,
-	api: Option<NativeApiClient>,
 }
 
 impl NativeServices {
@@ -1268,6 +1161,22 @@ impl NativeServices {
 		})
 	}
 }
+
+impl Network for NativeNetwork {
+	fn is_available(&self) -> bool {
+		todo!("")
+	}
+}
+
+impl Persistence for NativePersistence {
+	fn load(&self, key: &str) -> Result<Option<Vec<u8>>> {
+		todo!("")
+	}
+	fn save(&self, key: &str, value: &[u8]) -> Result<()> {
+		todo!("")
+	}
+}
+
 impl Services for NativeServices {
 	type Persistence = NativePersistence;
 	type Network = NativeNetwork;
@@ -1286,6 +1195,67 @@ impl Services for NativeServices {
 		&self.api
 	}
 }
+
+/// ## NativeApp (Laptop/Desktop Environment)
+///
+/// The platforms we've tested builds for
+///
+/// - [MacOS]
+/// - [Linux]
+/// - [Windows]
+///
+pub struct NativeApp {
+	pub app: AppRuntime<NativeRuntime, NativeExecutor>,
+	pub host: NativeHost,
+	pub runtime: NativeRuntime,
+	// Receiver channel for process/daemon
+	pub daemon_rx: Option<mpsc::Receiver<DaemonCommand>>,
+	// Sender channel for process/daemon
+	pub daemon_tx: mpsc::Sender<DaemonCommand>,
+
+	/// Manages listeners for hotkey events
+	pub hotkey_manager: GlobalHotkeys,
+	pub is_clocking: Arc<AtomicBool>,
+	pub menu: Option<TrayMenu>,
+	pub menu_bar: Option<Menu>,
+	pub monitor: NativeMonitor,
+	pub tokio: tokio::runtime::Runtime,
+	pub tray_clock: Option<TrayIcon>,
+	pub tray_cursor: Option<TrayIcon>,
+	// pub event_loop: ActiveEventLoop,
+	pub event_proxy: Option<EventLoopProxy<AppEvent>>,
+
+	/// ### Native Desktop Windows
+	///
+	/// Control Desktop Windows through this API
+	pub windows: Vec<AppWindow>,
+}
+
+#[derive(Debug, Default)]
+pub struct NativeHost {
+	window: NativeWindow,
+	storage: NativeStorage,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct NativeNetwork;
+
+#[derive(Debug, Default, Clone)]
+pub struct NativePersistence;
+
+#[derive(Debug, Default, Clone)]
+pub struct NativeStorage;
+
+#[derive(Debug, Clone)]
+pub struct NativeServices {
+	persistence: NativePersistence,
+	network: NativeNetwork,
+	api: Option<NativeApiClient>,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct NativeWindow;
+
 // impl NativeServices {
 // 	pub async fn connect(self) -> anyhow::Result<NativeServices> {
 // 		let api = NativeApiClient::connect().await?;
@@ -1299,17 +1269,6 @@ impl Services for NativeServices {
 // 	}
 // }
 
-impl Default for NativeServices {
-	fn default() -> Self {
-		Self {
-			api: None,
-			persistence: NativePersistence::default(),
-			network: NativeNetwork::default(),
-			// clock: NativeClock::default(),
-		}
-	}
-}
-
 // impl ApiServices for NativeServices {
 // 	type Client = NativeApiClient;
 
@@ -1317,23 +1276,3 @@ impl Default for NativeServices {
 // 		self.api()
 // 	}
 // }
-
-#[derive(Debug, Default, Clone)]
-pub struct NativePersistence;
-
-impl Persistence for NativePersistence {
-	fn load(&self, key: &str) -> Result<Option<Vec<u8>>> {
-		todo!("")
-	}
-	fn save(&self, key: &str, value: &[u8]) -> Result<()> {
-		todo!("")
-	}
-}
-#[derive(Debug, Default, Clone)]
-pub struct NativeNetwork;
-
-impl Network for NativeNetwork {
-	fn is_available(&self) -> bool {
-		todo!("")
-	}
-}
