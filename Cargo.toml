@@ -16,7 +16,6 @@ short_description = "Estate development environment"
 long_description = "Estate development environment"
 icon = ["assets/icon.icns"]
 
-
 # [[bin]]
 # name = "daemon"
 # path = "src/bin/daemon.rs"
@@ -32,7 +31,6 @@ required-features = ["web"]
 name = "estate"
 path = "src/bin/estate.rs"
 required-features = ["native"]
-
 
 [[bin]]
 name = "native"
@@ -72,6 +70,7 @@ path = "src/bin/macros.rs"
 
 # cargo nextest run --bin settings --test-threads 1 --no-fail-fast
 [features]
+# default = []
 # This overwrites IDE config causing diagnostics to be wrong given the targetted platform.
 #
 # To get IDE diagnostics functioning correctly remove the hardcoded default when troubleshooting another build target.
@@ -190,8 +189,8 @@ strum = { version = "0.27", features = ["derive"] }
 rand.workspace = true
 async-broadcast = "0.7.2"
 
-# [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-# tonic = { workspace = true, features = ["transport"] }
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tonic = { workspace = true, features = ["transport"] }
 
 # [target.'cfg(target_arch = "wasm32")'.dependencies]
 # getrandom = { version = "0.4.3", features = ["wasm_js"] }
@@ -201,9 +200,6 @@ async-broadcast = "0.7.2"
 
 # [target.'cfg(target_arch = "wasm32")'.dependencies]
 # tokio = { version = "1", default-features = false, features = ["rt", "macros", "time", "sync"] }
-
-[dependencies]
-
 
 [build-dependencies]
 prost-build = "0.14.4"

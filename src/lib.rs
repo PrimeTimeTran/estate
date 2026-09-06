@@ -40,14 +40,15 @@ pub mod util;
 
 pub use crate::app::event as e;
 pub use crate::ui::{theme::*, ui_prelude::*, *};
+pub use r#trait as traits;
+
+#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+pub mod native;
+#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+pub use crate::native::state as native_state;
 
 #[cfg(all(feature = "web", target_arch = "wasm32"))]
 pub mod web;
 
 #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 pub mod server;
-
-#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-pub mod native;
-#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-pub use crate::native::state as native_state;

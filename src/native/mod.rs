@@ -16,9 +16,7 @@ pub mod task;
 pub mod ui;
 pub mod window;
 
-pub use crate::native::discovery::*;
-pub use crate::native::native_prelude::*;
-pub use crate::native::scroll::*;
+pub use self::{discovery::*, native_prelude::*, scroll::*};
 pub use screens::*;
 
 #[cfg(target_os = "linux")]

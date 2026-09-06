@@ -23,6 +23,7 @@
 /// - Native built. Web didn't
 /// - Web built. Native didn't.
 /// - Web & Native built. Server didn't
+
 pub mod types {
 	include!(concat!(env!("OUT_DIR"), "/types.rs"));
 }

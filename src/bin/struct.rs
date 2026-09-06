@@ -1,3 +1,4 @@
+#![allow(warnings)]
 fn structs() {
 	// ## Classic C-Structs(Named Fields)
 	//
@@ -69,7 +70,6 @@ fn unit_struct() {
 		fn read(&self) {
 			// borrow
 		}
-
 		fn modify(&mut self) {
 			// mutable borrow
 		}

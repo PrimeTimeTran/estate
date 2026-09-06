@@ -1,3 +1,4 @@
+#![allow(warnings)]
 use estate::app::*;
 
 pub trait Ctx {
@@ -14,7 +15,6 @@ where
 	C: Ctx,
 {
 	pub fn new(context: C) -> Self {
-		context.
 		// Works
 		// context::AppContext::load_problems(&mut self);
 		// context::AppContext::load_problem(&mut self);
@@ -78,9 +78,7 @@ where
 		todo!("")
 	}
 
-	pub fn api(
-		&self,
-	) -> Option<&<<<C as Ctx>::Runtime as Runtime>::Services as Services>::Client> {
+	pub fn api(&self) -> Option<&<<<C as Ctx>::Runtime as Runtime>::Services as Services>::Client> {
 		// self.context.runtime().services().api().as_ref()
 		todo!("")
 	}
@@ -377,7 +375,7 @@ impl Tester {
 /// Wraps concrete Web & Native to expose runtime implementation to shared capabilities
 /// on both platforms more easily making the architecture more robust to changes.
 ///
-#[derive(Default, Clone)]
+// #[derive(Default, Clone)]
 pub struct AppRuntime<C>
 where
 	C: Ctx,
@@ -395,7 +393,6 @@ where
 }
 
 pub struct NativeHost;
-
 
 #[derive(Clone)]
 pub struct Tester {}

@@ -18,7 +18,7 @@ use crate::{RuntimeState, e, prelude::*};
 // }
 
 /// ## [Clock]
-/// 
+///
 pub trait Clock {
 	fn now(&self) -> String;
 
@@ -29,7 +29,7 @@ pub trait Clock {
 	fn run_foreground(&self, interval: Duration);
 
 	/// Spawn the clock as a background process/task.
-	fn run_background(&self, interval: Duration);
+	fn run_background(&self, interval: Duration) -> ClockHandle;
 }
 
 /// ## [Context]
@@ -79,7 +79,7 @@ pub trait Context: Sized {
 }
 
 /// ## [Engine]
-/// 
+///
 pub trait Engine {
 	// IDE anchors/bookmarks
 	fn upsert() -> Result<(), Error>;
@@ -104,14 +104,14 @@ pub trait Engine {
 /// ## [EventHandler]
 ///
 /// Broken Link. Why? Others using same structure work
-/// 
+///
 #[async_trait::async_trait]
 pub trait EventHandler<R: Runtime>: Send + Sync + 'static {
 	async fn handle(&self, event: &e::Event, runtime: &R);
 }
 
 /// ## [EventReceiver]
-/// 
+///
 pub trait EventReceiver {
 	fn try_recv(&mut self) -> Option<e::Event>;
 }
@@ -139,7 +139,7 @@ pub trait Executor: Clone + 'static {
 }
 
 /// ## [Index]
-/// 
+///
 /// derived structure optimized for finding that knowledge.
 pub trait Index {
 	fn generation(&self) -> u64;
@@ -148,21 +148,21 @@ pub trait Index {
 }
 
 /// ## [Input]
-/// 
+///
 pub trait Input {}
 
 /// ## [Media]
-/// 
+///
 pub trait Media {}
 
 /// ## [Network]
-/// 
+///
 pub trait Network {
 	fn is_available(&self) -> bool;
 }
 
 /// ## [Platform]
-/// 
+///
 pub trait Platform {
 	type Input: Input;
 	type Media: Media;
@@ -179,13 +179,13 @@ pub trait Platform {
 }
 
 /// ## [Renderer]
-/// 
+///
 pub trait Renderer {
 	fn render(&mut self);
 }
 
 /// ## [Provide]
-/// 
+///
 pub trait Provide {
 	type Clock: Clock;
 	type Worker: Worker;
@@ -202,7 +202,7 @@ pub trait Persistence {
 }
 
 /// ## [Registry]
-/// 
+///
 pub trait Registry {
 	fn get(&self, id: Uuid) -> Option<Resource>;
 	fn upsert(&mut self, resource: Resource);
@@ -284,14 +284,14 @@ pub trait Runtime: Clone + Sync + std::marker::Send + 'static {
 }
 
 /// ## [Resolver]
-/// 
+///
 /// 	"What does C mean?"
-/// 
+///
 /// derived structure optimized for finding that knowledge.
-/// 
+///
 /// - Inline IDE Anchor -> FS file for preview
 /// - Inline wikilink -> FS asset for embed
-/// 
+///
 pub trait Resolver {
 	fn resolve(&self, reference: &Reference, context: &ResolveContext) -> Vec<Resolution>;
 }
@@ -318,7 +318,7 @@ pub trait Services {
 }
 
 /// ## [Spawner]
-/// 
+///
 pub trait Spawner: Clone + 'static {
 	fn spawn<F>(&self, future: F)
 	where
@@ -337,7 +337,7 @@ pub trait Spawner: Clone + 'static {
 // }
 
 /// ## [Worker]
-/// 
+///
 pub trait Worker {
 	type Handle;
 
@@ -345,7 +345,7 @@ pub trait Worker {
 	where
 		F: FnOnce(CancellationToken) -> Fut + Send + 'static,
 		Fut: Future<Output = ()> + Send + 'static;
-	
+
 	fn run_foreground<F>(&self, task: F)
 	where
 		F: Fn() + Send + 'static;
