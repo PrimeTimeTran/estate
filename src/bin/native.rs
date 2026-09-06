@@ -28,7 +28,7 @@ fn main() -> Result<()> {
 	let mut app = App::new();
 	app.run(parsed)?;
 	app.start()?;
-	estate::app::test_main();
+	estate::app::tokio_main();
 
 	Ok(())
 }

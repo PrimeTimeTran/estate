@@ -21,7 +21,7 @@ fn time_now() -> String {
 }
 
 #[tokio::main]
-pub async fn test_main() {
+pub async fn tokio_main() {
 	let clock = HostClock;
 	let worker = HostWorker;
 	let handle = worker.run_background(move |cancel| async move {
@@ -63,6 +63,8 @@ pub async fn test_main_2() {
 
 impl App {
 	pub fn new() -> Self {
+		tracing::info!("App New");
+		println!("App New");
 		Self {
 			host: Host::new(),
 			handle_clock: None,
@@ -70,14 +72,20 @@ impl App {
 		}
 	}
 	pub fn run(&self, cli: Cli) -> Result<()> {
+		tracing::info!("App run");
+		println!("App run");
 		Ok(())
 	}
 	pub fn start(&mut self) -> Result<()> {
+		tracing::info!("App start");
+		println!("App start");
 		self.start_egui();
 		self.start_clock();
 		Ok(())
 	}
 	fn start_egui(&mut self) {
+		tracing::info!("App start_egui");
+		println!("App start_egui");
 		let cancel = CancellationToken::new();
 		// Install/register your egui hook here.
 		//
@@ -87,6 +95,8 @@ impl App {
 		self.handle_egui = Some(EguiHandle { cancel });
 	}
 	fn start_clock(&mut self) {
+		tracing::info!("App start_clock");
+		println!("App start_clock");
 		let clock = self.host.clock();
 		let handle = clock.run_background(Duration::from_secs(1));
 		self.handle_clock = Some(handle)
