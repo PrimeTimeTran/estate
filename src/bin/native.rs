@@ -28,8 +28,7 @@ fn main() -> Result<()> {
 	let mut app = App::new();
 	app.run(parsed)?;
 	app.start()?;
-	estate::app::tokio_main();
-
+	// estate::app::tokio_main();
 	Ok(())
 }
 // #[cfg(feature = "native")]

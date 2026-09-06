@@ -20,29 +20,9 @@ fn time_now() -> String {
 	now.format(format).to_string()
 }
 
-#[tokio::main]
-pub async fn tokio_main() {
-	let clock = HostClock;
-	let worker = HostWorker;
-	let handle = worker.run_background(move |cancel| async move {
-		loop {
-			tokio::select! {
-					_ = cancel.cancelled() => {
-							break;
-					}
-					_ = tokio::time::sleep(Duration::from_secs(1)) => {
-							println!("background tick: {}", clock.now());
-					}
-			}
-		}
-	});
-	tokio::time::sleep(Duration::from_secs(5)).await;
-	handle.stop();
-}
-
 pub async fn test_main_2() {
 	let clock = HostClock;
-	let worker = HostWorker;
+	let worker = HostWorker::new();
 
 	let handle = worker.run_background(move |cancel| async move {
 		loop {
@@ -60,6 +40,25 @@ pub async fn test_main_2() {
 
 	handle.stop();
 }
+#[tokio::main]
+pub async fn tokio_main() {
+	let clock = HostClock;
+	let worker = HostWorker::new();
+	let handle = worker.run_background(move |cancel| async move {
+		loop {
+			tokio::select! {
+					_ = cancel.cancelled() => {
+							break;
+					}
+					_ = tokio::time::sleep(Duration::from_secs(1)) => {
+							println!("background tick: {}", clock.now());
+					}
+			}
+		}
+	});
+	tokio::time::sleep(Duration::from_secs(5)).await;
+	handle.stop();
+}
 
 impl App {
 	pub fn new() -> Self {
@@ -71,9 +70,18 @@ impl App {
 			handle_egui: None,
 		}
 	}
-	pub fn run(&self, cli: Cli) -> Result<()> {
+	pub fn run(&mut self, cli: Cli) -> Result<()> {
 		tracing::info!("App run");
 		println!("App run");
+		self.start()?;
+
+		// Enter platform runtime/event loop here.
+		self.host.run();
+		// self.host.run(|| {
+		// 	// application is running
+		// });
+
+		self.shutdown();
 		Ok(())
 	}
 	pub fn start(&mut self) -> Result<()> {
@@ -202,61 +210,6 @@ impl ClockHandle {
 	}
 }
 
-#[cfg(target_arch = "wasm32")]
-impl Worker for HostWorker {
-	type Handle = WorkerHandle;
-
-	fn run_background<F, Fut>(&self, task: F) -> Self::Handle
-	where
-		F: FnOnce(CancellationToken) -> Fut + 'static,
-		Fut: Future<Output = ()> + 'static,
-	{
-		let cancel = CancellationToken::new();
-		let task_cancel = cancel.clone();
-
-		wasm_bindgen_futures::spawn_local(async move {
-			task(task_cancel).await;
-		});
-
-		WorkerHandle { cancel }
-	}
-
-	fn run_foreground<F>(&self, task: F)
-	where
-		F: Fn() + 'static,
-	{
-		task();
-	}
-}
-#[cfg(not(target_arch = "wasm32"))]
-impl Worker for HostWorker {
-	type Handle = WorkerHandle;
-
-	fn run_foreground<F>(&self, task: F)
-	where
-		F: Fn() + Send + 'static,
-	{
-		loop {
-			task();
-		}
-	}
-
-	fn run_background<F, Fut>(&self, task: F) -> Self::Handle
-	where
-		F: FnOnce(CancellationToken) -> Fut + Send + 'static,
-		Fut: Future<Output = ()> + Send + 'static,
-	{
-		let cancel = CancellationToken::new();
-		let task_cancel = cancel.clone();
-
-		tokio::spawn(async move {
-			task(task_cancel).await;
-		});
-
-		WorkerHandle { cancel }
-	}
-}
-
 pub struct App {
 	pub host: Host,
 	pub handle_clock: Option<ClockHandle>,
@@ -271,7 +224,4 @@ pub struct EguiHandle {
 	cancel: CancellationToken,
 	// winit diff
 	// Whatever is necessary to unregister the egui hook.
-}
-pub struct WorkerHandle {
-	cancel: CancellationToken,
 }

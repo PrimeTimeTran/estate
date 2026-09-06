@@ -1148,6 +1148,10 @@ impl NativeHost {
 	fn new() -> Self {
 		Self::default()
 	}
+	fn run() -> Self {
+		todo!("")
+		// Self::default()
+	}
 }
 
 impl NativeServices {
@@ -1233,6 +1237,7 @@ pub struct NativeApp {
 
 #[derive(Debug, Default)]
 pub struct NativeHost {
+
 	window: NativeWindow,
 	storage: NativeStorage,
 }

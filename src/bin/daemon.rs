@@ -8,7 +8,7 @@ fn main_daemon() -> Result<()> {
 	let trace = Tracer::new("app");
 	let flow = trace.flow("init");
 	flow.info("App::new");
-	let app = App::new();
+	let mut app = App::new();
 	flow.info(">>> Before app.run(): {app}");
 	let result = app.run(cli);
 	flow.info(">>> AFTER app.run(): {result}");

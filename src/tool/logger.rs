@@ -286,7 +286,7 @@ pub struct LogConfig {
 }
 /// ## [LogFieldConfig]
 ///
-/// Fields which are configured by the CLI tracer	
+/// Fields which are configured by the CLI tracer
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct LogFieldConfig {
 	pub enabled: bool,
@@ -328,10 +328,10 @@ pub struct LogOptions {
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct OutputOptions {}
 /// ## [Tracer]
-/// 
+///
 /// The object used to trace logs and flow through the app's lifecycle.
-/// 
-/// 
+///
+///
 #[derive(Clone)]
 pub struct Tracer {
 	namespace: String,
