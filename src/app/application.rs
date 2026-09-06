@@ -40,6 +40,27 @@ pub async fn test_main() {
 	handle.stop();
 }
 
+pub async fn test_main_2() {
+	let clock = HostClock;
+	let worker = HostWorker;
+
+	let handle = worker.run_background(move |cancel| async move {
+		loop {
+			tokio::select! {
+					_ = cancel.cancelled() => break,
+
+					_ = tokio::time::sleep(Duration::from_secs(1)) => {
+							println!("background tick: {}", clock.now());
+					}
+			}
+		}
+	});
+
+	tokio::time::sleep(Duration::from_secs(5)).await;
+
+	handle.stop();
+}
+
 impl App {
 	pub fn new() -> Self {
 		Self {
@@ -68,7 +89,7 @@ impl App {
 	fn start_clock(&mut self) {
 		let clock = self.host.clock();
 		let handle = clock.run_background(Duration::from_secs(1));
-		self.handle_clock = Some(handle);
+		self.handle_clock = Some(handle)
 	}
 	pub fn shutdown(&mut self) {
 		if let Some(handle) = self.handle_clock.take() {
@@ -82,7 +103,6 @@ impl App {
 	pub fn clock(&self) -> &impl Clock {
 		self.host.clock()
 	}
-
 	pub fn worker(&self) -> &impl Worker {
 		self.host.worker()
 	}
@@ -115,10 +135,12 @@ impl Clock for HostClock {
 	fn run_background(&self, interval: Duration) -> ClockHandle {
 		let cancel = CancellationToken::new();
 		let task_cancel = cancel.clone();
+
 		#[cfg(not(target_arch = "wasm32"))]
 		{
 			std::thread::spawn(move || {
 				let clock = HostClock;
+
 				loop {
 					if task_cancel.is_cancelled() {
 						break;

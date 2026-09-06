@@ -28,7 +28,22 @@ fn main() -> Result<()> {
 	let mut app = App::new();
 	app.run(parsed)?;
 	app.start()?;
+	estate::app::test_main();
 
-	// estate::app::test_main();
 	Ok(())
 }
+// #[cfg(feature = "native")]
+// #[tokio::main]
+// fn main() -> Result<()> {
+// 	use cli;
+// 	use estate::app::*;
+// 	let parsed = cli::context::parse();
+// 	let mut config = LogConfig::load()?;
+// 	config.apply_cli(&parsed)?;
+// 	logger::init_logging(&config)?;
+// 	let mut app = App::new();
+// 	app.run(parsed)?;
+// 	app.start()?;
+// 	estate::app::test_main().await;
+// 	Ok(())
+// }
