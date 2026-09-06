@@ -15,10 +15,6 @@
 // estate fmt path/to/file.rs
 // ```
 
-// lib.rs must have the following for logger import here to use.
-// pub mod tool;
-// pub use tool::*;
-
 use estate::app::*;
 
 #[cfg(feature = "native")]
@@ -29,9 +25,10 @@ fn main() -> Result<()> {
 	let mut config = LogConfig::load()?;
 	config.apply_cli(&parsed)?;
 	logger::init_logging(&config)?;
-	let app = App::new();
+	let mut app = App::new();
 	app.run(parsed)?;
+	app.start()?;
 
-	estate::app::test_main();
+	// estate::app::test_main();
 	Ok(())
 }

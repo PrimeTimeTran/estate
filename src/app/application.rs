@@ -20,22 +20,24 @@ fn time_now() -> String {
 	now.format(format).to_string()
 }
 
-pub fn test_main() {
+#[tokio::main]
+pub async fn test_main() {
 	let clock = HostClock;
 	let worker = HostWorker;
 	let handle = worker.run_background(move |cancel| async move {
 		loop {
 			tokio::select! {
-				_ = cancel.cancelled() => {
-					break;
-				}
-
-				_ = tokio::time::sleep(Duration::from_secs(1)) => {
-					println!("background tick: {}", clock.now());
-				}
+					_ = cancel.cancelled() => {
+							break;
+					}
+					_ = tokio::time::sleep(Duration::from_secs(1)) => {
+							println!("background tick: {}", clock.now());
+					}
 			}
 		}
 	});
+	tokio::time::sleep(Duration::from_secs(5)).await;
+	handle.stop();
 }
 
 impl App {
@@ -49,9 +51,10 @@ impl App {
 	pub fn run(&self, cli: Cli) -> Result<()> {
 		Ok(())
 	}
-	pub fn start(&mut self) {
+	pub fn start(&mut self) -> Result<()> {
 		self.start_egui();
 		self.start_clock();
+		Ok(())
 	}
 	fn start_egui(&mut self) {
 		let cancel = CancellationToken::new();

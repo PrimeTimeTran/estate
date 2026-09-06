@@ -1,12 +1,40 @@
-use std::fs::OpenOptions;
-
 use crate::{native::resolver::engine_data_dir, prelude::*};
-
+/// Sorting order of VSCode
+///
+/// Enum > Macros > Functions > Impl > Structs
+///
+/// Makes organization easier cross IDE.
+///
+use std::fs::OpenOptions;
 use tracing::{debug, error, info, trace, warn};
 use tracing_subscriber::{
 	EnvFilter, Layer, filter::LevelFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt,
 };
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LogLevel {
+	Trace,
+	Debug,
+	Info,
+	Warn,
+	Error,
+}
+
+#[macro_export]
+macro_rules! flow_warn {
+	($flow:expr, $($arg:tt)*) => {
+		$flow.warn(format!($($arg)*))
+	};
+}
+
+pub fn init() -> Result<()> {
+	tracing_subscriber::registry()
+		.with(EnvFilter::from_default_env())
+		.with(tracing_subscriber::fmt::layer())
+		.init();
+	Ok(())
+}
 pub fn init_logging(config: &LogConfig) -> Result<()> {
 	let terminal_filter = config.terminal_filter()?;
 	let terminal = fmt::layer()
@@ -53,24 +81,21 @@ pub fn init_logging(config: &LogConfig) -> Result<()> {
 		.init();
 	Ok(())
 }
-pub fn init() -> Result<()> {
-	tracing_subscriber::registry()
-		.with(EnvFilter::from_default_env())
-		.with(tracing_subscriber::fmt::layer())
-		.init();
+pub fn setup_logging() -> anyhow::Result<()> {
+	let cli = cli::context::parse();
+	let mut config = LogConfig::load()?;
+	config.apply_cli(&cli)?;
+	logger::init_logging(&config)?;
+	// tracing::trace!("[dryrun] trace");
+	// tracing::debug!("[dryrun] debug");
+	// tracing::info!("[dryrun] info");
+	// tracing::warn!("[dryrun] warn");
+	// tracing::error!("[dryrun] error");
 	Ok(())
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-#[serde(default)]
-pub struct LogConfig {
-	pub file: OutputConfig,
-	pub level: LogLevel,
-	pub targets: HashMap<String, LogLevel>,
-	pub terminal: OutputConfig,
-	// pub fields: LogFields,
-	// pub window: OutputConfig,
-}
+static FLOW_ID: AtomicU64 = AtomicU64::new(0);
+
 impl LogConfig {
 	#[cfg(feature = "native")]
 	pub fn apply_cli(&mut self, cli: &cli::context::Cli) -> Result<()> {
@@ -155,15 +180,6 @@ impl LogConfig {
 		self.targets.extend(other.targets);
 	}
 }
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(rename_all = "lowercase")]
-pub enum LogLevel {
-	Trace,
-	Debug,
-	Info,
-	Warn,
-	Error,
-}
 impl Default for LogLevel {
 	fn default() -> Self {
 		Self::Info
@@ -185,12 +201,6 @@ impl std::fmt::Display for LogLevel {
 		f.write_str(self.as_str())
 	}
 }
-
-static FLOW_ID: AtomicU64 = AtomicU64::new(0);
-#[derive(Clone)]
-pub struct Tracer {
-	namespace: String,
-}
 impl Tracer {
 	pub fn new(namespace: impl Into<String>) -> Self {
 		Self {
@@ -208,11 +218,6 @@ impl Tracer {
 	}
 }
 
-#[derive(Debug)]
-pub struct TraceFlow {
-	namespace: String,
-	name: String,
-}
 impl TraceFlow {
 	fn event(&self, level: LogLevel, message: impl std::fmt::Display) {
 		let id = Tracer::next_flow_id();
@@ -251,13 +256,6 @@ impl TraceFlow {
 	}
 }
 
-#[macro_export]
-macro_rules! flow_warn {
-	($flow:expr, $($arg:tt)*) => {
-		$flow.warn(format!($($arg)*))
-	};
-}
-
 #[derive(Debug, Deserialize)]
 struct CargoConfig {
 	#[serde(default)]
@@ -273,11 +271,20 @@ struct CargoManifest {
 	logging: Option<LogConfig>,
 }
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct OutputOptions {}
+#[serde(default)]
+pub struct LogConfig {
+	pub file: OutputConfig,
+	pub level: LogLevel,
+	pub targets: HashMap<String, LogLevel>,
+	pub terminal: OutputConfig,
+	// pub fields: LogFields,
+	// pub window: OutputConfig,
+}
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct LogFieldConfig {
 	pub enabled: bool,
 }
+
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct LogFields {
 	pub file: bool,
@@ -301,6 +308,7 @@ impl Default for OutputConfig {
 		}
 	}
 }
+
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct LogOptions {
 	pub file: Option<OutputOptions>,
@@ -309,15 +317,16 @@ pub struct LogOptions {
 	pub terminal: Option<OutputOptions>,
 }
 
-pub fn setup_logging() -> anyhow::Result<()> {
-	let cli = cli::context::parse();
-	let mut config = LogConfig::load()?;
-	config.apply_cli(&cli)?;
-	logger::init_logging(&config)?;
-	// tracing::trace!("[dryrun] trace");
-	// tracing::debug!("[dryrun] debug");
-	// tracing::info!("[dryrun] info");
-	// tracing::warn!("[dryrun] warn");
-	// tracing::error!("[dryrun] error");
-	Ok(())
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+pub struct OutputOptions {}
+
+#[derive(Clone)]
+pub struct Tracer {
+	namespace: String,
+}
+
+#[derive(Debug)]
+pub struct TraceFlow {
+	namespace: String,
+	name: String,
 }
