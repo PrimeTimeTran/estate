@@ -41,7 +41,7 @@ server-run = "run -q --bin server --no-default-features --features native"
 # ─────────────────────────────────────────────
 
 daemon = "run -q --bin native --no-default-features --features native -- start"
-daemon-bg = "run -q --bin native --no-default-features --features native -- start --tail=false"
+daemon-bg = "run -q --bin native --no-default-features --features native -- start"
 daemon-fg = "run -q --bin native --no-default-features --features native -- start --tail=true"
 
 

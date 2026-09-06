@@ -1,5 +1,29 @@
 [
   {
+    "number": 115,
+    "normalized-name": "distinct-subsequences",
+    "title": "Distinct Subsequences",
+    "difficulty": "hard",
+    "description": "Given two strings s and t, return the number of distinct subsequences of s which equals t.\n\nThe test cases are generated so that the answer fits on a 32-bit signed integer.",
+    "url": "https://leetcode.com/problems/distinct-subsequences/",
+    "filename": "115-distinct-subsequences.py",
+    "description-raw": "<p>Given two strings s and t, return <i>the number of distinct</i> <b><i>subsequences</i></b><i> of </i>s<i> which equals </i>t.</p>\n<p>The test cases are generated so that the answer fits on a 32-bit signed integer.</p>",
+    "test-cases": [
+      {
+        "index": 0,
+        "input": "s = \"rabbbit\", t = \"rabbit\"",
+        "output": "3",
+        "explanation": "As shown below, there are 3 ways you can generate \"rabbit\" from s.\nrabbbit\nrabbbit\nrabbbit"
+      },
+      {
+        "index": 1,
+        "input": "s = \"babgbag\", t = \"bag\"",
+        "output": "5",
+        "explanation": "As shown below, there are 5 ways you can generate \"bag\" from s.\nbabgbag\nbabgbag\nbabgbag\nbabgbag\nbabgbag"
+      }
+    ]
+  },
+  {
     "number": 3904,
     "normalized-name": "smallest-stable-index-ii",
     "title": "Smallest Stable Index II",

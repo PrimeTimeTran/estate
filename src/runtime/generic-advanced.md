@@ -915,6 +915,6 @@ It means:
 
 > **"Given the compile-time type of `executor`, resolve the `spawn` method according to Rust's method-resolution rules."**
 
-That's the piece that will make your `App<C>`, `AppRuntime<R, E>`, `NativeApp`, `NativeRuntime`, `Executor`, and `Runtime` architecture suddenly become much easier to reason about.
+That's the piece that will make your `App<C>`, `AppRuntime<C, S>`, `NativeApp`, `NativeRuntime`, `Executor`, and `Runtime` architecture suddenly become much easier to reason about.
 
 And in your current code, the cleanest next step is to **pick one owner of `spawn`**—I'd make `Executor` that abstraction—and then have `NativeExecutor` be the concrete implementation that bridges to Tokio. That eliminates a huge amount of accidental complexity while you're learning the type system.
