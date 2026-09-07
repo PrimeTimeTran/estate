@@ -1,5 +1,47 @@
 [
   {
+    "number": 940,
+    "normalized-name": "distinct-subsequences-ii",
+    "title": "Distinct Subsequences II",
+    "difficulty": "hard",
+    "description": "Given a string s, return the number of distinct non-empty subsequences of s. Since the answer may be very large, return it modulo 109 + 7.\n\n",
+    "url": "https://leetcode.com/problems/distinct-subsequences-ii/",
+    "filename": "940-distinct-subsequences-ii.py",
+    "description-raw": "<p>Given a string s, return <em>the number of <strong>distinct non-empty subsequences</strong> of</em> <code>s</code>. Since the answer may be very large, return it <strong>modulo</strong> <code>10<sup>9</sup> + 7</code>.</p>\n<p>&nbsp;</p>",
+    "test-cases": [
+      {
+        "index": 0,
+        "input": "s = \"abc\"",
+        "output": "7",
+        "explanation": "The 7 distinct subsequences are \"a\", \"b\", \"c\", \"ab\", \"ac\", \"bc\", and \"abc\"."
+      },
+      {
+        "index": 1,
+        "input": "s = \"aba\"",
+        "output": "6",
+        "explanation": "The 6 distinct subsequences are \"a\", \"b\", \"ab\", \"aa\", \"ba\", and \"aba\"."
+      },
+      {
+        "index": 2,
+        "input": "s = \"aaa\"",
+        "output": "3",
+        "explanation": "The 3 distinct subsequences are \"a\", \"aa\" and \"aaa\"."
+      },
+      {
+        "index": 3,
+        "input": null,
+        "output": null,
+        "explanation": null
+      },
+      {
+        "index": 4,
+        "input": null,
+        "output": null,
+        "explanation": null
+      }
+    ]
+  },
+  {
     "number": 115,
     "normalized-name": "distinct-subsequences",
     "title": "Distinct Subsequences",
