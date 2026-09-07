@@ -110,16 +110,58 @@ where
 		tracing::info!("App start");
 		self.start_egui();
 		self.start_clock();
+		#[cfg(not(target_arch = "wasm32"))]
+		self.start_cargo_watcher();
 		Ok(())
 	}
-	fn start_egui(&mut self) {
-		tracing::info!("App start_egui");
-		let cancel = CancellationToken::new();
-		// Install/register your egui hook here.
-		//
-		// The hook should retain `cancel.clone()` if it needs
-		// to check for shutdown.
-		self.handle_egui = Some(EguiHandle { cancel });
+	#[cfg(not(target_arch = "wasm32"))]
+	fn start_cargo_watcher(&mut self) {
+		let watcher = match CargoWatcher::new() {
+			Ok(watcher) => watcher,
+			Err(error) => {
+				tracing::error!("Failed to create Cargo watcher: {error}");
+				return;
+			}
+		};
+		tracing::info!("Watching Cargo.toml: {}", watcher.path().display());
+		self.worker().run_background_blocking(move |cancel| {
+			let (tx, rx) = std::sync::mpsc::channel();
+			let mut fs_watcher = match RecommendedWatcher::new(tx, Config::default()) {
+				Ok(watcher) => watcher,
+				Err(error) => {
+					tracing::error!("Failed to create Cargo watcher: {error}");
+					return;
+				}
+			};
+			if let Err(error) = fs_watcher.watch(watcher.path(), RecursiveMode::NonRecursive) {
+				tracing::error!("Failed to watch Cargo.toml: {error}");
+				return;
+			}
+			loop {
+				if cancel.is_cancelled() {
+					break;
+				}
+				match rx.recv() {
+					Ok(Ok(event)) => {
+						if matches!(
+							event.kind,
+							notify::EventKind::Modify(_) | notify::EventKind::Create(_)
+						) {
+							tracing::info!("Cargo.toml changed");
+							if let Err(error) = watcher.run_once_sync() {
+								tracing::error!("Failed to process Cargo.toml: {error}");
+							}
+						}
+					}
+					Ok(Err(error)) => {
+						tracing::error!("Cargo watcher error: {error}");
+					}
+					Err(_) => break,
+				}
+			}
+
+			tracing::info!("Cargo watcher stopped");
+		});
 	}
 	fn start_clock(&mut self) {
 		let clock = self.host.clock();
@@ -131,7 +173,6 @@ where
 		// let handle = Clock::run_background(clock, Duration::from_secs(1), msg);
 		self.handle_clock = Some(handle);
 	}
-
 	/// Inherent works method works
 	fn start_clock_wasm(&mut self) {
 		// self
@@ -145,6 +186,15 @@ where
 		// let msg = String::from("start_clock_wasm clock.run_background(Duration::from_secs(1));");
 		// clock.run_background(Duration::from_secs(1), msg.clone());
 		// let handle = Clock::run_background(clock, Duration::from_secs(1), msg.clone());
+	}
+	fn start_egui(&mut self) {
+		tracing::info!("App start_egui");
+		let cancel = CancellationToken::new();
+		// Install/register your egui hook here.
+		//
+		// The hook should retain `cancel.clone()` if it needs
+		// to check for shutdown.
+		self.handle_egui = Some(EguiHandle { cancel });
 	}
 	fn worker(&self) -> &impl Worker {
 		self.host.worker()

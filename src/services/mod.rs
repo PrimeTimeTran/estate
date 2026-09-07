@@ -7,9 +7,6 @@ use std::path::PathBuf;
 
 use crate::{app::*, model::*, proto::types::*};
 
-// pub mod service_prelude;
-// pub use service_prelude::*;
-
 #[cfg(not(feature = "web"))]
 pub use crate::proto::{
 	problem_service_server::ProblemService, submission_service_server::SubmissionService,

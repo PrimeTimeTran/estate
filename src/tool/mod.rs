@@ -6,6 +6,9 @@ pub mod logger;
 #[cfg(feature = "native")]
 pub mod cargo;
 
+#[cfg(feature = "native")]
+pub use cargo::*;
+
 #[macro_export]
 macro_rules! doc {
 	($text:expr) => {{ $text }};

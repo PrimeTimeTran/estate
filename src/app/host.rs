@@ -1,5 +1,11 @@
 use crate::prelude::*;
 
+pub enum CargoFeature {
+	Native,
+	Web,
+	None,
+}
+
 fn append_to_file(str: String) {}
 
 fn sleep(str: String) {}
@@ -28,9 +34,6 @@ impl Clock for HostClock {
 	fn now(&self) -> String {
 		time_now()
 	}
-	// fn run_once(&self) {
-	// 	tracing::info!("HostClock run_once Tick: {}", self.now());
-	// }
 	fn run_once(&self) -> String {
 		let now = self.now();
 		tracing::info!("HostClock Tick: {}", now);
@@ -68,9 +71,8 @@ impl Clock for HostClock {
 					// let time = clock.now();
 					// crate::bridge::log(&format!("🔥 impl Clock for HostClock run_background {msg}"));
 					// crate::bridge::log(&format!("🔥 {time}"));
-					clock.run_once();
-					let once_time = clock.run_once();
-					crate::bridge::log(&format!("🔥 {once_time}"));
+					let now = clock.run_once();
+					crate::bridge::log(&format!("🔥 {now}"));
 					gloo_timers::future::TimeoutFuture::new(1000).await;
 				}
 			});
@@ -215,6 +217,28 @@ impl Worker for HostWorker {
 
 		WorkerHandle { cancel }
 	}
+	fn run_background_blocking<F>(&self, task: F) -> WorkerHandle
+	where
+		F: FnOnce(CancellationToken) + Send + 'static,
+	{
+		let cancel = CancellationToken::new();
+		let task_cancel = cancel.clone();
+
+		self.runtime.spawn_blocking(move || {
+			task(task_cancel);
+		});
+
+		WorkerHandle { cancel }
+	}
+
+	#[cfg(not(target_arch = "wasm32"))]
+	fn spawn<F, Fut>(&self, task: F)
+	where
+		F: FnOnce() -> Fut + Send + 'static,
+		Fut: Future<Output = ()> + Send + 'static,
+	{
+		self.runtime.spawn(task());
+	}
 }
 #[cfg(target_arch = "wasm32")]
 impl Worker for HostWorker {
@@ -292,14 +316,10 @@ pub struct WebContext;
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Disconnected;
 
-#[cfg(feature = "native")]
 #[derive(Debug, Clone)]
 pub struct Connected {
-	pub api: NativeApiClient,
-}
-
-#[cfg(feature = "web")]
-#[derive(Debug, Clone)]
-pub struct Connected {
+	#[cfg(feature = "web")]
 	pub api: WebApiClient,
+	#[cfg(feature = "native")]
+	pub api: NativeApiClient,
 }

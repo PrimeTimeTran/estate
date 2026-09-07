@@ -351,4 +351,15 @@ pub trait Worker {
 	fn run_foreground<F>(&self, task: F)
 	where
 		F: Fn() + Send + 'static;
+
+	#[cfg(not(target_arch = "wasm32"))]
+	fn run_background_blocking<F>(&self, task: F) -> Self::Handle
+	where
+		F: FnOnce(CancellationToken) + Send + 'static;
+
+	#[cfg(not(target_arch = "wasm32"))]
+	fn spawn<F, Fut>(&self, task: F)
+	where
+		F: FnOnce() -> Fut + Send + 'static,
+		Fut: Future<Output = ()> + Send + 'static;
 }
