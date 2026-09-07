@@ -1,11 +1,10 @@
 //! [Macros]
 //!
 //! The macros used throughout our crate which are as generic as can be made
-//! 
-
+//!
 
 /// [problem_source!]
-/// 
+///
 /// Parse  string file path quickly and easily.
 #[macro_export]
 macro_rules! problem_source {
@@ -31,3 +30,51 @@ macro_rules! section {
 }
 
 pub use section;
+
+/// [panic_section!]
+///
+/// Print a section header for grouping output when reading through dense text.
+#[macro_export]
+macro_rules! panic_section {
+	($title:expr) => {
+		$crate::helpers::print_section($title, file!(), line!())
+	};
+}
+
+pub use panic_section;
+
+/// [awe!]
+///
+/// Acknowledge your awe are the state of affairs.
+///
+/// Acknowledge the current state of affairs.
+#[macro_export]
+macro_rules! awe {
+	// Section
+	($title:expr) => {
+		$crate::helpers::print_section(
+			$title,
+			file!(),
+			line!(),
+		)
+	};
+
+	// Debug a value
+	($level:ident, $value:expr) => {
+		$crate::helpers::print_debug(
+			$crate::helpers::Level::$level,
+			stringify!($value),
+			&$value,
+		)
+	};
+
+	// Formatted message
+	($level:ident, $($arg:tt)*) => {
+		$crate::helpers::print(
+			$crate::helpers::Level::$level,
+			format_args!($($arg)*),
+		)
+	};
+}
+
+pub use awe;

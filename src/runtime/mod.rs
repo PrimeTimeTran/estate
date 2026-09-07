@@ -11,7 +11,7 @@ pub use web::*;
 
 use crate::prelude::*;
 
-#[path = "./app.rs"]
+#[path = "./runtime.app.rs"]
 pub mod app_runtime;
 pub use app_runtime::*;
 

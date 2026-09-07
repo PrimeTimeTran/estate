@@ -19,7 +19,7 @@ use estate::app::*;
 
 #[cfg(feature = "native")]
 fn main() -> Result<()> {
-	let host = Host::init()?;
+	let host = Host::init().expect("Host should start successfully.");
 	let mut app = App::new(host)?;
 	app.run()?;
 	Ok(())
@@ -27,7 +27,7 @@ fn main() -> Result<()> {
 
 #[cfg(feature = "native")]
 fn _tokio_main() -> Result<()> {
-	let host = Host::init()?;
+	let host = Host::init().expect("Host should be there");
 	let _parsed = host.run()?;
 	let mut app = App::new(host)?;
 	app.run()?;

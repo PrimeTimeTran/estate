@@ -1,5 +1,38 @@
 use crate::prelude::*;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TerminalHost {
+	VsCode,
+	Zed,
+	JetBrains,
+	Unknown,
+}
+
+pub fn terminal_host() -> TerminalHost {
+	let env = std::env::vars().collect::<std::collections::HashMap<_, _>>();
+	if env.contains_key("VSCODE_INJECTION")
+		|| env.contains_key("VSCODE_PID")
+		|| env.contains_key("VSCODE_IPC_HOOK_CLI")
+	{
+		return TerminalHost::VsCode;
+	}
+
+	// Zed sets ZED_TERM in terminals launched from Zed.
+	if env.contains_key("ZED_TERM") {
+		return TerminalHost::Zed;
+	}
+
+	// JetBrains terminals commonly expose TERMINAL_EMULATOR.
+	if env
+		.get("TERMINAL_EMULATOR")
+		.is_some_and(|v| v.contains("JetBrains"))
+	{
+		return TerminalHost::JetBrains;
+	}
+
+	TerminalHost::Unknown
+}
+
 pub enum CargoFeature {
 	Native,
 	Web,
@@ -163,6 +196,27 @@ where
 #[cfg(feature = "native")]
 impl Host<NativeContext> {
 	pub fn init() -> Result<Self> {
+		// let count = 1;
+		// let host = "12";
+		// let error = EventKind::DaemonStarted;
+		// let state = ViewType::DashboardScreen;
+		// awe!("Runtime initialized");
+		// awe!(Info, "Runtime initialized");
+		// awe!(Success, "Runtime started");
+		// awe!(Warn, "No config found");
+		// awe!(Error, "Failed to start runtime");
+		// awe!(Info, "Loaded {} count", count);
+		// awe!(Success, "Connected to {}", host);
+		// awe!(Debug, "State = {:#?}", state);
+		// awe!(Debug, "Error = {:#?}", error);
+		// let nums = vec![1, 2, 3];
+		// let chars = vec!["1", "2", "3"];
+		// awe!(Info, "Loaded {:#?} nums", nums);
+		// awe!(Info, "Loaded {:#?} chars", chars);
+		// panic!("hi");
+		// awe!(Debug, "Runtime = {:?}", runtime);
+		// crate::app_macros::awe!(Trace, "Dispatching event: {:?}", event);
+		// panic!(" Hi ");
 		let parsed = cli::context::parse();
 		let mut config = LogConfig::load()?;
 		config.apply_cli(&parsed);
