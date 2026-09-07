@@ -26,34 +26,31 @@ impl AppCtx for WebContext {
 
 impl Clock for HostClock {
 	fn now(&self) -> String {
-		#[cfg(not(target_arch = "wasm32"))]
-		{
-			time_now()
-		}
-
-		#[cfg(target_arch = "wasm32")]
-		{
-			"0".to_string()
-		}
+		time_now()
 	}
-	fn run_once(&self) {
-		tracing::info!("HostClock Tick: {}", self.now());
+	// fn run_once(&self) {
+	// 	tracing::info!("HostClock run_once Tick: {}", self.now());
+	// }
+	fn run_once(&self) -> String {
+		let now = self.now();
+		tracing::info!("HostClock Tick: {}", now);
+		now
 	}
+	#[cfg(not(target_arch = "wasm32"))]
 	fn run_foreground(&self, interval: Duration) {
 		loop {
 			self.run_once();
 			std::thread::sleep(interval);
 		}
 	}
-	fn run_background(&self, interval: Duration) -> ClockHandle {
+	fn run_background(&self, interval: Duration, msg: String) -> ClockHandle {
 		let cancel = CancellationToken::new();
+		let clock = HostClock;
 		let task_cancel = cancel.clone();
 
 		#[cfg(not(target_arch = "wasm32"))]
 		{
 			std::thread::spawn(move || {
-				let clock = HostClock;
-
 				loop {
 					if task_cancel.is_cancelled() {
 						break;
@@ -66,8 +63,17 @@ impl Clock for HostClock {
 		}
 		#[cfg(target_arch = "wasm32")]
 		{
-			// Spawn async/browser task here later.
-			let _ = (interval, task_cancel);
+			wasm_bindgen_futures::spawn_local(async move {
+				loop {
+					// let time = clock.now();
+					// crate::bridge::log(&format!("🔥 impl Clock for HostClock run_background {msg}"));
+					// crate::bridge::log(&format!("🔥 {time}"));
+					clock.run_once();
+					let once_time = clock.run_once();
+					crate::bridge::log(&format!("🔥 {once_time}"));
+					gloo_timers::future::TimeoutFuture::new(1000).await;
+				}
+			});
 		}
 		ClockHandle { cancel }
 	}
@@ -98,7 +104,6 @@ where
 			tokio::signal::ctrl_c()
 				.await
 				.expect("failed to listen for Ctrl+C");
-
 			tracing::info!("Ctrl+C received");
 		});
 		#[cfg(all(target_arch = "wasm32"))]
@@ -224,7 +229,7 @@ impl Worker for HostWorker {
 		let task_cancel = cancel.clone();
 
 		wasm_bindgen_futures::spawn_local(async move {
-			task(task_cancel).await;
+			gloo_timers::future::TimeoutFuture::new(1000).await;
 		});
 
 		WorkerHandle { cancel }

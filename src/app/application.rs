@@ -57,17 +57,28 @@ where
 			handle_egui: None,
 		})
 	}
-	fn clock(&self) -> &impl Clock {
-		self.host.clock()
+	pub fn clock(&self) -> &HostClock {
+		&self.clock()
 	}
 	pub fn context(&self) -> &C {
 		self.host.context()
 	}
 	pub fn run(&mut self) -> Result<()> {
 		tracing::info!("App run");
+
 		self.start()?;
-		self.host.run()?;
-		self.shutdown();
+
+		#[cfg(not(target_arch = "wasm32"))]
+		{
+			self.host.run()?;
+			self.shutdown();
+		}
+
+		#[cfg(target_arch = "wasm32")]
+		{
+			self.host.run()?;
+		}
+
 		Ok(())
 	}
 	fn run_app(&mut self) -> Result<()> {
@@ -108,16 +119,33 @@ where
 		//
 		// The hook should retain `cancel.clone()` if it needs
 		// to check for shutdown.
-
 		self.handle_egui = Some(EguiHandle { cancel });
 	}
 	fn start_clock(&mut self) {
-		tracing::info!("App start_clock");
 		let clock = self.host.clock();
-		let handle = clock.run_background(Duration::from_secs(1));
-		self.handle_clock = Some(handle)
+		let msg = String::from("App.start_clock.clock.run_background(Duration::from_secs(1));");
+		// handle works
+		let handle = clock.run_background(Duration::from_secs(1), msg);
+		// So does the inherent
+		// let msg = String::from("Loi start_clock Clock::run_background(clock, Duration::from_secs(1));");
+		// let handle = Clock::run_background(clock, Duration::from_secs(1), msg);
+		self.handle_clock = Some(handle);
 	}
 
+	/// Inherent works method works
+	fn start_clock_wasm(&mut self) {
+		// self
+		// 	.host
+		// 	.clock()
+		// 	.inherent_background_tick(String::from("self.host.clock().inherent_background_tick"));
+		let clock = self.host.clock();
+		// clock.inherent_background_tick(String::from(
+		// 	"let clock = self.host.clock(); clock.inherent_background_tick",
+		// ));
+		// let msg = String::from("start_clock_wasm clock.run_background(Duration::from_secs(1));");
+		// clock.run_background(Duration::from_secs(1), msg.clone());
+		// let handle = Clock::run_background(clock, Duration::from_secs(1), msg.clone());
+	}
 	fn worker(&self) -> &impl Worker {
 		self.host.worker()
 	}

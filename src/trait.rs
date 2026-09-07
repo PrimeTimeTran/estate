@@ -25,15 +25,14 @@ pub trait AppCtx: Default {
 ///
 pub trait Clock {
 	fn now(&self) -> String;
-
 	/// Run once and return.
-	fn run_once(&self);
-
+	fn run_once(&self) -> String;
 	/// Run repeatedly in the foreground.
+	#[cfg(not(target_arch = "wasm32"))]
 	fn run_foreground(&self, interval: Duration);
 
 	/// Spawn the clock as a background process/task.
-	fn run_background(&self, interval: Duration) -> ClockHandle;
+	fn run_background(&self, interval: Duration, msg: String) -> ClockHandle;
 }
 
 /// ## [Context]

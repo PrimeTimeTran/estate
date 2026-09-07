@@ -22,10 +22,8 @@
 # ─────────────────────────────────────────────
 # Builds
 # ─────────────────────────────────────────────
-
-native = "build -q --bin native --no-default-features --features native"
+web = "build --bin web --target wasm32-unknown-unknown --features web"
 server = "build -q --bin server --no-default-features --features native"
-web = "build -q --bin web --no-default-features --features web --target wasm32-unknown-unknown"
 
 
 # ─────────────────────────────────────────────

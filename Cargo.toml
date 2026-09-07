@@ -92,12 +92,12 @@ web = [
   "dep:egui_extras",
   "dep:jsonc-parser",
   "dep:tokio-util",
+  "dep:js-sys",
 ]
 native = [
   "dep:notify",
   "dep:cli",
   "dep:demand",
-  "dep:tokio",
   "dep:rmcp",
   "dep:tower-lsp",
   "dep:tokio-util",
@@ -155,9 +155,9 @@ wasm-bindgen-futures.workspace = true
 wasm-bridge.workspace = true
 wgpu.workspace = true
 winit.workspace = true
-gloo-timers.workspace = true
 prost.workspace = true
 prost-types.workspace = true
+
 # Make all these optional so they can be toggled by the native feature
 cli = { workspace = true, optional = true }
 comfy-table = { workspace = true, optional = true }
@@ -180,21 +180,25 @@ sqlx = "0.9.0"
 strum = { version = "0.27", features = ["derive"] }
 rand.workspace = true
 async-broadcast = "0.7.2"
-tokio = { workspace = true, optional = true, features = ["rt", "macros", "time", "sync"] }
 tokio-util = { workspace = true, optional = true }
+js-sys = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 objc2 = { workspace = true, optional = true }
 objc2-app-kit = { workspace = true, optional = true }
 objc2-foundation = { workspace = true, optional = true }
 rmcp = { workspace = true, optional = true }
-tokio = { workspace = true, features = ["rt-multi-thread", "signal"] }
+tokio = { workspace = true, features = ["rt", "macros", "time", "sync"] }
 tokio-util = { workspace = true }
 tonic = { workspace = true, features = ["transport"] }
 tower-lsp = { workspace = true, optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
+js-sys = "0.3"
 getrandom = { version = "0.4.3", features = ["wasm_js"] }
+tokio = { version = "1", default-features = false, features = ["rt", "macros", "time", "sync"] }
+wasm-bindgen-futures = "0.4"
+gloo-timers = { version = "0.3", features = ["futures"] }
 
 [build-dependencies]
 prost-build = "0.14.4"
