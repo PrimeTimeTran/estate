@@ -1,30 +1,26 @@
 use crate::{RuntimeState, e, prelude::*};
 
+// https://github.com/rust-lang/rust/issues/41517
+// https://github.com/rust-lang/rust/issues/55628
+// https://github.com/rust-lang/rfcs/pull/1733
+pub trait ApiServices: Services {
+	type Client: Api;
+	/// ## Platform Generic API
+	///
+	/// Exposes capabilities for business logic to access server side resources
+	///
+	/// - [GRPC]
+	///
+	/// Has [`Native`] & [`Web`] implementations
+	fn foo(&self);
+	// fn api(&self) -> &Self::Client;
+	// fn api(&self) -> Option<&Self::Client>;
+}
 pub trait AppCtx: Default {
 	type State;
 	fn state(&self) -> &Self::State;
 }
-pub trait NativeCtx: Default {
-	type State;
-	fn state(&self) -> &Self::State;
-}
 
-// https://github.com/rust-lang/rust/issues/41517
-// https://github.com/rust-lang/rust/issues/55628
-// https://github.com/rust-lang/rfcs/pull/1733
-
-// pub trait ApiServices: Services {
-// 	type Client: Api;
-// 	/// ## Platform Generic API
-// 	///
-// 	/// Exposes capabilities for business logic to access server side resources
-// 	///
-// 	/// - [GRPC]
-// 	///
-// 	/// Has [`Native`] & [`Web`] implementations
-// 	fn api(&self) -> Option<&Self::Client>;
-// 	fn api(&self) -> &Self::Client;
-// }
 
 /// ## [Clock]
 ///

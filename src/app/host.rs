@@ -72,22 +72,15 @@ impl ClockHandle {
 	}
 }
 
-
 impl<C> Host<C>
 where
 	C: AppCtx,
 {
-	pub fn new(context: C) -> Result<Self> {
-		let parsed = cli::context::parse();
-		let mut config = LogConfig::load()?;
-		config.apply_cli(&parsed);
-		logger::init_logging(&config)?;
-		Ok(Self {
-			parsed,
-			context,
-			clock: HostClock,
-			worker: HostWorker::new(),
-		})
+	pub fn clock(&self) -> &HostClock {
+		&self.clock
+	}
+	pub fn context(&self) -> &C {
+		&self.context
 	}
 	pub fn run(&self) -> Result<()> {
 		tracing::info!("Host run");
@@ -103,18 +96,24 @@ where
 		});
 		Ok(())
 	}
-
-	pub fn clock(&self) -> &HostClock {
-		&self.clock
-	}
-
 	pub fn worker(&self) -> &HostWorker {
 		&self.worker
 	}
-	pub fn context(&self) -> &C {
-		&self.context
+
+	pub fn new(context: C) -> Result<Self> {
+		let parsed = cli::context::parse();
+		let mut config = LogConfig::load()?;
+		config.apply_cli(&parsed);
+		logger::init_logging(&config)?;
+		Ok(Self {
+			parsed,
+			context,
+			clock: HostClock,
+			worker: HostWorker::new(),
+		})
 	}
 }
+
 #[cfg(feature = "native")]
 impl Host<NativeContext> {
 	pub fn init() -> Result<Self> {
@@ -122,7 +121,12 @@ impl Host<NativeContext> {
 		Self::new(context)
 	}
 }
-
+#[cfg(feature = "web")]
+impl Host<WebContext> {
+	pub fn init() -> Result<Self> {
+		Self::new(WebContext::default())
+	}
+}
 impl<C> Provide for Host<C>
 where
 	C: AppCtx,
@@ -166,7 +170,6 @@ impl HostWorker {
 		self.runtime.block_on(future);
 	}
 }
-
 #[cfg(not(target_arch = "wasm32"))]
 impl Worker for HostWorker {
 	type Handle = WorkerHandle;
@@ -194,7 +197,6 @@ impl Worker for HostWorker {
 		WorkerHandle { cancel }
 	}
 }
-
 #[cfg(target_arch = "wasm32")]
 impl Worker for HostWorker {
 	type Handle = WorkerHandle;
