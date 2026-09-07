@@ -9,13 +9,13 @@ use crate::{
 
 #[async_trait]
 pub trait ProblemRepository: Send + Sync {
-	async fn list(&self, query: ProblemQuery) -> Result<Page<ProtoProblem>>;
 	async fn create(&self, problem: CreateProblem) -> Result<ProtoProblem>;
-	async fn update(&self, id: i64, problem: UpdateProblem) -> Result<ProtoProblem>;
 	async fn delete(&self, id: i64) -> Result<()>;
-	async fn get(&self, id: i64) -> Result<ProtoProblem>;
 	async fn get_by_slug(&self, slug: &str) -> Result<ProtoProblem>;
+	async fn get(&self, id: i64) -> Result<ProtoProblem>;
+	async fn list(&self, query: ProblemQuery) -> Result<Page<ProtoProblem>>;
 	async fn sample_problem(&self, query: ProblemQuery) -> Result<ProtoProblem>;
+	async fn update(&self, id: i64, problem: UpdateProblem) -> Result<ProtoProblem>;
 }
 
 fn problem_id(id: &str) -> Result<i64, Status> {
@@ -23,16 +23,26 @@ fn problem_id(id: &str) -> Result<i64, Status> {
 		.map_err(|_| Status::invalid_argument("invalid problem id"))
 }
 
-impl<R> ProblemServiceImpl<R> {
-	pub fn new(repository: R) -> Self {
-		Self { repository }
-	}
-}
 #[tonic::async_trait]
 impl<R> ProblemService for ProblemServiceImpl<R>
 where
 	R: ProblemRepository + 'static,
 {
+	async fn create_problem(
+		&self,
+		request: Request<CreateProblemRequest>,
+	) -> Result<Response<ProtoProblem>, Status> {
+		let request = request.into_inner();
+		let problem = self
+			.repository
+			.create(CreateProblem {
+				title: request.title,
+				slug: request.slug,
+			})
+			.await
+			.map_err(internal_error)?;
+		Ok(Response::new(problem))
+	}
 	async fn list_problems(
 		&self,
 		request: Request<ListProblemsRequest>,
@@ -60,21 +70,6 @@ where
 			problems: result.items.clone(),
 			page: Some(result.page_info()),
 		}))
-	}
-	async fn create_problem(
-		&self,
-		request: Request<CreateProblemRequest>,
-	) -> Result<Response<ProtoProblem>, Status> {
-		let request = request.into_inner();
-		let problem = self
-			.repository
-			.create(CreateProblem {
-				title: request.title,
-				slug: request.slug,
-			})
-			.await
-			.map_err(internal_error)?;
-		Ok(Response::new(problem))
 	}
 	async fn update_problem(
 		&self,
@@ -133,6 +128,12 @@ where
 			.map_err(internal_error)?;
 
 		Ok(Response::new(problem))
+	}
+}
+
+impl<R> ProblemServiceImpl<R> {
+	pub fn new(repository: R) -> Self {
+		Self { repository }
 	}
 }
 

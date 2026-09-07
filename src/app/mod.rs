@@ -34,18 +34,16 @@ pub mod worker;
 
 pub use self::application::*;
 pub use self::{clock::*, context::*, event::*, host::*, job::*, task::*, worker::*};
-// pub use crate::app::app as app_entry;
-// pub use app as app_entry;
 
 /// Platform Gates
 #[cfg(feature = "native")]
-#[path = "./app.native.rs"]
+#[path = "./native.app.rs"]
 pub mod app_native;
 
 #[cfg(all(feature = "web", target_arch = "wasm32"))]
-#[path = "./app.web.rs"]
+#[path = "./web.app.rs"]
 pub mod app_web;
 
 #[cfg(not(all(feature = "web", target_arch = "wasm32")))]
-#[path = "./app.web.stub.rs"]
+#[path = "./web.app.stub.rs"]
 pub mod app_web;

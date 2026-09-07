@@ -58,8 +58,8 @@ impl<R: Runtime + 'static, E: Executor> AppRuntime<R, E> {
 			}
 		});
 	}
-	pub fn api(&self) -> Option<&<R::Services as Services>::Client> {
-		self.engine.runtime.services().api().as_ref()
+	pub fn api(&self) -> &Option<<R::Services as Services>::Client> {
+		self.engine.runtime.services().api()
 	}
 	pub fn sample_problem(&mut self) {
 		if !self.start_problems_request() {

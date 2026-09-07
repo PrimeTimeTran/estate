@@ -17,6 +17,12 @@ fn time_now() -> String {
 	let format = "%B %-d, %Y at %-I:%M:%S %p UTC";
 	now.format(format).to_string()
 }
+impl AppCtx for WebContext {
+	type State = WebState;
+	fn state(&self) -> &Self::State {
+		&self.state()
+	}
+}
 
 impl Clock for HostClock {
 	fn now(&self) -> String {
@@ -82,11 +88,12 @@ where
 	pub fn context(&self) -> &C {
 		&self.context
 	}
+	/// Host-level execution goes here.
+	/// This does NOT need to be winit.
+	/// CLI, daemon, or GUI can build on top of this.
 	pub fn run(&self) -> Result<()> {
 		tracing::info!("Host run");
-		// Host-level execution goes here.
-		// This does NOT need to be winit.
-		// CLI, daemon, or GUI can build on top of this.
+		#[cfg(not(target_arch = "wasm32"))]
 		self.worker.block_on(async {
 			tokio::signal::ctrl_c()
 				.await
@@ -94,6 +101,11 @@ where
 
 			tracing::info!("Ctrl+C received");
 		});
+		#[cfg(all(target_arch = "wasm32"))]
+		{
+			// WASM has no process-level Ctrl+C signal.
+			// Shutdown must be triggered externally.
+		}
 		Ok(())
 	}
 	pub fn worker(&self) -> &HostWorker {
@@ -101,12 +113,7 @@ where
 	}
 
 	pub fn new(context: C) -> Result<Self> {
-		let parsed = cli::context::parse();
-		let mut config = LogConfig::load()?;
-		config.apply_cli(&parsed);
-		logger::init_logging(&config)?;
 		Ok(Self {
-			parsed,
 			context,
 			clock: HostClock,
 			worker: HostWorker::new(),
@@ -117,10 +124,15 @@ where
 #[cfg(feature = "native")]
 impl Host<NativeContext> {
 	pub fn init() -> Result<Self> {
+		let parsed = cli::context::parse();
+		let mut config = LogConfig::load()?;
+		config.apply_cli(&parsed);
+		logger::init_logging(&config)?;
 		let context = NativeContext::default();
 		Self::new(context)
 	}
 }
+
 #[cfg(feature = "web")]
 impl Host<WebContext> {
 	pub fn init() -> Result<Self> {
@@ -145,24 +157,26 @@ where
 	// }
 }
 impl HostWorker {
-	pub fn new() -> Self {
-		let runtime = tokio::runtime::Runtime::new().unwrap();
-		Self {
-			runtime: Arc::new(runtime),
-		}
-	}
-	/// When there's a proxied event loop, this is how I
-	/// listen for ctrl+c exit events.
+	#[cfg(all(not(feature = "web")))]
 	pub fn spawn_ctrl_c<S>(&self, sink: S)
 	where
 		S: EventSink<AppEvent>,
 	{
-		self.runtime.spawn(async move {
-			if tokio::signal::ctrl_c().await.is_ok() {
-				sink.send(AppEvent::Shutdown);
+		self.runtime.block_on(async {
+			#[cfg(not(target_arch = "wasm32"))]
+			{
+				if tokio::signal::ctrl_c().await.is_ok() {
+					sink.send(AppEvent::Shutdown);
+				}
+			}
+			#[cfg(target_arch = "wasm32")]
+			{
+				// WASM has no process-level Ctrl+C signal.
+				// Shutdown must be triggered externally.
 			}
 		});
 	}
+	#[cfg(all(not(feature = "web")))]
 	pub fn block_on<F>(&self, future: F)
 	where
 		F: Future,
@@ -223,21 +237,64 @@ impl Worker for HostWorker {
 		task();
 	}
 }
+#[cfg(not(target_arch = "wasm32"))]
+impl HostWorker {
+	pub fn new() -> Self {
+		let runtime = tokio::runtime::Runtime::new().unwrap();
+
+		Self {
+			runtime: Arc::new(runtime),
+		}
+	}
+}
+#[cfg(target_arch = "wasm32")]
+impl HostWorker {
+	pub fn new() -> Self {
+		Self {
+			// initialize browser worker
+		}
+	}
+}
 
 pub struct Host<C>
 where
 	C: AppCtx,
 {
-	pub parsed: Cli,
+	// pub parsed: Cli,
 	pub context: C,
 	worker: HostWorker,
 	clock: HostClock,
 }
 pub struct HostClock;
 pub struct HostRenderer;
+
+#[cfg(not(target_arch = "wasm32"))]
 pub struct HostWorker {
-	pub runtime: Arc<tokio::runtime::Runtime>,
+	runtime: Arc<tokio::runtime::Runtime>,
 }
+
+#[cfg(target_arch = "wasm32")]
+pub struct HostWorker;
 pub struct WorkerHandle {
 	pub cancel: CancellationToken,
+}
+
+#[derive(Debug, Default)]
+pub struct WebState;
+#[derive(Default)]
+pub struct WebContext;
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Disconnected;
+
+#[cfg(feature = "native")]
+#[derive(Debug, Clone)]
+pub struct Connected {
+	pub api: NativeApiClient,
+}
+
+#[cfg(feature = "web")]
+#[derive(Debug, Clone)]
+pub struct Connected {
+	pub api: WebApiClient,
 }

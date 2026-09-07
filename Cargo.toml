@@ -24,7 +24,7 @@ icon = ["assets/icon.icns"]
 name = "web"
 path = "src/bin/web.rs"
 required-features = ["web"]
-# target = "wasm32-unknown-unknown"
+target = "wasm32-unknown-unknown"
 
 # https://doc.rust-lang.org/cargo/reference/cargo-targets.html#configuring-a-target
 [[bin]]
@@ -89,9 +89,9 @@ web = [
   "dep:wasm-bindgen",
   "dep:web-sys",
   "dep:eframe",
-  # "dep:egui_commonmark",
   "dep:egui_extras",
   "dep:jsonc-parser",
+  "dep:tokio-util",
 ]
 native = [
   "dep:notify",
@@ -177,9 +177,6 @@ objc2-app-kit = { workspace = true, optional = true }
 objc2-foundation = { workspace = true, optional = true }
 rmcp = { workspace = true, optional = true }
 signal-hook = { workspace = true, optional = true }
-tokio = { workspace = true, optional = true, features = ["rt", "macros", "rt-multi-thread"] }
-tokio-util = { workspace = true, optional = true }
-# tokio-util = { version = "0.7", default-features = false, features = ["rt"] }
 tower-lsp = { workspace = true, optional = true }
 tray-icon = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
@@ -189,17 +186,16 @@ strum = { version = "0.27", features = ["derive"] }
 rand.workspace = true
 async-broadcast = "0.7.2"
 
+tokio = { workspace = true, optional = true, features = ["rt", "macros", "time", "sync"] }
+tokio-util = { workspace = true, optional = true }
+
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "signal"] }
+tokio-util = { workspace = true }
 tonic = { workspace = true, features = ["transport"] }
 
-# [target.'cfg(target_arch = "wasm32")'.dependencies]
-# getrandom = { version = "0.4.3", features = ["wasm_js"] }
-
-# [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-# tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync"] }
-
-# [target.'cfg(target_arch = "wasm32")'.dependencies]
-# tokio = { version = "1", default-features = false, features = ["rt", "macros", "time", "sync"] }
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.4.3", features = ["wasm_js"] }
 
 [build-dependencies]
 prost-build = "0.14.4"

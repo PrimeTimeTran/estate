@@ -1,21 +1,21 @@
 use crate::{
 	model::{ProtoSubmissionStatus, SubmissionStatus, common::Language},
 	prelude::*,
+	services::SubmissionService,
+	// services::*,
 	proto::{types::Submission, *},
 	server::*,
-	services::SubmissionService,
-	services::*,
 };
 
 use crate::{prelude::*, services::*};
 
 #[async_trait]
 pub trait SubmissionRepository {
-	async fn list(&self, query: SubmissionQuery) -> anyhow::Result<Page<Submission>>;
-	async fn get(&self, id: &str) -> anyhow::Result<Submission>;
 	async fn create(&self, submission: CreateSubmission) -> anyhow::Result<Submission>;
-	async fn update(&self, id: &str, submission: UpdateSubmission) -> anyhow::Result<Submission>;
 	async fn delete(&self, id: &str) -> anyhow::Result<()>;
+	async fn get(&self, id: &str) -> anyhow::Result<Submission>;
+	async fn list(&self, query: SubmissionQuery) -> anyhow::Result<Page<Submission>>;
+	async fn update(&self, id: &str, submission: UpdateSubmission) -> anyhow::Result<Submission>;
 }
 
 #[tonic::async_trait]

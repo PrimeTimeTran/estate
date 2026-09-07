@@ -58,6 +58,7 @@ impl<R: Runtime> EstateEngine<R> {
 	pub fn runtime(&self) -> Arc<R> {
 		Arc::clone(&self.runtime)
 	}
+	#[cfg(not(feature = "web"))]
 	pub async fn format(self, args: &FormatArgs) -> Result<String, Error> {
 		daemon::LintDaemon.run(&args).await;
 		Ok("Success".to_string())

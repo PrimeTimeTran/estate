@@ -1,9 +1,8 @@
-use tonic::Status;
-
 use crate::{
 	model::{ProtoSubmissionStatus, common::Language},
 	prelude::*,
 };
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum SubmissionStatus {
@@ -19,6 +18,10 @@ pub enum SubmissionStatus {
 	InternalError,
 }
 
+#[cfg(not(feature = "web"))]
+use tonic::Status;
+
+#[cfg(not(feature = "web"))]
 pub fn submission_status(status: Option<i32>) -> Result<Option<SubmissionStatus>, Status> {
 	status
 		.map(|status| {

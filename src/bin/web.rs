@@ -17,18 +17,7 @@
 //
 // "rust-analyzer.cargo.target": "wasm32-unknown-unknown",
 
-use anyhow::Result;
 use estate::*;
-
-// Turning feature flag is not enough, must set rust analyzer feature as well for cmd+click
-#[cfg(all(feature = "web", target_arch = "wasm32"))]
-fn main() -> Result<()> {
-	use estate::app::{App, app_web::WebApp};
-	let mut app = App::<WebApp>::new()?;
-	let parsed = String::from("");
-	app.run(parsed)?;
-	Ok(())
-}
 
 #[cfg(all(feature = "web", target_arch = "wasm32"))]
 mod wasm {
@@ -92,5 +81,18 @@ mod wasm {
 	}
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-fn main() {}
+#[cfg(not(feature = "web"))]
+#[tokio::main]
+fn main() -> anyhow::Result<()> {
+	let host = Host::init()?;
+	let mut app = App::new(host)?;
+	app.run()?;
+	Ok(())
+}
+
+fn main() -> anyhow::Result<()> {
+	let host = Host::init()?;
+	let mut app = App::new(host)?;
+	app.run()?;
+	Ok(())
+}

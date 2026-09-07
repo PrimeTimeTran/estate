@@ -21,7 +21,6 @@ pub trait AppCtx: Default {
 	fn state(&self) -> &Self::State;
 }
 
-
 /// ## [Clock]
 ///
 pub trait Clock {
@@ -312,16 +311,12 @@ pub trait Services {
 
 	fn persistence(&self) -> &Self::Persistence;
 	fn network(&self) -> &Self::Network;
-	// fn clock(&self) -> &Self::Clock;
 
 	/// ## Platform Generic API
 	///
-	/// Exposes capabilities for business logic to access server side resources
+	/// Exposes capabilities for business logic to access server side resources.
 	///
-	/// - [GRPC]
-	///
-	/// Has [`Native`] & [`Web`] implementations
-	///
+	/// Has [`Native`] & [`Web`] implementations.
 	fn api(&self) -> &Option<Self::Client>;
 }
 

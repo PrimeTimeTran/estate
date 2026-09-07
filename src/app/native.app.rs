@@ -2,6 +2,12 @@ use crate::doc;
 
 use crate::{prelude::*, spawn_global_cursor_daemon, r#trait::Context};
 
+impl EventSink<AppEvent> for EventLoopProxy<AppEvent> {
+	fn send(&self, event: AppEvent) {
+		let _ = self.send_event(event);
+	}
+}
+
 // impl ApplicationHandler<AppEvent> for NativeApp {
 // 	fn resumed(&mut self, event_loop: &ActiveEventLoop) {
 // 		if self.menu_bar.is_none() {
@@ -169,7 +175,6 @@ use crate::{prelude::*, spawn_global_cursor_daemon, r#trait::Context};
 
 impl Context for NativeApp {
 	type Args = Cli;
-	// type Host = NativeHost;
 	type Runtime = NativeRuntime;
 
 	fn new() -> Result<Self> {
@@ -178,9 +183,6 @@ impl Context for NativeApp {
 	fn run(&mut self, cli: Self::Args) -> Result<()> {
 		NativeApp::run(self, cli)
 	}
-	// fn host(&self) -> &Self::Host {
-	// 	&self.host
-	// }
 	fn runtime(&self) -> &Self::Runtime {
 		&self.runtime
 	}
@@ -193,16 +195,15 @@ impl Context for NativeApp {
 	}
 }
 
-impl Default for NativeServices {
-	fn default() -> Self {
-		Self {
-			api: None,
-			persistence: NativePersistence::default(),
-			network: NativeNetwork::default(),
-			// clock: NativeClock::default(),
-		}
-	}
-}
+// impl Default for NativeServices {
+// 	fn default() -> Self {
+// 		Self {
+// 			api:
+// 			persistence: NativePersistence::default(),
+// 			network: NativeNetwork::default(),
+// 		}
+// 	}
+// }
 
 impl NativeApp {
 	pub fn new() -> Result<Self> {
@@ -1160,7 +1161,6 @@ impl NativeServices {
 		Ok(Self {
 			persistence: NativePersistence::default(),
 			network: NativeNetwork::default(),
-			// clock: NativeClock::default(),
 			api: Some(api),
 		})
 	}
@@ -1184,7 +1184,6 @@ impl Persistence for NativePersistence {
 impl Services for NativeServices {
 	type Persistence = NativePersistence;
 	type Network = NativeNetwork;
-	// type Clock = NativeClock;
 	type Client = NativeApiClient;
 	fn persistence(&self) -> &Self::Persistence {
 		todo!("");
@@ -1192,9 +1191,6 @@ impl Services for NativeServices {
 	fn network(&self) -> &Self::Network {
 		todo!("")
 	}
-	// fn clock(&self) -> &Self::Clock {
-	// 	todo!("");
-	// }
 	fn api(&self) -> &Option<Self::Client> {
 		&self.api
 	}
@@ -1259,24 +1255,3 @@ pub struct NativeServices {
 
 #[derive(Debug, Default, Clone)]
 pub struct NativeWindow;
-
-// impl NativeServices {
-// 	pub async fn connect(self) -> anyhow::Result<NativeServices> {
-// 		let api = NativeApiClient::connect().await?;
-
-// 		Ok(NativeServices {
-// 			persistence: self.persistence,
-// 			network: self.network,
-// 			clock: self.clock,
-// 			// api: Connected { api },
-// 		})
-// 	}
-// }
-
-// impl ApiServices for NativeServices {
-// 	type Client = NativeApiClient;
-
-// 	fn api(&self) -> &Self::Client {
-// 		self.api()
-// 	}
-// }

@@ -2,6 +2,7 @@ use crate::prelude::*;
 
 use tokio_util::sync::CancellationToken;
 
+#[cfg(not(feature = "web"))]
 pub async fn test_main_2() {
 	let clock = HostClock;
 	let worker = HostWorker::new();
@@ -23,6 +24,7 @@ pub async fn test_main_2() {
 	handle.stop();
 }
 
+#[cfg(not(feature = "web"))]
 #[tokio::main]
 pub async fn tokio_main() {
 	let clock = HostClock;
@@ -71,6 +73,7 @@ where
 	fn run_app(&mut self) -> Result<()> {
 		todo!("")
 	}
+	#[cfg(all(not(feature = "web")))]
 	fn run_gui(&mut self) -> Result<()> {
 		let event_loop = EventLoop::<AppEvent>::with_user_event().build()?;
 		let proxy = event_loop.create_proxy();
@@ -310,11 +313,7 @@ impl EguiHandle {
 	// 	// unregister hook
 	// }
 }
-impl EventSink<AppEvent> for EventLoopProxy<AppEvent> {
-	fn send(&self, event: AppEvent) {
-		let _ = self.send_event(event);
-	}
-}
+
 impl traits::Renderer for HostRenderer {
 	#[cfg(target_arch = "wasm32")]
 	fn render(&mut self) {

@@ -124,9 +124,12 @@ impl Api for NativeApiClient {
 // ============================================================
 // Native Build needs client too.
 #[derive(Debug, Clone)]
+#[cfg(all(feature = "web", target_arch = "wasm32"))]
 pub struct WebApiClient {
 	base_url: String,
 }
+
+#[cfg(all(feature = "web", target_arch = "wasm32"))]
 impl WebApiClient {
 	pub fn new(base_url: impl Into<String>) -> Self {
 		Self {

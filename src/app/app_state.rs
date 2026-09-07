@@ -1,35 +1,8 @@
 use crate::{app::job::Job, prelude::*};
 
-#[derive(Debug, Copy, Clone)]
-pub struct State;
-
-#[derive(Debug, Clone, Copy, Default)]
-pub struct Disconnected;
-
-#[derive(Debug, Clone)]
-pub struct Connected {
-	pub api: NativeApiClient,
-}
-
 pub trait StateStore: Send + Sync {
 	fn load(&self) -> Result<EstateState>;
 	fn save(&self, state: &EstateState) -> Result<()>;
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(default)]
-pub struct EstateState {
-	pub revision: u64,
-	pub starts: u64,
-	pub longest_run: u64,
-	pub status_checks: u64,
-	pub started_at: u64,
-	pub events_processed: u64,
-	pub tasks_completed: u64,
-	pub tasks_created: u64,
-	pub files_indexed: u64,
-	pub session: Session,
-	pub jobs: VecDeque<Job>,
 }
 
 impl Default for EstateState {
@@ -60,3 +33,22 @@ impl EstateState {
 			.as_secs()
 	}
 }
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(default)]
+pub struct EstateState {
+	pub revision: u64,
+	pub starts: u64,
+	pub longest_run: u64,
+	pub status_checks: u64,
+	pub started_at: u64,
+	pub events_processed: u64,
+	pub tasks_completed: u64,
+	pub tasks_created: u64,
+	pub files_indexed: u64,
+	pub session: Session,
+	pub jobs: VecDeque<Job>,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct State;

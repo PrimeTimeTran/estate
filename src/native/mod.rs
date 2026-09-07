@@ -29,9 +29,6 @@ pub mod windows;
 #[cfg(target_os = "macos")]
 pub mod macos;
 
-#[derive(Debug, Default)]
-pub struct NativeState;
-
 #[derive(Default)]
 pub struct NativeContext {
 	pub menu_bar: Option<MenuBar>,
@@ -39,6 +36,9 @@ pub struct NativeContext {
 	pub tray_cursor: Option<TrayIcon>,
 	pub windows: Vec<AppWindow>,
 }
+
+#[derive(Debug, Default)]
+pub struct NativeState;
 
 impl AppCtx for NativeContext {
 	type State = NativeState;

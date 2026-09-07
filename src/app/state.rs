@@ -9,14 +9,6 @@ impl State {
 	}
 }
 
-#[derive(Debug, Clone, Copy, Default)]
-pub struct Disconnected;
-
-#[derive(Debug, Clone)]
-pub struct Connected {
-	pub api: NativeApiClient,
-}
-
 pub trait StateStore: Send + Sync {
 	fn load(&self) -> Result<EstateState>;
 	fn save(&self, state: &EstateState) -> Result<()>;
