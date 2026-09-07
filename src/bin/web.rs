@@ -19,7 +19,6 @@
 
 #[cfg(all(feature = "web", target_arch = "wasm32"))]
 fn main() -> anyhow::Result<()> {
-	use estate::web::bridge;
 	// Build and run
 	// cargo build --bin web --target wasm32-unknown-unknown --features web && trunk serve src/web/public/index.html
 	Ok(())
