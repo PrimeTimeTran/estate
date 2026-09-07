@@ -1,5 +1,12 @@
 use crate::{model::*, prelude::*};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Difficulty {
+	Easy,
+	Medium,
+	Hard,
+}
+
 #[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, Hash, Eq, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum Language {
@@ -7,6 +14,16 @@ pub enum Language {
 	Rust,
 	Python,
 	JavaScript,
+}
+
+impl From<Language> for ProtoLanguage {
+	fn from(value: Language) -> Self {
+		match value {
+			Language::Rust => Self::Rust,
+			Language::Python => Self::Python,
+			Language::JavaScript => Self::Javascript,
+		}
+	}
 }
 
 impl Language {
@@ -38,14 +55,33 @@ impl Language {
 		}
 	}
 }
+impl Language {
+	pub fn as_proto_i32(self) -> i32 {
+		ProtoLanguage::from(self) as i32
+	}
+}
 
-impl From<Language> for ProtoLanguage {
-	fn from(value: Language) -> Self {
+impl TryFrom<i32> for Difficulty {
+	type Error = anyhow::Error;
+
+	fn try_from(value: i32) -> Result<Self, Self::Error> {
 		match value {
-			Language::Rust => Self::Rust,
-			Language::Python => Self::Python,
-			Language::JavaScript => Self::Javascript,
+			1 => Ok(Self::Easy),
+			2 => Ok(Self::Medium),
+			3 => Ok(Self::Hard),
+			0 => anyhow::bail!("difficulty unspecified"),
+			other => anyhow::bail!("unknown difficulty: {other}"),
 		}
+	}
+}
+impl TryFrom<i32> for Language {
+	type Error = anyhow::Error;
+
+	fn try_from(value: i32) -> Result<Self, Self::Error> {
+		let proto =
+			ProtoLanguage::try_from(value).map_err(|_| anyhow::anyhow!("invalid language: {value}"))?;
+
+		Self::try_from(proto)
 	}
 }
 
@@ -60,44 +96,6 @@ impl TryFrom<ProtoLanguage> for Language {
 			ProtoLanguage::Typescript => {
 				anyhow::bail!("typescript is not currently supported")
 			}
-		}
-	}
-}
-
-impl TryFrom<i32> for Language {
-	type Error = anyhow::Error;
-
-	fn try_from(value: i32) -> Result<Self, Self::Error> {
-		let proto =
-			ProtoLanguage::try_from(value).map_err(|_| anyhow::anyhow!("invalid language: {value}"))?;
-
-		Self::try_from(proto)
-	}
-}
-
-impl Language {
-	pub fn as_proto_i32(self) -> i32 {
-		ProtoLanguage::from(self) as i32
-	}
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Difficulty {
-	Easy,
-	Medium,
-	Hard,
-}
-
-impl TryFrom<i32> for Difficulty {
-	type Error = anyhow::Error;
-
-	fn try_from(value: i32) -> Result<Self, Self::Error> {
-		match value {
-			1 => Ok(Self::Easy),
-			2 => Ok(Self::Medium),
-			3 => Ok(Self::Hard),
-			0 => anyhow::bail!("difficulty unspecified"),
-			other => anyhow::bail!("unknown difficulty: {other}"),
 		}
 	}
 }

@@ -1,10 +1,7 @@
 use crate::{
-	model::{Language, ProtoSubmissionStatus, SubmissionStatus},
+	model::{ProtoSubmissionStatus, SubmissionStatus, common::Language},
 	prelude::*,
-	proto::{
-		types::{Submission, *},
-		*,
-	},
+	proto::{types::Submission, *},
 	server::*,
 	services::SubmissionService,
 	services::*,
@@ -21,15 +18,6 @@ pub trait SubmissionRepository {
 	async fn delete(&self, id: &str) -> anyhow::Result<()>;
 }
 
-#[derive(Default)]
-pub struct SubmissionServiceImpl<R> {
-	repository: R,
-}
-impl<R> SubmissionServiceImpl<R> {
-	pub fn new(repository: R) -> Self {
-		Self { repository }
-	}
-}
 #[tonic::async_trait]
 impl<R> SubmissionService for SubmissionServiceImpl<R>
 where
@@ -138,14 +126,13 @@ where
 		Err(Status::unimplemented("run_submission is not implemented"))
 	}
 }
+impl<R> SubmissionServiceImpl<R> {
+	pub fn new(repository: R) -> Self {
+		Self { repository }
+	}
+}
 
-fn submission_status(status: Option<i32>) -> Result<Option<SubmissionStatus>, Status> {
-	status
-		.map(|status| {
-			ProtoSubmissionStatus::try_from(status)
-				.map_err(|_| Status::invalid_argument("invalid submission status"))?
-				.try_into()
-				.map_err(|_| Status::invalid_argument("invalid submission status"))
-		})
-		.transpose()
+#[derive(Default)]
+pub struct SubmissionServiceImpl<R> {
+	repository: R,
 }
