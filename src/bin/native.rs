@@ -19,30 +19,18 @@ use estate::app::*;
 
 #[cfg(feature = "native")]
 fn main() -> Result<()> {
-	use cli;
-	use estate::app::*;
-	let parsed = cli::context::parse();
-	let mut config = LogConfig::load()?;
-	config.apply_cli(&parsed)?;
-	logger::init_logging(&config)?;
-	let mut app = App::new();
-	app.run(parsed)?;
-	app.start()?;
-	// estate::app::tokio_main();
+	let host = Host::init()?;
+	let mut app = App::new(host)?;
+	app.run()?;
 	Ok(())
 }
-// #[cfg(feature = "native")]
-// #[tokio::main]
-// fn main() -> Result<()> {
-// 	use cli;
-// 	use estate::app::*;
-// 	let parsed = cli::context::parse();
-// 	let mut config = LogConfig::load()?;
-// 	config.apply_cli(&parsed)?;
-// 	logger::init_logging(&config)?;
-// 	let mut app = App::new();
-// 	app.run(parsed)?;
-// 	app.start()?;
-// 	estate::app::test_main().await;
-// 	Ok(())
-// }
+
+#[cfg(feature = "native")]
+fn _tokio_main() -> Result<()> {
+	let host = Host::init()?;
+	let _parsed = host.run()?;
+	let mut app = App::new(host)?;
+	app.run()?;
+	// estate::app::tokio_main().await;
+	Ok(())
+}

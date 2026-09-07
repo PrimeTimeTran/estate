@@ -2,170 +2,170 @@ use crate::doc;
 
 use crate::{prelude::*, spawn_global_cursor_daemon, r#trait::Context};
 
-impl ApplicationHandler<AppEvent> for NativeApp {
-	fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-		if self.menu_bar.is_none() {
-			let menu = Self::menu_bar(true);
-			menu.init_for_nsapp();
-			self.menu_bar = Some(menu);
-		}
-		if self.windows.is_empty() {
-			self.open_window(event_loop, crate::START_WINDOW);
-		}
-		if self.tray_clock.is_none() {
-			let (menu, tray) = match Self::bootstrap() {
-				Ok(value) => value,
-				Err(error) => {
-					tracing::error!(%error, "failed to bootstrap tray");
-					return;
-				}
-			};
-			self.menu = Some(menu);
-			self.tray_clock = Some(tray);
-			tracing::debug!("🔥 main tray initialized");
-		}
-		if self.tray_cursor.is_none() {
-			match TrayIconBuilder::new()
-				.with_icon(scroll_tray_icon())
-				.with_tooltip("Estate Scroll Controller")
-				.build()
-			{
-				Ok(tray) => {
-					self.tray_cursor = Some(tray);
-					tracing::debug!("🔥 scroll tray initialized");
-				}
-				Err(error) => {
-					tracing::error!(%error, "failed to create scroll tray");
-				}
-			}
-		}
-	}
-	fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
-		self.app.update();
-		while let Ok(event) = MenuEvent::receiver().try_recv() {
-			self.handle_event(event, event_loop);
-		}
-	}
-	fn window_event(
-		&mut self,
-		event_loop: &ActiveEventLoop,
-		window_id: WindowId,
-		event: WindowEvent,
-	) {
-		let Some(window) = self
-			.windows
-			.iter_mut()
-			.find(|window| window.window.instance.id() == window_id)
-		else {
-			return;
-		};
-		let response = window
-			.window
-			.gui_state
-			.on_window_event(&window.window.instance, &event);
-		if response.repaint {
-			window.window.instance.request_redraw();
-		}
-		match event {
-			WindowEvent::CloseRequested => {
-				tracing::info!("🛑 Window close requested for id: {:?}", window_id);
-				self
-					.windows
-					.retain(|window| window.window.instance.id() != window_id);
-				return;
-			}
-			WindowEvent::RedrawRequested => {
-				if window.window.occluded {
-					return;
-				}
-				let menu = {
-					let event_rx = self.app.engine.runtime().subscribe();
-					let mut ctx = AppContext {
-						app: &mut self.app,
-						input: IOState::default(),
-						event_rx,
-						last_revision: 0,
-					};
-					if let Err(e) = window.window.draw(&mut ctx) {
-						tracing::error!("DEV >>> draw failed: {e:#}");
-					}
-				};
-			}
-			WindowEvent::Focused(true) => {
-				window.window.instance.request_redraw();
-			}
-			WindowEvent::Occluded(occluded) => {
-				window.window.occluded = occluded;
-				if !occluded {
-					window.window.instance.request_redraw();
-				}
-			}
-			WindowEvent::Resized(size) => {
-				if size.width == 0 || size.height == 0 {
-					return;
-				}
-				window.window.config.width = size.width;
-				window.window.config.height = size.height;
-				window
-					.window
-					.surface
-					.configure(&window.window.device, &window.window.config);
-				window.window.needs_resize = false;
-				window.window.instance.request_redraw();
-			}
-			_ => {}
-		}
-	}
-	fn user_event(&mut self, event_loop: &ActiveEventLoop, event: AppEvent) {
-		match event {
-			AppEvent::RuntimeEvent => {
-				self.app.update();
-				self.sync_views();
-			}
-			AppEvent::Navigate(view) => {
-				self.runtime().emit(e::Event::app(e::Klass::Navigate(view)));
-				self.app.update();
-				self.sync_views();
-			}
-			AppEvent::Shutdown => {
-				tracing::info!(">>> shutdown event received");
-				self.shutdown();
+// impl ApplicationHandler<AppEvent> for NativeApp {
+// 	fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+// 		if self.menu_bar.is_none() {
+// 			let menu = Self::menu_bar(true);
+// 			menu.init_for_nsapp();
+// 			self.menu_bar = Some(menu);
+// 		}
+// 		if self.windows.is_empty() {
+// 			self.open_window(event_loop, crate::START_WINDOW);
+// 		}
+// 		if self.tray_clock.is_none() {
+// 			let (menu, tray) = match Self::bootstrap() {
+// 				Ok(value) => value,
+// 				Err(error) => {
+// 					tracing::error!(%error, "failed to bootstrap tray");
+// 					return;
+// 				}
+// 			};
+// 			self.menu = Some(menu);
+// 			self.tray_clock = Some(tray);
+// 			tracing::debug!("🔥 main tray initialized");
+// 		}
+// 		if self.tray_cursor.is_none() {
+// 			match TrayIconBuilder::new()
+// 				.with_icon(scroll_tray_icon())
+// 				.with_tooltip("Estate Scroll Controller")
+// 				.build()
+// 			{
+// 				Ok(tray) => {
+// 					self.tray_cursor = Some(tray);
+// 					tracing::debug!("🔥 scroll tray initialized");
+// 				}
+// 				Err(error) => {
+// 					tracing::error!(%error, "failed to create scroll tray");
+// 				}
+// 			}
+// 		}
+// 	}
+// 	fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+// 		self.app.update();
+// 		while let Ok(event) = MenuEvent::receiver().try_recv() {
+// 			self.handle_event(event, event_loop);
+// 		}
+// 	}
+// 	fn window_event(
+// 		&mut self,
+// 		event_loop: &ActiveEventLoop,
+// 		window_id: WindowId,
+// 		event: WindowEvent,
+// 	) {
+// 		let Some(window) = self
+// 			.windows
+// 			.iter_mut()
+// 			.find(|window| window.window.instance.id() == window_id)
+// 		else {
+// 			return;
+// 		};
+// 		let response = window
+// 			.window
+// 			.gui_state
+// 			.on_window_event(&window.window.instance, &event);
+// 		if response.repaint {
+// 			window.window.instance.request_redraw();
+// 		}
+// 		match event {
+// 			WindowEvent::CloseRequested => {
+// 				tracing::info!("🛑 Window close requested for id: {:?}", window_id);
+// 				self
+// 					.windows
+// 					.retain(|window| window.window.instance.id() != window_id);
+// 				return;
+// 			}
+// 			WindowEvent::RedrawRequested => {
+// 				if window.window.occluded {
+// 					return;
+// 				}
+// 				let menu = {
+// 					let event_rx = self.app.engine.runtime().subscribe();
+// 					let mut ctx = AppContext {
+// 						app: &mut self.app,
+// 						input: IOState::default(),
+// 						event_rx,
+// 						last_revision: 0,
+// 					};
+// 					if let Err(e) = window.window.draw(&mut ctx) {
+// 						tracing::error!("DEV >>> draw failed: {e:#}");
+// 					}
+// 				};
+// 			}
+// 			WindowEvent::Focused(true) => {
+// 				window.window.instance.request_redraw();
+// 			}
+// 			WindowEvent::Occluded(occluded) => {
+// 				window.window.occluded = occluded;
+// 				if !occluded {
+// 					window.window.instance.request_redraw();
+// 				}
+// 			}
+// 			WindowEvent::Resized(size) => {
+// 				if size.width == 0 || size.height == 0 {
+// 					return;
+// 				}
+// 				window.window.config.width = size.width;
+// 				window.window.config.height = size.height;
+// 				window
+// 					.window
+// 					.surface
+// 					.configure(&window.window.device, &window.window.config);
+// 				window.window.needs_resize = false;
+// 				window.window.instance.request_redraw();
+// 			}
+// 			_ => {}
+// 		}
+// 	}
+// 	fn user_event(&mut self, event_loop: &ActiveEventLoop, event: AppEvent) {
+// 		match event {
+// 			AppEvent::RuntimeEvent => {
+// 				self.app.update();
+// 				self.sync_views();
+// 			}
+// 			AppEvent::Navigate(view) => {
+// 				self.runtime().emit(e::Event::app(e::Klass::Navigate(view)));
+// 				self.app.update();
+// 				self.sync_views();
+// 			}
+// 			AppEvent::Shutdown => {
+// 				tracing::info!(">>> shutdown event received");
+// 				self.shutdown();
 
-				tracing::info!(">>> event_loop.exit() called");
-			}
-			AppEvent::CursorPosition { x, y } => {
-				// let text = format!("↖ {:.0}  {:.0}", x, y);
-				// let text = format!("← {:.0}  {:.0}", x, y);
-				// let text = format!("→ {:.0}  {:.0}", x, y);
-				// let text = format!("↑ {:.0}  {:.0}", x, y);
-				// let text = format!("● {:.0}, {:.0}", x, y);
-				// let text = format!("◉ {:.0}, {:.0}", x, y);
-				let text = format!("⌖ {:.0}, {:.0}", x, y);
-				// let text = format!("🟢 {:.0}, {:.0}", x, y);
-				// let text = format!("🔵 {:.0}, {:.0}", x, y);
-				// let text = format!("🟡 {:.0}, {:.0}", x, y);
-				// let text = format!("🔴 {:.0}, {:.0}", x, y);
-				// let region = if x < 960.0 { "← LEFT" } else { "RIGHT →" };
-				if let Some(tray) = &self.tray_cursor {
-					let _ = tray.set_title(Some(text));
-				}
-			}
-			AppEvent::TickClock(text) => {
-				if let Some(tray) = &self.tray_clock {
-					let _ = tray.set_title(Some(text));
-				}
-				self.sync_views();
-			}
-			AppEvent::ModifiersChanged {
-				alt,
-				command,
-				ctrl,
-				shift,
-			} => {}
-			_ => {}
-		}
-	}
-}
+// 				tracing::info!(">>> event_loop.exit() called");
+// 			}
+// 			AppEvent::CursorPosition { x, y } => {
+// 				// let text = format!("↖ {:.0}  {:.0}", x, y);
+// 				// let text = format!("← {:.0}  {:.0}", x, y);
+// 				// let text = format!("→ {:.0}  {:.0}", x, y);
+// 				// let text = format!("↑ {:.0}  {:.0}", x, y);
+// 				// let text = format!("● {:.0}, {:.0}", x, y);
+// 				// let text = format!("◉ {:.0}, {:.0}", x, y);
+// 				let text = format!("⌖ {:.0}, {:.0}", x, y);
+// 				// let text = format!("🟢 {:.0}, {:.0}", x, y);
+// 				// let text = format!("🔵 {:.0}, {:.0}", x, y);
+// 				// let text = format!("🟡 {:.0}, {:.0}", x, y);
+// 				// let text = format!("🔴 {:.0}, {:.0}", x, y);
+// 				// let region = if x < 960.0 { "← LEFT" } else { "RIGHT →" };
+// 				if let Some(tray) = &self.tray_cursor {
+// 					let _ = tray.set_title(Some(text));
+// 				}
+// 			}
+// 			AppEvent::TickClock(text) => {
+// 				if let Some(tray) = &self.tray_clock {
+// 					let _ = tray.set_title(Some(text));
+// 				}
+// 				self.sync_views();
+// 			}
+// 			AppEvent::ModifiersChanged {
+// 				alt,
+// 				command,
+// 				ctrl,
+// 				shift,
+// 			} => {}
+// 			_ => {}
+// 		}
+// 	}
+// }
 
 impl Context for NativeApp {
 	type Args = Cli;
@@ -362,7 +362,7 @@ impl NativeApp {
 		self
 			.runtime_old()
 			.emit(e::Event::app(e::Klass::SessionStart));
-		event_loop.run_app(self)?;
+		// event_loop.run_app(self)?;
 		tracing::info!(">>> NativeApp::start_runtime returning");
 		Ok(())
 	}
@@ -1237,7 +1237,6 @@ pub struct NativeApp {
 
 #[derive(Debug, Default)]
 pub struct NativeHost {
-
 	window: NativeWindow,
 	storage: NativeStorage,
 }

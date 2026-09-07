@@ -1,5 +1,14 @@
 use crate::{RuntimeState, e, prelude::*};
 
+pub trait AppCtx: Default {
+	type State;
+	fn state(&self) -> &Self::State;
+}
+pub trait NativeCtx: Default {
+	type State;
+	fn state(&self) -> &Self::State;
+}
+
 // https://github.com/rust-lang/rust/issues/41517
 // https://github.com/rust-lang/rust/issues/55628
 // https://github.com/rust-lang/rfcs/pull/1733
@@ -138,6 +147,9 @@ pub trait Executor: Clone + 'static {
 	fn spawn(&self, future: impl Future<Output = ()> + 'static);
 }
 
+pub trait EventSink<E>: Send + Sync + 'static {
+	fn send(&self, event: E);
+}
 /// ## [Index]
 ///
 /// derived structure optimized for finding that knowledge.

@@ -113,6 +113,13 @@ impl LogConfig {
 		}
 		Ok(())
 	}
+	pub fn load() -> Result<Self> {
+		let mut config = Self::default();
+		if let Some(global) = Self::load_global()? {
+			config.merge(global);
+		}
+		Ok(config)
+	}
 	fn terminal_filter(&self) -> Result<EnvFilter> {
 		// let mut filter = EnvFilter::new("off");
 		// for (target, level) in &self.targets {
@@ -130,13 +137,7 @@ impl LogConfig {
 		}
 		Ok(filter)
 	}
-	pub fn load() -> Result<Self> {
-		let mut config = Self::default();
-		if let Some(global) = Self::load_global()? {
-			config.merge(global);
-		}
-		Ok(config)
-	}
+
 	fn load_from_cargo() -> Result<Option<LogConfig>> {
 		let path = Path::new(env!("CARGO_MANIFEST_DIR"))
 			.ancestors()

@@ -1,6 +1,7 @@
 use estate::prelude::*;
 
 fn main() -> Result<()> {
-	let _app = App::new();
+	let host = Host::init()?;
+	let _app = App::new(host);
 	Ok(())
 }
