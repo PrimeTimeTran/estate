@@ -2,28 +2,6 @@ use crate::prelude::*;
 
 use owo_colors::OwoColorize;
 
-#[macro_export]
-macro_rules! problem_source {
-	($problem:literal, Rust) => {
-		include_str!(concat!("../data/problems/", $problem, "/success.rs"))
-	};
-	($problem:literal, Python) => {
-		include_str!(concat!("../data/problems/", $problem, "/success.py"))
-	};
-	($problem:literal, JavaScript) => {
-		include_str!(concat!("../data/problems/", $problem, "/success.js"))
-	};
-}
-
-#[macro_export]
-macro_rules! section {
-	($title:expr) => {
-		$crate::helpers::print_section($title, file!(), line!())
-	};
-}
-
-pub use section;
-
 pub fn print_section(title: &str, file: &str, line: u32) {
 	let file = normalize_file(file);
 	println!("{}", "-".repeat(80).dimmed());
@@ -35,7 +13,7 @@ pub fn print_section(title: &str, file: &str, line: u32) {
 	println!("{}", "-".repeat(80).dimmed());
 }
 
-pub(crate) fn hyperlink(text: &str, url: &str) -> String {
+pub fn hyperlink(text: &str, url: &str) -> String {
 	format!("\x1b]8;;{url}\x07{text}\x1b]8;;\x07")
 }
 

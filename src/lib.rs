@@ -27,6 +27,7 @@ pub mod api;
 pub mod app;
 pub mod data;
 pub mod helpers;
+pub mod r#macro;
 pub mod model;
 pub mod prelude;
 pub mod proto;
@@ -40,7 +41,13 @@ pub mod util;
 
 pub use crate::app::event as e;
 pub use crate::ui::{theme::*, ui_prelude::*, *};
+
+/// ## [Traits]
+///
+/// The collection of traits used through the codebase
 pub use r#trait as traits;
+
+pub use crate::r#macro as app_macros;
 
 #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 pub mod native;

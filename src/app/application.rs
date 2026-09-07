@@ -1,7 +1,5 @@
 use crate::prelude::*;
 
-use tokio_util::sync::CancellationToken;
-
 impl<C> App<C>
 where
 	C: AppCtx + 'static,
@@ -18,6 +16,10 @@ where
 	}
 	#[cfg(not(target_arch = "wasm32"))]
 	pub fn new(host: Host<C>) -> Result<Self> {
+    use crate::r#macro;
+
+		app_macros::section!("Hello World");
+
 		tracing::info!("App New");
 		let (cursor_event_tx, cursor_events) = std::sync::mpsc::channel();
 		Ok(Self {

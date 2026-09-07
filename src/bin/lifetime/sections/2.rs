@@ -16,7 +16,7 @@
 //
 // Each approach has tradeoffs worth understanding.
 
-use crate::helpers::*;
+pub use estate::{app_macros::section, helpers};
 
 pub fn ownership_borrows_sharing() {
 	section!("2. Ownership, Borrowing, Sharing");

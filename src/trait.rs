@@ -1,3 +1,6 @@
+//! ## [Traits]
+//!
+//! The collection of traits used through the codebase
 use crate::{RuntimeState, e, prelude::*};
 
 // https://github.com/rust-lang/rust/issues/41517
@@ -16,6 +19,10 @@ pub trait ApiServices: Services {
 	// fn api(&self) -> &Self::Client;
 	// fn api(&self) -> Option<&Self::Client>;
 }
+
+/// [AppCtx]
+///
+/// A type safe abstraction with room for growth via it's internal  [associated type](https://doc.rust-lang.org/rust-by-example/generics/assoc_items/types.html), [State](Self::State).
 pub trait AppCtx: Default {
 	type State;
 	// type Worker: Worker;
@@ -23,12 +30,9 @@ pub trait AppCtx: Default {
 	fn state(&self) -> &Self::State;
 }
 
-pub trait Hand<C> {
-	fn stop(&self);
-}
-
 /// ## [Clock]
 ///
+/// The literal heart beat of the engine. The clock has a handle on the [runtime](Runtime) of [tokio] which 
 pub trait Clock: Clone {
 	type Handle<C: AppCtx>;
 
