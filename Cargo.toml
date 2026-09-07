@@ -79,8 +79,8 @@ path = "src/bin/macros.rs"
 # cargo build --bin web --no-default-features --features="web" --target wasm32-unknown-unknown
 # default = []
 # [CHOOSE 1]
-default = ["native"]
-# default = ["web"]
+# default = ["native"]
+default = ["web"]
 # [DEFAULT to this]
 
 # default = []
@@ -172,12 +172,7 @@ jsonc-parser = { workspace = true, optional = true }
 jsonschema = { workspace = true, optional = true }
 macos-accessibility-client = { workspace = true, optional = true }
 notify = { workspace = true, optional = true }
-objc2 = { workspace = true, optional = true }
-objc2-app-kit = { workspace = true, optional = true }
-objc2-foundation = { workspace = true, optional = true }
-rmcp = { workspace = true, optional = true }
 signal-hook = { workspace = true, optional = true }
-tower-lsp = { workspace = true, optional = true }
 tray-icon = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 web-sys = { workspace = true, optional = true }
@@ -185,14 +180,18 @@ sqlx = "0.9.0"
 strum = { version = "0.27", features = ["derive"] }
 rand.workspace = true
 async-broadcast = "0.7.2"
-
 tokio = { workspace = true, optional = true, features = ["rt", "macros", "time", "sync"] }
 tokio-util = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+objc2 = { workspace = true, optional = true }
+objc2-app-kit = { workspace = true, optional = true }
+objc2-foundation = { workspace = true, optional = true }
+rmcp = { workspace = true, optional = true }
 tokio = { workspace = true, features = ["rt-multi-thread", "signal"] }
 tokio-util = { workspace = true }
 tonic = { workspace = true, features = ["transport"] }
+tower-lsp = { workspace = true, optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.4.3", features = ["wasm_js"] }

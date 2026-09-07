@@ -79,3 +79,4 @@ format = "run -q --bin native --no-default-features --features native -- format"
 
 trunk = "trunk build -q --release"
 trunk-run = "trunk serve src/web/public/index.html --features web"
+# trunk-it = "cargo build --bin web --target wasm32-unknown-unknown --features web && trunk serve src/web/public/index.html "

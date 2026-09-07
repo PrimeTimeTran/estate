@@ -17,7 +17,7 @@
 //
 // "rust-analyzer.cargo.target": "wasm32-unknown-unknown",
 
-use estate::*;
+use estate::{App, Host};
 
 #[cfg(all(feature = "web", target_arch = "wasm32"))]
 mod wasm {
