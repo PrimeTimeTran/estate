@@ -17,6 +17,7 @@
 //! - [Web/Browser](WebApp)
 //!
 #![allow(warnings)]
+// #![feature(associated_type_defaults)]
 
 // Disables unused input variables
 // #![allow(unused_variables)]

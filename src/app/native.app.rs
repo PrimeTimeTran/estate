@@ -270,7 +270,7 @@ impl NativeApp {
 		self.spawn_global_hotkey_daemon()?;
 		self.spawn_clock()?;
 		// Self::spawn_clock()?;
-		self.spawn_cursor_daemon()?;
+		self.sspawn_cursor_daemon()?;
 
 		self
 			.runtime_old()
@@ -439,16 +439,10 @@ impl NativeApp {
 		self.hotkey_manager.start();
 		Ok(())
 	}
-	fn spawn_cursor_daemon(&mut self) -> Result<()> {
-		// spawn_global_cursor_daemon(proxy)
+	fn sspawn_cursor_daemon(&mut self) -> Result<()> {
+		// sspawn_global_cursor_daemon(proxy);
 		Ok(())
 	}
-	// fn spawn_cursor_daemon(&mut self, proxy: EventLoopProxy<AppEvent>) -> Result<()> {
-	// 	spawn_global_cursor_daemon(proxy)
-	// }
-	// fn spawn_cursor_daemon(&mut self, proxy: EventLoopProxy<AppEvent>) -> Result<()> {
-	// 	spawn_global_cursor_daemon(proxy)
-	// }
 }
 impl NativeApp {
 	fn open_window(&mut self, event_loop: &ActiveEventLoop, kind: WindowType) {

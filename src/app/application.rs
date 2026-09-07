@@ -8,25 +8,17 @@ where
 	pub fn new(host: Host<C>) -> Result<Self> {
 		tracing::info!("App New");
 		Ok(Self {
-			handle_clock: None,
-			handle_egui: None,
 			host,
 			workers: vec![],
 		})
 	}
 	#[cfg(not(target_arch = "wasm32"))]
 	pub fn new(host: Host<C>) -> Result<Self> {
-    use crate::r#macro;
-
-		app_macros::section!("Hello World");
-
 		tracing::info!("App New");
 		let (cursor_event_tx, cursor_events) = std::sync::mpsc::channel();
 		Ok(Self {
 			cursor_events,
 			cursor_event_tx,
-			handle_clock: None,
-			handle_egui: None,
 			host,
 			workers: vec![],
 		})
@@ -37,14 +29,15 @@ where
 	pub fn context(&self) -> &C {
 		self.host.context()
 	}
+
 	pub fn run(&mut self) -> Result<()> {
 		tracing::info!("App run");
-
 		self.start()?;
 
 		#[cfg(not(target_arch = "wasm32"))]
 		{
-			self.host.run()?;
+			// self.host.run()?;
+			self.worker().wait_for_ctrl_c();
 			self.shutdown();
 		}
 
@@ -63,13 +56,8 @@ where
 	fn run_gui(&mut self) -> Result<()> {
 		let event_loop = EventLoop::<AppEvent>::with_user_event().build()?;
 		let proxy = event_loop.create_proxy();
-
-		// Host owns infrastructure.
 		self.host.worker().spawn_ctrl_c(proxy);
-
-		// App owns GUI behavior.
 		event_loop.run_app(self)?;
-
 		Ok(())
 	}
 
@@ -77,26 +65,24 @@ where
 		for worker in &self.workers {
 			worker.stop();
 		}
+		// self.host.shutdown();
 	}
-
 	pub fn start(&mut self) -> Result<()> {
 		tracing::info!("App start");
-
-		let mut workers = Vec::new();
-
-		workers.push(self.start_egui()?);
-		workers.push(self.start_clock()?);
+		let handle = self.start_clock()?;
+		self.workers.push(handle);
 
 		#[cfg(not(target_arch = "wasm32"))]
-		workers.push(self.start_cargo_watcher()?);
-
-		#[cfg(not(target_arch = "wasm32"))]
-		workers.push(self.start_cursor_watcher_from_app()?);
-
-		self.workers.extend(workers);
-
+		{
+			// spawn_global_cursor_daemon_new
+			let handle = self.start_cargo_watcher()?;
+			self.workers.push(handle);
+			let handle = self.start_cursor_watcher_from_app()?;
+			self.workers.push(handle);
+		}
 		Ok(())
 	}
+
 	#[cfg(not(target_arch = "wasm32"))]
 	fn start_cargo_watcher(&mut self) -> Result<WorkHandle<C>> {
 		let watcher = CargoWatcher::new().map_err(|error| {
@@ -400,16 +386,6 @@ where
 	}
 }
 
-impl EguiHandle {
-	pub fn stop(&self) {
-		self.cancel.cancel();
-	}
-	// winit different?
-	// pub fn stop(self) {
-	// 	// unregister hook
-	// }
-}
-
 impl traits::Renderer for HostRenderer {
 	#[cfg(target_arch = "wasm32")]
 	fn render(&mut self) {
@@ -423,33 +399,23 @@ impl traits::Renderer for HostRenderer {
 
 pub struct App<C: AppCtx> {
 	pub host: Host<C>,
-	// pub workers: Vec<WorkHandle>,
 	pub workers: Vec<WorkHandle<C>>,
-	pub handle_clock: Option<ClockHandle>,
-	pub handle_egui: Option<EguiHandle>,
 	#[cfg(not(target_arch = "wasm32"))]
 	pub cursor_events: std::sync::mpsc::Receiver<CursorEvent>,
 	#[cfg(not(target_arch = "wasm32"))]
 	pub cursor_event_tx: std::sync::mpsc::Sender<CursorEvent>,
 }
 
-pub struct EguiHandle {
-	pub cancel: CancellationToken,
-	// winit diff
-	// Whatever is necessary to unregister the egui hook.
-}
-#[derive(Debug, Clone, Copy)]
-pub struct CursorPosition {
-	pub x: f64,
-	pub y: f64,
-}
+#[derive(Debug, Clone)]
 pub struct CursorDaemon<S> {
 	pub sink: S,
 	pub cancel: CancellationToken,
 }
 
-pub struct ClockHandle {
-	pub cancel: CancellationToken,
+#[derive(Debug, Clone, Copy)]
+pub struct CursorPosition {
+	pub x: f64,
+	pub y: f64,
 }
 
 // "This is a unit of work that I know how to stop."
@@ -495,3 +461,34 @@ where
 		self.join.await
 	}
 }
+
+// pub struct GuiDriver {
+// 	// winit/egui stuff
+// }
+
+// impl<C> AppDriver<C> for GuiDriver
+// where
+// 	C: AppCtx,
+// {
+// 	fn run(&mut self, app: &mut App<C>) -> Result<()> {
+// 		// start winit
+// 		// run event loop
+// 		// render egui
+// 		// receive shutdown
+// 		Ok(())
+// 	}
+// }
+
+// pub struct LspDriver;
+
+// impl<C> AppDriver<C> for LspDriver
+// where
+// 	C: AppCtx,
+// {
+// 	fn run(&mut self, app: &mut App<C>) -> Result<()> {
+// 		// stdin/stdout JSON-RPC loop
+// 		Ok(())
+// 	}
+// }
+
+// pub struct VsCodeDriver;

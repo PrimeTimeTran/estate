@@ -6,6 +6,12 @@ use crate::{RuntimeState, e, prelude::*};
 // https://github.com/rust-lang/rust/issues/41517
 // https://github.com/rust-lang/rust/issues/55628
 // https://github.com/rust-lang/rfcs/pull/1733
+pub trait AppDriver<C>
+where
+	C: AppCtx,
+{
+	fn run(&mut self, app: &mut App<C>) -> Result<()>;
+}
 pub trait ApiServices: Services {
 	type Client: Api;
 	/// ## Platform Generic API
@@ -25,14 +31,12 @@ pub trait ApiServices: Services {
 /// A type safe abstraction with room for growth via it's internal  [associated type](https://doc.rust-lang.org/rust-by-example/generics/assoc_items/types.html), [State](Self::State).
 pub trait AppCtx: Default {
 	type State;
-	// type Worker: Worker;
-	// type WorkHandle<C> = <<C as AppCtx>::Worker as Worker>::Handle;
 	fn state(&self) -> &Self::State;
 }
 
 /// ## [Clock]
 ///
-/// The literal heart beat of the engine. The clock has a handle on the [runtime](Runtime) of [tokio] which 
+/// The literal heart beat of the engine. The clock has a handle on the [runtime](Runtime) of [tokio] which
 pub trait Clock: Clone {
 	type Handle<C: AppCtx>;
 
@@ -157,6 +161,15 @@ pub trait Executor: Clone + 'static {
 
 pub trait EventSink<E>: Send + Sync + 'static {
 	fn send(&self, event: E);
+}
+
+impl<E> EventSink<E> for std::sync::mpsc::Sender<E>
+where
+	E: Send + 'static,
+{
+	fn send(&self, event: E) {
+		let _ = self.send(event);
+	}
 }
 /// ## [Index]
 ///

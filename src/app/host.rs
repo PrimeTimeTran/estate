@@ -53,6 +53,7 @@ fn time_now() -> String {
 	let format = "%B %-d, %Y at %-I:%M:%S %p UTC";
 	now.format(format).to_string()
 }
+
 impl AppCtx for WebContext {
 	type State = WebState;
 
@@ -90,10 +91,8 @@ impl Clock for HostClock {
 				if task_cancel.is_cancelled() {
 					break;
 				}
-
 				let now = clock.run_once();
 				tracing::info!("{msg}: {now}");
-
 				tokio::select! {
 					_ = task_cancel.cancelled() => break,
 					_ = tokio::time::sleep(interval) => {}
@@ -125,11 +124,6 @@ impl Clock for HostClock {
 		WorkHandle::new(cancel)
 	}
 }
-impl ClockHandle {
-	pub fn stop(&self) {
-		self.cancel.cancel();
-	}
-}
 
 impl<C: AppCtx> Host<C> {
 	pub fn new(context: C) -> anyhow::Result<Self> {
@@ -143,7 +137,7 @@ impl<C: AppCtx> Host<C> {
 			context,
 			worker: HostWorker::new(),
 			#[cfg(target_arch = "wasm32")]
-			clock: HostClock::default(),
+			clock: HostClock::default,
 			#[cfg(not(target_arch = "wasm32"))]
 			clock: HostClock::new(handle),
 			#[cfg(not(target_arch = "wasm32"))]
@@ -162,45 +156,47 @@ where
 	pub fn context(&self) -> &C {
 		&self.context
 	}
+
+	#[cfg(not(target_arch = "wasm32"))]
+	pub fn handle(&self) -> tokio::runtime::Handle {
+		self.runtime.handle().clone()
+	}
 	/// Host-level execution goes here.
 	/// This does NOT need to be winit.
 	/// CLI, daemon, or GUI can build on top of this.
 	pub fn run(&self) -> Result<()> {
 		tracing::info!("Host run");
-		#[cfg(not(target_arch = "wasm32"))]
-		self.worker.block_on(async {
-			tokio::signal::ctrl_c()
-				.await
-				.expect("failed to listen for Ctrl+C");
-			tracing::info!("Ctrl+C received");
-		});
-		#[cfg(all(target_arch = "wasm32"))]
-		{
-			// WASM has no process-level Ctrl+C signal.
-			// Shutdown must be triggered externally.
-		}
+		// self.worker().spawn_ctrl_c();
+		// #[cfg(not(target_arch = "wasm32"))]
+		// self.worker.block_on(async {
+		// 	tokio::signal::ctrl_c()
+		// 		.await
+		// 		.expect("failed to listen for Ctrl+C");
+		// 	tracing::info!("Ctrl+C received");
+		// });
+		// #[cfg(all(target_arch = "wasm32"))]
+		// {
+		// 	// WASM has no process-level Ctrl+C signal.
+		// 	// Shutdown must be triggered externally.
+		// }
 		Ok(())
 	}
 	pub fn worker(&self) -> &HostWorker<C> {
 		&self.worker
 	}
-	// pub fn new(context: C) -> Result<Self> {
-	// 	let cancel = CancellationToken::new();
-	// 	Ok(Self {
-	// 		context,
-	// 		clock: HostClock::new(cancel),
-	// 		worker: HostWorker::new(),
-	// 	})
-	// }
+	pub fn shutdown(self) {
+		#[cfg(all(not(target_arch = "wasm32")))]
+		self.runtime.shutdown_background();
+	}
 }
 #[cfg(feature = "native")]
 impl Host<NativeContext> {
 	pub fn init() -> Result<Self> {
 		// let count = 1;
 		// let host = "12";
-		// let error = EventKind::DaemonStarted;
+		// let error = EventKind::DaemonStarted;o
 		// let state = ViewType::DashboardScreen;
-		// awe!("Runtime initialized");
+		// awe!("Runtime f");
 		// awe!(Info, "Runtime initialized");
 		// awe!(Success, "Runtime started");
 		// awe!(Warn, "No config found");
@@ -259,7 +255,6 @@ where
 	pub fn new() -> Self {
 		Self {
 			_phantom: PhantomData,
-			// initialize browser worker
 		}
 	}
 }
@@ -267,6 +262,14 @@ impl<C> HostWorker<C>
 where
 	C: AppCtx,
 {
+	#[cfg(not(feature = "web"))]
+	pub fn wait_for_ctrl_c(&self) {
+		let (tx, rx) = std::sync::mpsc::channel();
+
+		self.spawn_ctrl_c(tx);
+
+		let _ = rx.recv();
+	}
 	#[cfg(all(not(feature = "web")))]
 	pub fn spawn_ctrl_c<S>(&self, sink: S)
 	where
@@ -395,32 +398,7 @@ where
 
 		WorkHandle::new(cancel)
 	}
-	// fn interval<F, Fut>(&self, duration: Duration, task: F) -> Self::Handle<()>
-	// where
-	// 	F: Fn(CancellationToken) -> Fut + 'static,
-	// 	Fut: Future<Output = ()> + 'static,
-	// {
-	// 	let cancel = CancellationToken::new();
-	// 	let task_cancel = cancel.clone();
 
-	// 	wasm_bindgen_futures::spawn_local(async move {
-	// 		loop {
-	// 			if task_cancel.is_cancelled() {
-	// 				break;
-	// 			}
-
-	// 			task(task_cancel.clone()).await;
-
-	// 			if task_cancel.is_cancelled() {
-	// 				break;
-	// 			}
-
-	// 			gloo_timers::future::TimeoutFuture::new(duration.as_millis() as u32).await;
-	// 		}
-	// 	});
-
-	// 	WorkHandle::from_token(cancel)
-	// }
 	fn run_foreground<F>(&self, task: F)
 	where
 		F: Fn() + 'static,
@@ -428,118 +406,6 @@ where
 		task();
 	}
 }
-// #[cfg(not(target_arch = "wasm32"))]
-// impl<C> WorkerRuntime for HostWorker<C>
-// where
-// 	C: AppCtx,
-// {
-// 	type H = WorkHandle<C>;
-
-// 	fn foreground<F>(&self, task: F)
-// 	where
-// 		F: FnOnce() + 'static,
-// 	{
-// 		task();
-// 	}
-
-// 	fn spawn<F, Fut>(&self, task: F) -> Self::H<C>;
-// 	where
-// 		F: FnOnce(CancellationToken) -> Fut + Send + 'static,
-// 		Fut: Future<Output = ()> + Send + 'static,
-// 	{
-// 		let cancel = CancellationToken::new();
-// 		let task_cancel = cancel.clone();
-
-// 		let join = self.runtime.spawn(async move {
-// 			task(task_cancel).await;
-// 		});
-
-// 		WorkHandle::new(cancel, join)
-// 	}
-
-// 	fn interval<F, Fut>(&self, duration: Duration, task: F) -> Self::H
-// 	where
-// 		F: Fn(CancellationToken) -> Fut + Send + 'static,
-// 		Fut: Future<Output = ()> + Send + 'static,
-// 	{
-// 		let cancel = CancellationToken::new();
-// 		let task_cancel = cancel.clone();
-
-// 		let join = self.runtime.spawn(async move {
-// 			loop {
-// 				if task_cancel.is_cancelled() {
-// 					break;
-// 				}
-
-// 				task(task_cancel.clone()).await;
-
-// 				if task_cancel.is_cancelled() {
-// 					break;
-// 				}
-
-// 				tokio::time::sleep(duration).await;
-// 			}
-// 		});
-
-// 		WorkHandle::new(cancel, join)
-// 	}
-// }
-// #[cfg(target_arch = "wasm32")]
-// impl<C> WorkerRuntime for HostWorker<C>
-// where
-// 	C: AppCtx,
-// {
-// 	type Handle = WasmWorkHandle;
-
-// 	fn foreground<F>(&self, task: F)
-// 	where
-// 		F: FnOnce() + 'static,
-// 	{
-// 		task();
-// 	}
-
-// 	fn spawn<F, Fut>(&self, task: F) -> Self::Handle
-// 	where
-// 		F: FnOnce(CancellationToken) -> Fut + 'static,
-// 		Fut: Future<Output = ()> + 'static,
-// 	{
-// 		let cancel = CancellationToken::new();
-// 		let task_cancel = cancel.clone();
-
-// 		wasm_bindgen_futures::spawn_local(async move {
-// 			task(task_cancel).await;
-// 		});
-
-// 		WasmWorkHandle::new(cancel)
-// 	}
-
-// 	fn interval<F, Fut>(&self, duration: Duration, task: F) -> Self::Handle
-// 	where
-// 		F: Fn(CancellationToken) -> Fut + 'static,
-// 		Fut: Future<Output = ()> + 'static,
-// 	{
-// 		let cancel = CancellationToken::new();
-// 		let task_cancel = cancel.clone();
-
-// 		wasm_bindgen_futures::spawn_local(async move {
-// 			loop {
-// 				if task_cancel.is_cancelled() {
-// 					break;
-// 				}
-
-// 				task(task_cancel.clone()).await;
-
-// 				if task_cancel.is_cancelled() {
-// 					break;
-// 				}
-
-// 				gloo_timers::future::TimeoutFuture::new(duration.as_millis() as u32).await;
-// 			}
-// 		});
-
-// 		WasmWorkHandle::new(cancel)
-// 	}
-// }
 
 #[derive(Debug, Clone)]
 pub struct Connected {
@@ -556,30 +422,28 @@ where
 	C: AppCtx,
 {
 	pub context: C,
-	worker: HostWorker<C>,
 	clock: HostClock,
+	worker: HostWorker<C>,
 
 	#[cfg(not(target_arch = "wasm32"))]
-	runtime: tokio::runtime::Runtime,
+	pub runtime: tokio::runtime::Runtime,
 }
+
+#[cfg(all(target_arch = "wasm32"))]
+#[derive(Clone, Default)]
+pub struct HostClock;
 
 #[cfg(not(target_arch = "wasm32"))]
 #[derive(Clone)]
 pub struct HostClock {
 	handle: tokio::runtime::Handle,
 }
-#[cfg(target_arch = "wasm32")]
-#[derive(Clone, Default)]
-pub struct HostClock;
 pub struct HostRenderer;
-#[cfg(not(target_arch = "wasm32"))]
+
 pub struct HostWorker<C: AppCtx> {
+	_phantom: PhantomData<C>,
+	#[cfg(not(target_arch = "wasm32"))]
 	runtime: Arc<tokio::runtime::Runtime>,
-	_phantom: PhantomData<C>,
-}
-#[cfg(target_arch = "wasm32")]
-pub struct HostWorker<C: AppCtx> {
-	_phantom: PhantomData<C>,
 }
 #[derive(Debug, Default)]
 pub struct WebState;
