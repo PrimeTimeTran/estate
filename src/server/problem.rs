@@ -19,24 +19,11 @@ pub trait ProblemRepository: Send + Sync {
 	async fn sample_problem(&self, query: ProblemQuery) -> Result<ProtoProblem>;
 }
 
-pub struct ProblemQuery {
-	pub page: Option<i32>,
-	pub page_size: Option<i32>,
-	pub difficulty: Option<Difficulty>,
-}
-pub struct CreateProblem {
-	pub title: String,
-	pub slug: String,
-}
-pub struct UpdateProblem {
-	pub title: Option<String>,
-	pub slug: Option<String>,
+fn problem_id(id: &str) -> Result<i64, Status> {
+	id.parse()
+		.map_err(|_| Status::invalid_argument("invalid problem id"))
 }
 
-#[derive(Default)]
-pub struct ProblemServiceImpl<R> {
-	repository: R,
-}
 impl<R> ProblemServiceImpl<R> {
 	pub fn new(repository: R) -> Self {
 		Self { repository }
@@ -149,7 +136,21 @@ where
 		Ok(Response::new(problem))
 	}
 }
-fn problem_id(id: &str) -> Result<i64, Status> {
-	id.parse()
-		.map_err(|_| Status::invalid_argument("invalid problem id"))
+
+pub struct CreateProblem {
+	pub title: String,
+	pub slug: String,
+}
+pub struct ProblemQuery {
+	pub page: Option<i32>,
+	pub page_size: Option<i32>,
+	pub difficulty: Option<Difficulty>,
+}
+#[derive(Default)]
+pub struct ProblemServiceImpl<R> {
+	repository: R,
+}
+pub struct UpdateProblem {
+	pub title: Option<String>,
+	pub slug: Option<String>,
 }
