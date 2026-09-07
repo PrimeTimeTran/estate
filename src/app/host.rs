@@ -7,29 +7,26 @@ pub enum CargoFeature {
 }
 
 fn append_to_file(str: String) {}
-
 fn sleep(str: String) {}
-
 fn task() {
 	println!(
 		"The task asts the time that's used by the clock. {}",
 		time_now()
 	)
 }
-
 fn time_now() -> String {
 	use chrono::Utc;
 	let now = Utc::now();
 	let format = "%B %-d, %Y at %-I:%M:%S %p UTC";
 	now.format(format).to_string()
 }
+
 impl AppCtx for WebContext {
 	type State = WebState;
 	fn state(&self) -> &Self::State {
 		&self.state()
 	}
 }
-
 impl Clock for HostClock {
 	fn now(&self) -> String {
 		time_now()
@@ -85,7 +82,6 @@ impl ClockHandle {
 		self.cancel.cancel();
 	}
 }
-
 impl<C> Host<C>
 where
 	C: AppCtx,
@@ -118,7 +114,6 @@ where
 	pub fn worker(&self) -> &HostWorker {
 		&self.worker
 	}
-
 	pub fn new(context: C) -> Result<Self> {
 		Ok(Self {
 			context,
@@ -127,7 +122,6 @@ where
 		})
 	}
 }
-
 #[cfg(feature = "native")]
 impl Host<NativeContext> {
 	pub fn init() -> Result<Self> {
@@ -139,29 +133,28 @@ impl Host<NativeContext> {
 		Self::new(context)
 	}
 }
-
 #[cfg(feature = "web")]
 impl Host<WebContext> {
 	pub fn init() -> Result<Self> {
 		Self::new(WebContext::default())
 	}
 }
-impl<C> Provide for Host<C>
-where
-	C: AppCtx,
-{
-	type Clock = HostClock;
-	type Worker = HostWorker;
-	// type Renderer = HostRenderer;
-	fn clock(&self) -> &Self::Clock {
-		&self.clock
+#[cfg(not(target_arch = "wasm32"))]
+impl HostWorker {
+	pub fn new() -> Self {
+		let runtime = tokio::runtime::Runtime::new().unwrap();
+		Self {
+			runtime: Arc::new(runtime),
+		}
 	}
-	fn worker(&self) -> &Self::Worker {
-		&self.worker
+}
+#[cfg(target_arch = "wasm32")]
+impl HostWorker {
+	pub fn new() -> Self {
+		Self {
+			// initialize browser worker
+		}
 	}
-	// fn renderer(&mut self) -> &mut Self::Renderer {
-	// 	&mut self.renderer
-	// }
 }
 impl HostWorker {
 	#[cfg(all(not(feature = "web")))]
@@ -191,10 +184,26 @@ impl HostWorker {
 		self.runtime.block_on(future);
 	}
 }
+impl<C> Provide for Host<C>
+where
+	C: AppCtx,
+{
+	type Clock = HostClock;
+	type Worker = HostWorker;
+	// type Renderer = HostRenderer;
+	fn clock(&self) -> &Self::Clock {
+		&self.clock
+	}
+	fn worker(&self) -> &Self::Worker {
+		&self.worker
+	}
+	// fn renderer(&mut self) -> &mut Self::Renderer {
+	// 	&mut self.renderer
+	// }
+}
 #[cfg(not(target_arch = "wasm32"))]
 impl Worker for HostWorker {
 	type Handle = WorkerHandle;
-
 	fn run_foreground<F>(&self, task: F)
 	where
 		F: Fn() + Send + 'static,
@@ -230,7 +239,6 @@ impl Worker for HostWorker {
 
 		WorkerHandle { cancel }
 	}
-
 	#[cfg(not(target_arch = "wasm32"))]
 	fn spawn<F, Fut>(&self, task: F)
 	where
@@ -266,25 +274,16 @@ impl Worker for HostWorker {
 		task();
 	}
 }
-#[cfg(not(target_arch = "wasm32"))]
-impl HostWorker {
-	pub fn new() -> Self {
-		let runtime = tokio::runtime::Runtime::new().unwrap();
 
-		Self {
-			runtime: Arc::new(runtime),
-		}
-	}
+#[derive(Debug, Clone)]
+pub struct Connected {
+	#[cfg(feature = "web")]
+	pub api: WebApiClient,
+	#[cfg(feature = "native")]
+	pub api: NativeApiClient,
 }
-#[cfg(target_arch = "wasm32")]
-impl HostWorker {
-	pub fn new() -> Self {
-		Self {
-			// initialize browser worker
-		}
-	}
-}
-
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Disconnected;
 pub struct Host<C>
 where
 	C: AppCtx,
@@ -296,30 +295,16 @@ where
 }
 pub struct HostClock;
 pub struct HostRenderer;
-
 #[cfg(not(target_arch = "wasm32"))]
 pub struct HostWorker {
 	runtime: Arc<tokio::runtime::Runtime>,
 }
-
 #[cfg(target_arch = "wasm32")]
 pub struct HostWorker;
-pub struct WorkerHandle {
-	pub cancel: CancellationToken,
-}
-
 #[derive(Debug, Default)]
 pub struct WebState;
 #[derive(Default)]
 pub struct WebContext;
-
-#[derive(Debug, Clone, Copy, Default)]
-pub struct Disconnected;
-
-#[derive(Debug, Clone)]
-pub struct Connected {
-	#[cfg(feature = "web")]
-	pub api: WebApiClient,
-	#[cfg(feature = "native")]
-	pub api: NativeApiClient,
+pub struct WorkerHandle {
+	pub cancel: CancellationToken,
 }

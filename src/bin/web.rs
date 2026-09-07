@@ -43,3 +43,18 @@ fn _troubleshoot_wasm() {
 	// wasm-objdump -x ../../target/wasm32-unknown-unknown/debug/web.wasm | \\n  grep -A10 '^Export'
 	// grep -R -n '#\[wasm_bindgen(start)\]' crates/estate crates 2>/dev/null
 }
+
+// check hard links / deleted files and compare against filesystem usage.
+// df -h .
+// du -sh .
+// sudo lsof +L1
+
+// du -h -d 1 work | sort -h
+// du -h -d 1 . | sort -h
+// du -h -d 1 . | sort -h
+// du -h -d 1 . | sort -h
+// du -h -d 1 . | sort -h
+// du -h -d 1 . | sort -h
+// find . -type l -exec sh -c 'printf "%s -> %s\n" "$1" "$(readlink "$1")"' _ {} \;
+// du -h -d 2 ./ml_classifiers | sort -h | tail -30
+// find . -type l -exec sh -c 'printf "%s -> %s\n" "$1" "$(readlink "$1")"' _ {} \;
