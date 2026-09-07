@@ -72,13 +72,7 @@ impl ClockHandle {
 	}
 }
 
-#[cfg(feature = "native")]
-impl Host<NativeContext> {
-	pub fn init() -> Result<Self> {
-		let context = NativeContext::default();
-		Self::new(context)
-	}
-}
+
 impl<C> Host<C>
 where
 	C: AppCtx,
@@ -119,6 +113,13 @@ where
 	}
 	pub fn context(&self) -> &C {
 		&self.context
+	}
+}
+#[cfg(feature = "native")]
+impl Host<NativeContext> {
+	pub fn init() -> Result<Self> {
+		let context = NativeContext::default();
+		Self::new(context)
 	}
 }
 
@@ -165,6 +166,7 @@ impl HostWorker {
 		self.runtime.block_on(future);
 	}
 }
+
 #[cfg(not(target_arch = "wasm32"))]
 impl Worker for HostWorker {
 	type Handle = WorkerHandle;
@@ -220,11 +222,6 @@ impl Worker for HostWorker {
 	}
 }
 
-pub struct HostWorker {
-	pub runtime: Arc<tokio::runtime::Runtime>,
-}
-pub struct HostClock;
-pub struct HostRenderer;
 pub struct Host<C>
 where
 	C: AppCtx,
@@ -233,6 +230,11 @@ where
 	pub context: C,
 	worker: HostWorker,
 	clock: HostClock,
+}
+pub struct HostClock;
+pub struct HostRenderer;
+pub struct HostWorker {
+	pub runtime: Arc<tokio::runtime::Runtime>,
 }
 pub struct WorkerHandle {
 	pub cancel: CancellationToken,
