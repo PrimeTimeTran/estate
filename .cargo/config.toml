@@ -5,7 +5,7 @@
 # server = "build -q --bin server --no-default-features --features native"
 # server-run = "run -q --bin server --no-default-features --features=native"
 
-# native = "build -q --bin native --no-default-features --features native"
+
 # native-run = "run -q --bin native --no-default-features --features native"
 
 # # No build. The Wasm is run with other server.
@@ -24,7 +24,7 @@
 # ─────────────────────────────────────────────
 web = "build --bin web --target wasm32-unknown-unknown --features web"
 server = "build -q --bin server --no-default-features --features native"
-
+native = "build -q --bin native --no-default-features --features native"
 
 # ─────────────────────────────────────────────
 # Direct execution

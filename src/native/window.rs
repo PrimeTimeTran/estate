@@ -22,23 +22,7 @@ pub struct Window {
 	queue: wgpu::Queue,
 	renderer: gui::Renderer,
 }
-// pub struct Window<State: 'static> {
-// 	screen: ui::ScreenInstance<NativeRuntime, NativeExecutor>,
-// 	// This Surface contains/borrows something that is guaranteed to be valid for the 'static lifetime.
-// 	pub surface: gui::wgpu::Surface<'static>,
-// 	pub config: gui::wgpu::SurfaceConfiguration,
-// 	pub device: wgpu::Device,
-// 	pub gui_ctx: gui::Context,
-// 	pub gui_state: egui_winit::State,
-// 	pub instance: Arc<winit::window::Window>,
-// 	pub kind: WindowType,
-// 	pub needs_resize: bool,
-// 	pub occluded: bool,
 
-// 	pending_textures: gui::TexturesDelta,
-// 	queue: wgpu::Queue,
-// 	renderer: gui::Renderer,
-// }
 impl Window {
 	pub fn new(event_loop: &ActiveEventLoop, view: ViewType) -> Result<Self> {
 		let (gui_ctx, gui_state) = build_egui(event_loop);
@@ -741,12 +725,7 @@ pub struct AppWindow {
 	pub view: ViewType,
 	pub window: Window,
 }
-// pub struct AppWindow {
-// 	pub runtime: NativeRuntime,
-// 	pub kind: WindowType,
-// 	pub view: ViewType,
-// 	pub window: Window,
-// }
+
 pub struct GlobalHotkeys {
 	hotkey_id: u32,
 	manager: GlobalHotKeyManager,

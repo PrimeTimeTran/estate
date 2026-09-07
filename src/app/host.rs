@@ -20,14 +20,17 @@ fn time_now() -> String {
 	let format = "%B %-d, %Y at %-I:%M:%S %p UTC";
 	now.format(format).to_string()
 }
-
 impl AppCtx for WebContext {
 	type State = WebState;
+
 	fn state(&self) -> &Self::State {
 		&self.state()
 	}
 }
+
 impl Clock for HostClock {
+	type Handle<C: AppCtx> = WorkHandle<C>;
+
 	fn now(&self) -> String {
 		time_now()
 	}
@@ -43,38 +46,50 @@ impl Clock for HostClock {
 			std::thread::sleep(interval);
 		}
 	}
-	fn run_background(&self, interval: Duration, msg: String) -> ClockHandle {
+	#[cfg(not(target_arch = "wasm32"))]
+	fn run_background<C: AppCtx>(&self, interval: Duration, msg: String) -> WorkHandle<C> {
 		let cancel = CancellationToken::new();
-		let clock = HostClock;
 		let task_cancel = cancel.clone();
+		let clock = self.clone();
 
-		#[cfg(not(target_arch = "wasm32"))]
-		{
-			std::thread::spawn(move || {
-				loop {
-					if task_cancel.is_cancelled() {
-						break;
-					}
+		let join = self.handle.spawn(async move {
+			loop {
+				if task_cancel.is_cancelled() {
+					break;
+				}
 
-					clock.run_once();
-					std::thread::sleep(interval);
+				let now = clock.run_once();
+				tracing::info!("{msg}: {now}");
+
+				tokio::select! {
+					_ = task_cancel.cancelled() => break,
+					_ = tokio::time::sleep(interval) => {}
 				}
-			});
-		}
-		#[cfg(target_arch = "wasm32")]
-		{
-			wasm_bindgen_futures::spawn_local(async move {
-				loop {
-					// let time = clock.now();
-					// crate::bridge::log(&format!("🔥 impl Clock for HostClock run_background {msg}"));
-					// crate::bridge::log(&format!("🔥 {time}"));
-					let now = clock.run_once();
-					crate::bridge::log(&format!("🔥 {now}"));
-					gloo_timers::future::TimeoutFuture::new(1000).await;
+			}
+		});
+
+		WorkHandle::new(cancel, join)
+	}
+	#[cfg(target_arch = "wasm32")]
+	fn run_background<C: AppCtx>(&self, interval: Duration, msg: String) -> WorkHandle<C> {
+		let cancel = CancellationToken::new();
+		let task_cancel = cancel.clone();
+		let clock = self.clone();
+
+		wasm_bindgen_futures::spawn_local(async move {
+			loop {
+				if task_cancel.is_cancelled() {
+					break;
 				}
-			});
-		}
-		ClockHandle { cancel }
+
+				let now = clock.run_once();
+				tracing::info!("{msg}: {now}");
+
+				gloo_timers::future::TimeoutFuture::new(interval.as_millis() as u32).await;
+			}
+		});
+
+		WorkHandle::new(cancel)
 	}
 }
 impl ClockHandle {
@@ -82,6 +97,28 @@ impl ClockHandle {
 		self.cancel.cancel();
 	}
 }
+
+impl<C: AppCtx> Host<C> {
+	pub fn new(context: C) -> anyhow::Result<Self> {
+		#[cfg(not(target_arch = "wasm32"))]
+		let runtime = tokio::runtime::Runtime::new()?;
+
+		#[cfg(not(target_arch = "wasm32"))]
+		let handle = runtime.handle().clone();
+
+		Ok(Self {
+			context,
+			worker: HostWorker::new(),
+			#[cfg(target_arch = "wasm32")]
+			clock: HostClock::default(),
+			#[cfg(not(target_arch = "wasm32"))]
+			clock: HostClock::new(handle),
+			#[cfg(not(target_arch = "wasm32"))]
+			runtime,
+		})
+	}
+}
+
 impl<C> Host<C>
 where
 	C: AppCtx,
@@ -111,16 +148,17 @@ where
 		}
 		Ok(())
 	}
-	pub fn worker(&self) -> &HostWorker {
+	pub fn worker(&self) -> &HostWorker<C> {
 		&self.worker
 	}
-	pub fn new(context: C) -> Result<Self> {
-		Ok(Self {
-			context,
-			clock: HostClock,
-			worker: HostWorker::new(),
-		})
-	}
+	// pub fn new(context: C) -> Result<Self> {
+	// 	let cancel = CancellationToken::new();
+	// 	Ok(Self {
+	// 		context,
+	// 		clock: HostClock::new(cancel),
+	// 		worker: HostWorker::new(),
+	// 	})
+	// }
 }
 #[cfg(feature = "native")]
 impl Host<NativeContext> {
@@ -140,23 +178,41 @@ impl Host<WebContext> {
 	}
 }
 #[cfg(not(target_arch = "wasm32"))]
-impl HostWorker {
+impl HostClock {
+	pub fn new(handle: tokio::runtime::Handle) -> Self {
+		Self { handle }
+	}
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl<C> HostWorker<C>
+where
+	C: AppCtx,
+{
 	pub fn new() -> Self {
 		let runtime = tokio::runtime::Runtime::new().unwrap();
 		Self {
 			runtime: Arc::new(runtime),
+			_phantom: PhantomData,
 		}
 	}
 }
 #[cfg(target_arch = "wasm32")]
-impl HostWorker {
+impl<C> HostWorker<C>
+where
+	C: AppCtx,
+{
 	pub fn new() -> Self {
 		Self {
+			_phantom: PhantomData,
 			// initialize browser worker
 		}
 	}
 }
-impl HostWorker {
+impl<C> HostWorker<C>
+where
+	C: AppCtx,
+{
 	#[cfg(all(not(feature = "web")))]
 	pub fn spawn_ctrl_c<S>(&self, sink: S)
 	where
@@ -184,12 +240,12 @@ impl HostWorker {
 		self.runtime.block_on(future);
 	}
 }
-impl<C> Provide for Host<C>
+impl<C> Provide<C> for Host<C>
 where
 	C: AppCtx,
 {
 	type Clock = HostClock;
-	type Worker = HostWorker;
+	type Worker = HostWorker<C>;
 	// type Renderer = HostRenderer;
 	fn clock(&self) -> &Self::Clock {
 		&self.clock
@@ -202,8 +258,12 @@ where
 	// }
 }
 #[cfg(not(target_arch = "wasm32"))]
-impl Worker for HostWorker {
-	type Handle = WorkerHandle;
+impl<C> Worker<C> for HostWorker<C>
+where
+	C: AppCtx,
+{
+	type Handle = WorkHandle<C>;
+
 	fn run_foreground<F>(&self, task: F)
 	where
 		F: Fn() + Send + 'static,
@@ -212,7 +272,8 @@ impl Worker for HostWorker {
 			task();
 		}
 	}
-	fn run_background<F, Fut>(&self, task: F) -> WorkerHandle
+
+	fn run_background<F, Fut>(&self, task: F) -> WorkHandle<C>
 	where
 		F: FnOnce(CancellationToken) -> Fut + Send + 'static,
 		Fut: Future<Output = ()> + Send + 'static,
@@ -220,37 +281,51 @@ impl Worker for HostWorker {
 		let cancel = CancellationToken::new();
 		let task_cancel = cancel.clone();
 
-		self.runtime.spawn(async move {
+		let join = self.runtime.spawn(async move {
 			task(task_cancel).await;
 		});
 
-		WorkerHandle { cancel }
+		WorkHandle::new(cancel, join)
 	}
-	fn run_background_blocking<F>(&self, task: F) -> WorkerHandle
+
+	#[cfg(not(target_arch = "wasm32"))]
+	fn run_background_blocking<F>(&self, task: F) -> WorkHandle<C>
 	where
 		F: FnOnce(CancellationToken) + Send + 'static,
 	{
 		let cancel = CancellationToken::new();
 		let task_cancel = cancel.clone();
 
-		self.runtime.spawn_blocking(move || {
+		let join = self.runtime.spawn_blocking(move || {
 			task(task_cancel);
 		});
 
-		WorkerHandle { cancel }
+		WorkHandle::new(cancel, join)
 	}
+
 	#[cfg(not(target_arch = "wasm32"))]
-	fn spawn<F, Fut>(&self, task: F)
+	fn spawn<F, Fut>(&self, task: F) -> WorkHandle<C>
 	where
 		F: FnOnce() -> Fut + Send + 'static,
 		Fut: Future<Output = ()> + Send + 'static,
 	{
-		self.runtime.spawn(task());
+		let cancel = CancellationToken::new();
+		let task_cancel = cancel.clone();
+		let join = self.runtime.spawn(async move {
+			// If you want cancellation to actually matter,
+			// the future itself needs to observe task_cancel.
+			task().await;
+		});
+
+		WorkHandle::new(cancel, join)
 	}
 }
 #[cfg(target_arch = "wasm32")]
-impl Worker for HostWorker {
-	type Handle = WorkerHandle;
+impl<C> Worker<C> for HostWorker<C>
+where
+	C: AppCtx,
+{
+	type Handle = WorkHandle<C>;
 
 	fn run_background<F, Fut>(&self, task: F) -> Self::Handle
 	where
@@ -261,12 +336,37 @@ impl Worker for HostWorker {
 		let task_cancel = cancel.clone();
 
 		wasm_bindgen_futures::spawn_local(async move {
-			gloo_timers::future::TimeoutFuture::new(1000).await;
+			task(task_cancel).await;
 		});
 
-		WorkerHandle { cancel }
+		WorkHandle::new(cancel)
 	}
+	// fn interval<F, Fut>(&self, duration: Duration, task: F) -> Self::Handle<()>
+	// where
+	// 	F: Fn(CancellationToken) -> Fut + 'static,
+	// 	Fut: Future<Output = ()> + 'static,
+	// {
+	// 	let cancel = CancellationToken::new();
+	// 	let task_cancel = cancel.clone();
 
+	// 	wasm_bindgen_futures::spawn_local(async move {
+	// 		loop {
+	// 			if task_cancel.is_cancelled() {
+	// 				break;
+	// 			}
+
+	// 			task(task_cancel.clone()).await;
+
+	// 			if task_cancel.is_cancelled() {
+	// 				break;
+	// 			}
+
+	// 			gloo_timers::future::TimeoutFuture::new(duration.as_millis() as u32).await;
+	// 		}
+	// 	});
+
+	// 	WorkHandle::from_token(cancel)
+	// }
 	fn run_foreground<F>(&self, task: F)
 	where
 		F: Fn() + 'static,
@@ -274,6 +374,118 @@ impl Worker for HostWorker {
 		task();
 	}
 }
+// #[cfg(not(target_arch = "wasm32"))]
+// impl<C> WorkerRuntime for HostWorker<C>
+// where
+// 	C: AppCtx,
+// {
+// 	type H = WorkHandle<C>;
+
+// 	fn foreground<F>(&self, task: F)
+// 	where
+// 		F: FnOnce() + 'static,
+// 	{
+// 		task();
+// 	}
+
+// 	fn spawn<F, Fut>(&self, task: F) -> Self::H<C>;
+// 	where
+// 		F: FnOnce(CancellationToken) -> Fut + Send + 'static,
+// 		Fut: Future<Output = ()> + Send + 'static,
+// 	{
+// 		let cancel = CancellationToken::new();
+// 		let task_cancel = cancel.clone();
+
+// 		let join = self.runtime.spawn(async move {
+// 			task(task_cancel).await;
+// 		});
+
+// 		WorkHandle::new(cancel, join)
+// 	}
+
+// 	fn interval<F, Fut>(&self, duration: Duration, task: F) -> Self::H
+// 	where
+// 		F: Fn(CancellationToken) -> Fut + Send + 'static,
+// 		Fut: Future<Output = ()> + Send + 'static,
+// 	{
+// 		let cancel = CancellationToken::new();
+// 		let task_cancel = cancel.clone();
+
+// 		let join = self.runtime.spawn(async move {
+// 			loop {
+// 				if task_cancel.is_cancelled() {
+// 					break;
+// 				}
+
+// 				task(task_cancel.clone()).await;
+
+// 				if task_cancel.is_cancelled() {
+// 					break;
+// 				}
+
+// 				tokio::time::sleep(duration).await;
+// 			}
+// 		});
+
+// 		WorkHandle::new(cancel, join)
+// 	}
+// }
+// #[cfg(target_arch = "wasm32")]
+// impl<C> WorkerRuntime for HostWorker<C>
+// where
+// 	C: AppCtx,
+// {
+// 	type Handle = WasmWorkHandle;
+
+// 	fn foreground<F>(&self, task: F)
+// 	where
+// 		F: FnOnce() + 'static,
+// 	{
+// 		task();
+// 	}
+
+// 	fn spawn<F, Fut>(&self, task: F) -> Self::Handle
+// 	where
+// 		F: FnOnce(CancellationToken) -> Fut + 'static,
+// 		Fut: Future<Output = ()> + 'static,
+// 	{
+// 		let cancel = CancellationToken::new();
+// 		let task_cancel = cancel.clone();
+
+// 		wasm_bindgen_futures::spawn_local(async move {
+// 			task(task_cancel).await;
+// 		});
+
+// 		WasmWorkHandle::new(cancel)
+// 	}
+
+// 	fn interval<F, Fut>(&self, duration: Duration, task: F) -> Self::Handle
+// 	where
+// 		F: Fn(CancellationToken) -> Fut + 'static,
+// 		Fut: Future<Output = ()> + 'static,
+// 	{
+// 		let cancel = CancellationToken::new();
+// 		let task_cancel = cancel.clone();
+
+// 		wasm_bindgen_futures::spawn_local(async move {
+// 			loop {
+// 				if task_cancel.is_cancelled() {
+// 					break;
+// 				}
+
+// 				task(task_cancel.clone()).await;
+
+// 				if task_cancel.is_cancelled() {
+// 					break;
+// 				}
+
+// 				gloo_timers::future::TimeoutFuture::new(duration.as_millis() as u32).await;
+// 			}
+// 		});
+
+// 		WasmWorkHandle::new(cancel)
+// 	}
+// }
 
 #[derive(Debug, Clone)]
 pub struct Connected {
@@ -284,27 +496,38 @@ pub struct Connected {
 }
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Disconnected;
+
 pub struct Host<C>
 where
 	C: AppCtx,
 {
-	// pub parsed: Cli,
 	pub context: C,
-	worker: HostWorker,
+	worker: HostWorker<C>,
 	clock: HostClock,
+
+	#[cfg(not(target_arch = "wasm32"))]
+	runtime: tokio::runtime::Runtime,
 }
+
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Clone)]
+pub struct HostClock {
+	handle: tokio::runtime::Handle,
+}
+#[cfg(target_arch = "wasm32")]
+#[derive(Clone, Default)]
 pub struct HostClock;
 pub struct HostRenderer;
 #[cfg(not(target_arch = "wasm32"))]
-pub struct HostWorker {
+pub struct HostWorker<C: AppCtx> {
 	runtime: Arc<tokio::runtime::Runtime>,
+	_phantom: PhantomData<C>,
 }
 #[cfg(target_arch = "wasm32")]
-pub struct HostWorker;
+pub struct HostWorker<C: AppCtx> {
+	_phantom: PhantomData<C>,
+}
 #[derive(Debug, Default)]
 pub struct WebState;
 #[derive(Default)]
 pub struct WebContext;
-pub struct WorkerHandle {
-	pub cancel: CancellationToken,
-}

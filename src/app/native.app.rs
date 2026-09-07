@@ -1,6 +1,6 @@
 use crate::doc;
 
-use crate::{prelude::*, spawn_global_cursor_daemon, r#trait::Context};
+use crate::{prelude::*, r#trait::Context};
 
 impl EventSink<AppEvent> for EventLoopProxy<AppEvent> {
 	fn send(&self, event: AppEvent) {
@@ -194,16 +194,6 @@ impl Context for NativeApp {
 		NativeApp::bar(&self, args)
 	}
 }
-
-// impl Default for NativeServices {
-// 	fn default() -> Self {
-// 		Self {
-// 			api:
-// 			persistence: NativePersistence::default(),
-// 			network: NativeNetwork::default(),
-// 		}
-// 	}
-// }
 
 impl NativeApp {
 	pub fn new() -> Result<Self> {

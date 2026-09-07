@@ -18,21 +18,27 @@ pub trait ApiServices: Services {
 }
 pub trait AppCtx: Default {
 	type State;
+	// type Worker: Worker;
+	// type WorkHandle<C> = <<C as AppCtx>::Worker as Worker>::Handle;
 	fn state(&self) -> &Self::State;
+}
+
+pub trait Hand<C> {
+	fn stop(&self);
 }
 
 /// ## [Clock]
 ///
-pub trait Clock {
+pub trait Clock: Clone {
+	type Handle<C: AppCtx>;
+
 	fn now(&self) -> String;
 	/// Run once and return.
 	fn run_once(&self) -> String;
 	/// Run repeatedly in the foreground.
 	#[cfg(not(target_arch = "wasm32"))]
 	fn run_foreground(&self, interval: Duration);
-
-	/// Spawn the clock as a background process/task.
-	fn run_background(&self, interval: Duration, msg: String) -> ClockHandle;
+	fn run_background<C: AppCtx>(&self, interval: Duration, msg: String) -> Self::Handle<C>;
 }
 
 /// ## [Context]
@@ -80,7 +86,11 @@ pub trait Context: Sized {
 
 	fn bar(&self, args: String) -> Result<()>;
 }
-
+pub trait CursorEventSink: Send + Sync + 'static {
+	// fn cursor_moved(&self, position: CGPoint);
+	fn cursor_moved(&self, position: CursorPosition);
+	fn modifiers_changed(&self, modifiers: Modifiers);
+}
 /// ## [Engine]
 ///
 pub trait Engine {
@@ -192,9 +202,9 @@ pub trait Renderer {
 
 /// ## [Provide]
 ///
-pub trait Provide {
+pub trait Provide<C: AppCtx> {
 	type Clock: Clock;
-	type Worker: Worker;
+	type Worker;
 	// type Renderer: Renderer;
 	fn clock(&self) -> &Self::Clock;
 	fn worker(&self) -> &Self::Worker;
@@ -340,17 +350,17 @@ pub trait Spawner: Clone + 'static {
 
 /// ## [Worker]
 ///
-pub trait Worker {
+pub trait Worker<C: AppCtx> {
 	type Handle;
+
+	fn run_foreground<F>(&self, task: F)
+	where
+		F: Fn() + Send + 'static;
 
 	fn run_background<F, Fut>(&self, task: F) -> Self::Handle
 	where
 		F: FnOnce(CancellationToken) -> Fut + Send + 'static,
 		Fut: Future<Output = ()> + Send + 'static;
-
-	fn run_foreground<F>(&self, task: F)
-	where
-		F: Fn() + Send + 'static;
 
 	#[cfg(not(target_arch = "wasm32"))]
 	fn run_background_blocking<F>(&self, task: F) -> Self::Handle
@@ -358,8 +368,22 @@ pub trait Worker {
 		F: FnOnce(CancellationToken) + Send + 'static;
 
 	#[cfg(not(target_arch = "wasm32"))]
-	fn spawn<F, Fut>(&self, task: F)
+	fn spawn<F, Fut>(&self, task: F) -> Self::Handle
 	where
 		F: FnOnce() -> Fut + Send + 'static,
 		Fut: Future<Output = ()> + Send + 'static;
+
+	// #[cfg(target_arch = "wasm32")]
+	// fn interval<F, Fut>(&self, duration: Duration, task: F) -> Self::Handle<()>
+	// where
+	// 	F: Fn(CancellationToken) -> Fut + 'static,
+	// 	Fut: Future<Output = ()> + 'static;
+}
+
+pub async fn sleep(duration: Duration) {
+	#[cfg(not(target_arch = "wasm32"))]
+	tokio::time::sleep(duration).await;
+
+	#[cfg(target_arch = "wasm32")]
+	gloo_timers::future::TimeoutFuture::new(duration.as_millis() as u32).await;
 }

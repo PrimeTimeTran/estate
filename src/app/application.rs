@@ -2,59 +2,31 @@ use crate::prelude::*;
 
 use tokio_util::sync::CancellationToken;
 
-#[cfg(not(feature = "web"))]
-pub async fn test_main_2() {
-	let clock = HostClock;
-	let worker = HostWorker::new();
-
-	let handle = worker.run_background(move |cancel| async move {
-		loop {
-			tokio::select! {
-					_ = cancel.cancelled() => break,
-
-					_ = tokio::time::sleep(Duration::from_secs(1)) => {
-							println!("background tick: {}", clock.now());
-					}
-			}
-		}
-	});
-
-	tokio::time::sleep(Duration::from_secs(5)).await;
-
-	handle.stop();
-}
-
-#[cfg(not(feature = "web"))]
-#[tokio::main]
-pub async fn tokio_main() {
-	let clock = HostClock;
-	let worker = HostWorker::new();
-	let handle = worker.run_background(move |cancel| async move {
-		loop {
-			tokio::select! {
-					_ = cancel.cancelled() => {
-							break;
-					}
-					_ = tokio::time::sleep(Duration::from_secs(1)) => {
-							println!("background tick: {}", clock.now());
-					}
-			}
-		}
-	});
-	tokio::time::sleep(Duration::from_secs(5)).await;
-	handle.stop();
-}
-
 impl<C> App<C>
 where
-	C: AppCtx,
+	C: AppCtx + 'static,
 {
+	#[cfg(target_arch = "wasm32")]
 	pub fn new(host: Host<C>) -> Result<Self> {
 		tracing::info!("App New");
 		Ok(Self {
-			host,
 			handle_clock: None,
 			handle_egui: None,
+			host,
+			workers: vec![],
+		})
+	}
+	#[cfg(not(target_arch = "wasm32"))]
+	pub fn new(host: Host<C>) -> Result<Self> {
+		tracing::info!("App New");
+		let (cursor_event_tx, cursor_events) = std::sync::mpsc::channel();
+		Ok(Self {
+			cursor_events,
+			cursor_event_tx,
+			handle_clock: None,
+			handle_egui: None,
+			host,
+			workers: vec![],
 		})
 	}
 	pub fn clock(&self) -> &HostClock {
@@ -84,6 +56,7 @@ where
 	fn run_app(&mut self) -> Result<()> {
 		todo!("")
 	}
+
 	#[cfg(all(not(feature = "web")))]
 	fn run_gui(&mut self) -> Result<()> {
 		let event_loop = EventLoop::<AppEvent>::with_user_event().build()?;
@@ -97,35 +70,42 @@ where
 
 		Ok(())
 	}
-	pub fn shutdown(&mut self) {
-		if let Some(handle) = self.handle_clock.take() {
-			handle.stop();
-		}
 
-		if let Some(handle) = self.handle_egui.take() {
-			handle.stop();
+	pub fn shutdown(&mut self) {
+		for worker in &self.workers {
+			worker.stop();
 		}
 	}
+
 	pub fn start(&mut self) -> Result<()> {
 		tracing::info!("App start");
-		self.start_egui();
-		self.start_clock();
+
+		let mut workers = Vec::new();
+
+		workers.push(self.start_egui()?);
+		workers.push(self.start_clock()?);
+
 		#[cfg(not(target_arch = "wasm32"))]
-		self.start_cargo_watcher();
+		workers.push(self.start_cargo_watcher()?);
+
+		#[cfg(not(target_arch = "wasm32"))]
+		workers.push(self.start_cursor_watcher_from_app()?);
+
+		self.workers.extend(workers);
+
 		Ok(())
 	}
 	#[cfg(not(target_arch = "wasm32"))]
-	fn start_cargo_watcher(&mut self) {
-		let watcher = match CargoWatcher::new() {
-			Ok(watcher) => watcher,
-			Err(error) => {
-				tracing::error!("Failed to create Cargo watcher: {error}");
-				return;
-			}
-		};
+	fn start_cargo_watcher(&mut self) -> Result<WorkHandle<C>> {
+		let watcher = CargoWatcher::new().map_err(|error| {
+			tracing::error!("Failed to create Cargo watcher: {error}");
+			error
+		})?;
 		tracing::info!("Watching Cargo.toml: {}", watcher.path().display());
-		self.worker().run_background_blocking(move |cancel| {
+		let worker = self.worker();
+		Ok(worker.run_background_blocking(move |cancel| {
 			let (tx, rx) = std::sync::mpsc::channel();
+
 			let mut fs_watcher = match RecommendedWatcher::new(tx, Config::default()) {
 				Ok(watcher) => watcher,
 				Err(error) => {
@@ -141,39 +121,42 @@ where
 				if cancel.is_cancelled() {
 					break;
 				}
-				match rx.recv() {
+
+				match rx.recv_timeout(std::time::Duration::from_millis(100)) {
 					Ok(Ok(event)) => {
 						if matches!(
 							event.kind,
 							notify::EventKind::Modify(_) | notify::EventKind::Create(_)
 						) {
 							tracing::info!("Cargo.toml changed");
+
 							if let Err(error) = watcher.run_once_sync() {
 								tracing::error!("Failed to process Cargo.toml: {error}");
 							}
 						}
 					}
+
 					Ok(Err(error)) => {
 						tracing::error!("Cargo watcher error: {error}");
 					}
-					Err(_) => break,
+
+					Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+						// Allows us to check cancellation.
+					}
+
+					Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+						break;
+					}
 				}
 			}
-
 			tracing::info!("Cargo watcher stopped");
-		});
+		}))
 	}
-	fn start_clock(&mut self) {
+	fn start_clock(&mut self) -> Result<WorkHandle<C>> {
 		let clock = self.host.clock();
 		let msg = String::from("App.start_clock.clock.run_background(Duration::from_secs(1));");
-		// handle works
-		let handle = clock.run_background(Duration::from_secs(1), msg);
-		// So does the inherent
-		// let msg = String::from("Loi start_clock Clock::run_background(clock, Duration::from_secs(1));");
-		// let handle = Clock::run_background(clock, Duration::from_secs(1), msg);
-		self.handle_clock = Some(handle);
+		Ok(clock.run_background(Duration::from_secs(1), msg))
 	}
-	/// Inherent works method works
 	fn start_clock_wasm(&mut self) {
 		// self
 		// 	.host
@@ -187,16 +170,49 @@ where
 		// clock.run_background(Duration::from_secs(1), msg.clone());
 		// let handle = Clock::run_background(clock, Duration::from_secs(1), msg.clone());
 	}
-	fn start_egui(&mut self) {
+	fn start_egui(&mut self) -> Result<WorkHandle<C>> {
 		tracing::info!("App start_egui");
-		let cancel = CancellationToken::new();
-		// Install/register your egui hook here.
-		//
-		// The hook should retain `cancel.clone()` if it needs
-		// to check for shutdown.
-		self.handle_egui = Some(EguiHandle { cancel });
+
+		#[cfg(not(target_arch = "wasm32"))]
+		{
+			Ok(self.worker().run_background_blocking(move |cancel| {
+				// egui work
+				// check `cancel`
+			}))
+		}
+
+		#[cfg(target_arch = "wasm32")]
+		{
+			Ok(self.worker().run_background(move |cancel| async move {
+				// egui work
+				// check `cancel`
+			}))
+		}
 	}
-	fn worker(&self) -> &impl Worker {
+	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+	pub fn start_cursor_watcher_from_app(&mut self) -> anyhow::Result<WorkHandle<C>> {
+		let sink = AppCursorSink {
+			tx: self.cursor_event_tx.clone(),
+		};
+
+		Ok(self.worker().run_background_blocking(move |cancel| {
+			if let Err(error) = CursorDaemon::new(sink, cancel).run() {
+				tracing::error!("Cursor daemon failed: {error}");
+			}
+		}))
+	}
+	// #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+	// fn start_cursor_watcher_from_app2(&mut self) -> Result<WorkHandle<C>> {
+	// 	let sink = AppCursorSink {
+	// 		tx: self.cursor_event_tx.clone(),
+	// 	};
+	// 	Ok(self.worker().run_background_blocking(move |cancel| {
+	// 		if let Err(error) = CursorDaemon::new(sink, cancel).run() {
+	// 			tracing::error!("Cursor daemon failed: {error}");
+	// 		}
+	// 	}))
+	// }
+	fn worker(&self) -> &HostWorker<C> {
 		self.host.worker()
 	}
 }
@@ -402,24 +418,78 @@ impl traits::Renderer for HostRenderer {
 		// native rendering
 	}
 }
-impl WorkerHandle {
-	pub fn stop(&self) {
-		self.cancel.cancel();
-	}
-}
 
 pub struct App<C: AppCtx> {
 	pub host: Host<C>,
+	// pub workers: Vec<WorkHandle>,
+	pub workers: Vec<WorkHandle<C>>,
 	pub handle_clock: Option<ClockHandle>,
 	pub handle_egui: Option<EguiHandle>,
-}
-
-pub struct ClockHandle {
-	pub cancel: CancellationToken,
+	#[cfg(not(target_arch = "wasm32"))]
+	pub cursor_events: std::sync::mpsc::Receiver<CursorEvent>,
+	#[cfg(not(target_arch = "wasm32"))]
+	pub cursor_event_tx: std::sync::mpsc::Sender<CursorEvent>,
 }
 
 pub struct EguiHandle {
 	pub cancel: CancellationToken,
 	// winit diff
 	// Whatever is necessary to unregister the egui hook.
+}
+#[derive(Debug, Clone, Copy)]
+pub struct CursorPosition {
+	pub x: f64,
+	pub y: f64,
+}
+pub struct CursorDaemon<S> {
+	pub sink: S,
+	pub cancel: CancellationToken,
+}
+
+pub struct ClockHandle {
+	pub cancel: CancellationToken,
+}
+
+// "This is a unit of work that I know how to stop."
+pub struct WorkHandle<C>
+where
+	C: AppCtx,
+{
+	pub cancel: CancellationToken,
+
+	#[cfg(not(target_arch = "wasm32"))]
+	pub join: JoinHandle<()>,
+
+	_phantom: PhantomData<C>,
+}
+
+impl<C> WorkHandle<C>
+where
+	C: AppCtx,
+{
+	#[cfg(target_arch = "wasm32")]
+	pub fn new(cancel: CancellationToken) -> Self {
+		Self {
+			cancel,
+			_phantom: PhantomData,
+		}
+	}
+
+	#[cfg(not(target_arch = "wasm32"))]
+	pub fn new(cancel: CancellationToken, join: JoinHandle<()>) -> Self {
+		Self {
+			cancel,
+			join,
+			_phantom: PhantomData,
+		}
+	}
+
+	pub fn stop(&self) {
+		self.cancel.cancel();
+	}
+
+	#[cfg(not(target_arch = "wasm32"))]
+	pub async fn join(self) -> Result<(), tokio::task::JoinError> {
+		self.join.await
+	}
 }
