@@ -6,12 +6,12 @@ use crate::{RuntimeState, e, prelude::*};
 // https://github.com/rust-lang/rust/issues/41517
 // https://github.com/rust-lang/rust/issues/55628
 // https://github.com/rust-lang/rfcs/pull/1733
-pub trait AppDriver<C>
-where
-	C: AppCtx,
-{
-	fn run(&mut self, app: &mut App<C>) -> Result<()>;
-}
+// pub trait AppDriver<C>
+// where
+// 	C: AppCtx,
+// {
+// 	fn run(&mut self, app: &mut App<C>) -> Result<()>;
+// }
 pub trait ApiServices: Services {
 	type Client: Api;
 	/// ## Platform Generic API
@@ -30,15 +30,14 @@ pub trait ApiServices: Services {
 ///
 /// A type safe abstraction with room for growth via it's internal  [associated type](https://doc.rust-lang.org/rust-by-example/generics/assoc_items/types.html), [State](Self::State).
 pub trait AppCtx: Default {
-	type State;
+	type State: Clone + Send + Sync + 'static;
 	fn state(&self) -> &Self::State;
 }
-
 /// ## [Clock]
 ///
 /// The literal heart beat of the engine. The clock has a handle on the [runtime](Runtime) of [tokio] which
 pub trait Clock: Clone {
-	type Handle<C: AppCtx>;
+	type Handle<C: AppCtx, J>;
 
 	fn now(&self) -> String;
 	/// Run once and return.
@@ -46,7 +45,10 @@ pub trait Clock: Clone {
 	/// Run repeatedly in the foreground.
 	#[cfg(not(target_arch = "wasm32"))]
 	fn run_foreground(&self, interval: Duration);
-	fn run_background<C: AppCtx>(&self, interval: Duration, msg: String) -> Self::Handle<C>;
+	fn run_background<C, J>(&self, interval: Duration, msg: String) -> Self::Handle<C, J>
+	where
+		C: AppCtx,
+		J: From<tokio::task::JoinHandle<()>>;
 }
 
 /// ## [Context]

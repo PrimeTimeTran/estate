@@ -63,7 +63,7 @@ impl AppCtx for WebContext {
 }
 
 impl Clock for HostClock {
-	type Handle<C: AppCtx> = WorkHandle<C>;
+	type Handle<C: AppCtx, J> = WorkHandle<C, J>;
 
 	fn now(&self) -> String {
 		time_now()
@@ -81,29 +81,32 @@ impl Clock for HostClock {
 		}
 	}
 	#[cfg(not(target_arch = "wasm32"))]
-	fn run_background<C: AppCtx>(&self, interval: Duration, msg: String) -> WorkHandle<C> {
+	fn run_background<C, J>(&self, interval: Duration, msg: String) -> Self::Handle<C, J>
+	where
+		C: AppCtx,
+		J: From<tokio::task::JoinHandle<()>>,
+	{
 		let cancel = CancellationToken::new();
 		let task_cancel = cancel.clone();
 		let clock = self.clone();
 
 		let join = self.handle.spawn(async move {
 			loop {
-				if task_cancel.is_cancelled() {
-					break;
-				}
-				let now = clock.run_once();
-				tracing::info!("{msg}: {now}");
 				tokio::select! {
-					_ = task_cancel.cancelled() => break,
-					_ = tokio::time::sleep(interval) => {}
+						_ = task_cancel.cancelled() => break,
+
+						_ = tokio::time::sleep(interval) => {
+								let now = clock.run_once();
+								tracing::info!("{msg}: {now}");
+						}
 				}
 			}
 		});
 
-		WorkHandle::new(cancel, join)
+		WorkHandle::new(cancel, J::from(join))
 	}
 	#[cfg(target_arch = "wasm32")]
-	fn run_background<C: AppCtx>(&self, interval: Duration, msg: String) -> WorkHandle<C> {
+	fn run_background<C, J>(&self, interval: Duration, msg: String) -> WorkHandle<C, J> {
 		let cancel = CancellationToken::new();
 		let task_cancel = cancel.clone();
 		let clock = self.clone();
@@ -120,13 +123,12 @@ impl Clock for HostClock {
 				gloo_timers::future::TimeoutFuture::new(interval.as_millis() as u32).await;
 			}
 		});
-
 		WorkHandle::new(cancel)
 	}
 }
 
 impl<C: AppCtx> Host<C> {
-	pub fn new(context: C) -> anyhow::Result<Self> {
+	pub fn new(context: Arc<C>) -> anyhow::Result<Self> {
 		#[cfg(not(target_arch = "wasm32"))]
 		let runtime = tokio::runtime::Runtime::new()?;
 
@@ -153,8 +155,8 @@ where
 	pub fn clock(&self) -> &HostClock {
 		&self.clock
 	}
-	pub fn context(&self) -> &C {
-		&self.context
+	pub fn context(&self) -> Arc<C> {
+		self.context.clone()
 	}
 
 	#[cfg(not(target_arch = "wasm32"))]
@@ -218,13 +220,13 @@ impl Host<NativeContext> {
 		config.apply_cli(&parsed);
 		logger::init_logging(&config)?;
 		let context = NativeContext::default();
-		Self::new(context)
+		Self::new(Arc::new(context))
 	}
 }
 #[cfg(feature = "web")]
 impl Host<WebContext> {
 	pub fn init() -> Result<Self> {
-		Self::new(WebContext::default())
+		Self::new(Arc::new(WebContext::default()))
 	}
 }
 #[cfg(not(target_arch = "wasm32"))]
@@ -319,7 +321,7 @@ impl<C> Worker<C> for HostWorker<C>
 where
 	C: AppCtx,
 {
-	type Handle = WorkHandle<C>;
+	type Handle = WorkHandle<C, tokio::task::JoinHandle<()>>;
 
 	fn run_foreground<F>(&self, task: F)
 	where
@@ -330,7 +332,7 @@ where
 		}
 	}
 
-	fn run_background<F, Fut>(&self, task: F) -> WorkHandle<C>
+	fn run_background<F, Fut>(&self, task: F) -> Self::Handle
 	where
 		F: FnOnce(CancellationToken) -> Fut + Send + 'static,
 		Fut: Future<Output = ()> + Send + 'static,
@@ -345,8 +347,7 @@ where
 		WorkHandle::new(cancel, join)
 	}
 
-	#[cfg(not(target_arch = "wasm32"))]
-	fn run_background_blocking<F>(&self, task: F) -> WorkHandle<C>
+	fn run_background_blocking<F>(&self, task: F) -> Self::Handle
 	where
 		F: FnOnce(CancellationToken) + Send + 'static,
 	{
@@ -360,17 +361,14 @@ where
 		WorkHandle::new(cancel, join)
 	}
 
-	#[cfg(not(target_arch = "wasm32"))]
-	fn spawn<F, Fut>(&self, task: F) -> WorkHandle<C>
+	fn spawn<F, Fut>(&self, task: F) -> Self::Handle
 	where
 		F: FnOnce() -> Fut + Send + 'static,
 		Fut: Future<Output = ()> + Send + 'static,
 	{
 		let cancel = CancellationToken::new();
-		let task_cancel = cancel.clone();
+
 		let join = self.runtime.spawn(async move {
-			// If you want cancellation to actually matter,
-			// the future itself needs to observe task_cancel.
 			task().await;
 		});
 
@@ -382,7 +380,7 @@ impl<C> Worker<C> for HostWorker<C>
 where
 	C: AppCtx,
 {
-	type Handle = WorkHandle<C>;
+	type Handle = WorkHandle<C, tokio::task::JoinHandle<()>>;
 
 	fn run_background<F, Fut>(&self, task: F) -> Self::Handle
 	where
@@ -421,7 +419,7 @@ pub struct Host<C>
 where
 	C: AppCtx,
 {
-	pub context: C,
+	pub context: Arc<C>,
 	clock: HostClock,
 	worker: HostWorker<C>,
 
@@ -445,7 +443,7 @@ pub struct HostWorker<C: AppCtx> {
 	#[cfg(not(target_arch = "wasm32"))]
 	runtime: Arc<tokio::runtime::Runtime>,
 }
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct WebState;
 #[derive(Default)]
 pub struct WebContext;

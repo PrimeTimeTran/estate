@@ -79,8 +79,8 @@ path = "src/bin/macros.rs"
 # cargo build --bin web --no-default-features --features="web" --target wasm32-unknown-unknown
 # default = []
 # [CHOOSE 1]
-default = ["native"]
-# default = ["web"]
+# default = ["native"]
+default = ["web"]
 # [DEFAULT to this]
 
 # default = []
@@ -211,3 +211,7 @@ debug = "line-tables-only" #
 # Compile dependencies with high optimization so your dev binary runs fast,
 # while keeping your own application code unoptimized for fast rebuilds
 opt-level = 3 #
+
+
+[lints.cargo]
+all = "allow"

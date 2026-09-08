@@ -35,6 +35,8 @@ fn main() {
 	// The old implementation failed to prove
 	// the where-bound of `impls`.
 	impls::<(u32, for<'a> fn(&'a u32))>();
+	foo(false);
+	()
 }
 
 // fn main1() {

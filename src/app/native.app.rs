@@ -56,7 +56,7 @@ impl EventSink<AppEvent> for EventLoopProxy<AppEvent> {
 // 		&mut self,
 // 		event_loop: &ActiveEventLoop,
 // 		window_id: WindowId,
-// 		event: WindowEvent,
+// 		'event: WindowEvent,'
 // 	) {
 // 		let Some(window) = self
 // 			.windows

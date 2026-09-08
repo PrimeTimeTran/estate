@@ -1,0 +1,19 @@
+{
+    // /Users/future/kb/project/crates/estate/cspell.json
+    "version": "0.2",
+    "ignorePaths": [],
+    "dictionaryDefinitions": [],
+    "dictionaries": [],
+    "words": [
+        "fooo",
+        "foooo",
+        "HRTB",
+        "implss",
+        "implsss",
+        "rustflags",
+        "Traitt",
+        "Traittt"
+    ],
+    "ignoreWords": [],
+    "import": []
+}

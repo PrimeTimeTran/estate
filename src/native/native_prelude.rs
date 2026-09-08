@@ -34,14 +34,7 @@ pub use tray_icon::{
 	Icon, TrayIcon, TrayIconBuilder,
 	menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu},
 };
-// pub use winit::event_loop::EventLoopProxy;
-pub use winit::{
-	application::ApplicationHandler,
-	event::WindowEvent,
-	event_loop::{ActiveEventLoop, EventLoop, EventLoopProxy},
-	platform::macos::{ActivationPolicy, EventLoopBuilderExtMacOS},
-	window::WindowId,
-};
+pub use winit::platform::macos::{ActivationPolicy, EventLoopBuilderExtMacOS};
 
 /// # Description
 /// Centralized external dependency management for native platform targets like MacOS, Windows, Linux.

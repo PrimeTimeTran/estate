@@ -37,7 +37,7 @@ pub struct NativeContext {
 	pub windows: Vec<AppWindow>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct NativeState;
 
 impl AppCtx for NativeContext {

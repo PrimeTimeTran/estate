@@ -12,8 +12,6 @@
 //! - ./src/web
 //! - ./src/mobile
 //!
-
-pub mod app_state;
 /// Generic traits defined in ./src/trait module
 /// Platform implementations for native, mobile, web should exist in their own respective namespaces
 ///
@@ -21,8 +19,11 @@ pub mod app_state;
 /// ./src/web
 /// ./src/mobile
 ///
-// ./src/app/mod.rs
-pub mod application;
+/// ./src/app/mod.rs
+#[path = "app-entry.rs"]
+pub mod app_entry;
+#[path = "app-state.rs"]
+pub mod app_state;
 pub mod clock;
 pub mod context;
 pub mod event;
@@ -32,8 +33,7 @@ pub mod state;
 pub mod task;
 pub mod worker;
 
-pub use self::application::*;
-pub use self::{clock::*, context::*, event::*, host::*, job::*, task::*, worker::*};
+pub use self::{app_entry::*, clock::*, context::*, event::*, host::*, job::*, task::*, worker::*};
 
 /// Platform Gates
 #[cfg(feature = "native")]

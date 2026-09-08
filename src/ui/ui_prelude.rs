@@ -19,8 +19,11 @@ pub use std::fmt;
 pub use strum::IntoStaticStr;
 pub use wgpu::{Adapter, Device, SurfaceColorSpace};
 pub use winit::{
+	application::ApplicationHandler,
 	dpi::{PhysicalPosition, PhysicalSize},
-	event_loop::ActiveEventLoop,
+	event::WindowEvent,
+	event_loop::{ActiveEventLoop, EventLoop, EventLoopClosed, EventLoopProxy, *},
+	window::WindowId,
 };
 
 pub use crate::{

@@ -18,7 +18,7 @@ Every value in Rust has:
 
 The fundamental relationship is:
 
-```text
+```sh
 Ownership
    │
    ├── Move

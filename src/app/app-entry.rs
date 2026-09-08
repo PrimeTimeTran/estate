@@ -4,29 +4,24 @@ impl<C> App<C>
 where
 	C: AppCtx + 'static,
 {
-	#[cfg(target_arch = "wasm32")]
 	pub fn new(host: Host<C>) -> Result<Self> {
 		tracing::info!("App New");
-		Ok(Self {
-			host,
-			workers: vec![],
-		})
-	}
-	#[cfg(not(target_arch = "wasm32"))]
-	pub fn new(host: Host<C>) -> Result<Self> {
-		tracing::info!("App New");
+		#[cfg(not(target_arch = "wasm32"))]
 		let (cursor_event_tx, cursor_events) = std::sync::mpsc::channel();
 		Ok(Self {
-			cursor_events,
-			cursor_event_tx,
 			host,
 			workers: vec![],
+			#[cfg(not(target_arch = "wasm32"))]
+			cursor_events,
+			#[cfg(not(target_arch = "wasm32"))]
+			cursor_event_tx,
 		})
 	}
 	pub fn clock(&self) -> &HostClock {
 		&self.clock()
 	}
-	pub fn context(&self) -> &C {
+
+	pub fn context(&self) -> Arc<C> {
 		self.host.context()
 	}
 
@@ -52,14 +47,14 @@ where
 		todo!("")
 	}
 
-	#[cfg(all(not(feature = "web")))]
-	fn run_gui(&mut self) -> Result<()> {
-		let event_loop = EventLoop::<AppEvent>::with_user_event().build()?;
-		let proxy = event_loop.create_proxy();
-		self.host.worker().spawn_ctrl_c(proxy);
-		event_loop.run_app(self)?;
-		Ok(())
-	}
+	// #[cfg(all(not(feature = "web")))]
+	// fn run_gui(&mut self) -> Result<()> {
+	// 	let event_loop = EventLoop::<AppEvent>::with_user_event().build()?;
+	// 	let proxy = event_loop.create_proxy();
+	// 	self.host.worker().spawn_ctrl_c(proxy);
+	// 	event_loop.run_app(self)?;
+	// 	Ok(())
+	// }
 
 	pub fn shutdown(&mut self) {
 		for worker in &self.workers {
@@ -84,7 +79,7 @@ where
 	}
 
 	#[cfg(not(target_arch = "wasm32"))]
-	fn start_cargo_watcher(&mut self) -> Result<WorkHandle<C>> {
+	fn start_cargo_watcher(&mut self) -> Result<WorkHandle<C, tokio::task::JoinHandle<()>>> {
 		let watcher = CargoWatcher::new().map_err(|error| {
 			tracing::error!("Failed to create Cargo watcher: {error}");
 			error
@@ -140,7 +135,7 @@ where
 			tracing::info!("Cargo watcher stopped");
 		}))
 	}
-	fn start_clock(&mut self) -> Result<WorkHandle<C>> {
+	fn start_clock(&mut self) -> Result<WorkHandle<C, tokio::task::JoinHandle<()>>> {
 		let clock = self.host.clock();
 		let msg = String::from("App.start_clock.clock.run_background(Duration::from_secs(1));");
 		Ok(clock.run_background(Duration::from_secs(1), msg))
@@ -158,27 +153,48 @@ where
 		// clock.run_background(Duration::from_secs(1), msg.clone());
 		// let handle = Clock::run_background(clock, Duration::from_secs(1), msg.clone());
 	}
-	fn start_egui(&mut self) -> Result<WorkHandle<C>> {
-		tracing::info!("App start_egui");
 
-		#[cfg(not(target_arch = "wasm32"))]
-		{
-			Ok(self.worker().run_background_blocking(move |cancel| {
-				// egui work
-				// check `cancel`
-			}))
-		}
+	#[cfg(all(not(target_arch = "wasm32")))]
+	pub fn start_gui(&mut self) -> Result<GuiHandle<C>> {
+		let cancel = CancellationToken::new();
 
-		#[cfg(target_arch = "wasm32")]
-		{
-			Ok(self.worker().run_background(move |cancel| async move {
-				// egui work
-				// check `cancel`
-			}))
-		}
+		let gui_app = GuiApp {
+			state: self.context().state().clone(),
+			cancel: cancel.clone(),
+		};
+
+		let (proxy_tx, proxy_rx) = std::sync::mpsc::sync_channel(1);
+
+		let join = std::thread::spawn(move || {
+			let event_loop = EventLoop::<AppEvent>::with_user_event()
+				.with_activation_policy(ActivationPolicy::Regular)
+				.build()
+				.expect("failed to build GUI event loop");
+
+			let proxy = event_loop.create_proxy();
+
+			proxy_tx.send(proxy).expect("failed to send GUI proxy");
+
+			let mut gui_app = gui_app;
+
+			if let Err(err) = event_loop.run_app(&mut gui_app) {
+				tracing::error!("GUI event loop failed: {err}");
+			}
+		});
+
+		let proxy = proxy_rx
+			.recv()
+			.expect("GUI thread exited before creating event loop");
+
+		Ok(GuiHandle {
+			work: WorkHandle::new(cancel, join),
+			proxy,
+		})
 	}
 	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-	pub fn start_cursor_watcher_from_app(&mut self) -> anyhow::Result<WorkHandle<C>> {
+	pub fn start_cursor_watcher_from_app(
+		&mut self,
+	) -> anyhow::Result<WorkHandle<C, tokio::task::JoinHandle<()>>> {
 		let sink = AppCursorSink {
 			tx: self.cursor_event_tx.clone(),
 		};
@@ -189,26 +205,15 @@ where
 			}
 		}))
 	}
-	// #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-	// fn start_cursor_watcher_from_app2(&mut self) -> Result<WorkHandle<C>> {
-	// 	let sink = AppCursorSink {
-	// 		tx: self.cursor_event_tx.clone(),
-	// 	};
-	// 	Ok(self.worker().run_background_blocking(move |cancel| {
-	// 		if let Err(error) = CursorDaemon::new(sink, cancel).run() {
-	// 			tracing::error!("Cursor daemon failed: {error}");
-	// 		}
-	// 	}))
-	// }
 	fn worker(&self) -> &HostWorker<C> {
 		self.host.worker()
 	}
 }
 
-#[cfg(feature = "native")]
-impl<C> ApplicationHandler<AppEvent> for App<C>
+// #[cfg(all(features()))]
+impl<S> ApplicationHandler<AppEvent> for GuiApp<S>
 where
-	C: AppCtx,
+	S: Send + Sync + 'static,
 {
 	fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
 		// self.app.update();
@@ -399,7 +404,7 @@ impl traits::Renderer for HostRenderer {
 
 pub struct App<C: AppCtx> {
 	pub host: Host<C>,
-	pub workers: Vec<WorkHandle<C>>,
+	pub workers: Vec<WorkHandle<C, tokio::task::JoinHandle<()>>>,
 	#[cfg(not(target_arch = "wasm32"))]
 	pub cursor_events: std::sync::mpsc::Receiver<CursorEvent>,
 	#[cfg(not(target_arch = "wasm32"))]
@@ -419,22 +424,45 @@ pub struct CursorPosition {
 }
 
 // "This is a unit of work that I know how to stop."
-pub struct WorkHandle<C>
+pub struct WorkHandle<C, J>
 where
 	C: AppCtx,
 {
 	pub cancel: CancellationToken,
-
 	#[cfg(not(target_arch = "wasm32"))]
-	pub join: JoinHandle<()>,
-
-	_phantom: PhantomData<C>,
+	pub join: J,
+	_phantom: PhantomData<(C,J)>,
 }
 
-impl<C> WorkHandle<C>
+impl<C> WorkHandle<C, std::thread::JoinHandle<()>>
 where
 	C: AppCtx,
 {
+	pub fn join(self) -> std::thread::Result<()> {
+		self.join.join()
+	}
+}
+impl<C> WorkHandle<C, tokio::task::JoinHandle<()>>
+where
+	C: AppCtx,
+{
+	pub async fn join(self) -> Result<(), tokio::task::JoinError> {
+		self.join.await
+	}
+}
+impl<C, J> WorkHandle<C, J>
+where
+	C: AppCtx,
+{
+	#[cfg(not(target_arch = "wasm32"))]
+	pub fn new(cancel: CancellationToken, join: J) -> Self {
+		Self {
+			cancel,
+			join,
+			_phantom: PhantomData,
+		}
+	}
+
 	#[cfg(target_arch = "wasm32")]
 	pub fn new(cancel: CancellationToken) -> Self {
 		Self {
@@ -443,52 +471,51 @@ where
 		}
 	}
 
-	#[cfg(not(target_arch = "wasm32"))]
-	pub fn new(cancel: CancellationToken, join: JoinHandle<()>) -> Self {
-		Self {
-			cancel,
-			join,
-			_phantom: PhantomData,
-		}
-	}
-
 	pub fn stop(&self) {
 		self.cancel.cancel();
 	}
-
-	#[cfg(not(target_arch = "wasm32"))]
-	pub async fn join(self) -> Result<(), tokio::task::JoinError> {
-		self.join.await
-	}
 }
 
-// pub struct GuiDriver {
-// 	// winit/egui stuff
-// }
+#[cfg(all(not(target_arch = "wasm")))]
+pub struct GuiHandle<C>
+where
+	C: AppCtx,
+{
+	work: WorkHandle<C, std::thread::JoinHandle<()>>,
+	proxy: EventLoopProxy<AppEvent>,
+}
 
-// impl<C> AppDriver<C> for GuiDriver
+#[cfg(all(not(target_arch = "wasm")))]
+impl<C> GuiHandle<C>
+where
+	C: AppCtx,
+{
+	pub fn stop(&self) {
+		let _ = self.proxy.send_event(AppEvent::Shutdown);
+	}
+
+	pub fn send(&self, event: AppEvent) -> Result<(), EventLoopClosed<AppEvent>> {
+		self.proxy.send_event(event)
+	}
+
+	pub fn join(self) -> std::thread::Result<()> {
+		self.work.join.join()
+	}
+}
+pub struct GuiApp<S> {
+	state: S,
+	cancel: CancellationToken,
+}
+impl<S> GuiApp<S> {
+	// ...
+}
+// impl<C> GuiApp<C>
 // where
 // 	C: AppCtx,
 // {
-// 	fn run(&mut self, app: &mut App<C>) -> Result<()> {
-// 		// start winit
-// 		// run event loop
-// 		// render egui
-// 		// receive shutdown
-// 		Ok(())
+// 	fn new() -> Self {
+// 		Self {
+// 			app
+// 		}
 // 	}
 // }
-
-// pub struct LspDriver;
-
-// impl<C> AppDriver<C> for LspDriver
-// where
-// 	C: AppCtx,
-// {
-// 	fn run(&mut self, app: &mut App<C>) -> Result<()> {
-// 		// stdin/stdout JSON-RPC loop
-// 		Ok(())
-// 	}
-// }
-
-// pub struct VsCodeDriver;
