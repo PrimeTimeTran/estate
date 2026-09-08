@@ -6,9 +6,10 @@ use crate::{RuntimeState, e, prelude::*};
 // https://github.com/rust-lang/rust/issues/41517
 // https://github.com/rust-lang/rust/issues/55628
 // https://github.com/rust-lang/rfcs/pull/1733
+//
 // pub trait AppDriver<C>
 // where
-// 	C: AppCtx,
+// 	C: Ctx,
 // {
 // 	fn run(&mut self, app: &mut App<C>) -> Result<()>;
 // }
@@ -26,10 +27,10 @@ pub trait ApiServices: Services {
 	// fn api(&self) -> Option<&Self::Client>;
 }
 
-/// [AppCtx]
+/// [Ctx]
 ///
 /// A type safe abstraction with room for growth via it's internal  [associated type](https://doc.rust-lang.org/rust-by-example/generics/assoc_items/types.html), [State](Self::State).
-pub trait AppCtx: Default {
+pub trait Ctx: Default {
 	type State: Clone + Send + Sync + 'static;
 	fn state(&self) -> &Self::State;
 }
@@ -37,7 +38,7 @@ pub trait AppCtx: Default {
 ///
 /// The literal heart beat of the engine. The clock has a handle on the [runtime](Runtime) of [tokio] which
 pub trait Clock: Clone {
-	type Handle<C: AppCtx, J>;
+	type Handle<C: Ctx, J>;
 
 	fn now(&self) -> String;
 	/// Run once and return.
@@ -48,7 +49,7 @@ pub trait Clock: Clone {
 
 	fn run_background<C, J>(&self, interval: Duration, msg: String) -> Self::Handle<C, J>
 	where
-		C: AppCtx,
+		C: Ctx,
 		J: From<tokio::task::JoinHandle<()>>;
 }
 
@@ -98,7 +99,6 @@ pub trait Context: Sized {
 	fn bar(&self, args: String) -> Result<()>;
 }
 pub trait CursorEventSink: Send + Sync + 'static {
-	// fn cursor_moved(&self, position: CGPoint);
 	fn cursor_moved(&self, position: CursorPosition);
 	fn modifiers_changed(&self, modifiers: Modifiers);
 }
@@ -222,7 +222,7 @@ pub trait Renderer {
 
 /// ## [Provide]
 ///
-pub trait Provide<C: AppCtx> {
+pub trait Provide<C: Ctx> {
 	type Clock: Clock;
 	type Worker;
 	// type Renderer: Renderer;
@@ -370,7 +370,7 @@ pub trait Spawner: Clone + 'static {
 
 /// ## [Worker]
 ///
-pub trait Worker<C: AppCtx> {
+pub trait Worker<C: Ctx> {
 	type Handle;
 
 	fn run_foreground<F>(&self, task: F)

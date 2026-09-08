@@ -55,7 +55,7 @@ fn time_now() -> String {
 }
 
 impl Clock for HostClock {
-	type Handle<C: AppCtx, J> = WorkHandle<C, J>;
+	type Handle<C: Ctx, J> = WorkHandle<C, J>;
 
 	fn now(&self) -> String {
 		time_now()
@@ -75,7 +75,7 @@ impl Clock for HostClock {
 	#[cfg(not(target_arch = "wasm32"))]
 	fn run_background<C, J>(&self, interval: Duration, msg: String) -> WorkHandle<C, J>
 	where
-		C: AppCtx,
+		C: Ctx,
 		J: From<tokio::task::JoinHandle<()>>,
 	{
 		let cancel = CancellationToken::new();
@@ -103,7 +103,7 @@ impl Clock for HostClock {
 	#[cfg(target_arch = "wasm32")]
 	fn run_background<C, J>(&self, interval: Duration, msg: String) -> WorkHandle<C, J>
 	where
-		C: AppCtx,
+		C: Ctx,
 	{
 		let cancel = CancellationToken::new();
 		let task_cancel = cancel.clone();
@@ -126,7 +126,7 @@ impl Clock for HostClock {
 	}
 }
 
-impl<C: AppCtx> Host<C> {
+impl<C: Ctx> Host<C> {
 	pub fn new(context: Arc<C>) -> anyhow::Result<Self> {
 		#[cfg(not(target_arch = "wasm32"))]
 		let runtime = tokio::runtime::Runtime::new()?;
@@ -149,7 +149,7 @@ impl<C: AppCtx> Host<C> {
 
 impl<C> Host<C>
 where
-	C: AppCtx,
+	C: Ctx,
 {
 	pub fn clock(&self) -> &HostClock {
 		&self.clock
@@ -232,7 +232,7 @@ impl HostClock {
 #[cfg(not(target_arch = "wasm32"))]
 impl<C> HostWorker<C>
 where
-	C: AppCtx,
+	C: Ctx,
 {
 	pub fn new() -> Self {
 		let runtime = tokio::runtime::Runtime::new().unwrap();
@@ -245,7 +245,7 @@ where
 #[cfg(target_arch = "wasm32")]
 impl<C> HostWorker<C>
 where
-	C: AppCtx,
+	C: Ctx,
 {
 	pub fn new() -> Self {
 		Self {
@@ -255,7 +255,7 @@ where
 }
 impl<C> HostWorker<C>
 where
-	C: AppCtx,
+	C: Ctx,
 {
 	#[cfg(not(feature = "web"))]
 	pub fn wait_for_ctrl_c(&self) {
@@ -294,7 +294,7 @@ where
 }
 impl<C> Provide<C> for Host<C>
 where
-	C: AppCtx,
+	C: Ctx,
 {
 	type Clock = HostClock;
 	type Worker = HostWorker<C>;
@@ -312,7 +312,7 @@ where
 #[cfg(not(target_arch = "wasm32"))]
 impl<C> Worker<C> for HostWorker<C>
 where
-	C: AppCtx,
+	C: Ctx,
 {
 	type Handle = WorkHandle<C, tokio::task::JoinHandle<()>>;
 
@@ -371,7 +371,7 @@ where
 #[cfg(target_arch = "wasm32")]
 impl<C> Worker<C> for HostWorker<C>
 where
-	C: AppCtx,
+	C: Ctx,
 {
 	type Handle = WorkHandle<C, tokio::task::JoinHandle<()>>;
 
@@ -410,7 +410,7 @@ pub struct Disconnected;
 
 pub struct Host<C>
 where
-	C: AppCtx,
+	C: Ctx,
 {
 	pub context: Arc<C>,
 	clock: HostClock,
@@ -431,13 +431,13 @@ pub struct HostClock {
 }
 pub struct HostRenderer;
 
-pub struct HostWorker<C: AppCtx> {
+pub struct HostWorker<C: Ctx> {
 	_phantom: PhantomData<C>,
 	#[cfg(not(target_arch = "wasm32"))]
 	runtime: Arc<tokio::runtime::Runtime>,
 }
 
-impl AppCtx for WebContext {
+impl Ctx for WebContext {
 	type State = WebState;
 	fn state(&self) -> &Self::State {
 		self.state()
@@ -450,7 +450,7 @@ pub struct WebState;
 pub struct WebContext;
 
 #[cfg(feature = "native")]
-impl AppCtx for NativeContext {
+impl Ctx for NativeContext {
 	type State = NativeState;
 
 	fn state(&self) -> &Self::State {

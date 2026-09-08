@@ -159,13 +159,10 @@ pub fn start() {
 				canvas,
 				WebOptions::default(),
 				Box::new(|_cc| {
-					// log("🔥 EFRAME APP CREATOR RUNNING");
 					let host = Host::init()?;
 					let mut app = App::new(host)?;
-					// let screen = MarkdownScreen::new(include_str!("../data/corpus.md").to_owned());
 					// 	Ok(Box::new(WebApp { graphics: screen }))
 					app.run()?;
-					// log("🔥 APP Loi");
 					Ok(Box::new(app))
 				}),
 			)
@@ -176,7 +173,7 @@ pub fn start() {
 
 impl<C> eframe::App for App<C>
 where
-	C: AppCtx,
+	C: Ctx,
 {
 	fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {}
 	fn logic(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {}
