@@ -28,7 +28,7 @@ rustup show
 rustup override unset
 ```
 
-```bash
+```sh
 rustup toolchain install nightly --profile minimal
 ```
 

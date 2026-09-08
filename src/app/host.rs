@@ -137,7 +137,7 @@ impl<C: AppCtx> Host<C> {
 			context,
 			worker: HostWorker::new(),
 			#[cfg(target_arch = "wasm32")]
-			clock: HostClock::default,
+			clock: HostClock::default(),
 			#[cfg(not(target_arch = "wasm32"))]
 			clock: HostClock::new(handle),
 			#[cfg(not(target_arch = "wasm32"))]

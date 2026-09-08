@@ -28,8 +28,8 @@ target = "wasm32-unknown-unknown"
 
 # https://doc.rust-lang.org/cargo/reference/cargo-targets.html#configuring-a-target
 [[bin]]
-name = "estate"
-path = "src/bin/estate.rs"
+name = "runner1"
+path = "src/bin/runner1.rs"
 required-features = ["native"]
 
 [[bin]]
@@ -108,7 +108,6 @@ native = [
   "dep:core-graphics",
   "dep:signal-hook",
   "dep:comfy-table",
-  "dep:jsonschema",
   "dep:tray-icon",
   "dep:egui-winit",
   "dep:macos-accessibility-client",
@@ -176,7 +175,6 @@ signal-hook = { workspace = true, optional = true }
 tray-icon = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 web-sys = { workspace = true, optional = true }
-sqlx = "0.9.0"
 strum = { version = "0.27", features = ["derive"] }
 rand.workspace = true
 async-broadcast = "0.7.2"
