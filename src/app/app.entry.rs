@@ -10,7 +10,6 @@ where
 		let (cursor_event_tx, cursor_events) = std::sync::mpsc::channel();
 		Ok(Self {
 			host,
-			// ctx: C,
 			workers: vec![],
 			gui: None,
 			#[cfg(not(target_arch = "wasm32"))]
@@ -19,41 +18,39 @@ where
 			cursor_event_tx,
 		})
 	}
-	pub fn clock(&self) -> &HostClock {
-		&self.clock()
-	}
-
-	pub fn ctx(&self) -> Arc<C> {
-		self.host.context()
-	}
 	fn init_services(&mut self) -> Result<()> {
 		tracing::info!("App init services");
+
 		let handle = self.start_clock()?;
+		tracing::info!("clock handle created");
 		self.workers.push(handle);
+
 		#[cfg(not(target_arch = "wasm32"))]
 		{
 			let handle = self.start_cargo_watcher()?;
+			tracing::info!("cargo handle created");
 			self.workers.push(handle);
+
 			let handle = self.start_cursor_watcher_from_app()?;
+			tracing::info!("cursor handle created");
 			self.workers.push(handle);
 		}
 
+		tracing::info!("App init services complete");
 		Ok(())
 	}
 	pub fn run(&mut self) -> Result<()> {
 		tracing::info!("App run");
-
 		self.init_services()?;
-
 		#[cfg(not(target_arch = "wasm32"))]
 		{
-			self.run_gui()?;
+			self.host.wait_for_shutdown();
 			self.shutdown();
 		}
 
 		#[cfg(target_arch = "wasm32")]
 		{
-			self.host.run()?;
+			// self.host.run()?;
 		}
 
 		Ok(())
@@ -61,11 +58,10 @@ where
 	fn run_gui(&mut self) -> Result<()> {
 		let cancel = CancellationToken::new();
 		let mut gui_app = GuiApp {
-			state: self.ctx().state().clone(),
+			state: self.host.context().state().clone(),
 			cancel,
 		};
 		let event_loop = EventLoop::<AppEvent>::with_user_event()
-			.with_activation_policy(ActivationPolicy::Regular)
 			.build()
 			.expect("failed to build GUI event loop");
 		event_loop
@@ -85,12 +81,18 @@ where
 	}
 	#[cfg(not(target_arch = "wasm32"))]
 	fn start_cargo_watcher(&mut self) -> Result<WorkHandle<C, tokio::task::JoinHandle<()>>> {
+		tracing::info!("cargo: entered");
+
 		let watcher = CargoWatcher::new().map_err(|error| {
 			tracing::error!("Failed to create Cargo watcher: {error}");
 			error
 		})?;
+		tracing::info!("cargo: watcher created");
+
 		tracing::info!("Watching Cargo.toml: {}", watcher.path().display());
 		let worker = self.worker();
+		tracing::info!("cargo: watcher started");
+
 		Ok(worker.run_background_blocking(move |cancel| {
 			let (tx, rx) = std::sync::mpsc::channel();
 
@@ -173,7 +175,7 @@ where
 		}))
 	}
 	fn worker(&self) -> &HostWorker<C> {
-		self.worker()
+		self.host.worker()
 	}
 }
 
@@ -433,6 +435,23 @@ where
 	}
 }
 
+#[derive(Debug, Clone)]
+pub struct CursorDaemon<S> {
+	pub sink: S,
+	pub cancel: CancellationToken,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct CursorPosition {
+	pub x: f64,
+	pub y: f64,
+}
+
+pub struct GuiApp<S> {
+	pub state: S,
+	pub cancel: CancellationToken,
+}
+
 pub struct GuiHandle {
 	pub proxy: EventLoopProxy<AppEvent>,
 }
@@ -445,13 +464,4 @@ impl GuiHandle {
 	pub fn send(&self, event: AppEvent) -> Result<(), EventLoopClosed<AppEvent>> {
 		self.proxy.send_event(event)
 	}
-}
-pub struct GuiApp<S> {
-	state: S,
-	cancel: CancellationToken,
-}
-impl<S> GuiApp<S> {
-	// fn state(&self) -> &C {
-	// 	&self.context.state()
-	// }
 }

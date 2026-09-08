@@ -154,6 +154,7 @@ where
 	pub fn clock(&self) -> &HostClock {
 		&self.clock
 	}
+
 	pub fn context(&self) -> Arc<C> {
 		self.context.clone()
 	}
@@ -162,31 +163,24 @@ where
 	pub fn handle(&self) -> tokio::runtime::Handle {
 		self.runtime.handle().clone()
 	}
-	/// Host-level execution goes here.
-	/// This does NOT need to be winit.
-	/// CLI, daemon, or GUI can build on top of this.
-	pub fn run(&self) -> Result<()> {
-		tracing::info!("Host run");
-		// self.worker().spawn_ctrl_c();
-		// #[cfg(not(target_arch = "wasm32"))]
-		// self.worker.block_on(async {
-		// 	tokio::signal::ctrl_c()
-		// 		.await
-		// 		.expect("failed to listen for Ctrl+C");
-		// 	tracing::info!("Ctrl+C received");
-		// });
-		// #[cfg(all(target_arch = "wasm32"))]
-		// {
-		// 	// WASM has no process-level Ctrl+C signal.
-		// 	// Shutdown must be triggered externally.
-		// }
-		Ok(())
+
+	#[cfg(not(target_arch = "wasm32"))]
+	pub fn wait_for_shutdown(&self) {
+		self.worker.block_on(async {
+			tokio::signal::ctrl_c()
+				.await
+				.expect("failed to listen for Ctrl+C");
+
+			tracing::info!("Ctrl+C received");
+		});
 	}
+
 	pub fn worker(&self) -> &HostWorker<C> {
 		&self.worker
 	}
+
+	#[cfg(not(target_arch = "wasm32"))]
 	pub fn shutdown(self) {
-		#[cfg(all(not(target_arch = "wasm32")))]
 		self.runtime.shutdown_background();
 	}
 }
@@ -308,7 +302,7 @@ where
 	fn clock(&self) -> &Self::Clock {
 		&self.clock
 	}
-	fn worker(&self) -> &Self::Worker {
+	fn worker(&self) -> &HostWorker<C> {
 		&self.worker
 	}
 	// fn renderer(&mut self) -> &mut Self::Renderer {

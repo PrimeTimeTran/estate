@@ -164,7 +164,7 @@ pub fn start() {
 					let mut app = App::new(host)?;
 					// let screen = MarkdownScreen::new(include_str!("../data/corpus.md").to_owned());
 					// 	Ok(Box::new(WebApp { graphics: screen }))
-					app.start()?;
+					app.run()?;
 					// log("🔥 APP Loi");
 					Ok(Box::new(app))
 				}),
