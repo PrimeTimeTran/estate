@@ -54,14 +54,6 @@ fn time_now() -> String {
 	now.format(format).to_string()
 }
 
-impl AppCtx for WebContext {
-	type State = WebState;
-
-	fn state(&self) -> &Self::State {
-		&self.state()
-	}
-}
-
 impl Clock for HostClock {
 	type Handle<C: AppCtx, J> = WorkHandle<C, J>;
 
@@ -81,7 +73,7 @@ impl Clock for HostClock {
 		}
 	}
 	#[cfg(not(target_arch = "wasm32"))]
-	fn run_background<C, J>(&self, interval: Duration, msg: String) -> Self::Handle<C, J>
+	fn run_background<C, J>(&self, interval: Duration, msg: String) -> WorkHandle<C, J>
 	where
 		C: AppCtx,
 		J: From<tokio::task::JoinHandle<()>>,
@@ -92,13 +84,16 @@ impl Clock for HostClock {
 
 		let join = self.handle.spawn(async move {
 			loop {
+				if task_cancel.is_cancelled() {
+					break;
+				}
+
+				let now = clock.run_once();
+				tracing::info!("{msg}: {now}");
+
 				tokio::select! {
 						_ = task_cancel.cancelled() => break,
-
-						_ = tokio::time::sleep(interval) => {
-								let now = clock.run_once();
-								tracing::info!("{msg}: {now}");
-						}
+						_ = tokio::time::sleep(interval) => {}
 				}
 			}
 		});
@@ -106,7 +101,10 @@ impl Clock for HostClock {
 		WorkHandle::new(cancel, J::from(join))
 	}
 	#[cfg(target_arch = "wasm32")]
-	fn run_background<C, J>(&self, interval: Duration, msg: String) -> WorkHandle<C, J> {
+	fn run_background<C, J>(&self, interval: Duration, msg: String) -> WorkHandle<C, J>
+	where
+		C: AppCtx,
+	{
 		let cancel = CancellationToken::new();
 		let task_cancel = cancel.clone();
 		let clock = self.clone();
@@ -123,6 +121,7 @@ impl Clock for HostClock {
 				gloo_timers::future::TimeoutFuture::new(interval.as_millis() as u32).await;
 			}
 		});
+
 		WorkHandle::new(cancel)
 	}
 }
@@ -407,10 +406,10 @@ where
 
 #[derive(Debug, Clone)]
 pub struct Connected {
-	#[cfg(feature = "web")]
-	pub api: WebApiClient,
-	#[cfg(feature = "native")]
+	#[cfg(all(feature = "native"))]
 	pub api: NativeApiClient,
+	#[cfg(all(feature = "wasm32"))]
+	pub api: WebApiClient,
 }
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Disconnected;
@@ -443,7 +442,39 @@ pub struct HostWorker<C: AppCtx> {
 	#[cfg(not(target_arch = "wasm32"))]
 	runtime: Arc<tokio::runtime::Runtime>,
 }
+
+impl AppCtx for WebContext {
+	type State = WebState;
+	fn state(&self) -> &Self::State {
+		self.state()
+	}
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct WebState;
 #[derive(Default)]
 pub struct WebContext;
+
+#[cfg(feature = "native")]
+impl AppCtx for NativeContext {
+	type State = NativeState;
+
+	fn state(&self) -> &Self::State {
+		&self.state
+	}
+}
+#[derive(Debug, Default, Clone)]
+pub struct NativeState;
+
+#[cfg(feature = "native")]
+use crate::native::native_prelude::*;
+
+#[cfg(feature = "native")]
+#[derive(Default)]
+pub struct NativeContext {
+	pub state: NativeState,
+	pub menu_bar: Option<MenuBar>,
+	pub tray_clock: Option<MenuBar>,
+	pub tray_cursor: Option<TrayIcon>,
+	pub windows: Vec<AppWindow>,
+}

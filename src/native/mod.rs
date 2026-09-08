@@ -17,7 +17,6 @@ pub mod ui;
 pub mod window;
 
 pub use self::{discovery::*, native_prelude::*, scroll::*};
-use egui::MenuBar;
 pub use screens::*;
 
 #[cfg(target_os = "linux")]
@@ -28,21 +27,3 @@ pub mod windows;
 
 #[cfg(target_os = "macos")]
 pub mod macos;
-
-#[derive(Default)]
-pub struct NativeContext {
-	pub menu_bar: Option<MenuBar>,
-	pub tray_clock: Option<MenuBar>,
-	pub tray_cursor: Option<TrayIcon>,
-	pub windows: Vec<AppWindow>,
-}
-
-#[derive(Debug, Default, Clone)]
-pub struct NativeState;
-
-impl AppCtx for NativeContext {
-	type State = NativeState;
-	fn state(&self) -> &Self::State {
-		&self.state()
-	}
-}

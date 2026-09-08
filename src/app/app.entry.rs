@@ -1,8 +1,8 @@
-use crate::prelude::*;
+use crate::prelude::{traits::AppCtx as Ctx, *};
 
 impl<C> App<C>
 where
-	C: AppCtx + 'static,
+	C: Ctx + 'static,
 {
 	pub fn new(host: Host<C>) -> Result<Self> {
 		tracing::info!("App New");
@@ -10,7 +10,9 @@ where
 		let (cursor_event_tx, cursor_events) = std::sync::mpsc::channel();
 		Ok(Self {
 			host,
+			// ctx: C,
 			workers: vec![],
+			gui: None,
 			#[cfg(not(target_arch = "wasm32"))]
 			cursor_events,
 			#[cfg(not(target_arch = "wasm32"))]
@@ -21,18 +23,31 @@ where
 		&self.clock()
 	}
 
-	pub fn context(&self) -> Arc<C> {
+	pub fn ctx(&self) -> Arc<C> {
 		self.host.context()
 	}
+	fn init_services(&mut self) -> Result<()> {
+		tracing::info!("App init services");
+		let handle = self.start_clock()?;
+		self.workers.push(handle);
+		#[cfg(not(target_arch = "wasm32"))]
+		{
+			let handle = self.start_cargo_watcher()?;
+			self.workers.push(handle);
+			let handle = self.start_cursor_watcher_from_app()?;
+			self.workers.push(handle);
+		}
 
+		Ok(())
+	}
 	pub fn run(&mut self) -> Result<()> {
 		tracing::info!("App run");
-		self.start()?;
+
+		self.init_services()?;
 
 		#[cfg(not(target_arch = "wasm32"))]
 		{
-			// self.host.run()?;
-			self.worker().wait_for_ctrl_c();
+			self.run_gui()?;
 			self.shutdown();
 		}
 
@@ -43,41 +58,31 @@ where
 
 		Ok(())
 	}
-	fn run_app(&mut self) -> Result<()> {
-		todo!("")
+	fn run_gui(&mut self) -> Result<()> {
+		let cancel = CancellationToken::new();
+		let mut gui_app = GuiApp {
+			state: self.ctx().state().clone(),
+			cancel,
+		};
+		let event_loop = EventLoop::<AppEvent>::with_user_event()
+			.with_activation_policy(ActivationPolicy::Regular)
+			.build()
+			.expect("failed to build GUI event loop");
+		event_loop
+			.run_app(&mut gui_app)
+			.map_err(|err| anyhow::anyhow!("GUI event loop failed: {err}"))
 	}
-
-	// #[cfg(all(not(feature = "web")))]
-	// fn run_gui(&mut self) -> Result<()> {
-	// 	let event_loop = EventLoop::<AppEvent>::with_user_event().build()?;
-	// 	let proxy = event_loop.create_proxy();
-	// 	self.host.worker().spawn_ctrl_c(proxy);
-	// 	event_loop.run_app(self)?;
-	// 	Ok(())
-	// }
-
 	pub fn shutdown(&mut self) {
+		tracing::info!("App shutdown");
+
 		for worker in &self.workers {
 			worker.stop();
 		}
-		// self.host.shutdown();
-	}
-	pub fn start(&mut self) -> Result<()> {
-		tracing::info!("App start");
-		let handle = self.start_clock()?;
-		self.workers.push(handle);
 
-		#[cfg(not(target_arch = "wasm32"))]
-		{
-			// spawn_global_cursor_daemon_new
-			let handle = self.start_cargo_watcher()?;
-			self.workers.push(handle);
-			let handle = self.start_cursor_watcher_from_app()?;
-			self.workers.push(handle);
+		if let Some(gui) = &self.gui {
+			gui.stop();
 		}
-		Ok(())
 	}
-
 	#[cfg(not(target_arch = "wasm32"))]
 	fn start_cargo_watcher(&mut self) -> Result<WorkHandle<C, tokio::task::JoinHandle<()>>> {
 		let watcher = CargoWatcher::new().map_err(|error| {
@@ -153,46 +158,8 @@ where
 		// clock.run_background(Duration::from_secs(1), msg.clone());
 		// let handle = Clock::run_background(clock, Duration::from_secs(1), msg.clone());
 	}
-
-	#[cfg(all(not(target_arch = "wasm32")))]
-	pub fn start_gui(&mut self) -> Result<GuiHandle<C>> {
-		let cancel = CancellationToken::new();
-
-		let gui_app = GuiApp {
-			state: self.context().state().clone(),
-			cancel: cancel.clone(),
-		};
-
-		let (proxy_tx, proxy_rx) = std::sync::mpsc::sync_channel(1);
-
-		let join = std::thread::spawn(move || {
-			let event_loop = EventLoop::<AppEvent>::with_user_event()
-				.with_activation_policy(ActivationPolicy::Regular)
-				.build()
-				.expect("failed to build GUI event loop");
-
-			let proxy = event_loop.create_proxy();
-
-			proxy_tx.send(proxy).expect("failed to send GUI proxy");
-
-			let mut gui_app = gui_app;
-
-			if let Err(err) = event_loop.run_app(&mut gui_app) {
-				tracing::error!("GUI event loop failed: {err}");
-			}
-		});
-
-		let proxy = proxy_rx
-			.recv()
-			.expect("GUI thread exited before creating event loop");
-
-		Ok(GuiHandle {
-			work: WorkHandle::new(cancel, join),
-			proxy,
-		})
-	}
 	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-	pub fn start_cursor_watcher_from_app(
+	fn start_cursor_watcher_from_app(
 		&mut self,
 	) -> anyhow::Result<WorkHandle<C, tokio::task::JoinHandle<()>>> {
 		let sink = AppCursorSink {
@@ -206,23 +173,25 @@ where
 		}))
 	}
 	fn worker(&self) -> &HostWorker<C> {
-		self.host.worker()
+		self.worker()
 	}
 }
 
-// #[cfg(all(features()))]
 impl<S> ApplicationHandler<AppEvent> for GuiApp<S>
 where
 	S: Send + Sync + 'static,
 {
 	fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+		tracing::info!("about_to_wait");
 		// self.app.update();
+		#[cfg(not(target_arch = "wasm32"))]
 		while let Ok(event) = MenuEvent::receiver().try_recv() {
 			// self.handle_event(event, event_loop);
 		}
 	}
 	fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-		todo!("")
+		tracing::info!("Resumed");
+		// todo!("")
 		// if self.context().menu_bar.is_none() {
 		// 	// let menu = Self::menu_bar(true);
 		// 	// menu.init_for_nsapp();
@@ -265,13 +234,8 @@ where
 		window_id: WindowId,
 		event: WindowEvent,
 	) {
-		todo!("")
-		// let Some(window) = self
-		// 	.context()
-		// 	.windows
-		// 	.iter_mut()
-		// 	.find(|window| window.window.instance.id() == window_id)
-		// else {
+		println!("window_event");
+		// let Some(window) = self.state() else {
 		// 	return;
 		// };
 		// let response = window
@@ -281,59 +245,59 @@ where
 		// if response.repaint {
 		// 	window.window.instance.request_redraw();
 		// }
-		// match event {
-		// 	WindowEvent::CloseRequested => {
-		// 		tracing::info!("🛑 Window close requested for id: {:?}", window_id);
-		// 		self
-		// 			.context()
-		// 			.windows
-		// 			.retain(|window| window.window.instance.id() != window_id);
-		// 		return;
-		// 	}
-		// 	WindowEvent::RedrawRequested => {
-		// 		if window.window.occluded {
-		// 			return;
-		// 		}
-		// 		let menu = {
-		// 			// let event_rx = self.app.engine.runtime().subscribe();
-		// 			// let mut ctx = AppContext {
-		// 			// 	app: &mut self.app,
-		// 			// 	input: IOState::default(),
-		// 			// 	event_rx,
-		// 			// 	last_revision: 0,
-		// 			// };
-		// 			// if let Err(e) = window.window.draw(&mut ctx) {
-		// 			// 	tracing::error!("DEV >>> draw failed: {e:#}");
-		// 			// }
-		// 		};
-		// 	}
-		// 	WindowEvent::Focused(true) => {
-		// 		window.window.instance.request_redraw();
-		// 	}
-		// 	WindowEvent::Occluded(occluded) => {
-		// 		window.window.occluded = occluded;
-		// 		if !occluded {
-		// 			window.window.instance.request_redraw();
-		// 		}
-		// 	}
-		// 	WindowEvent::Resized(size) => {
-		// 		if size.width == 0 || size.height == 0 {
-		// 			return;
-		// 		}
-		// 		window.window.config.width = size.width;
-		// 		window.window.config.height = size.height;
-		// 		window
-		// 			.window
-		// 			.surface
-		// 			.configure(&window.window.device, &window.window.config);
-		// 		window.window.needs_resize = false;
-		// 		window.window.instance.request_redraw();
-		// 	}
-		// 	_ => {}
-		// }
+		match event {
+			// WindowEvent::CloseRequested => {
+			// 	tracing::info!("🛑 Window close requested for id: {:?}", window_id);
+			// 	self
+			// 		.windows
+			// 		.retain(|window| window.window.instance.id() != window_id);
+			// 	return;
+			// }
+			// WindowEvent::RedrawRequested => {
+			// 	if window.window.occluded {
+			// 		return;
+			// 	}
+			// 	let menu = {
+			// 		let event_rx = self.app.engine.runtime().subscribe();
+			// 		let mut ctx = AppContext {
+			// 			app: &mut self.app,
+			// 			input: IOState::default(),
+			// 			event_rx,
+			// 			last_revision: 0,
+			// 		};
+			// 		if let Err(e) = window.window.draw(&mut ctx) {
+			// 			tracing::error!("DEV >>> draw failed: {e:#}");
+			// 		}
+			// 	};
+			// }
+			// WindowEvent::Focused(true) => {
+			// 	window.window.instance.request_redraw();
+			// }
+			// WindowEvent::Occluded(occluded) => {
+			// 	window.window.occluded = occluded;
+			// 	if !occluded {
+			// 		window.window.instance.request_redraw();
+			// 	}
+			// }
+			// WindowEvent::Resized(size) => {
+			// 	if size.width == 0 || size.height == 0 {
+			// 		return;
+			// 	}
+			// 	// window.window.config.width = size.width;
+			// 	// window.window.config.height = size.height;
+			// 	// window
+			// 	// 	.window
+			// 	// 	.surface
+			// 	// 	.configure(&window.window.device, &window.window.config);
+			// 	// window.window.needs_resize = false;
+			// 	// window.window.instance.request_redraw();
+			// }
+			_ => {}
+		}
 	}
+
 	fn user_event(&mut self, event_loop: &ActiveEventLoop, event: AppEvent) {
-		todo!("")
+		tracing::info!("user_event");
 		// match event {
 		// 	AppEvent::RuntimeEvent => {
 		// 		// self.app.update();
@@ -403,6 +367,8 @@ impl traits::Renderer for HostRenderer {
 }
 
 pub struct App<C: AppCtx> {
+	// pub ctx: C,
+	pub gui: Option<GuiHandle>,
 	pub host: Host<C>,
 	pub workers: Vec<WorkHandle<C, tokio::task::JoinHandle<()>>>,
 	#[cfg(not(target_arch = "wasm32"))]
@@ -411,43 +377,34 @@ pub struct App<C: AppCtx> {
 	pub cursor_event_tx: std::sync::mpsc::Sender<CursorEvent>,
 }
 
-#[derive(Debug, Clone)]
-pub struct CursorDaemon<S> {
-	pub sink: S,
-	pub cancel: CancellationToken,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct CursorPosition {
-	pub x: f64,
-	pub y: f64,
-}
-
 // "This is a unit of work that I know how to stop."
 pub struct WorkHandle<C, J>
 where
 	C: AppCtx,
 {
 	pub cancel: CancellationToken,
+
 	#[cfg(not(target_arch = "wasm32"))]
 	pub join: J,
-	_phantom: PhantomData<(C,J)>,
-}
 
+	_phantom: PhantomData<(C, J)>,
+}
 impl<C> WorkHandle<C, std::thread::JoinHandle<()>>
 where
 	C: AppCtx,
 {
 	pub fn join(self) -> std::thread::Result<()> {
-		self.join.join()
+		self.join()
 	}
 }
+
+#[cfg(not(target_arch = "wasm32"))]
 impl<C> WorkHandle<C, tokio::task::JoinHandle<()>>
 where
 	C: AppCtx,
 {
-	pub async fn join(self) -> Result<(), tokio::task::JoinError> {
-		self.join.await
+	pub async fn join(self) -> Result<JoinHandle<()>> {
+		Ok(self.join)
 	}
 }
 impl<C, J> WorkHandle<C, J>
@@ -476,20 +433,11 @@ where
 	}
 }
 
-#[cfg(all(not(target_arch = "wasm")))]
-pub struct GuiHandle<C>
-where
-	C: AppCtx,
-{
-	work: WorkHandle<C, std::thread::JoinHandle<()>>,
-	proxy: EventLoopProxy<AppEvent>,
+pub struct GuiHandle {
+	pub proxy: EventLoopProxy<AppEvent>,
 }
 
-#[cfg(all(not(target_arch = "wasm")))]
-impl<C> GuiHandle<C>
-where
-	C: AppCtx,
-{
+impl GuiHandle {
 	pub fn stop(&self) {
 		let _ = self.proxy.send_event(AppEvent::Shutdown);
 	}
@@ -497,25 +445,13 @@ where
 	pub fn send(&self, event: AppEvent) -> Result<(), EventLoopClosed<AppEvent>> {
 		self.proxy.send_event(event)
 	}
-
-	pub fn join(self) -> std::thread::Result<()> {
-		self.work.join.join()
-	}
 }
 pub struct GuiApp<S> {
 	state: S,
 	cancel: CancellationToken,
 }
 impl<S> GuiApp<S> {
-	// ...
+	// fn state(&self) -> &C {
+	// 	&self.context.state()
+	// }
 }
-// impl<C> GuiApp<C>
-// where
-// 	C: AppCtx,
-// {
-// 	fn new() -> Self {
-// 		Self {
-// 			app
-// 		}
-// 	}
-// }

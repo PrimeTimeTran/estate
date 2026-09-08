@@ -12,6 +12,7 @@ pub use core_graphics::{
 	geometry,
 };
 
+pub use egui::MenuBar;
 pub use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 pub use rmcp::{
 	handler::server::wrapper::Parameters,

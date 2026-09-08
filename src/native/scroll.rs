@@ -454,3 +454,15 @@ where
 {
 	CursorDaemon::new(sink, cancel).run()
 }
+
+#[derive(Debug, Clone)]
+pub struct CursorDaemon<S> {
+	pub sink: S,
+	pub cancel: CancellationToken,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct CursorPosition {
+	pub x: f64,
+	pub y: f64,
+}

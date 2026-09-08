@@ -52,76 +52,7 @@ impl EventSink<AppEvent> for EventLoopProxy<AppEvent> {
 // 			self.handle_event(event, event_loop);
 // 		}
 // 	}
-// 	fn window_event(
-// 		&mut self,
-// 		event_loop: &ActiveEventLoop,
-// 		window_id: WindowId,
-// 		'event: WindowEvent,'
-// 	) {
-// 		let Some(window) = self
-// 			.windows
-// 			.iter_mut()
-// 			.find(|window| window.window.instance.id() == window_id)
-// 		else {
-// 			return;
-// 		};
-// 		let response = window
-// 			.window
-// 			.gui_state
-// 			.on_window_event(&window.window.instance, &event);
-// 		if response.repaint {
-// 			window.window.instance.request_redraw();
-// 		}
-// 		match event {
-// 			WindowEvent::CloseRequested => {
-// 				tracing::info!("🛑 Window close requested for id: {:?}", window_id);
-// 				self
-// 					.windows
-// 					.retain(|window| window.window.instance.id() != window_id);
-// 				return;
-// 			}
-// 			WindowEvent::RedrawRequested => {
-// 				if window.window.occluded {
-// 					return;
-// 				}
-// 				let menu = {
-// 					let event_rx = self.app.engine.runtime().subscribe();
-// 					let mut ctx = AppContext {
-// 						app: &mut self.app,
-// 						input: IOState::default(),
-// 						event_rx,
-// 						last_revision: 0,
-// 					};
-// 					if let Err(e) = window.window.draw(&mut ctx) {
-// 						tracing::error!("DEV >>> draw failed: {e:#}");
-// 					}
-// 				};
-// 			}
-// 			WindowEvent::Focused(true) => {
-// 				window.window.instance.request_redraw();
-// 			}
-// 			WindowEvent::Occluded(occluded) => {
-// 				window.window.occluded = occluded;
-// 				if !occluded {
-// 					window.window.instance.request_redraw();
-// 				}
-// 			}
-// 			WindowEvent::Resized(size) => {
-// 				if size.width == 0 || size.height == 0 {
-// 					return;
-// 				}
-// 				window.window.config.width = size.width;
-// 				window.window.config.height = size.height;
-// 				window
-// 					.window
-// 					.surface
-// 					.configure(&window.window.device, &window.window.config);
-// 				window.window.needs_resize = false;
-// 				window.window.instance.request_redraw();
-// 			}
-// 			_ => {}
-// 		}
-// 	}
+
 // 	fn user_event(&mut self, event_loop: &ActiveEventLoop, event: AppEvent) {
 // 		match event {
 // 			AppEvent::RuntimeEvent => {

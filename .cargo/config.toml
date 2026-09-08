@@ -13,13 +13,7 @@
 
 
 # .cargo/config.toml
-[build]
-rustflags = ["-A", "warnings"]
 
-[lints.cargo]
-all = "allow"
-missing_lints_inheritance = "allow"
-unused_workspace_dependencies = "allow" # <-- Add this line
 
 [alias]
 

@@ -20,9 +20,9 @@
 /// ./src/mobile
 ///
 /// ./src/app/mod.rs
-#[path = "app-entry.rs"]
+#[path = "app.entry.rs"]
 pub mod app_entry;
-#[path = "app-state.rs"]
+#[path = "app.state.rs"]
 pub mod app_state;
 pub mod clock;
 pub mod context;

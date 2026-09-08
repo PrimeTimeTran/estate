@@ -45,6 +45,7 @@ pub trait Clock: Clone {
 	/// Run repeatedly in the foreground.
 	#[cfg(not(target_arch = "wasm32"))]
 	fn run_foreground(&self, interval: Duration);
+
 	fn run_background<C, J>(&self, interval: Duration, msg: String) -> Self::Handle<C, J>
 	where
 		C: AppCtx,
