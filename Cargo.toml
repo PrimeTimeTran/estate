@@ -85,7 +85,6 @@ path = "src/bin/web.rs"
 required-features = ["web"]
 target = "wasm32-unknown-unknown"
 
-
 # cargo nextest run --bin settings --test-threads 1 --no-fail-fast
 [features]
 # default = []

@@ -33,7 +33,7 @@ pub use crate::{
 		types::{self, *},
 		*,
 	},
-	r#trait::Runtime,
+	traits::Runtime,
 	ui::{
 		config::*, layout::*, primitive::*, region::*, screen::*, theme::palette::*, ui_trait::*,
 		view::*, *,

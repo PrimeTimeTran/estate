@@ -1,5 +1,5 @@
 #![allow(warnings)]
-use estate::{app::*, r#struct::AppState};
+use estate::{app::*, prelude::*, structs::AppState};
 
 pub trait Ctx {
 	type Executor: Executor;

@@ -4,7 +4,7 @@
 //!
 use crate::{
 	prelude::*,
-	r#struct::{C, S},
+	structs::{C, S},
 };
 
 impl<C> Clone for S<C> {
@@ -50,5 +50,34 @@ impl traits::Renderer for HostRenderer {
 	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 	fn render(&mut self) {
 		// native rendering
+	}
+}
+
+impl Default for EstateState {
+	fn default() -> Self {
+		Self {
+			events_processed: 0,
+			files_indexed: 0,
+			longest_run: 0,
+			jobs: VecDeque::new(),
+			revision: 0,
+			started_at: 0,
+			starts: 0,
+			status_checks: 0,
+			tasks_completed: 0,
+			tasks_created: 0,
+			session: Session::default(),
+		}
+	}
+}
+impl EstateState {
+	pub fn save_workspace(path: &PathBuf) {
+		println!("💾 save_workspace not implemented yet: {:?}", path);
+	}
+	pub fn now() -> u64 {
+		std::time::SystemTime::now()
+			.duration_since(std::time::UNIX_EPOCH)
+			.unwrap()
+			.as_secs()
 	}
 }

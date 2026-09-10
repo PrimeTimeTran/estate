@@ -12,7 +12,7 @@ impl WorkspaceContext {
 }
 
 impl WorkspaceContext {
-	pub fn load() -> Result<Self> {
+	pub fn load() -> anyhow::Result<Self> {
 		Ok(Self { files: vec![] })
 	}
 }

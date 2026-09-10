@@ -1,5 +1,65 @@
 [
   {
+    "number": 2265,
+    "normalized-name": "count-nodes-equal-to-average-of-subtree",
+    "title": "Count Nodes Equal to Average of Subtree",
+    "difficulty": "medium",
+    "description": "Given the root of a binary tree, return the number of nodes where the value of the node is equal to the average of the values in its subtree.\n\nNote:",
+    "url": "https://leetcode.com/problems/count-nodes-equal-to-average-of-subtree/",
+    "filename": "2265-count-nodes-equal-to-average-of-subtree.py",
+    "description-raw": "<p>Given the <code>root</code> of a binary tree, return <em>the number of nodes where the value of the node is equal to the <strong>average</strong> of the values in its <strong>subtree</strong></em>.</p>\n<p><strong>Note:</strong></p>",
+    "test-cases": [
+      {
+        "index": 0,
+        "input": "root = [4,8,5,0,1,null,6]",
+        "output": "5",
+        "explanation": "For the node with value 4: The average of its subtree is (4 + 8 + 5 + 0 + 1 + 6) / 6 = 24 / 6 = 4.\nFor the node with value 5: The average of its subtree is (5 + 6) / 2 = 11 / 2 = 5.\nFor the node with value 0: The average of its subtree is 0 / 1 = 0.\nFor the node with value 1: The average of its subtree is 1 / 1 = 1.\nFor the node with value 6: The average of its subtree is 6 / 1 = 6."
+      },
+      {
+        "index": 1,
+        "input": "root = [1]",
+        "output": "1",
+        "explanation": "For the node with value 1: The average of its subtree is 1 / 1 = 1."
+      },
+      {
+        "index": 2,
+        "input": null,
+        "output": null,
+        "explanation": null
+      },
+      {
+        "index": 3,
+        "input": null,
+        "output": null,
+        "explanation": null
+      },
+      {
+        "index": 4,
+        "input": null,
+        "output": null,
+        "explanation": null
+      },
+      {
+        "index": 5,
+        "input": null,
+        "output": null,
+        "explanation": null
+      },
+      {
+        "index": 6,
+        "input": null,
+        "output": null,
+        "explanation": null
+      },
+      {
+        "index": 7,
+        "input": null,
+        "output": null,
+        "explanation": null
+      }
+    ]
+  },
+  {
     "number": 940,
     "normalized-name": "distinct-subsequences-ii",
     "title": "Distinct Subsequences II",

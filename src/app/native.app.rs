@@ -1,7 +1,7 @@
 use crate::doc;
 
 use crate::native::router;
-use crate::{prelude::*, r#trait::Context};
+use crate::{prelude::*, traits::Context};
 
 impl EventSink<AppEvent> for EventLoopProxy<AppEvent> {
 	fn send(&self, event: AppEvent) {

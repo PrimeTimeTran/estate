@@ -22,8 +22,6 @@
 /// ./src/app/mod.rs
 #[path = "app.entry.rs"]
 pub mod app_entry;
-#[path = "app.state.rs"]
-pub mod app_state;
 pub mod clock;
 pub mod context;
 pub mod event;
@@ -33,16 +31,21 @@ pub mod state;
 pub mod task;
 pub mod worker;
 
-pub use self::{app_entry::*, clock::*, context::*, event::*, host::*, job::*, task::*, worker::*};
+#[cfg(feature = "native")]
+#[path = "./[native].rs"]
+pub mod native_ctx;
+
+#[cfg(feature = "web")]
+#[path = "./[web].rs"]
+pub mod web_ctx;
+
+#[path = "./[prelude].rs"]
+pub mod app_prelude;
 
 /// Platform Gates
 #[cfg(feature = "native")]
 #[path = "./native.app.rs"]
 pub mod app_native;
-
-#[cfg(all(feature = "web", target_arch = "wasm32"))]
-#[path = "./web.app.rs"]
-pub mod app_web;
 
 #[cfg(not(all(feature = "web", target_arch = "wasm32")))]
 #[path = "./web.app.stub.rs"]

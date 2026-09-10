@@ -2,6 +2,7 @@ use crate::{
 	app::*,
 	e,
 	native::{OracleScreen, monitor::StateMonitor},
+	prelude::*,
 	ui::{Component, chart::*},
 };
 

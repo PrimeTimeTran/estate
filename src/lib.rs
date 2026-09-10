@@ -29,7 +29,7 @@ pub mod app;
 pub mod data;
 pub mod helpers;
 #[path = "./[impl].rs"]
-pub mod r#impl;
+pub mod impls;
 pub mod r#macro;
 pub mod model;
 pub mod prelude;
@@ -38,19 +38,17 @@ pub mod runtime;
 pub mod services;
 pub mod share;
 #[path = "./[struct].rs"]
-pub mod r#struct;
+pub mod structs;
 pub mod tool;
-pub mod r#trait;
+#[path = "./[trait].rs"]
+pub mod traits;
 pub mod ui;
 pub mod util;
 
+pub use crate::app::app_prelude;
 pub use crate::app::event as e;
 pub use crate::r#macro as app_macros;
 pub use crate::ui::{theme::*, ui_prelude::*, *};
-
-pub use r#impl as impls;
-pub use r#struct as structs;
-pub use r#trait as traits;
 
 #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 pub mod native;

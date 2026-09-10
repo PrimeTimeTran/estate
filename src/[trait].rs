@@ -1,66 +1,14 @@
 //! ## [Traits]
 //!
 //! The collection of traits used through the codebase
+//! 
+//! 
 //!
 use crate::{RuntimeState, e, prelude::*};
-
-#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-use crate::native::{self, native_prelude::*, *};
 
 // https://github.com/rust-lang/rust/issues/41517
 // https://github.com/rust-lang/rust/issues/55628
 // https://github.com/rust-lang/rfcs/pull/1733
-//
-// pub trait AppDriver<C>
-// where
-// 	C: Ctx,
-// {
-// 	fn run(&mut self, app: &mut App<C>) -> Result<()>;
-// }
-pub trait ApiServices: Services {
-	type Client: Api;
-	/// ## Platform Generic API
-	///
-	/// Exposes capabilities for business logic to access server side resources
-	///
-	/// - [GRPC]
-	///
-	/// Has [`Native`] & [`Web`] implementations
-	fn foo(&self);
-	// fn api(&self) -> &Self::Client;
-	// fn api(&self) -> Option<&Self::Client>;
-}
-
-/// ## [Ctx]
-///
-/// A type safe abstraction with room for growth via it's internal [associated types][], [State](Self::State).
-///
-/// [associated types]: https://doc.rust-lang.org/rust-by-example/generics/assoc_items/types.html
-pub trait Ctx: Default {
-	type State: Clone + Send + Sync + 'static;
-	fn state(&self) -> &Self::State;
-}
-
-/// ## [Clock]
-///
-/// The literal heart beat of the engine. The clock has a handle on
-/// the [runtime](Runtime) of [tokio] which enables spawning of workers
-///
-pub trait Clock: Clone {
-	type Handle<C: Ctx, J>;
-
-	fn now(&self) -> String;
-	/// Run once and return.
-	fn run_once(&self) -> String;
-	/// Run repeatedly in the foreground.
-	#[cfg(not(target_arch = "wasm32"))]
-	fn run_foreground(&self, interval: Duration);
-
-	fn run_background<C, J>(&self, interval: Duration, msg: String) -> Self::Handle<C, J>
-	where
-		C: Ctx,
-		J: From<tokio::task::JoinHandle<()>>;
-}
 
 /// ## [Context]
 ///
@@ -106,6 +54,53 @@ pub trait Context: Sized {
 	fn foo(&self, args: String) -> Result<()>;
 
 	fn bar(&self, args: String) -> Result<()>;
+}
+
+pub trait State {}
+
+pub trait ApiServices: Services {
+	type Client: Api;
+	/// ## Platform Generic API
+	///
+	/// Exposes capabilities for business logic to access server side resources
+	///
+	/// - [GRPC]
+	///
+	/// Has [`Native`] & [`Web`] implementations
+	fn foo(&self);
+	// fn api(&self) -> &Self::Client;
+	// fn api(&self) -> Option<&Self::Client>;
+}
+
+/// ## [Ctx]
+///
+/// A type safe abstraction with room for growth via it's internal [associated types][], [State](Self::State).
+///
+/// [associated types]: https://doc.rust-lang.org/rust-by-example/generics/assoc_items/types.html
+pub trait Ctx: Default {
+	type State: Clone + Send + Sync + 'static;
+	fn state(&self) -> &Self::State;
+}
+
+/// ## [Clock]
+///
+/// The literal heart beat of the engine. The clock has a handle on
+/// the [runtime](Runtime) of [tokio] which enables spawning of workers
+///
+pub trait Clock: Clone {
+	type Handle<C: Ctx, J>;
+
+	fn now(&self) -> String;
+	/// Run once and return.
+	fn run_once(&self) -> String;
+	/// Run repeatedly in the foreground.
+	#[cfg(not(target_arch = "wasm32"))]
+	fn run_foreground(&self, interval: Duration);
+
+	fn run_background<C, J>(&self, interval: Duration, msg: String) -> Self::Handle<C, J>
+	where
+		C: Ctx,
+		J: From<tokio::task::JoinHandle<()>>;
 }
 
 /// ## [CursorEventSink]
@@ -429,4 +424,9 @@ pub trait NativeCtx {
 	fn handle(&self) -> tokio::runtime::Handle;
 	fn shutdown(self);
 	fn wait_for_shutdown(&self);
+}
+
+pub trait StateStore: Send + Sync {
+	fn load(&self) -> Result<EstateState>;
+	fn save(&self, state: &EstateState) -> Result<()>;
 }

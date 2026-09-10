@@ -1,4 +1,7 @@
-use crate::{app::app_state::EstateState, prelude::*, r#struct::AppState};
+use crate::{
+	prelude::*,
+	structs::{AppState, EstateState},
+};
 
 /// ## [AppRuntime]
 ///

@@ -4,16 +4,7 @@ use crate::{
 	ui, ui_prelude as gui,
 };
 
-#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-use crate::native::{native_prelude::*, *};
-
 use anyhow::anyhow;
-
-#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-use crate::app::host::NativeContext;
-
-#[cfg(all(feature = "web", target_arch = "wasm32"))]
-use crate::app::host::WebContext;
 
 impl<C> App<C>
 where
