@@ -137,6 +137,12 @@ pub enum EventSource {
 	Filesystem,
 }
 
+impl EventSink<AppEvent> for EventLoopProxy<AppEvent> {
+	fn send(&self, event: AppEvent) {
+		let _ = self.send_event(event);
+	}
+}
+
 impl Event {
 	fn new(source: EventSource, kind: EventKind) -> Self {
 		tracing::debug!("new Event {:?}", source);

@@ -3,12 +3,6 @@ use crate::doc;
 use crate::native::router;
 use crate::{prelude::*, traits::Context};
 
-impl EventSink<AppEvent> for EventLoopProxy<AppEvent> {
-	fn send(&self, event: AppEvent) {
-		let _ = self.send_event(event);
-	}
-}
-
 // impl ApplicationHandler<AppEvent> for NativeApp {
 // 	fn resumed(&mut self, event_loop: &ActiveEventLoop) {
 // 		if self.menu_bar.is_none() {

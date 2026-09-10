@@ -4,6 +4,7 @@
 //! 'pub use' enables external users of this crate to access the public dependencies.
 //! The double prelude is done to manage native dependencies in a centralized manner, allowing for easier maintenance and updates.
 //!
+pub use cli::context::*;
 pub use core_foundation::runloop::{CFRunLoop, kCFRunLoopCommonModes};
 pub use core_graphics::{
 	display::{CGDisplay, CGPoint, CGRect},
@@ -11,7 +12,6 @@ pub use core_graphics::{
 	event_source::{CGEventSource, CGEventSourceStateID},
 	geometry,
 };
-
 pub use egui::MenuBar;
 pub use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 pub use rmcp::{
@@ -48,7 +48,7 @@ pub use winit::platform::macos::{ActivationPolicy, EventLoopBuilderExtMacOS};
 /// cause compilation errors or runtime issues in the native platform targets.
 pub use crate::{
 	native::{
-		self, daemon::*, lint::*, monitor::*, native_job::*, state as native_state, ui::*, window::*,
+		self, daemon::*, monitor::*, native_job::*, state as native_state, ui::*, window::*,
 	},
 	server::*,
 };
