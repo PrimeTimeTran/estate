@@ -109,6 +109,6 @@ pub struct EstateDiscovery;
 #[derive(Clone, Debug)]
 
 pub struct EstateDiscovery<State = Disconnected> {
-	pub store: DiscoveryStore,
+	pub store: crate::native::discovery::DiscoveryStore,
 	pub state: State,
 }

@@ -47,7 +47,10 @@ pub use winit::platform::macos::{ActivationPolicy, EventLoopBuilderExtMacOS};
 /// The items here are necessary to bring dependencies into scope for the native platform targets. Removing items may
 /// cause compilation errors or runtime issues in the native platform targets.
 pub use crate::{
-	native::{self, daemon::*, monitor::*, native_job::*, state as native_state, ui::*, window::*},
+	native::{
+		daemon::*, monitor::*, native_job::*, screens::*, scroll::*, state as native_state, ui::*,
+		window::*,
+	},
 	server::*,
 };
 
