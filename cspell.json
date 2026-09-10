@@ -10,6 +10,8 @@
         "HRTB",
         "implss",
         "implsss",
+        "objdump",
+        "readlink",
         "rustflags",
         "Traitt",
         "Traittt"

@@ -720,7 +720,7 @@ impl Window {
 }
 
 pub struct AppWindow {
-	pub runtime: NativeRuntime,
+	// pub runtime: NativeRuntime,
 	pub kind: WindowType,
 	pub view: ViewType,
 	pub window: Window,

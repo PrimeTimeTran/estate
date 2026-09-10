@@ -277,14 +277,10 @@ impl NativeApp {
 			menu.init_for_nsapp();
 		}
 		let proxy = event_loop.create_proxy();
-		// self.spawn_clock(proxy.clone());
-		// self.spawn_cursor_daemon(proxy.clone());
-		// self.spawn_signal_handler(proxy.clone());
 		self.runtime_old().attach_event_proxy(proxy);
 		self
 			.runtime_old()
 			.emit(e::Event::app(e::Klass::SessionStart));
-		// event_loop.run_app(self)?;
 		tracing::info!(">>> NativeApp::start_runtime returning");
 		Ok(())
 	}
@@ -386,7 +382,7 @@ impl NativeApp {
 				tracing::info!(" open window end, new window");
 				window.instance.set_title(self.app.view().name().into());
 				self.windows.push(AppWindow {
-					runtime: self.runtime.clone(),
+					// runtime: self.runtime.clone(),
 					kind,
 					view: self.app.view(),
 					window,

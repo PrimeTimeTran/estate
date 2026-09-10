@@ -1,6 +1,7 @@
 //! ## [Traits]
 //!
 //! The collection of traits used through the codebase
+//!
 use crate::{RuntimeState, e, prelude::*};
 
 // https://github.com/rust-lang/rust/issues/41517
@@ -27,16 +28,21 @@ pub trait ApiServices: Services {
 	// fn api(&self) -> Option<&Self::Client>;
 }
 
-/// [Ctx]
+/// ## [Ctx]
 ///
-/// A type safe abstraction with room for growth via it's internal  [associated type](https://doc.rust-lang.org/rust-by-example/generics/assoc_items/types.html), [State](Self::State).
+/// A type safe abstraction with room for growth via it's internal [associated types][], [State](Self::State).
+///
+/// [associated types]: https://doc.rust-lang.org/rust-by-example/generics/assoc_items/types.html
 pub trait Ctx: Default {
 	type State: Clone + Send + Sync + 'static;
 	fn state(&self) -> &Self::State;
 }
+
 /// ## [Clock]
 ///
-/// The literal heart beat of the engine. The clock has a handle on the [runtime](Runtime) of [tokio] which
+/// The literal heart beat of the engine. The clock has a handle on
+/// the [runtime](Runtime) of [tokio] which enables spawning of workers
+///
 pub trait Clock: Clone {
 	type Handle<C: Ctx, J>;
 
@@ -98,10 +104,17 @@ pub trait Context: Sized {
 
 	fn bar(&self, args: String) -> Result<()>;
 }
+
+/// ## [CursorEventSink]
+///
+/// A drain of all events from
+///
+#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 pub trait CursorEventSink: Send + Sync + 'static {
 	fn cursor_moved(&self, position: CursorPosition);
 	fn modifiers_changed(&self, modifiers: Modifiers);
 }
+
 /// ## [Engine]
 ///
 pub trait Engine {
@@ -174,6 +187,7 @@ where
 		let _ = self.send(event);
 	}
 }
+
 /// ## [Index]
 ///
 /// derived structure optimized for finding that knowledge.
@@ -222,6 +236,7 @@ pub trait Renderer {
 
 /// ## [Provide]
 ///
+/// Ensures we have platform agnostic APIs to  enables behavior.
 pub trait Provide<C: Ctx> {
 	type Clock: Clock;
 	type Worker;
@@ -274,7 +289,6 @@ pub trait Runtime: Clone + Sync + std::marker::Send + 'static {
 	fn sleep(&self, duration: Duration) -> impl Future<Output = ()>;
 
 	fn session(&self) -> Session;
-
 	fn emit(&self, event: e::Event);
 	fn event_processed(&self);
 
@@ -406,4 +420,10 @@ pub async fn sleep(duration: Duration) {
 
 	#[cfg(target_arch = "wasm32")]
 	gloo_timers::future::TimeoutFuture::new(duration.as_millis() as u32).await;
+}
+
+pub trait NativeCtx {
+	fn handle(&self) -> tokio::runtime::Handle;
+	fn shutdown(self);
+	fn wait_for_shutdown(&self);
 }

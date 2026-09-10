@@ -1,4 +1,13 @@
+#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+use crate::native::native_prelude::*;
+
 use crate::prelude::*;
+
+pub enum CargoFeature {
+	Native,
+	Web,
+	None,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TerminalHost {
@@ -8,7 +17,8 @@ pub enum TerminalHost {
 	Unknown,
 }
 
-pub fn terminal_host() -> TerminalHost {
+fn append_to_file(str: String) {}
+fn terminal_host() -> TerminalHost {
 	let env = std::env::vars().collect::<std::collections::HashMap<_, _>>();
 	if env.contains_key("VSCODE_INJECTION")
 		|| env.contains_key("VSCODE_PID")
@@ -32,14 +42,6 @@ pub fn terminal_host() -> TerminalHost {
 
 	TerminalHost::Unknown
 }
-
-pub enum CargoFeature {
-	Native,
-	Web,
-	None,
-}
-
-fn append_to_file(str: String) {}
 fn sleep(str: String) {}
 fn task() {
 	println!(
@@ -65,14 +67,14 @@ impl Clock for HostClock {
 		tracing::info!("HostClock Tick: {}", now);
 		now
 	}
-	#[cfg(not(target_arch = "wasm32"))]
+	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 	fn run_foreground(&self, interval: Duration) {
 		loop {
 			self.run_once();
 			std::thread::sleep(interval);
 		}
 	}
-	#[cfg(not(target_arch = "wasm32"))]
+	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 	fn run_background<C, J>(&self, interval: Duration, msg: String) -> WorkHandle<C, J>
 	where
 		C: Ctx,
@@ -126,12 +128,29 @@ impl Clock for HostClock {
 	}
 }
 
+#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+impl Ctx for NativeContext {
+	type State = NativeState;
+
+	fn state(&self) -> &Self::State {
+		&self.state
+	}
+}
+
+#[cfg(all(feature = "web", target_arch = "wasm32"))]
+impl Ctx for WebContext {
+	type State = WebState;
+	fn state(&self) -> &Self::State {
+		self.state()
+	}
+}
+
 impl<C: Ctx> Host<C> {
 	pub fn new(context: Arc<C>) -> anyhow::Result<Self> {
-		#[cfg(not(target_arch = "wasm32"))]
+		#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 		let runtime = tokio::runtime::Runtime::new()?;
 
-		#[cfg(not(target_arch = "wasm32"))]
+		#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 		let handle = runtime.handle().clone();
 
 		Ok(Self {
@@ -139,52 +158,81 @@ impl<C: Ctx> Host<C> {
 			worker: HostWorker::new(),
 			#[cfg(target_arch = "wasm32")]
 			clock: HostClock::default(),
-			#[cfg(not(target_arch = "wasm32"))]
+			#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 			clock: HostClock::new(handle),
-			#[cfg(not(target_arch = "wasm32"))]
+			#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 			runtime,
 		})
 	}
 }
 
-impl<C> Host<C>
+#[cfg(all(feature = "web", target_arch = "wasm32"))]
+impl<WebContext> Host<WebContext>
 where
-	C: Ctx,
+	WebContext: Ctx,
 {
 	pub fn clock(&self) -> &HostClock {
 		&self.clock
 	}
+	pub fn context(&self) -> Arc<WebContext> {
+		self.context.clone()
+	}
+	pub fn wait_for_shutdown(&self) {
+		#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+		{
+			self.worker.block_on(async {
+				tokio::signal::ctrl_c()
+					.await
+					.expect("failed to listen for Ctrl+C");
 
-	pub fn context(&self) -> Arc<C> {
+				tracing::info!("Ctrl+C received");
+			});
+		}
+	}
+	pub fn worker(&self) -> &HostWorker<WebContext> {
+		&self.worker
+	}
+}
+
+#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+impl<NativeContext> Host<NativeContext>
+where
+	NativeContext: Ctx,
+{
+	pub fn clock(&self) -> &HostClock {
+		&self.clock
+	}
+	pub fn context(&self) -> Arc<NativeContext> {
 		self.context.clone()
 	}
 
-	#[cfg(not(target_arch = "wasm32"))]
 	pub fn handle(&self) -> tokio::runtime::Handle {
 		self.runtime.handle().clone()
 	}
 
-	#[cfg(not(target_arch = "wasm32"))]
-	pub fn wait_for_shutdown(&self) {
-		self.worker.block_on(async {
-			tokio::signal::ctrl_c()
-				.await
-				.expect("failed to listen for Ctrl+C");
-
-			tracing::info!("Ctrl+C received");
-		});
-	}
-
-	pub fn worker(&self) -> &HostWorker<C> {
-		&self.worker
-	}
-
-	#[cfg(not(target_arch = "wasm32"))]
 	pub fn shutdown(self) {
 		self.runtime.shutdown_background();
 	}
+
+	pub fn wait_for_shutdown(&self) {
+		#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+		{
+			self.worker.block_on(async {
+				tokio::signal::ctrl_c()
+					.await
+					.expect("failed to listen for Ctrl+C");
+
+				tracing::info!("Ctrl+C received");
+			});
+		}
+	}
+
+	pub fn worker(&self) -> &HostWorker<NativeContext> {
+		&self.worker
+	}
 }
-#[cfg(feature = "native")]
+
+#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 impl Host<NativeContext> {
 	pub fn init() -> Result<Self> {
 		// let count = 1;
@@ -216,24 +264,26 @@ impl Host<NativeContext> {
 		Self::new(Arc::new(context))
 	}
 }
-#[cfg(feature = "web")]
+
+#[cfg(all(feature = "web", target_arch = "wasm32"))]
 impl Host<WebContext> {
 	pub fn init() -> Result<Self> {
 		Self::new(Arc::new(WebContext::default()))
 	}
 }
-#[cfg(not(target_arch = "wasm32"))]
+
+#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 impl HostClock {
 	pub fn new(handle: tokio::runtime::Handle) -> Self {
 		Self { handle }
 	}
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 impl<C> HostWorker<C>
 where
 	C: Ctx,
 {
+	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 	pub fn new() -> Self {
 		let runtime = tokio::runtime::Runtime::new().unwrap();
 		Self {
@@ -241,18 +291,14 @@ where
 			_phantom: PhantomData,
 		}
 	}
-}
-#[cfg(target_arch = "wasm32")]
-impl<C> HostWorker<C>
-where
-	C: Ctx,
-{
+	#[cfg(target_arch = "wasm32")]
 	pub fn new() -> Self {
 		Self {
 			_phantom: PhantomData,
 		}
 	}
 }
+
 impl<C> HostWorker<C>
 where
 	C: Ctx,
@@ -271,7 +317,7 @@ where
 		S: EventSink<AppEvent>,
 	{
 		self.runtime.block_on(async {
-			#[cfg(not(target_arch = "wasm32"))]
+			#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 			{
 				if tokio::signal::ctrl_c().await.is_ok() {
 					sink.send(AppEvent::Shutdown);
@@ -292,24 +338,23 @@ where
 		self.runtime.block_on(future);
 	}
 }
+
 impl<C> Provide<C> for Host<C>
 where
 	C: Ctx,
 {
 	type Clock = HostClock;
 	type Worker = HostWorker<C>;
-	// type Renderer = HostRenderer;
+
 	fn clock(&self) -> &Self::Clock {
 		&self.clock
 	}
 	fn worker(&self) -> &HostWorker<C> {
 		&self.worker
 	}
-	// fn renderer(&mut self) -> &mut Self::Renderer {
-	// 	&mut self.renderer
-	// }
 }
-#[cfg(not(target_arch = "wasm32"))]
+
+#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 impl<C> Worker<C> for HostWorker<C>
 where
 	C: Ctx,
@@ -405,6 +450,7 @@ pub struct Connected {
 	#[cfg(all(feature = "wasm32"))]
 	pub api: WebApiClient,
 }
+
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Disconnected;
 
@@ -416,7 +462,7 @@ where
 	clock: HostClock,
 	worker: HostWorker<C>,
 
-	#[cfg(not(target_arch = "wasm32"))]
+	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 	pub runtime: tokio::runtime::Runtime,
 }
 
@@ -424,7 +470,7 @@ where
 #[derive(Clone, Default)]
 pub struct HostClock;
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 #[derive(Clone)]
 pub struct HostClock {
 	handle: tokio::runtime::Handle,
@@ -433,38 +479,21 @@ pub struct HostRenderer;
 
 pub struct HostWorker<C: Ctx> {
 	_phantom: PhantomData<C>,
-	#[cfg(not(target_arch = "wasm32"))]
+	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 	runtime: Arc<tokio::runtime::Runtime>,
 }
 
-impl Ctx for WebContext {
-	type State = WebState;
-	fn state(&self) -> &Self::State {
-		self.state()
-	}
+#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+#[derive(Clone, Default)]
+pub struct NativeState {
+	pub menu_bar: Option<MenuBar>,
+	// pub tray_clock: Option<MenuBar>,
+	// pub tray_cursor: Arc<Option<TrayIcon>>,
+	// pub windows: Vec<AppWindow>,
 }
 
-#[derive(Clone, Debug, Default)]
-pub struct WebState;
 #[derive(Default)]
-pub struct WebContext;
-
-#[cfg(feature = "native")]
-impl Ctx for NativeContext {
-	type State = NativeState;
-
-	fn state(&self) -> &Self::State {
-		&self.state
-	}
-}
-#[derive(Debug, Default, Clone)]
-pub struct NativeState;
-
-#[cfg(feature = "native")]
-use crate::native::native_prelude::*;
-
-#[cfg(feature = "native")]
-#[derive(Default)]
+#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 pub struct NativeContext {
 	pub state: NativeState,
 	pub menu_bar: Option<MenuBar>,
@@ -472,3 +501,10 @@ pub struct NativeContext {
 	pub tray_cursor: Option<TrayIcon>,
 	pub windows: Vec<AppWindow>,
 }
+
+#[cfg(all(feature = "web", target_arch = "wasm32"))]
+#[derive(Default)]
+pub struct WebContext;
+
+#[derive(Clone, Debug, Default)]
+pub struct WebState;

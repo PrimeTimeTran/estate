@@ -21,16 +21,28 @@ icon = ["assets/icon.icns"]
 # path = "src/bin/daemon.rs"
 
 [[bin]]
-name = "web"
-path = "src/bin/web.rs"
-required-features = ["web"]
-target = "wasm32-unknown-unknown"
+name = "base"
+path = "src/bin/[base].rs"
 
-# https://doc.rust-lang.org/cargo/reference/cargo-targets.html#configuring-a-target
 [[bin]]
-name = "runner1"
-path = "src/bin/runner1.rs"
-required-features = ["native"]
+name = "dispatch"
+path = "src/bin/[dispatch].rs"
+
+[[bin]]
+name = "type-state"
+path = "src/bin/[type-state].rs"
+
+[[bin]]
+name = "type-state1"
+path = "src/bin/[type-state1].rs"
+
+[[bin]]
+name = "lifetime"
+path = "src/bin/lifetime/main.rs"
+
+[[bin]]
+name = "macros"
+path = "src/bin/macros.rs"
 
 [[bin]]
 name = "native"
@@ -40,6 +52,13 @@ required-features = ["native"]
 # target = "aarch64-apple-darwin"
 # 1. Run as native
 # cargo run --bin native --features=native
+
+# https://doc.rust-lang.org/cargo/reference/cargo-targets.html#configuring-a-target
+[[bin]]
+name = "runner1"
+path = "src/bin/runner1.rs"
+required-features = ["native"]
+
 
 [[bin]]
 name = "runner"
@@ -61,18 +80,17 @@ name = "threads"
 path = "src/bin/threads.rs"
 
 [[bin]]
-name = "lifetime"
-path = "src/bin/lifetime/main.rs"
+name = "web"
+path = "src/bin/web.rs"
+required-features = ["web"]
+target = "wasm32-unknown-unknown"
 
-[[bin]]
-name = "macros"
-path = "src/bin/macros.rs"
 
 # cargo nextest run --bin settings --test-threads 1 --no-fail-fast
 [features]
 # default = []
-# default = ["web"]
-default = ["native"]
+default = ["web"]
+# default = ["native"]
 # This overwrites IDE config causing diagnostics to be wrong given the targetted platform.
 #
 # To get IDE diagnostics functioning correctly remove the hardcoded default when troubleshooting another build target.

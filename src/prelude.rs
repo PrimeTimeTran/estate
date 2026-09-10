@@ -19,6 +19,8 @@ pub use std::{
 	},
 	time::{Duration, Instant, SystemTime},
 };
+
+
 pub use tokio_util::sync::CancellationToken;
 pub use uuid::Uuid;
 
@@ -46,6 +48,10 @@ pub use crate::{
 	r#trait as traits,
 	r#trait::{Context, EventReceiver, *},
 	ui::{config::*, theme::*, ui_prelude::*, ui_trait::*, *},
+};
+
+pub use crate::{
+	app::{app_entry::{self, Renderer}}
 };
 
 #[cfg(all(feature = "web", target_arch = "wasm32"))]

@@ -1,3 +1,8 @@
+#[path = "./composition.rs"]
+mod composition;
+#[path = "./comp-family.rs"]
+mod composition_family;
+
 fn main() {
 	// # Traits of Rust
 	//
@@ -61,8 +66,5 @@ fn main() {
 pub mod traits;
 use traits::*;
 
-pub use estate::{
-	app_macros::{section},
-	helpers,
-};
+pub use estate::{app_macros::section, helpers};
 pub use helpers::*;

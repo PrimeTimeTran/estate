@@ -49,9 +49,11 @@ wait "$SERVER_PID" 2>/dev/null || true
 echo "🌐 Checking web..."
 cargo -q build \
   --bin web \
+  --no-default-features \
   --target wasm32-unknown-unknown \
-  --features web \
-  --no-default-features
+  --features web
+
+# cargo -q build --bin web --no-default-features --target wasm32-unknown-unknown --features web
 
 echo "✅ [Web] build passed"
 

@@ -2,3 +2,11 @@
 channel = "nightly"
 components = ["rust-src", "rustfmt", "clippy"]
 targets = ["wasm32-unknown-unknown"]
+
+# Broken
+
+# [toolchain]
+# # channel = "nightly"
+# # components = ["rust-src", "rustfmt", "clippy"]
+# channel = "stable"
+# targets = ["wasm32-unknown-unknown"]

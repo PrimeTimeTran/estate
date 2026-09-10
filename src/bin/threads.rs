@@ -23,18 +23,22 @@ fn main() {
 	rw_lock_serializes_mutable_access();
 	println!("{:?} Main Thread done", thread::current().id());
 }
+
+/// ## [Thread::spawn]
+/// 
+/// Both main and this function/thread are executed asynchronously
+/// so the following prints are not guaranteed to print
+///
+/// A call to `thread::spawn()` returns a handle which can be used to ensure
+/// that this thread must complete before it's parent process can exit.
+/// t2.join().unwrap();
+/// 
 fn threads_are_async() {
-	let t2 = thread::spawn(|| {
-		/// Both main and this function/thread are executed asynchronously
-		/// so the following prints are not guaranteed to print
-		///
-		/// A call to `thread::spawn()` returns a handle which can be used to ensure
-		/// that this thread must complete before it's parent process can exit.
-		/// t2.join().unwrap();
+	let t2: thread::JoinHandle<()> = thread::spawn(|| {
 		println!("{:?} Spawned thread '2' running...", thread::current().id());
 		println!("{:?} thread '2' done", thread::current().id())
 	});
-	// t2.join().unwrap();
+	let join = t2.join().unwrap();
 	println!("{:?} Spawned thread '2' done", thread::current().id());
 }
 fn demo_loop() {
@@ -186,7 +190,6 @@ fn arc_mutex_allows_shared_mutation() {
 	let t1 = thread::spawn(move || {
 		*c1.lock().unwrap() += 1;
 	});
-
 	let t2 = thread::spawn(move || {
 		*c2.lock().unwrap() += 100;
 	});
@@ -245,8 +248,11 @@ fn mutex_does_not_make_separate_operations_atomic() {
 	//      │
 	//      └── coordinates PROGRESS OF THREADS
 }
+
+/// RwLock makes the entire mutable access
+/// through a write guard exclusive, so concurrent writers
+/// cannot operate on stale copies of the protected value.
 fn rw_lock_serializes_mutable_access() {
-	// RwLock makes the entire mutable access through a write guard exclusive, so concurrent writers cannot operate on stale copies of the protected value.
 	let counter = Arc::new(RwLock::new(0));
 	let c1 = Arc::clone(&counter);
 	let c2 = Arc::clone(&counter);

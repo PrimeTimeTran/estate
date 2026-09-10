@@ -1,6 +1,5 @@
-use crate::prelude::*;
+use crate::{prelude::*, ui::*};
 
-use crate::ui::*;
 use eframe::{self, Frame, WebOptions, WebRunner};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::{JsCast, JsValue, prelude::*};
@@ -213,25 +212,17 @@ pub struct Payload {
 	pub id: u64,
 	pub name: String,
 	pub active: bool,
-
 	pub count: i32,
 	pub score: f32,
 	pub price: f64,
-
 	pub optional: Option<String>,
-
 	pub tags: Vec<String>,
 	pub values: Vec<i64>,
-
 	pub meta_hashmap: HashMap<String, String>,
 	pub meta_hashset: HashSet<(String, String)>,
-
 	pub bytes: Vec<u8>,
-
 	pub address: Address,
-
 	pub status: Status,
-
 	pub children: Vec<Child>,
 }
 

@@ -1,32 +1,99 @@
-use crate::prelude::{traits::Ctx, *};
+use crate::{
+	doc,
+	prelude::{traits::Ctx, *},
+	ui, ui_prelude as gui,
+};
+
+use anyhow::anyhow;
+
+mod impls {
+	use super::structs::*;
+	use crate::prelude::*;
+
+	impl<C> Clone for S<C> {
+		fn clone(&self) -> Self {
+			Self {
+				context: PhantomData,
+				state: PhantomData,
+				view: self.view.clone(),
+			}
+		}
+	}
+	/// Manually implement Default specifically for S<C>
+	///
+	impl Default for S<C> {
+		fn default() -> Self {
+			S {
+				view: ViewType::MarkdownScreen,
+				context: PhantomData,
+				state: PhantomData,
+			}
+		}
+	}
+}
+
+mod structs {
+	use super::impls::*;
+	use crate::prelude::*;
+
+	pub struct Linux;
+	pub struct MacOS;
+	pub struct Windows;
+
+	pub struct C;
+
+	/// State vs Context is like "Nature vs Nurture",there is no perfect answer to what drives what.
+	/// Every state depends on some context which depending on how you think of it, might be considered "state" as well.
+	///
+	/// So for now, in order to implement a Type State system robustly, we're going to agree that all apps/processes must come from a context.
+	///
+	/// Linux, MacOS, Windows, they're all contexts in which the app can run so we begin our app with that assumption for modeling more robustly.
+	///
+	#[derive(Debug)]
+	pub struct S<C> {
+		pub context: PhantomData<C>,
+		pub state: PhantomData<C>,
+		pub view: ViewType,
+	}
+}
+
+#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+use crate::app::host::NativeContext;
+
+#[cfg(all(feature = "web", target_arch = "wasm32"))]
+use crate::app::host::WebContext;
+
 impl<C> App<C>
 where
 	C: Ctx + 'static,
 {
 	pub fn new(host: Host<C>) -> Result<Self> {
 		tracing::debug!("App New");
-		#[cfg(not(target_arch = "wasm32"))]
+
+		#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 		let (cursor_event_tx, cursor_events) = std::sync::mpsc::channel();
+		let state = structs::S::default();
 		Ok(Self {
+			state,
 			host,
 			workers: vec![],
-			gui: None,
-			#[cfg(not(target_arch = "wasm32"))]
+			#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 			cursor_events,
-			#[cfg(not(target_arch = "wasm32"))]
+			#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 			cursor_event_tx,
 		})
 	}
+	pub fn context(self) -> Arc<C> {
+		self.host.context()
+	}
 
+	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 	fn init_services(&mut self) -> Result<()> {
 		tracing::debug!("App init services");
-
-		let handle = self.start_clock()?;
-		tracing::debug!("clock handle created");
-		self.workers.push(handle);
-
-		#[cfg(not(target_arch = "wasm32"))]
+		#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 		{
+			let handle = self.start_clock()?;
+			self.workers.push(handle);
 			let handle = self.start_cargo_watcher()?;
 			tracing::debug!("cargo handle created");
 			self.workers.push(handle);
@@ -35,17 +102,15 @@ where
 			tracing::debug!("cursor handle created");
 			self.workers.push(handle);
 		}
-
 		tracing::debug!("App init services complete");
 		Ok(())
 	}
 	pub fn run(&mut self) -> Result<()> {
 		tracing::debug!("App run");
-		self.init_services()?;
-		#[cfg(not(target_arch = "wasm32"))]
+		// self.init_services()?;
+		#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 		{
-			self.host.wait_for_shutdown();
-			self.shutdown();
+			self.run_gui()?;
 		}
 
 		#[cfg(target_arch = "wasm32")]
@@ -55,32 +120,66 @@ where
 
 		Ok(())
 	}
+
 	fn run_gui(&mut self) -> Result<()> {
 		let cancel = CancellationToken::new();
-		let mut gui_app = GuiApp {
-			state: self.host.context().state().clone(),
-			cancel,
-		};
 		let event_loop = EventLoop::<AppEvent>::with_user_event()
 			.build()
 			.expect("failed to build GUI event loop");
+		let proxy = event_loop.create_proxy();
+		#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+		self.start_app_events(proxy.clone());
+		#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+		let mut renderer =
+			Renderer::<NativeContext, structs::S<structs::C>>::new(self.state.clone(), cancel);
+		#[cfg(all(feature = "web", target_arch = "wasm32"))]
+		let mut renderer: Renderer<WebContext, structs::S<structs::C>> =
+			Renderer::<WebContext, structs::S<structs::C>>::new(self.state.clone(), cancel);
+
+		#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 		event_loop
-			.run_app(&mut gui_app)
-			.map_err(|err| anyhow::anyhow!("GUI event loop failed: {err}"))
+			.run_app(&mut renderer)
+			.map_err(|err| anyhow::anyhow!("GUI event loop failed: {err}"));
+		Ok(())
 	}
 	pub fn shutdown(&mut self) {
 		tracing::debug!("App shutdown");
-
 		for worker in &self.workers {
 			worker.stop();
 		}
-
-		if let Some(gui) = &self.gui {
-			gui.stop();
-		}
 	}
 
-	#[cfg(not(target_arch = "wasm32"))]
+	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+	fn start_app_events(
+		&mut self,
+		proxy: EventLoopProxy<AppEvent>,
+	) -> Result<WorkHandle<C, tokio::task::JoinHandle<()>>> {
+		let handle = self.host.worker().run_background(move |cancel| async move {
+			tracing::info!("🔥 APP EVENTS TASK STARTED");
+			loop {
+				tokio::select! {
+					_ = cancel.cancelled() => {
+						tracing::info!("🔥 APP EVENTS CANCELLED");
+						break;
+					}
+					_ = tokio::time::sleep(Duration::from_secs(5)) => {
+						tracing::info!("🔥 APP EVENTS SENDING");
+							match proxy.send_event(AppEvent::RuntimeEvent) {
+								Ok(()) => {
+									tracing::info!("🔥 RuntimeEvent SENT");
+								}
+								Err(err) => {
+									tracing::error!(?err, "🔥 RuntimeEvent FAILED");
+								}
+							}
+					}
+				}
+			}
+		});
+		Ok(handle)
+	}
+
+	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 	fn start_cargo_watcher(&mut self) -> Result<WorkHandle<C, tokio::task::JoinHandle<()>>> {
 		tracing::debug!("cargo: entered");
 
@@ -143,16 +242,14 @@ where
 			tracing::debug!("Cargo watcher stopped");
 		}))
 	}
+
 	fn start_clock(&mut self) -> Result<WorkHandle<C, tokio::task::JoinHandle<()>>> {
 		let clock = self.host.clock();
 		let msg = String::from("App.start_clock.clock.run_background(Duration::from_secs(1));");
 		Ok(clock.run_background(Duration::from_secs(1), msg))
 	}
+
 	fn start_clock_wasm(&mut self) {
-		// self
-		// 	.host
-		// 	.clock()
-		// 	.inherent_background_tick(String::from("self.host.clock().inherent_background_tick"));
 		let clock = self.host.clock();
 		// clock.inherent_background_tick(String::from(
 		// 	"let clock = self.host.clock(); clock.inherent_background_tick",
@@ -181,283 +278,47 @@ where
 	}
 }
 
-impl<S> ApplicationHandler<AppEvent> for GuiApp<S>
-where
-	S: Send + Sync + 'static,
-{
-	fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
-		tracing::debug!("about_to_wait");
-		// self.app.update();
-		#[cfg(not(target_arch = "wasm32"))]
-		while let Ok(event) = MenuEvent::receiver().try_recv() {
-			// self.handle_event(event, event_loop);
-		}
-	}
-	fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-		tracing::debug!("Resumed");
-		// todo!("")
-		// if self.context().menu_bar.is_none() {
-		// 	// let menu = Self::menu_bar(true);
-		// 	// menu.init_for_nsapp();
-		// 	// self.menu_bar = Some(menu);
-		// }
-		// if self.context().windows.is_empty() {
-		// 	// self.open_window(event_loop, crate::START_WINDOW);
-		// }
-		// if self.context().tray_clock.is_none() {
-		// 	// let (menu, tray) = match Self::bootstrap() {
-		// 	// 	Ok(value) => value,
-		// 	// 	Err(error) => {
-		// 	// 		tracing::error!(%error, "failed to bootstrap tray");
-		// 	// 		return;
-		// 	// 	}
-		// 	// };
-		// 	// self.menu = Some(menu);
-		// 	// self.tray_clock = Some(tray);
-		// 	tracing::debug!("🔥 main tray initialized");
-		// }
-		// if self.context().tray_cursor.is_none() {
-		// 	match TrayIconBuilder::new()
-		// 		.with_icon(scroll_tray_icon())
-		// 		.with_tooltip("Estate Scroll Controller")
-		// 		.build()
-		// 	{
-		// 		Ok(tray) => {
-		// 			self.context().tray_cursor = Some(tray);
-		// 			tracing::debug!("🔥 scroll tray initialized");
-		// 		}
-		// 		Err(error) => {
-		// 			tracing::error!(%error, "failed to create scroll tray");
-		// 		}
-		// 	}
-		// }
-	}
-	fn window_event(
-		&mut self,
-		event_loop: &ActiveEventLoop,
-		window_id: WindowId,
-		event: WindowEvent,
-	) {
-		println!("window_event");
-		// let Some(window) = self.state() else {
-		// 	return;
-		// };
-		// let response = window
-		// 	.window
-		// 	.gui_state
-		// 	.on_window_event(&window.window.instance, &event);
-		// if response.repaint {
-		// 	window.window.instance.request_redraw();
-		// }
-		match event {
-			// WindowEvent::CloseRequested => {
-			// 	tracing::debug!("🛑 Window close requested for id: {:?}", window_id);
-			// 	self
-			// 		.windows
-			// 		.retain(|window| window.window.instance.id() != window_id);
-			// 	return;
-			// }
-			// WindowEvent::RedrawRequested => {
-			// 	if window.window.occluded {
-			// 		return;
-			// 	}
-			// 	let menu = {
-			// 		let event_rx = self.app.engine.runtime().subscribe();
-			// 		let mut ctx = AppContext {
-			// 			app: &mut self.app,
-			// 			input: IOState::default(),
-			// 			event_rx,
-			// 			last_revision: 0,
-			// 		};
-			// 		if let Err(e) = window.window.draw(&mut ctx) {
-			// 			tracing::error!("DEV >>> draw failed: {e:#}");
-			// 		}
-			// 	};
-			// }
-			// WindowEvent::Focused(true) => {
-			// 	window.window.instance.request_redraw();
-			// }
-			// WindowEvent::Occluded(occluded) => {
-			// 	window.window.occluded = occluded;
-			// 	if !occluded {
-			// 		window.window.instance.request_redraw();
-			// 	}
-			// }
-			// WindowEvent::Resized(size) => {
-			// 	if size.width == 0 || size.height == 0 {
-			// 		return;
-			// 	}
-			// 	// window.window.config.width = size.width;
-			// 	// window.window.config.height = size.height;
-			// 	// window
-			// 	// 	.window
-			// 	// 	.surface
-			// 	// 	.configure(&window.window.device, &window.window.config);
-			// 	// window.window.needs_resize = false;
-			// 	// window.window.instance.request_redraw();
-			// }
-			_ => {}
-		}
-	}
+#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 
-	fn user_event(&mut self, event_loop: &ActiveEventLoop, event: AppEvent) {
-		tracing::debug!("user_event");
-		// match event {
-		// 	AppEvent::RuntimeEvent => {
-		// 		// self.app.update();
-		// 		// self.sync_views();
-		// 	}
-		// 	AppEvent::Navigate(view) => {
-		// 		// self.host.run();
-		// 		// self.host.worker().
-		// 		self
-		// 			.host
-		// 			.worker()
-		// 			.runtime
-		// 			.spawn(e::Event::app(e::Klass::Navigate(view)));
-		// 		// self.runtime().emit(e::Event::app(e::Klass::Navigate(view)));
-		// 		// self.app.update();
-		// 		// self.sync_views();
-		// 	}
-		// 	AppEvent::Shutdown => {
-		// 		tracing::debug!(">>> shutdown event received");
-		// 		self.shutdown();
-
-		// 		tracing::debug!(">>> event_loop.exit() called");
-		// 	}
-		// 	AppEvent::CursorPosition { x, y } => {
-		// 		// let text = format!("↖ {:.0}  {:.0}", x, y);
-		// 		// let text = format!("← {:.0}  {:.0}", x, y);
-		// 		// let text = format!("→ {:.0}  {:.0}", x, y);
-		// 		// let text = format!("↑ {:.0}  {:.0}", x, y);
-		// 		// let text = format!("● {:.0}, {:.0}", x, y);
-		// 		// let text = format!("◉ {:.0}, {:.0}", x, y);
-		// 		let text = format!("⌖ {:.0}, {:.0}", x, y);
-		// 		// let text = format!("🟢 {:.0}, {:.0}", x, y);
-		// 		// let text = format!("🔵 {:.0}, {:.0}", x, y);
-		// 		// let text = format!("🟡 {:.0}, {:.0}", x, y);
-		// 		// let text = format!("🔴 {:.0}, {:.0}", x, y);
-		// 		// let region = if x < 960.0 { "← LEFT" } else { "RIGHT →" };
-		// 		if let Some(tray) = &self.tray_cursor {
-		// 			let _ = tray.set_title(Some(text));
-		// 		}
-		// 	}
-		// 	AppEvent::TickClock(text) => {
-		// 		if let Some(tray) = &self.context().tray_clock {
-		// 			// let _ = tray.set_title(Some(text));
-		// 		}
-		// 		// self.sync_views();
-		// 	}
-		// 	AppEvent::ModifiersChanged {
-		// 		alt,
-		// 		command,
-		// 		ctrl,
-		// 		shift,
-		// 	} => {}
-		// 	_ => {}
-		// }
-	}
-}
-impl GuiHandle {
-	pub fn stop(&self) {
-		let _ = self.proxy.send_event(AppEvent::Shutdown);
-	}
-	pub fn send(&self, event: AppEvent) -> Result<(), EventLoopClosed<AppEvent>> {
-		self.proxy.send_event(event)
-	}
-}
 impl traits::Renderer for HostRenderer {
 	#[cfg(target_arch = "wasm32")]
 	fn render(&mut self) {
 		// wasm rendering
 	}
-	#[cfg(not(target_arch = "wasm32"))]
+	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 	fn render(&mut self) {
 		// native rendering
 	}
 }
 
-impl<C> WorkHandle<C, std::thread::JoinHandle<()>>
-where
-	C: Ctx,
-{
-	pub fn join(self) -> std::thread::Result<()> {
-		self.join()
-	}
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-impl<C> WorkHandle<C, tokio::task::JoinHandle<()>>
-where
-	C: Ctx,
-{
-	pub async fn join(self) -> Result<JoinHandle<()>> {
-		Ok(self.join)
-	}
-}
-impl<C, J> WorkHandle<C, J>
-where
-	C: Ctx,
-{
-	#[cfg(not(target_arch = "wasm32"))]
-	pub fn new(cancel: CancellationToken, join: J) -> Self {
+impl<C, S> Renderer<C, S> {
+	pub fn new(state: S, cancel: CancellationToken) -> Self {
 		Self {
 			cancel,
-			join,
-			_phantom: PhantomData,
+			state,
+			phantom: PhantomData,
+			view: ViewType::MarkdownScreen,
+			#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+			windows: vec![],
 		}
-	}
-
-	#[cfg(target_arch = "wasm32")]
-	pub fn new(cancel: CancellationToken) -> Self {
-		Self {
-			cancel,
-			_phantom: PhantomData,
-		}
-	}
-
-	pub fn stop(&self) {
-		self.cancel.cancel();
 	}
 }
 
 pub struct App<C: Ctx> {
-	pub gui: Option<GuiHandle>,
+	state: structs::S<structs::C>,
 	pub host: Host<C>,
 	pub workers: Vec<WorkHandle<C, tokio::task::JoinHandle<()>>>,
-	#[cfg(not(target_arch = "wasm32"))]
+	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 	pub cursor_events: std::sync::mpsc::Receiver<CursorEvent>,
-	#[cfg(not(target_arch = "wasm32"))]
+	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 	pub cursor_event_tx: std::sync::mpsc::Sender<CursorEvent>,
 }
-#[derive(Debug, Clone)]
-pub struct CursorDaemon<S> {
-	pub sink: S,
-	pub cancel: CancellationToken,
-}
 
-#[derive(Debug, Clone, Copy)]
-pub struct CursorPosition {
-	pub x: f64,
-	pub y: f64,
-}
-
-pub struct GuiApp<S> {
+pub struct Renderer<C, S> {
+	phantom: PhantomData<C>,
 	pub state: S,
+	pub view: ViewType,
+	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+	pub windows: Vec<AppWindow>,
 	pub cancel: CancellationToken,
-}
-
-pub struct GuiHandle {
-	pub proxy: EventLoopProxy<AppEvent>,
-}
-
-// "This is a unit of work that I know how to stop."
-pub struct WorkHandle<C, J>
-where
-	C: Ctx,
-{
-	pub cancel: CancellationToken,
-	#[cfg(not(target_arch = "wasm32"))]
-	pub join: J,
-	_phantom: PhantomData<(C, J)>,
 }
