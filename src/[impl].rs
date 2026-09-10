@@ -7,6 +7,14 @@ use crate::{
 	structs::{C, S},
 };
 
+pub async fn sleep(duration: Duration) {
+	#[cfg(not(target_arch = "wasm32"))]
+	tokio::time::sleep(duration).await;
+
+	#[cfg(target_arch = "wasm32")]
+	gloo_timers::future::TimeoutFuture::new(duration.as_millis() as u32).await;
+}
+
 impl<C> Clone for S<C> {
 	fn clone(&self) -> Self {
 		Self {

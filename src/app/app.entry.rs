@@ -25,6 +25,7 @@ where
 		tracing::debug!("App init services complete");
 		Ok(())
 	}
+
 	pub fn run(&mut self) -> Result<()> {
 		tracing::debug!("App run");
 		self.init_services()?;
@@ -53,14 +54,15 @@ where
 			.build()
 			.expect("failed to build GUI event loop");
 		let proxy = event_loop.create_proxy();
-		self.start_app_events(proxy.clone());
+		let _handle = self.start_app_events(proxy.clone());
 		let mut renderer =
 			structs::Renderer::<NativeContext, structs::S<structs::C>>::new(self.state.clone(), cancel);
-		event_loop
+		let _loop = event_loop
 			.run_app(&mut renderer)
 			.map_err(|err| anyhow::anyhow!("GUI event loop failed: {err}"));
 		Ok(())
 	}
+	
 	pub fn shutdown(&mut self) {
 		tracing::debug!("App shutdown");
 		for worker in &self.workers {

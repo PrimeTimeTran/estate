@@ -419,14 +419,6 @@ pub trait Worker<C: Ctx> {
 	// 	Fut: Future<Output = ()> + 'static;
 }
 
-pub async fn sleep(duration: Duration) {
-	#[cfg(not(target_arch = "wasm32"))]
-	tokio::time::sleep(duration).await;
-
-	#[cfg(target_arch = "wasm32")]
-	gloo_timers::future::TimeoutFuture::new(duration.as_millis() as u32).await;
-}
-
 pub trait NativeCtx {
 	fn handle(&self) -> tokio::runtime::Handle;
 	fn shutdown(self);
