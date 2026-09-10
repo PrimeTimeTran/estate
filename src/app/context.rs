@@ -1,4 +1,4 @@
-use crate::{Executor, app::*, e, prelude::*, traits::EventReceiver};
+use crate::{e, prelude::*};
 
 // The lifetimes 'a and 'static in your code tell a precise story about memory ownership, data borrows, and concurrency safety.
 // Here is exactly what each lifetime communicates to the Rust compiler and to other developers:
@@ -45,7 +45,7 @@ pub struct AppContext<'a, R: Runtime, E> {
 // ## 2. What the 'static constraint tells you
 // The + 'static on impl<'a, R: Runtime + 'static> AppContext<'a, R> tells
 // us that the underlying runtime implementation (R) must be completely free of short-lived borrows.
-impl<'a, R: Runtime + 'static, E: Executor> AppContext<'a, R, E> {
+impl<'a, R: Runtime + 'static, E: traits::Executor> AppContext<'a, R, E> {
 	pub fn load_problems(&mut self) {
 		tracing::info!("load_problems");
 		self.app.load_problems()

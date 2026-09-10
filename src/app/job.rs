@@ -1,24 +1,7 @@
 use crate::prelude::*;
 
-/// ## [Job]
-///
-#[derive(Debug, Clone, Eq, Deserialize, PartialEq, Serialize)]
-pub struct Job {
-	pub id: Uuid,
-	pub task_id: Uuid,
-	pub kind: TaskKind,
-	pub status: JobStatus,
-
-	pub created_at: u64,
-	pub started_at: Option<u64>,
-	pub completed_at: Option<u64>,
-}
-
-
 /// ## [JobStatus]
-/// 
-/// 
-/// 
+///
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 pub enum JobStatus {
 	Pending,
@@ -26,6 +9,19 @@ pub enum JobStatus {
 	Completed,
 	Failed,
 	Cancelled,
+	Interrupted,
+}
+
+/// ## [TaskStatus]
+///
+///
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TaskStatus {
+	Pending,
+	Running,
+	Completed,
+	Failed(String),
+	Stopped,
 	Interrupted,
 }
 
@@ -52,12 +48,16 @@ impl JobStatus {
 	}
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum TaskStatus {
-	Pending,
-	Running,
-	Completed,
-	Failed(String),
-	Stopped,
-	Interrupted,
+/// ## [Job]
+///
+#[derive(Debug, Clone, Eq, Deserialize, PartialEq, Serialize)]
+pub struct Job {
+	pub id: Uuid,
+	pub task_id: Uuid,
+	pub kind: TaskKind,
+	pub status: JobStatus,
+
+	pub created_at: u64,
+	pub started_at: Option<u64>,
+	pub completed_at: Option<u64>,
 }

@@ -1,4 +1,5 @@
 //! # Estate
+//! 
 //! Idea is a "global workspace" the merges package configs across multiple shells, IDEs, & project types.
 //!
 //! ## Goal
@@ -16,7 +17,8 @@
 //! - [Laptop/Desktop](NativeApp)
 //! - [Web/Browser](WebApp)
 //!
-#![allow(warnings)]
+// #![allow(warnings)]
+
 // #![feature(associated_type_defaults)]
 
 // Disables unused input variables
@@ -48,7 +50,7 @@ pub mod util;
 pub use crate::app::app_prelude;
 pub use crate::app::event as e;
 pub use crate::r#macro as app_macros;
-pub use crate::ui::{theme::*, ui_prelude::*, *};
+pub use crate::ui::{ui_prelude::*, *};
 
 #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 pub mod native;

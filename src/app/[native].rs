@@ -1,8 +1,6 @@
 use crate::{
-	doc,
-	native::{native_prelude::*, *},
+	native::native_prelude::*,
 	prelude::{traits::Ctx, *},
-	ui, ui_prelude as gui,
 };
 
 impl Ctx for NativeContext {

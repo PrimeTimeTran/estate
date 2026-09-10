@@ -1,10 +1,4 @@
-use crate::{
-	doc,
-	prelude::{traits::Ctx, *},
-	ui, ui_prelude as gui,
-};
-
-use anyhow::anyhow;
+use crate::prelude::{traits::Ctx, *};
 
 impl<C> App<C>
 where
@@ -30,7 +24,6 @@ where
 		self.host.context()
 	}
 
-	// #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 	fn init_services(&mut self) -> Result<()> {
 		tracing::debug!("App init services");
 		let handle = self.start_clock()?;

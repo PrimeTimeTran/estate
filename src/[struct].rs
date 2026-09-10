@@ -50,14 +50,13 @@ pub struct Renderer<C, S> {
 	pub phantom: PhantomData<C>,
 	pub state: S,
 	pub view: ViewType,
+	pub cancel: CancellationToken,
 	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 	pub windows: Vec<AppWindow>,
-	pub cancel: CancellationToken,
 }
 
 /// # Shared application state
 ///
-/// ============================================================
 #[derive(Debug, Default, Clone)]
 pub struct AppState {
 	pub problems: ProblemListState,
@@ -98,18 +97,18 @@ pub struct EstateState {
 	pub jobs: VecDeque<Job>,
 }
 
-impl State {
-	pub fn new() -> Self {
-		Self {}
-	}
-}
-
-#[cfg(feature="native")]
+#[cfg(feature = "native")]
 #[derive(Clone)]
 pub struct HostClock {
 	pub handle: tokio::runtime::Handle,
 }
 
-#[cfg(feature="web")]
+#[cfg(feature = "web")]
 #[derive(Clone, Default)]
 pub struct HostClock;
+
+impl State {
+	pub fn new() -> Self {
+		Self {}
+	}
+}

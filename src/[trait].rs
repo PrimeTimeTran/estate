@@ -177,14 +177,6 @@ pub trait EventSink<E>: Send + Sync + 'static {
 	fn send(&self, event: E);
 }
 
-impl<E> EventSink<E> for std::sync::mpsc::Sender<E>
-where
-	E: Send + 'static,
-{
-	fn send(&self, event: E) {
-		let _ = self.send(event);
-	}
-}
 
 /// ## [Index]
 ///
