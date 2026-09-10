@@ -3,7 +3,7 @@ use crate::{data, prelude::*};
 use revelation::analyzer::Workspace;
 
 #[derive(Clone, Debug)]
-pub struct Connected {
+struct Connected {
 	task_tx: mpsc::Sender<DiscoveryTask>,
 }
 

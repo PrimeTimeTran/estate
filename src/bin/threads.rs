@@ -25,14 +25,14 @@ fn main() {
 }
 
 /// ## [Thread::spawn]
-/// 
+///
 /// Both main and this function/thread are executed asynchronously
 /// so the following prints are not guaranteed to print
 ///
 /// A call to `thread::spawn()` returns a handle which can be used to ensure
 /// that this thread must complete before it's parent process can exit.
 /// t2.join().unwrap();
-/// 
+///
 fn threads_are_async() {
 	let t2: thread::JoinHandle<()> = thread::spawn(|| {
 		println!("{:?} Spawned thread '2' running...", thread::current().id());

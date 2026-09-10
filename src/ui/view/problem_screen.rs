@@ -1,8 +1,10 @@
-use crate::model::{ProtoLanguage, StoredProblem, StoredSolution, StoredSubmission};
+use crate::{
+	model::{ProtoLanguage, StoredProblem, StoredSolution, StoredSubmission},
+	prelude::*,
+	proto::types::SubmissionStatus,
+	ui::Layout,
+};
 
-use crate::proto::types::SubmissionStatus;
-
-use crate::{e, prelude::*, ui::Layout};
 use egui::{ScrollArea, Ui};
 
 #[derive(Debug, Default)]

@@ -2,8 +2,6 @@
 //!
 //! # Description
 //!
-use crate::api::Api;
-
 pub use crate::prelude::*;
 
 #[derive(Clone, Debug)]
@@ -145,8 +143,6 @@ pub enum EstateScope {
 //                        ▼          ▼          ▼
 //                      Zed       VS Code      CLI
 
-use crate::prelude::*;
-
 // Anchor/bookmark store...? FS store...? Asset store?
 // - "I need a thing, give it to me"
 // pub trait Store {
@@ -224,8 +220,6 @@ pub struct Resolution {
 // }
 
 /// LSP, Linter, FS Registry/index,
-use crate::prelude::*;
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Change {
 	Created(Uuid),

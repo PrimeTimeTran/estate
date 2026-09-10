@@ -10,7 +10,7 @@ pub use egui::{
 pub use egui_commonmark::{CommonMarkCache, CommonMarkViewer};
 pub use egui_extras::{Column, TableBuilder};
 pub use egui_plot::{Bar, BarChart, Line, Plot, Points};
-pub use egui_wgpu::{Renderer, RendererOptions, wgpu};
+pub use egui_wgpu::{RendererOptions, wgpu};
 pub use global_hotkey::{
 	GlobalHotKeyEvent, GlobalHotKeyManager,
 	hotkey::{Code, HotKey, Modifiers},

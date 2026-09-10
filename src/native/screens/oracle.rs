@@ -1,4 +1,9 @@
-use crate::{app::*, e, native::{GestureController, TrackpadState}, prelude::*, ui::Layout};
+use crate::{
+	e,
+	native::{GestureController, TrackpadState},
+	prelude::*,
+	ui::Layout,
+};
 
 pub struct OracleScreen {
 	active_focus: FocusedPane,

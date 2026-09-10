@@ -44,7 +44,7 @@ where
 }
 
 /// "This is a unit of work that I know how to stop."
-/// 
+///
 pub struct WorkHandle<C, J>
 where
 	C: Ctx,

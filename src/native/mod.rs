@@ -1,5 +1,3 @@
-
-
 pub mod agent;
 pub mod backend;
 pub mod daemon;
@@ -19,6 +17,7 @@ pub mod ui;
 pub mod window;
 
 pub use self::{discovery::*, native_prelude::*, scroll::*};
+
 pub use screens::*;
 
 #[cfg(target_os = "linux")]
@@ -31,10 +30,8 @@ pub mod windows;
 pub mod macos;
 
 use crate::{
-	doc,
 	prelude::{traits::Ctx, *},
 	ui::*,
-	ui_prelude as gui,
 };
 
 impl<NativeCtx, S> ApplicationHandler<AppEvent> for structs::Renderer<NativeCtx, S>

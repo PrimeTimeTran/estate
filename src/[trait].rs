@@ -1,8 +1,8 @@
 //! ## [Traits]
 //!
 //! The collection of traits used through the codebase
-//! 
-//! 
+//!
+//!
 //!
 use crate::{RuntimeState, e, prelude::*};
 
@@ -176,7 +176,6 @@ pub trait Executor: Clone + 'static {
 pub trait EventSink<E>: Send + Sync + 'static {
 	fn send(&self, event: E);
 }
-
 
 /// ## [Index]
 ///

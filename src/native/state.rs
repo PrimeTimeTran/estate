@@ -1,7 +1,5 @@
-use crate::{native::{self, resolver}, prelude::*};
+use crate::{native::resolver, prelude::*};
 
-#[derive(Clone, Debug)]
-pub struct NativeStateStore;
 impl NativeStateStore {
 	pub fn new() -> Result<Self> {
 		Ok(Self {})
@@ -27,7 +25,7 @@ impl StateStore for NativeStateStore {
 		Ok(serde_json::from_str(&raw)?)
 	}
 	fn save(&self, state: &EstateState) -> Result<()> {
-		let path = native::resolver::engine_data_dir()?.join("state.json");
+		let path = crate::native::resolver::engine_data_dir()?.join("state.json");
 
 		let json = serde_json::to_string_pretty(state)?;
 		fs::write(path, json)?;
@@ -64,3 +62,6 @@ impl EstateState {
 		Ok(())
 	}
 }
+
+#[derive(Clone, Debug)]
+pub struct NativeStateStore;

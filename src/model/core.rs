@@ -13,8 +13,6 @@
 //! Core business logic for resolving links, workspace indexing, namespace resolution, package management.
 //!
 
-#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-use crate::native::DiscoveryStore;
 use crate::prelude::*;
 
 /// ## [Estate]

@@ -15,7 +15,7 @@
 // estate fmt path/to/file.rs
 // ```
 
-use estate::{prelude::*};
+use estate::prelude::*;
 
 /// ## [Native Entry]
 ///

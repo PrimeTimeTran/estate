@@ -1,5 +1,5 @@
 //! # Estate
-//! 
+//!
 //! Idea is a "global workspace" the merges package configs across multiple shells, IDEs, & project types.
 //!
 //! ## Goal
@@ -47,19 +47,20 @@ pub mod traits;
 pub mod ui;
 pub mod util;
 
-pub use crate::app::app_prelude;
-pub use crate::app::event as e;
-pub use crate::r#macro as app_macros;
-pub use crate::ui::{ui_prelude::*, *};
+pub use crate::{
+	app::{app_prelude, event as e},
+	r#macro as app_macros,
+	ui::{ui_prelude::*, *},
+};
 
 #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 pub mod native;
+
+#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+pub mod server;
 
 #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 pub use crate::native::state as native_state;
 
 #[cfg(all(feature = "web", target_arch = "wasm32"))]
 pub mod web;
-
-#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-pub mod server;

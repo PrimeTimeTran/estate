@@ -1,4 +1,4 @@
-use crate::{model::*};
+use crate::model::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Difficulty {

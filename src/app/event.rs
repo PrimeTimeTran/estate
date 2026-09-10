@@ -25,8 +25,8 @@
 pub use crate::prelude::*;
 
 /// # Create Events
-/// 
-/// A namespace for creating events 
+///
+/// A namespace for creating events
 ///
 /// ### Example
 ///

@@ -1,6 +1,9 @@
-use core_foundation::{date::CFTimeInterval, runloop::kCFRunLoopDefaultMode};
+use core_foundation::runloop::kCFRunLoopDefaultMode;
 
-use crate::{native::{CursorDaemon, CursorPosition}, prelude::*};
+use crate::{
+	native::{CursorDaemon, CursorPosition},
+	prelude::*,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScrollDirection {

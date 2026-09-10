@@ -251,4 +251,3 @@ impl<S, T> Ctx<T> for App<S> {
 	fn update() {}
 	fn delete() {}
 }
-Self::

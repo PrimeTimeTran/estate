@@ -1,28 +1,198 @@
 use crate::{doc, prelude::anyhow::anyhow, prelude::*, ui, ui_prelude as gui};
 
-pub use egui_winit::State;
-pub use objc2_app_kit::{NSApplication, NSApplicationActivationPolicy};
-pub use objc2_foundation::MainThreadMarker;
-pub use tray_icon::menu::{MenuItem, Submenu};
+use objc2_app_kit::{NSApplication, NSApplicationActivationPolicy};
+use objc2_foundation::MainThreadMarker;
+use tray_icon::menu::{MenuItem, Submenu};
 
-pub struct Window {
-	screen: ui::ScreenInstance<NativeRuntime, NativeExecutor>,
-	// This Surface contains/borrows something that is guaranteed to be valid for the 'static lifetime.
-	pub surface: gui::wgpu::Surface<'static>,
-	pub config: gui::wgpu::SurfaceConfiguration,
-	pub device: wgpu::Device,
-	pub gui_ctx: gui::Context,
-	pub gui_state: egui_winit::State,
-	pub instance: Arc<winit::window::Window>,
-	pub kind: WindowType,
-	pub needs_resize: bool,
-	pub occluded: bool,
-
-	pending_textures: gui::TexturesDelta,
-	queue: wgpu::Queue,
-	renderer: gui::Renderer,
+// WIP: Self Activating Select
+fn build_egui(event_loop: &ActiveEventLoop) -> (gui::Context, egui_winit::State) {
+	let ctx = gui::Context::default();
+	ctx.global_style_mut(|style| {
+		style.interaction.selectable_labels = true;
+		style.interaction.multi_widget_text_select = true;
+		style.visuals.widgets.hovered = style.visuals.widgets.inactive.clone();
+		style.visuals.widgets.active = style.visuals.widgets.inactive.clone();
+	});
+	// ctx.memory_mut(|memory| {
+	// 	memory.surrender_focus();
+	// });
+	let state = egui_winit::State::new(
+		ctx.clone(),
+		gui::ViewportId::ROOT,
+		event_loop,
+		None,
+		None,
+		None,
+	);
+	(ctx, state)
+}
+fn build_window(event_loop: &ActiveEventLoop) -> Result<Arc<winit::window::Window>> {
+	let width = 1920;
+	let height = 1280;
+	let icon_file = include_bytes!("../../assets/icon.png");
+	let icon = {
+		let image = image::load_from_memory(icon_file)
+			.expect("failed to load icon")
+			.into_rgba8();
+		let (width, height) = image.dimensions();
+		winit::window::Icon::from_rgba(image.into_raw(), width, height)?
+	};
+	let mut attrs = winit::window::Window::default_attributes()
+		.with_title("Estate Dev")
+		.with_inner_size(PhysicalSize::new(width, height))
+		.with_window_icon(Some(icon));
+	// .with_window_level(WindowLevel::AlwaysOnTop);
+	// Calculate bottom-right screen coordinates if a monitor is available
+	if let Some(monitor) = event_loop
+		.primary_monitor()
+		.or_else(|| event_loop.available_monitors().next())
+	{
+		let screen_size = monitor.size();
+		let scale_factor = monitor.scale_factor();
+		// Optional: leave a small margin (e.g., 40 pixels) away from the edge/dock
+		// let margin_x = (40.0 * scale_factor) as i32;
+		// let margin_y = (60.0 * scale_factor) as i32;
+		// let x = screen_size.width as i32 - width as i32 - margin_x;
+		// let y = screen_size.height as i32 - height as i32 - margin_y;
+		let x = (screen_size.width as i32) - (width as i32);
+		let y = (screen_size.height as i32) - (height as i32);
+		attrs = attrs.with_position(PhysicalPosition::new(x.max(0), y.max(0)));
+	} else {
+		// Fallback position if no monitor info is found
+		attrs = attrs.with_position(PhysicalPosition::new(100, 100));
+	}
+	let window = event_loop.create_window(attrs)?;
+	// Force macOS to show a Dock icon and participate in Cmd + Tab
+	#[cfg(target_os = "macos")]
+	{
+		{
+			let mtm = MainThreadMarker::new().expect("must be on the main thread");
+			let app = NSApplication::sharedApplication(mtm);
+			app.setActivationPolicy(NSApplicationActivationPolicy::Regular);
+			app.activateIgnoringOtherApps(true);
+		}
+	}
+	Ok(Arc::new(window))
+}
+fn build_renderer(
+	surface: &wgpu::Surface<'_>,
+	adapter: wgpu::Adapter,
+	device: &wgpu::Device,
+	size: PhysicalSize<u32>,
+) -> Result<
+	(
+		wgpu::wgt::SurfaceConfiguration<Vec<wgpu::TextureFormat>>,
+		egui_wgpu::Renderer,
+	),
+	Error,
+> {
+	let caps = surface.get_capabilities(&adapter);
+	let format = caps
+		.formats
+		.iter()
+		.copied()
+		.find(|format| {
+			matches!(
+				format,
+				wgpu::TextureFormat::Bgra8Unorm | wgpu::TextureFormat::Rgba8Unorm
+			)
+		})
+		.or_else(|| caps.formats.first().copied())
+		.ok_or_else(|| anyhow!("GPU surface has no supported formats"))?;
+	let present_mode = caps
+		.present_modes
+		.iter()
+		.copied()
+		.find(|mode| *mode == wgpu::PresentMode::Fifo)
+		.unwrap_or(wgpu::PresentMode::Fifo);
+	let alpha_mode = caps
+		.alpha_modes
+		.first()
+		.copied()
+		.ok_or_else(|| anyhow!("GPU surface has no alpha modes"))?;
+	let config = wgpu::SurfaceConfiguration {
+		format,
+		alpha_mode,
+		present_mode,
+		view_formats: vec![],
+		width: size.width.max(1),
+		height: size.height.max(1),
+		desired_maximum_frame_latency: 2,
+		color_space: gui::SurfaceColorSpace::Auto,
+		usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+	};
+	surface.configure(device, &config);
+	let renderer = egui_wgpu::Renderer::new(device, format, egui_wgpu::RendererOptions::default());
+	Ok((config, renderer))
+}
+fn create_gpu_surface(
+	event_loop: &ActiveEventLoop,
+) -> Result<(
+	Arc<winit::window::Window>,
+	wgpu::Instance,
+	wgpu::Surface<'static>,
+)> {
+	let window = build_window(event_loop)?;
+	let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle());
+	let surface = { instance.create_surface(window.clone())? };
+	Ok((window, instance, surface))
+}
+fn initialize_gpu(
+	instance: &wgpu::Instance,
+	surface: &wgpu::Surface<'_>,
+) -> Result<(gui::Adapter, gui::Device, wgpu::Queue)> {
+	let adapter = pollster::block_on(instance.request_adapter(
+		&(wgpu::RequestAdapterOptions {
+			apply_limit_buckets: true,
+			power_preference: wgpu::PowerPreference::HighPerformance,
+			compatible_surface: Some(&surface),
+			force_fallback_adapter: false,
+		}),
+	))
+	.map_err(|e| anyhow!("failed to find suitable GPU adapter: {e}"))?;
+	let (device, queue) = pollster::block_on(adapter.request_device(
+		&(wgpu::DeviceDescriptor {
+			experimental_features: wgpu::ExperimentalFeatures::disabled(),
+			label: Some("estate-dev-device"),
+			required_features: wgpu::Features::empty(),
+			required_limits: wgpu::Limits::default(),
+			memory_hints: wgpu::MemoryHints::Performance,
+			trace: wgpu::Trace::Off,
+		}),
+	))?;
+	Ok((adapter, device, queue))
 }
 
+impl GlobalHotkeys {
+	pub fn new() -> Result<Self> {
+		let manager = GlobalHotKeyManager::new()?;
+		let hotkey = HotKey::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyP);
+		let hotkey_id = hotkey.id();
+		manager.register(hotkey)?;
+		Ok(Self {
+			manager,
+			hotkey_id,
+			shutdown: Arc::new(AtomicBool::new(false)),
+		})
+	}
+	pub fn start(&self) {
+		let shutdown = Arc::clone(&self.shutdown);
+		let hotkey_id = self.hotkey_id;
+		std::thread::spawn(move || {
+			let receiver = GlobalHotKeyEvent::receiver();
+			while !shutdown.load(Ordering::Relaxed) {
+				if let Ok(event) = receiver.recv() {
+					if event.id == hotkey_id && event.state == global_hotkey::HotKeyState::Pressed {
+						move_cursor_to(ScreenPosition::Left);
+					}
+				}
+			}
+		});
+	}
+	pub fn shutdown(&self) {
+		self.shutdown.store(true, Ordering::Relaxed);
+	}
+}
 impl Window {
 	pub fn new(event_loop: &ActiveEventLoop, view: ViewType) -> Result<Self> {
 		let (gui_ctx, gui_state) = build_egui(event_loop);
@@ -274,164 +444,6 @@ impl Window {
 			self.screen = ui::ScreenInstance::new(view);
 		}
 	}
-}
-fn initialize_gpu(
-	instance: &wgpu::Instance,
-	surface: &wgpu::Surface<'_>,
-) -> Result<(gui::Adapter, gui::Device, wgpu::Queue)> {
-	let adapter = pollster::block_on(instance.request_adapter(
-		&(wgpu::RequestAdapterOptions {
-			apply_limit_buckets: true,
-			power_preference: wgpu::PowerPreference::HighPerformance,
-			compatible_surface: Some(&surface),
-			force_fallback_adapter: false,
-		}),
-	))
-	.map_err(|e| anyhow!("failed to find suitable GPU adapter: {e}"))?;
-	let (device, queue) = pollster::block_on(adapter.request_device(
-		&(wgpu::DeviceDescriptor {
-			experimental_features: wgpu::ExperimentalFeatures::disabled(),
-			label: Some("estate-dev-device"),
-			required_features: wgpu::Features::empty(),
-			required_limits: wgpu::Limits::default(),
-			memory_hints: wgpu::MemoryHints::Performance,
-			trace: wgpu::Trace::Off,
-		}),
-	))?;
-	Ok((adapter, device, queue))
-}
-fn create_gpu_surface(
-	event_loop: &ActiveEventLoop,
-) -> Result<(
-	Arc<winit::window::Window>,
-	wgpu::Instance,
-	wgpu::Surface<'static>,
-)> {
-	let window = build_window(event_loop)?;
-	let instance = wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle());
-	let surface = { instance.create_surface(window.clone())? };
-	Ok((window, instance, surface))
-}
-// WIP: Self Activating Select
-fn build_egui(event_loop: &ActiveEventLoop) -> (gui::Context, egui_winit::State) {
-	let ctx = gui::Context::default();
-	ctx.global_style_mut(|style| {
-		style.interaction.selectable_labels = true;
-		style.interaction.multi_widget_text_select = true;
-		style.visuals.widgets.hovered = style.visuals.widgets.inactive.clone();
-		style.visuals.widgets.active = style.visuals.widgets.inactive.clone();
-	});
-	// ctx.memory_mut(|memory| {
-	// 	memory.surrender_focus();
-	// });
-	let state = egui_winit::State::new(
-		ctx.clone(),
-		gui::ViewportId::ROOT,
-		event_loop,
-		None,
-		None,
-		None,
-	);
-	(ctx, state)
-}
-fn build_window(event_loop: &ActiveEventLoop) -> Result<Arc<winit::window::Window>> {
-	let width = 1920;
-	let height = 1280;
-	let icon_file = include_bytes!("../../assets/icon.png");
-	let icon = {
-		let image = image::load_from_memory(icon_file)
-			.expect("failed to load icon")
-			.into_rgba8();
-		let (width, height) = image.dimensions();
-		winit::window::Icon::from_rgba(image.into_raw(), width, height)?
-	};
-	let mut attrs = winit::window::Window::default_attributes()
-		.with_title("Estate Dev")
-		.with_inner_size(PhysicalSize::new(width, height))
-		.with_window_icon(Some(icon));
-	// .with_window_level(WindowLevel::AlwaysOnTop);
-	// Calculate bottom-right screen coordinates if a monitor is available
-	if let Some(monitor) = event_loop
-		.primary_monitor()
-		.or_else(|| event_loop.available_monitors().next())
-	{
-		let screen_size = monitor.size();
-		let scale_factor = monitor.scale_factor();
-		// Optional: leave a small margin (e.g., 40 pixels) away from the edge/dock
-		// let margin_x = (40.0 * scale_factor) as i32;
-		// let margin_y = (60.0 * scale_factor) as i32;
-		// let x = screen_size.width as i32 - width as i32 - margin_x;
-		// let y = screen_size.height as i32 - height as i32 - margin_y;
-		let x = (screen_size.width as i32) - (width as i32);
-		let y = (screen_size.height as i32) - (height as i32);
-		attrs = attrs.with_position(PhysicalPosition::new(x.max(0), y.max(0)));
-	} else {
-		// Fallback position if no monitor info is found
-		attrs = attrs.with_position(PhysicalPosition::new(100, 100));
-	}
-	let window = event_loop.create_window(attrs)?;
-	// Force macOS to show a Dock icon and participate in Cmd + Tab
-	#[cfg(target_os = "macos")]
-	{
-		{
-			let mtm = MainThreadMarker::new().expect("must be on the main thread");
-			let app = NSApplication::sharedApplication(mtm);
-			app.setActivationPolicy(NSApplicationActivationPolicy::Regular);
-			app.activateIgnoringOtherApps(true);
-		}
-	}
-	Ok(Arc::new(window))
-}
-fn build_renderer(
-	surface: &wgpu::Surface<'_>,
-	adapter: wgpu::Adapter,
-	device: &wgpu::Device,
-	size: PhysicalSize<u32>,
-) -> Result<
-	(
-		wgpu::wgt::SurfaceConfiguration<Vec<wgpu::TextureFormat>>,
-		gui::Renderer,
-	),
-	Error,
-> {
-	let caps = surface.get_capabilities(&adapter);
-	let format = caps
-		.formats
-		.iter()
-		.copied()
-		.find(|format| {
-			matches!(
-				format,
-				wgpu::TextureFormat::Bgra8Unorm | wgpu::TextureFormat::Rgba8Unorm
-			)
-		})
-		.or_else(|| caps.formats.first().copied())
-		.ok_or_else(|| anyhow!("GPU surface has no supported formats"))?;
-	let present_mode = caps
-		.present_modes
-		.iter()
-		.copied()
-		.find(|mode| *mode == wgpu::PresentMode::Fifo)
-		.unwrap_or(wgpu::PresentMode::Fifo);
-	let alpha_mode = caps
-		.alpha_modes
-		.first()
-		.copied()
-		.ok_or_else(|| anyhow!("GPU surface has no alpha modes"))?;
-	let config = wgpu::SurfaceConfiguration {
-		format,
-		alpha_mode,
-		present_mode,
-		view_formats: vec![],
-		width: size.width.max(1),
-		height: size.height.max(1),
-		desired_maximum_frame_latency: 2,
-		color_space: gui::SurfaceColorSpace::Auto,
-		usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-	};
-	surface.configure(device, &config);
-	let renderer = gui::Renderer::new(device, format, gui::RendererOptions::default());
-	Ok((config, renderer))
 }
 impl Window {
 	fn doc_todo() {
@@ -725,41 +737,10 @@ pub struct AppWindow {
 	pub view: ViewType,
 	pub window: Window,
 }
-
 pub struct GlobalHotkeys {
 	hotkey_id: u32,
 	manager: GlobalHotKeyManager,
 	shutdown: Arc<AtomicBool>,
-}
-impl GlobalHotkeys {
-	pub fn new() -> Result<Self> {
-		let manager = GlobalHotKeyManager::new()?;
-		let hotkey = HotKey::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyP);
-		let hotkey_id = hotkey.id();
-		manager.register(hotkey)?;
-		Ok(Self {
-			manager,
-			hotkey_id,
-			shutdown: Arc::new(AtomicBool::new(false)),
-		})
-	}
-	pub fn start(&self) {
-		let shutdown = Arc::clone(&self.shutdown);
-		let hotkey_id = self.hotkey_id;
-		std::thread::spawn(move || {
-			let receiver = GlobalHotKeyEvent::receiver();
-			while !shutdown.load(Ordering::Relaxed) {
-				if let Ok(event) = receiver.recv() {
-					if event.id == hotkey_id && event.state == global_hotkey::HotKeyState::Pressed {
-						move_cursor_to(ScreenPosition::Left);
-					}
-				}
-			}
-		});
-	}
-	pub fn shutdown(&self) {
-		self.shutdown.store(true, Ordering::Relaxed);
-	}
 }
 pub struct TrayMenu {
 	pub clear_tasks: MenuItem,
@@ -772,4 +753,21 @@ pub struct TrayMenu {
 	pub problem_screen: MenuItem,
 	pub tasks: Submenu,
 	pub oracle: MenuItem,
+}
+pub struct Window {
+	screen: ui::ScreenInstance<NativeRuntime, NativeExecutor>,
+	// This Surface contains/borrows something that is guaranteed to be valid for the 'static lifetime.
+	pub surface: gui::wgpu::Surface<'static>,
+	pub config: gui::wgpu::SurfaceConfiguration,
+	pub device: wgpu::Device,
+	pub gui_ctx: gui::Context,
+	pub gui_state: egui_winit::State,
+	pub instance: Arc<winit::window::Window>,
+	pub kind: WindowType,
+	pub needs_resize: bool,
+	pub occluded: bool,
+
+	pending_textures: gui::TexturesDelta,
+	queue: wgpu::Queue,
+	renderer: egui_wgpu::Renderer,
 }

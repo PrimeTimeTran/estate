@@ -49,7 +49,7 @@ pub use crate::{
 };
 
 #[cfg(all(feature = "web", target_arch = "wasm32"))]
-pub use crate::{web::*};
+pub use crate::web::*;
 // #[cfg(all(feature = "web", target_arch = "wasm32"))]
 // pub use crate::{app::app_web::*, web::*};
 
