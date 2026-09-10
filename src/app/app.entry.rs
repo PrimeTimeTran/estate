@@ -87,7 +87,7 @@ where
 		let proxy = event_loop.create_proxy();
 		self.start_app_events(proxy.clone());
 		let mut renderer =
-			Renderer::<NativeContext, structs::S<structs::C>>::new(self.state.clone(), cancel);
+			structs::Renderer::<NativeContext, structs::S<structs::C>>::new(self.state.clone(), cancel);
 		event_loop
 			.run_app(&mut renderer)
 			.map_err(|err| anyhow::anyhow!("GUI event loop failed: {err}"));
@@ -230,31 +230,6 @@ where
 	}
 }
 
-#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-impl traits::Renderer for HostRenderer {
-	#[cfg(target_arch = "wasm32")]
-	fn render(&mut self) {
-		// wasm rendering
-	}
-	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-	fn render(&mut self) {
-		// native rendering
-	}
-}
-
-impl<C, S> Renderer<C, S> {
-	pub fn new(state: S, cancel: CancellationToken) -> Self {
-		Self {
-			cancel,
-			state,
-			phantom: PhantomData,
-			view: ViewType::MarkdownScreen,
-			#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-			windows: vec![],
-		}
-	}
-}
-
 pub struct App<C: Ctx> {
 	state: structs::S<structs::C>,
 	pub host: Host<C>,
@@ -263,13 +238,4 @@ pub struct App<C: Ctx> {
 	pub cursor_events: std::sync::mpsc::Receiver<CursorEvent>,
 	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 	pub cursor_event_tx: std::sync::mpsc::Sender<CursorEvent>,
-}
-
-pub struct Renderer<C, S> {
-	phantom: PhantomData<C>,
-	pub state: S,
-	pub view: ViewType,
-	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-	pub windows: Vec<AppWindow>,
-	pub cancel: CancellationToken,
 }

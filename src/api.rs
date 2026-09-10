@@ -1,30 +1,7 @@
 use crate::{model::problem_model::StoredProblem, prelude::*, proto::types::SampleProblemRequest};
 
-// # Shared application state
-// ============================================================
-#[derive(Debug, Default, Clone)]
-pub struct AppState {
-	pub problems: ProblemListState,
-	pub problem: ProblemState,
-}
-
-#[derive(Debug, Default, Clone)]
-pub struct ProblemListState {
-	pub items: Vec<StoredProblem>,
-	pub loading: bool,
-	pub error: Option<String>,
-}
-
-#[derive(Debug, Default, Clone)]
-pub struct ProblemState {
-	pub value: Option<StoredProblem>,
-	pub loading: bool,
-	pub error: Option<String>,
-}
-
-// # Shared API Trait
-// ============================================================
-//
+/// ## [Api]
+///
 #[cfg(not(target_arch = "wasm32"))]
 #[async_trait::async_trait]
 pub trait Api: Debug + 'static {
@@ -49,9 +26,9 @@ impl Clone for Box<dyn Api> {
 	}
 }
 
-// # Native
-// ============================================================
-//
+/// # Native
+/// ============================================================
+///
 #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 use crate::proto::{
 	problem_service_client::ProblemServiceClient, submission_service_client::SubmissionServiceClient,

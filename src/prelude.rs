@@ -4,8 +4,6 @@ pub use chrono::{DateTime, Utc};
 pub use futures::FutureExt;
 pub use serde::{Deserialize, Serialize, de::DeserializeOwned};
 pub use serde_json::Value;
-pub use tokio::task::JoinHandle;
-
 pub use std::{
 	collections::*,
 	env,
@@ -19,7 +17,7 @@ pub use std::{
 	},
 	time::{Duration, Instant, SystemTime},
 };
-
+pub use tokio::task::JoinHandle;
 pub use tokio_util::sync::CancellationToken;
 pub use uuid::Uuid;
 
@@ -34,21 +32,22 @@ pub use uuid::Uuid;
 pub use crate::{
 	api::*,
 	app::{
-		app_entry::{self, Renderer, *},
+		app_entry::{self, *},
 		app_state, *,
 	},
 	app_macros,
 	app_state::*,
 	data::*,
-	e,
+	e, impls,
 	r#macro::*,
 	model::*,
 	runtime::*,
 	services::*,
 	share::{share_prelude::*, *},
+	structs,
 	tool::{time::*, *},
-	r#trait as traits,
 	r#trait::{Context, EventReceiver, *},
+	traits,
 	ui::{config::*, theme::*, ui_prelude::*, ui_trait::*, *},
 };
 
@@ -63,58 +62,3 @@ pub use crate::{
 	native_state::*,
 	server::{self, events::*},
 };
-
-pub mod enums {}
-pub mod impls {
-	use super::structs::*;
-	use crate::prelude::*;
-
-	impl<C> Clone for S<C> {
-		fn clone(&self) -> Self {
-			Self {
-				context: PhantomData,
-				state: PhantomData,
-				view: self.view.clone(),
-			}
-		}
-	}
-	/// Manually implement Default specifically for S<C>
-	///
-	impl Default for S<C> {
-		fn default() -> Self {
-			S {
-				view: ViewType::MarkdownScreen,
-				context: PhantomData,
-				state: PhantomData,
-			}
-		}
-	}
-}
-
-pub mod structs {
-	use super::impls::*;
-	use crate::prelude::*;
-	pub struct Linux;
-	pub struct MacOS;
-	pub struct Windows;
-
-	pub use crate::app_entry::Renderer;
-
-	pub struct C;
-
-	/// State vs Context is like "Nature vs Nurture",there is no perfect answer to what drives what.
-	/// Every state depends on some context which depending on how you think of it, might be considered "state" as well.
-	///
-	/// So for now, in order to implement a Type State system robustly, we're going to agree that all apps/processes must come from a context.
-	///
-	/// Linux, MacOS, Windows, they're all contexts in which the app can run so we begin our app with that assumption for modeling more robustly.
-	///
-	#[derive(Debug)]
-	pub struct S<C> {
-		pub context: PhantomData<C>,
-		pub state: PhantomData<C>,
-		pub view: ViewType,
-	}
-}
-
-pub use crate::prelude::{impls as i, structs as s};

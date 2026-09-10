@@ -1,4 +1,4 @@
-use crate::{app::app_state::EstateState, prelude::*};
+use crate::{app::app_state::EstateState, prelude::*, r#struct::AppState};
 
 /// ## [AppRuntime]
 ///
@@ -80,7 +80,7 @@ impl<R: Runtime + 'static, E: Executor> AppRuntime<R, E> {
 		// 	println!("App Runtime After problems click {:?}", problems);
 		// 	match problems {
 		// 		Ok(problems) => {
-		// 			println!("App Runtime emiting success");
+		// 			println!("App Runtime emitting success");
 		// 			runtime.emit(e::Event::app(e::Klass::ProblemsLoaded(vec![problems])));
 		// 		}
 		// 		Err(error) => {
@@ -107,17 +107,6 @@ impl<R: Runtime + 'static, E: Executor> AppRuntime<R, E> {
 		// });
 	}
 }
-// impl<R: Runtime + 'static, E: Executor> AppRuntime<R, E> {
-// 	fn start_problem_request(&mut self) -> bool {
-// 		if self.state.problem.loading {
-// 			tracing::info!("⚠️ problem already loading");
-// 			return false;
-// 		}
-// 		self.state.problem.loading = true;
-// 		self.state.problem.error = None;
-// 		true
-// 	}
-// }
 
 impl<R: Runtime, E> AppRuntime<R, E> {
 	/// Runtime Reference

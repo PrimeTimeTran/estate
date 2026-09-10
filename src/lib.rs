@@ -28,6 +28,8 @@ pub mod api;
 pub mod app;
 pub mod data;
 pub mod helpers;
+#[path = "./[impl].rs"]
+pub mod r#impl;
 pub mod r#macro;
 pub mod model;
 pub mod prelude;
@@ -35,23 +37,24 @@ pub mod proto;
 pub mod runtime;
 pub mod services;
 pub mod share;
+#[path = "./[struct].rs"]
+pub mod r#struct;
 pub mod tool;
 pub mod r#trait;
 pub mod ui;
 pub mod util;
 
 pub use crate::app::event as e;
+pub use crate::r#macro as app_macros;
 pub use crate::ui::{theme::*, ui_prelude::*, *};
 
-/// ## [Traits]
-///
-/// The collection of traits used through the codebase
+pub use r#impl as impls;
+pub use r#struct as structs;
 pub use r#trait as traits;
-
-pub use crate::r#macro as app_macros;
 
 #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 pub mod native;
+
 #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 pub use crate::native::state as native_state;
 

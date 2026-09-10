@@ -3,7 +3,7 @@
 //! The macros used throughout our crate which are as generic as can be made
 //!
 
-/// [problem_source!]
+/// ## [problem_source!]
 ///
 /// Parse  string file path quickly and easily.
 #[macro_export]
@@ -19,7 +19,7 @@ macro_rules! problem_source {
 	};
 }
 
-/// [section!]
+/// ## [section!]
 ///
 /// Print a section header for grouping output when reading through dense text.
 #[macro_export]
@@ -31,7 +31,7 @@ macro_rules! section {
 
 pub use section;
 
-/// [panic_section!]
+/// ## [panic_section!]
 ///
 /// Print a section header for grouping output when reading through dense text.
 #[macro_export]
@@ -43,7 +43,7 @@ macro_rules! panic_section {
 
 pub use panic_section;
 
-/// [awe!]
+/// ## [awe!]
 ///
 /// Acknowledge your awe are the state of affairs.
 ///
