@@ -90,9 +90,17 @@ pub trait Ctx: Default {
 pub trait Clock: Clone {
 	type Handle<C: Ctx, J>;
 
+	// #[cfg(not(target_arch = "wasm32"))]
+	// type WorkHandle<C: Ctx, J>;
+
+	// #[cfg(target_arch = "wasm32")]
+	// type WorkHandle<C: Ctx>;
+
 	fn now(&self) -> String;
+
 	/// Run once and return.
 	fn run_once(&self) -> String;
+
 	/// Run repeatedly in the foreground.
 	#[cfg(not(target_arch = "wasm32"))]
 	fn run_foreground(&self, interval: Duration);
@@ -101,6 +109,14 @@ pub trait Clock: Clone {
 	where
 		C: Ctx,
 		J: From<tokio::task::JoinHandle<()>>;
+	// #[cfg(not(target_arch = "wasm32"))]
+	// fn run_background<C>(&self, interval: Duration, msg: String) -> Self::WorkHandle<C>
+	// where
+	// 	C: Ctx;
+	// 	// J: From<tokio::task::JoinHandle<()>>;
+
+	// #[cfg(target_arch = "wasm32")]
+	// fn run_background<C: Ctx>(&self, interval: Duration, msg: String) -> Self::WorkHandle<C>;
 }
 
 /// ## [CursorEventSink]
@@ -217,9 +233,9 @@ pub trait Platform {
 	fn has_touch(&self) -> bool;
 }
 
-/// ## [Renderer]
+/// ## [Renders]
 ///
-pub trait Renderer {
+pub trait Renders {
 	fn render(&mut self);
 }
 

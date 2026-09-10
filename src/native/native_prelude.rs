@@ -5,7 +5,7 @@
 //! The double prelude is done to manage native dependencies in a centralized manner, allowing for easier maintenance and updates.
 //!
 pub use cli::context::*;
-pub use core_foundation::runloop::{CFRunLoop, kCFRunLoopCommonModes};
+pub use core_foundation::runloop::{CFRunLoop, kCFRunLoopCommonModes, kCFRunLoopDefaultMode};
 pub use core_graphics::{
 	display::{CGDisplay, CGPoint, CGRect},
 	event::*,
@@ -47,9 +47,7 @@ pub use winit::platform::macos::{ActivationPolicy, EventLoopBuilderExtMacOS};
 /// The items here are necessary to bring dependencies into scope for the native platform targets. Removing items may
 /// cause compilation errors or runtime issues in the native platform targets.
 pub use crate::{
-	native::{
-		self, daemon::*, monitor::*, native_job::*, state as native_state, ui::*, window::*,
-	},
+	native::{self, daemon::*, monitor::*, native_job::*, state as native_state, ui::*, window::*},
 	server::*,
 };
 

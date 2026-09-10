@@ -8,7 +8,7 @@
 //! The difference may noe be apparent to both the reader & the author. But having these structures next to each other
 //! enables us to see where they can be squashed and where they meaningfully diverge.
 //!
-//! When the identifier has stabalizd and we're confident this is a meaningful difference,
+//! When the identifier has stabilized and we're confident this is a meaningful difference,
 //! then it's appropriate to move the definition to a domain specific dir.
 //!
 use crate::prelude::*;

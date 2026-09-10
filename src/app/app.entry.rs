@@ -4,22 +4,6 @@ impl<C> App<C>
 where
 	C: Ctx + 'static,
 {
-	pub fn new(host: Host<C>) -> Result<Self> {
-		tracing::debug!("App New");
-
-		#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-		let (cursor_event_tx, cursor_events) = std::sync::mpsc::channel();
-		let state = structs::S::default();
-		Ok(Self {
-			state,
-			host,
-			workers: vec![],
-			#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-			cursor_events,
-			#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-			cursor_event_tx,
-		})
-	}
 	pub fn context(self) -> Arc<C> {
 		self.host.context()
 	}
@@ -189,8 +173,9 @@ where
 		// clock.inherent_background_tick(String::from(
 		// 	"let clock = self.host.clock(); clock.inherent_background_tick",
 		// ));
-		// let msg = String::from("start_clock_wasm clock.run_background(Duration::from_secs(1));");
+		let msg = String::from("start_clock_wasm clock.run_background(Duration::from_secs(1));");
 		// clock.run_background(Duration::from_secs(1), msg.clone());
+		// clock.run_background::<C, ()>(Duration::from_secs(1), msg.clone())
 		// let handle = Clock::run_background(clock, Duration::from_secs(1), msg.clone());
 	}
 
@@ -212,14 +197,32 @@ where
 	fn worker(&self) -> &HostWorker<C> {
 		self.host.worker()
 	}
+
+	pub fn new(host: Host<C>) -> Result<Self> {
+		tracing::debug!("App New");
+
+		#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+		let (cursor_event_tx, cursor_events) = std::sync::mpsc::channel();
+		let state = structs::S::default();
+		Ok(Self {
+			state,
+			host,
+			workers: vec![],
+			#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+			cursor_events,
+			#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+			cursor_event_tx,
+		})
+	}
 }
 
 pub struct App<C: Ctx> {
-	state: structs::S<structs::C>,
-	pub host: Host<C>,
-	pub workers: Vec<WorkHandle<C, tokio::task::JoinHandle<()>>>,
 	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 	pub cursor_events: std::sync::mpsc::Receiver<CursorEvent>,
 	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 	pub cursor_event_tx: std::sync::mpsc::Sender<CursorEvent>,
+
+	pub host: Host<C>,
+	state: structs::S<structs::C>,
+	pub workers: Vec<WorkHandle<C, tokio::task::JoinHandle<()>>>,
 }

@@ -1,5 +1,6 @@
 use crate::prelude::{traits::Ctx, *};
 
+#[cfg(target_arch = "wasm32")]
 impl<C> WorkHandle<C, std::thread::JoinHandle<()>>
 where
 	C: Ctx,
@@ -26,7 +27,7 @@ where
 		Self {
 			cancel,
 			join,
-			_phantom: PhantomData,
+			_ctx: PhantomData,
 		}
 	}
 
@@ -34,6 +35,7 @@ where
 	pub fn new(cancel: CancellationToken) -> Self {
 		Self {
 			cancel,
+			_ctx: PhantomData,
 			_phantom: PhantomData,
 		}
 	}
@@ -52,5 +54,16 @@ where
 	pub cancel: CancellationToken,
 	#[cfg(not(target_arch = "wasm32"))]
 	pub join: J,
-	_phantom: PhantomData<(C, J)>,
+	#[cfg(target_arch = "wasm32")]
+	_phantom: PhantomData<J>,
+	_ctx: PhantomData<C>,
 }
+
+#[cfg(target_arch = "wasm32")]
+pub type PlatformJoin = ();
+
+#[cfg(not(target_arch = "wasm32"))]
+pub type ClockWork<NativeContext> = WorkHandle<NativeContext, tokio::task::JoinHandle<()>>;
+
+#[cfg(target_arch = "wasm32")]
+pub type ClockWork<WebContext> = WorkHandle<WebContext, ()>;

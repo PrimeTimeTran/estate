@@ -88,7 +88,7 @@ impl<C, S> structs::Renderer<C, S> {
 /// When we're confident that all features can render on all platforms thi guy should hold the root
 /// rendering logic.
 ///
-impl traits::Renderer for HostRenderer {
+impl traits::Renders for HostRenderer {
 	#[cfg(target_arch = "wasm32")]
 	fn render(&mut self) {
 		// wasm rendering

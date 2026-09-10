@@ -56,6 +56,12 @@ fn time_now() -> String {
 impl Clock for HostClock {
 	type Handle<C: Ctx, J> = WorkHandle<C, J>;
 
+	// #[cfg(not(target_arch = "wasm32"))]
+	// type WorkHandle<C: Ctx> = WorkHandle<C, tokio::task::JoinHandle<()>>;
+
+	// #[cfg(target_arch = "wasm32")]
+	// type Handle<C: Ctx> = WorkHandle<C, ()>;
+
 	fn now(&self) -> String {
 		time_now()
 	}
@@ -73,7 +79,7 @@ impl Clock for HostClock {
 		}
 	}
 
-	#[cfg(all(feature = "native", not(target_arch = "wasm32-unknown-unknown")))]
+	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 	fn run_background<C, J>(&self, interval: Duration, msg: String) -> WorkHandle<C, J>
 	where
 		C: Ctx,
@@ -230,7 +236,7 @@ where
 pub struct Connected {
 	#[cfg(all(feature = "native"))]
 	pub api: NativeApiClient,
-	#[cfg(all(feature = "wasm32"))]
+	#[cfg(all(feature = "web"))]
 	pub api: WebApiClient,
 }
 

@@ -29,10 +29,7 @@ pub mod windows;
 #[cfg(target_os = "macos")]
 pub mod macos;
 
-use crate::{
-	prelude::{traits::Ctx, *},
-	ui::*,
-};
+use crate::ui::*;
 
 impl<NativeCtx, S> ApplicationHandler<AppEvent> for structs::Renderer<NativeCtx, S>
 where

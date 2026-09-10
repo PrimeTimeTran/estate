@@ -1,4 +1,3 @@
-use core_foundation::runloop::kCFRunLoopDefaultMode;
 
 use crate::{
 	native::{CursorDaemon, CursorPosition},

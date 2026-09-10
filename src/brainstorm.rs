@@ -76,6 +76,7 @@ struct OS<C> {
 struct Context<T> {
 	data: PhantomData<T>,
 }
+
 impl<T> Context<T> {
 	fn inherent_struct_method() {
 		println!("Always available")
