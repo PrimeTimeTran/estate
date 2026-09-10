@@ -4,14 +4,13 @@
 //!
 //! This module contains:
 //!
-//! - [`Estate`]
-//! - [`Node`]
-//! - [`Resource`]
-//! - [`Relation`]
-//! - [`EstateDiscovery`]
+//! - [Estate]
+//! - [Node]
+//! - [Resource]
+//! - [Relation]
+//! - [EstateDiscovery]
 //!
 //! Core business logic for resolving links, workspace indexing, namespace resolution, package management.
-//!
 
 use crate::prelude::*;
 

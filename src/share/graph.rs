@@ -2,7 +2,7 @@ use crate::prelude::*;
 
 /// A semantic entity in the Estate graph.
 ///
-/// A [`Node`] represents a named thing independently of where that thing is
+/// A [Node] represents a named thing independently of where that thing is
 /// stored or how it is represented. A node may correspond to a source file,
 /// code snippet, concept, document, workspace, artifact, or other semantic
 /// entity.
@@ -19,7 +19,7 @@ use crate::prelude::*;
 /// └── notes comparing recursive and dynamic-programming solutions
 /// ```
 ///
-/// Nodes form the semantic layer of an Estate. [`Relation`]s connect nodes
+/// Nodes form the semantic layer of an Estate. [Relation]s connect nodes
 /// to describe how those entities relate to one another.
 ///
 /// # Semantic Relationships
@@ -58,7 +58,7 @@ use crate::prelude::*;
 ///
 /// # Identity
 ///
-/// The [`Uuid`] identifies the semantic entity rather than a particular
+/// The [Uuid] identifies the semantic entity rather than a particular
 /// resource containing it. This permits multiple resources or representations
 /// to refer to the same node without duplicating its semantic identity.
 ///
@@ -67,8 +67,8 @@ use crate::prelude::*;
 /// A node representing a conceptual implementation can exist independently
 /// of the files containing its implementations:
 ///
-/// ```
-/// # use estate::prelude::*;
+/// ```rust
+/// use estate::prelude::*;
 ///
 /// let climbing_stairs = Node::new(
 ///     "climbingStairs".into(),
@@ -80,8 +80,9 @@ use crate::prelude::*;
 /// ```
 ///
 /// Individual implementations or explanations can then be represented by
-/// other nodes and connected with [`Relation`]s such as [`RelationKind::Implements`],
-/// [`RelationKind::Explains`], or [`RelationKind::References`].
+/// other nodes and connected with [Relation]s such as [RelationKind::Implements],
+/// [RelationKind::Explains], or [RelationKind::References].
+///
 #[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct Node {
 	/// The stable identity of this semantic entity.
@@ -254,7 +255,7 @@ pub enum RelationKind {
 	Calls,
 }
 
-/// The semantic category of a [`Node`].
+/// The semantic category of a [Node].
 ///
 /// `NodeKind` describes what a node *represents*, rather than where it is
 /// stored. A single semantic concept may therefore have many resources or
@@ -301,7 +302,7 @@ pub enum NodeKind {
 
 // "What named thing exists?"
 
-/// A directed semantic relationship between two [`Node`]s.
+/// A directed semantic relationship between two [Node]s.
 ///
 /// A relation describes how one semantic entity relates to another. Relations
 /// are independent of the physical location of either node, allowing the
