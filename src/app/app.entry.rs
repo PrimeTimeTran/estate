@@ -4,58 +4,10 @@ use crate::{
 	ui, ui_prelude as gui,
 };
 
+#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+use crate::native::{native_prelude::*, *};
+
 use anyhow::anyhow;
-
-mod impls {
-	use super::structs::*;
-	use crate::prelude::*;
-
-	impl<C> Clone for S<C> {
-		fn clone(&self) -> Self {
-			Self {
-				context: PhantomData,
-				state: PhantomData,
-				view: self.view.clone(),
-			}
-		}
-	}
-	/// Manually implement Default specifically for S<C>
-	///
-	impl Default for S<C> {
-		fn default() -> Self {
-			S {
-				view: ViewType::MarkdownScreen,
-				context: PhantomData,
-				state: PhantomData,
-			}
-		}
-	}
-}
-
-mod structs {
-	use super::impls::*;
-	use crate::prelude::*;
-
-	pub struct Linux;
-	pub struct MacOS;
-	pub struct Windows;
-
-	pub struct C;
-
-	/// State vs Context is like "Nature vs Nurture",there is no perfect answer to what drives what.
-	/// Every state depends on some context which depending on how you think of it, might be considered "state" as well.
-	///
-	/// So for now, in order to implement a Type State system robustly, we're going to agree that all apps/processes must come from a context.
-	///
-	/// Linux, MacOS, Windows, they're all contexts in which the app can run so we begin our app with that assumption for modeling more robustly.
-	///
-	#[derive(Debug)]
-	pub struct S<C> {
-		pub context: PhantomData<C>,
-		pub state: PhantomData<C>,
-		pub view: ViewType,
-	}
-}
 
 #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 use crate::app::host::NativeContext;
@@ -87,12 +39,12 @@ where
 		self.host.context()
 	}
 
-	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+	// #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 	fn init_services(&mut self) -> Result<()> {
 		tracing::debug!("App init services");
+		let handle = self.start_clock()?;
 		#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 		{
-			let handle = self.start_clock()?;
 			self.workers.push(handle);
 			let handle = self.start_cargo_watcher()?;
 			tracing::debug!("cargo handle created");
@@ -107,7 +59,7 @@ where
 	}
 	pub fn run(&mut self) -> Result<()> {
 		tracing::debug!("App run");
-		// self.init_services()?;
+		self.init_services()?;
 		#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 		{
 			self.run_gui()?;
@@ -121,22 +73,21 @@ where
 		Ok(())
 	}
 
+	#[cfg(all(feature = "web", target_arch = "wasm32"))]
+	fn run_gui(&mut self) -> Result<()> {
+		Ok(())
+	}
+
+	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 	fn run_gui(&mut self) -> Result<()> {
 		let cancel = CancellationToken::new();
 		let event_loop = EventLoop::<AppEvent>::with_user_event()
 			.build()
 			.expect("failed to build GUI event loop");
 		let proxy = event_loop.create_proxy();
-		#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 		self.start_app_events(proxy.clone());
-		#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 		let mut renderer =
 			Renderer::<NativeContext, structs::S<structs::C>>::new(self.state.clone(), cancel);
-		#[cfg(all(feature = "web", target_arch = "wasm32"))]
-		let mut renderer: Renderer<WebContext, structs::S<structs::C>> =
-			Renderer::<WebContext, structs::S<structs::C>>::new(self.state.clone(), cancel);
-
-		#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 		event_loop
 			.run_app(&mut renderer)
 			.map_err(|err| anyhow::anyhow!("GUI event loop failed: {err}"));
@@ -258,6 +209,7 @@ where
 		// clock.run_background(Duration::from_secs(1), msg.clone());
 		// let handle = Clock::run_background(clock, Duration::from_secs(1), msg.clone());
 	}
+
 	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 	fn start_cursor_watcher_from_app(
 		&mut self,
@@ -279,7 +231,6 @@ where
 }
 
 #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-
 impl traits::Renderer for HostRenderer {
 	#[cfg(target_arch = "wasm32")]
 	fn render(&mut self) {

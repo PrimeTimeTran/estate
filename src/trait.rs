@@ -4,6 +4,9 @@
 //!
 use crate::{RuntimeState, e, prelude::*};
 
+#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+use crate::native::{self, native_prelude::*, *};
+
 // https://github.com/rust-lang/rust/issues/41517
 // https://github.com/rust-lang/rust/issues/55628
 // https://github.com/rust-lang/rfcs/pull/1733

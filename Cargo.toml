@@ -89,8 +89,8 @@ target = "wasm32-unknown-unknown"
 # cargo nextest run --bin settings --test-threads 1 --no-fail-fast
 [features]
 # default = []
-default = ["web"]
-# default = ["native"]
+# default = ["web"]
+default = ["native"]
 # This overwrites IDE config causing diagnostics to be wrong given the targetted platform.
 #
 # To get IDE diagnostics functioning correctly remove the hardcoded default when troubleshooting another build target.

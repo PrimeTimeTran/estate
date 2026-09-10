@@ -1,4 +1,4 @@
-use crate::{native, prelude::*};
+use crate::{native::{self, resolver}, prelude::*};
 
 #[derive(Clone, Debug)]
 pub struct NativeStateStore;

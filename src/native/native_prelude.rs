@@ -4,6 +4,7 @@
 //! 'pub use' enables external users of this crate to access the public dependencies.
 //! The double prelude is done to manage native dependencies in a centralized manner, allowing for easier maintenance and updates.
 //!
+pub use cli::context::*;
 pub use core_foundation::runloop::{CFRunLoop, kCFRunLoopCommonModes};
 pub use core_graphics::{
 	display::{CGDisplay, CGPoint, CGRect},

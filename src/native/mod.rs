@@ -35,7 +35,7 @@ use crate::{
 	ui_prelude as gui,
 };
 
-impl<NativeCtx, S> ApplicationHandler<AppEvent> for app_entry::Renderer<NativeCtx, S>
+impl<NativeCtx, S> ApplicationHandler<AppEvent> for structs::Renderer<NativeCtx, S>
 where
 	NativeCtx: Ctx,
 	S: Send + Sync + 'static,
@@ -250,7 +250,7 @@ where
 	}
 }
 
-impl<NativeCtx, S> app_entry::Renderer<NativeCtx, S> {
+impl<NativeCtx, S> structs::Renderer<NativeCtx, S> {
 	fn window_by_type(&mut self, kind: WindowType) -> Option<&mut AppWindow> {
 		self.windows.iter_mut().find(|window| window.kind == kind)
 	}

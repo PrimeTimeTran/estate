@@ -60,6 +60,8 @@ impl<R: Runtime> EstateEngine<R> {
 	}
 	#[cfg(not(feature = "web"))]
 	pub async fn format(self, args: &FormatArgs) -> Result<String, Error> {
+		use crate::native::daemon;
+
 		daemon::LintDaemon.run(&args).await;
 		Ok("Success".to_string())
 	}
@@ -154,9 +156,9 @@ use crate::prelude::*;
 // 	fn remove(&mut self, id: Uuid);
 // }
 
-/// Abstraction for ranking responses which are not deteminitic.
+/// Abstraction for ranking responses which are not deterministic.
 /// - "Give me package.json" can produce many results
-/// - "Give me available" commnands can produce different results depending on file .ext, settings.json, UI focus, and state.
+/// - "Give me available" commands can produce different results depending on file .ext, settings.json, UI focus, and state.
 #[derive(Clone, Debug, Default, PartialEq, Deserialize, Serialize)]
 pub struct Resolution {
 	pub id: Uuid,
