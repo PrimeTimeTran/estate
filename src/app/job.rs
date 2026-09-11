@@ -14,7 +14,6 @@ pub enum JobStatus {
 
 /// ## [TaskStatus]
 ///
-///
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TaskStatus {
 	Pending,

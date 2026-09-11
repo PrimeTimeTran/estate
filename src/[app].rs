@@ -2,7 +2,8 @@ use crate::prelude::{traits::Ctx, *};
 
 impl<C> App<C>
 where
-	C: Ctx + 'static,
+	C: Ctx
+	// C: Ctx + 'static,
 {
 	pub fn context(self) -> Arc<C> {
 		self.host.context()

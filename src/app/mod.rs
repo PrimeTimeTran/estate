@@ -25,7 +25,6 @@ pub mod context;
 pub mod event;
 pub mod host;
 pub mod job;
-pub mod state;
 pub mod task;
 pub mod worker;
 

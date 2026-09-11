@@ -16,6 +16,7 @@ impl HostClock {
 		Self { handle }
 	}
 }
+
 impl<C> Worker<C> for HostWorker<C>
 where
 	C: Ctx,
@@ -147,7 +148,7 @@ impl Host<NativeContext> {
 #[derive(Clone, Default)]
 pub struct NativeState {
 	pub menu_bar: Option<MenuBar>,
-	// pub tray_clock: Option<MenuBar>,
+	pub tray_clock: Option<MenuBar>,
 	// pub tray_cursor: Arc<Option<TrayIcon>>,
 	// pub windows: Vec<AppWindow>,
 }

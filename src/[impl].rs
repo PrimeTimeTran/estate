@@ -43,7 +43,7 @@ impl Default for EstateState {
 	}
 }
 
-/// Manually implement Default specifically for S<C>
+/// ## Default implementation for [S]
 ///
 impl Default for S<C> {
 	fn default() -> Self {
