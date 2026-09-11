@@ -137,10 +137,11 @@ impl Clock for HostClock {
 impl<C: Ctx> Host<C> {
 	#[cfg(feature = "web")]
 	pub fn new(context: Arc<C>) -> anyhow::Result<Self> {
+		let clock = HostClock {};
 		Ok(Self {
+			clock,
 			context,
 			worker: HostWorker::new(),
-			clock: HostClock::default(),
 		})
 	}
 

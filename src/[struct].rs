@@ -17,8 +17,8 @@ use crate::prelude::*;
 ///
 #[derive(Debug, Default, Clone)]
 pub struct AppState {
-	pub problems: ProblemListState,
 	pub problem: ProblemState,
+	pub problems: ProblemListState,
 }
 
 /// ## [C]
@@ -49,15 +49,11 @@ pub struct EstateState {
 	pub jobs: VecDeque<Job>,
 }
 
-#[cfg(feature = "native")]
 #[derive(Clone)]
 pub struct HostClock {
+	#[cfg(feature = "native")]
 	pub handle: tokio::runtime::Handle,
 }
-
-#[cfg(feature = "web")]
-#[derive(Clone, Default)]
-pub struct HostClock;
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub struct Inode;
@@ -67,16 +63,16 @@ pub struct MacOS;
 
 #[derive(Debug, Default, Clone)]
 pub struct ProblemListState {
+	pub error: Option<String>,
 	pub items: Vec<StoredProblem>,
 	pub loading: bool,
-	pub error: Option<String>,
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct ProblemState {
-	pub value: Option<StoredProblem>,
-	pub loading: bool,
 	pub error: Option<String>,
+	pub loading: bool,
+	pub value: Option<StoredProblem>,
 }
 pub struct Renderer<C, S> {
 	pub phantom: PhantomData<C>,
@@ -97,7 +93,7 @@ pub struct Renderer<C, S> {
 /// So for now, in order to implement a Type State system robustly, we're going to agree that all apps/processes must come from a context.
 ///
 /// Linux, MacOS, Windows, they're all contexts in which the app can run so we begin our app with that assumption for modeling more robustly.
-/// 
+///
 #[derive(Debug)]
 pub struct S<C> {
 	pub context: PhantomData<C>,

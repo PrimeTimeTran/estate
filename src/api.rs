@@ -1,7 +1,8 @@
 use crate::{model::problem_model::StoredProblem, prelude::*, proto::types::SampleProblemRequest};
 
-/// ## [Api]
-///
+/// ## [API][Api]
+/// 
+/// GRPC Api
 #[cfg(not(target_arch = "wasm32"))]
 #[async_trait::async_trait]
 pub trait Api: Debug + 'static {
@@ -27,7 +28,6 @@ impl Clone for Box<dyn Api> {
 }
 
 /// # Native
-/// ============================================================
 ///
 #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 use crate::proto::{

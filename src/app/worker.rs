@@ -52,11 +52,11 @@ where
 	C: Ctx,
 {
 	pub cancel: CancellationToken,
+	_ctx: PhantomData<C>,
 	#[cfg(not(target_arch = "wasm32"))]
 	pub join: J,
 	#[cfg(target_arch = "wasm32")]
 	_phantom: PhantomData<J>,
-	_ctx: PhantomData<C>,
 }
 
 #[cfg(target_arch = "wasm32")]

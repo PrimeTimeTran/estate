@@ -2,8 +2,6 @@
 //!
 //! The collection of traits used through the codebase
 //!
-//!
-//!
 use crate::{RuntimeState, e, prelude::*};
 
 // https://github.com/rust-lang/rust/issues/41517
@@ -14,7 +12,7 @@ use crate::{RuntimeState, e, prelude::*};
 ///
 /// from runtime, host, platform
 ///
-/// ### [Traits](https://doc.rust-lang.org/rust-by-example/trait.html)
+/// ### [Traits][traits]
 ///
 /// - [Runtime](Context::Runtime): Platform specific runtime
 ///
@@ -22,6 +20,8 @@ use crate::{RuntimeState, e, prelude::*};
 ///
 /// - [runtime](Context::runtime) to [`spawn`](Executor::spawn).
 ///
+///
+/// [traits]: https://doc.rust-lang.org/rust-by-example/trait.html
 pub trait Context: Sized {
 	/// The host on which the application is running.
 	///
@@ -39,6 +39,8 @@ pub trait Context: Sized {
 	/// implementor and can vary based on the platform, host, configuration,
 	/// and other runtime factors.
 	type Runtime: Runtime;
+	/// ## [Context::runtime]
+	///
 	/// Returns a reference to the concrete [`Runtime`] associated with this context.
 	///
 	/// The returned type is [`Self::Runtime`], i.e. the associated type selected
@@ -56,7 +58,7 @@ pub trait Context: Sized {
 	// fn bar(&self, args: String) -> Result<()>;
 }
 
-pub trait State {}
+// pub trait State {}
 
 pub trait ApiServices: Services {
 	type Client: Api;
@@ -74,7 +76,11 @@ pub trait ApiServices: Services {
 
 /// ## [Ctx]
 ///
-/// A type safe abstraction with room for growth via it's internal [associated types][], [State](Self::State).
+/// A type safe abstraction with room for growth via it's internal [associated types].
+/// 
+/// ### [Types][associated types]
+/// 
+/// - [State](Self::State).
 ///
 /// [associated types]: https://doc.rust-lang.org/rust-by-example/generics/assoc_items/types.html
 pub trait Ctx: Default {

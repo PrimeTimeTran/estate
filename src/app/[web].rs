@@ -4,40 +4,27 @@ use crate::{
 	ui, ui_prelude as gui,
 };
 
+impl Ctx for WebContext {
+	type State = WebState;
+	fn state(&self) -> &Self::State {
+		self.state()
+	}
+}
+
 impl Host<WebContext> {
+	// pub fn new(context: Arc<C>) -> anyhow::Result<Self> {
+	// 	let clock = HostClock {};
+	// 	Ok(Self {
+	// 		clock,
+	// 		context,
+	// 		worker: HostWorker::new(),
+	// 	})
+	// }
 	pub fn init() -> Result<Self> {
 		Self::new(Arc::new(WebContext::default()))
 	}
 }
 
-impl<C> Worker<C> for HostWorker<C>
-where
-	C: Ctx,
-{
-	type Handle = WorkHandle<C, tokio::task::JoinHandle<()>>;
-
-	fn run_background<F, Fut>(&self, task: F) -> Self::Handle
-	where
-		F: FnOnce(CancellationToken) -> Fut + 'static,
-		Fut: Future<Output = ()> + 'static,
-	{
-		let cancel = CancellationToken::new();
-		let task_cancel = cancel.clone();
-
-		wasm_bindgen_futures::spawn_local(async move {
-			task(task_cancel).await;
-		});
-
-		WorkHandle::new(cancel)
-	}
-
-	fn run_foreground<F>(&self, task: F)
-	where
-		F: Fn() + 'static,
-	{
-		task();
-	}
-}
 impl<WebContext> Host<WebContext>
 where
 	WebContext: Ctx,
@@ -64,10 +51,32 @@ where
 		&self.worker
 	}
 }
-impl Ctx for WebContext {
-	type State = WebState;
-	fn state(&self) -> &Self::State {
-		self.state()
+impl<C> Worker<C> for HostWorker<C>
+where
+	C: Ctx,
+{
+	type Handle = WorkHandle<C, tokio::task::JoinHandle<()>>;
+
+	fn run_background<F, Fut>(&self, task: F) -> Self::Handle
+	where
+		F: FnOnce(CancellationToken) -> Fut + 'static,
+		Fut: Future<Output = ()> + 'static,
+	{
+		let cancel = CancellationToken::new();
+		let task_cancel = cancel.clone();
+
+		wasm_bindgen_futures::spawn_local(async move {
+			task(task_cancel).await;
+		});
+
+		WorkHandle::new(cancel)
+	}
+
+	fn run_foreground<F>(&self, task: F)
+	where
+		F: Fn() + 'static,
+	{
+		task();
 	}
 }
 
