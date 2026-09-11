@@ -15,11 +15,8 @@ where
 		{
 			self.workers.push(handle);
 			let handle = self.start_cargo_watcher()?;
-			tracing::debug!("cargo handle created");
 			self.workers.push(handle);
-
 			let handle = self.start_cursor_watcher_from_app()?;
-			tracing::debug!("cursor handle created");
 			self.workers.push(handle);
 		}
 		tracing::debug!("App init services complete");
@@ -33,36 +30,31 @@ where
 		{
 			self.run_gui()?;
 		}
-
 		#[cfg(target_arch = "wasm32")]
 		{
 			// self.host.run()?;
 		}
-
 		Ok(())
 	}
 
-	#[cfg(all(feature = "web", target_arch = "wasm32"))]
 	fn run_gui(&mut self) -> Result<()> {
+		#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+		{
+			let cancel = CancellationToken::new();
+			let event_loop = EventLoop::<AppEvent>::with_user_event()
+				.build()
+				.expect("failed to build GUI event loop");
+			let proxy = event_loop.create_proxy();
+			let _handle = self.start_app_events(proxy.clone());
+			let mut renderer =
+				structs::Renderer::<NativeContext, structs::S<structs::C>>::new(self.state.clone(), cancel);
+			let _loop = event_loop
+				.run_app(&mut renderer)
+				.map_err(|err| anyhow::anyhow!("GUI event loop failed: {err}"));
+		}
 		Ok(())
 	}
 
-	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-	fn run_gui(&mut self) -> Result<()> {
-		let cancel = CancellationToken::new();
-		let event_loop = EventLoop::<AppEvent>::with_user_event()
-			.build()
-			.expect("failed to build GUI event loop");
-		let proxy = event_loop.create_proxy();
-		let _handle = self.start_app_events(proxy.clone());
-		let mut renderer =
-			structs::Renderer::<NativeContext, structs::S<structs::C>>::new(self.state.clone(), cancel);
-		let _loop = event_loop
-			.run_app(&mut renderer)
-			.map_err(|err| anyhow::anyhow!("GUI event loop failed: {err}"));
-		Ok(())
-	}
-	
 	pub fn shutdown(&mut self) {
 		tracing::debug!("App shutdown");
 		for worker in &self.workers {
@@ -103,20 +95,16 @@ where
 	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 	fn start_cargo_watcher(&mut self) -> Result<WorkHandle<C, tokio::task::JoinHandle<()>>> {
 		tracing::debug!("cargo: entered");
-
 		let watcher = CargoWatcher::new().map_err(|error| {
 			tracing::error!("Failed to create Cargo watcher: {error}");
 			error
 		})?;
 		tracing::debug!("cargo: watcher created");
-
 		tracing::debug!("Watching Cargo.toml: {}", watcher.path().display());
 		let worker = self.worker();
 		tracing::debug!("cargo: watcher started");
-
 		Ok(worker.run_background_blocking(move |cancel| {
 			let (tx, rx) = std::sync::mpsc::channel();
-
 			let mut fs_watcher = match RecommendedWatcher::new(tx, Config::default()) {
 				Ok(watcher) => watcher,
 				Err(error) => {
@@ -202,19 +190,26 @@ where
 
 	pub fn new(host: Host<C>) -> Result<Self> {
 		tracing::debug!("App New");
-
-		#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-		let (cursor_event_tx, cursor_events) = std::sync::mpsc::channel();
 		let state = structs::S::default();
-		Ok(Self {
-			state,
-			host,
-			workers: vec![],
-			#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-			cursor_events,
-			#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-			cursor_event_tx,
-		})
+		#[cfg(all(feature = "web", target_arch = "wasm32"))]
+		{
+			return Ok(Self {
+				state,
+				host,
+				workers: vec![],
+			});
+		}
+		#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+		{
+			let (cursor_event_tx, cursor_events) = std::sync::mpsc::channel();
+			return Ok(Self {
+				state,
+				host,
+				workers: vec![],
+				cursor_events,
+				cursor_event_tx,
+			});
+		}
 	}
 }
 

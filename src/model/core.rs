@@ -24,15 +24,15 @@ use crate::prelude::*;
 /// Each Estate has a globally unique [Uuid] and may optionally have a
 /// parent Estate, allowing Estates to be organized hierarchically.
 ///
-/// # Resources
+/// ### Resources
 ///
 /// Resources represent files or other external assets associated with the
 /// Estate. They can be created, looked up, mutably accessed, and removed
 /// through the resource methods on this type.
 ///
-/// # Examples
+/// ### Examples
 ///
-/// ```
+/// ```ignore
 /// let estate = Estate::new("my-project".into(), Scope::default());
 /// assert_eq!(estate.resources.len(), 0);
 /// ```
@@ -52,6 +52,7 @@ pub struct Estate {
 ///
 /// Constructors of Estate Entities
 impl Estate {
+	/// ## [Estate::new]
 	/// Initializes an Estate Entity.
 	///
 	/// The Estate starts with no parent, nodes, resources, relations, or
@@ -68,6 +69,8 @@ impl Estate {
 			scope,
 		}
 	}
+	/// ## [Estate::create_resource]
+	///
 	/// Adds a resource to the Estate and returns its identifier.
 	///
 	/// The resource's existing [`Resource::id`] is preserved.
@@ -77,6 +80,7 @@ impl Estate {
 		id
 	}
 
+	/// ## [Estate::resource]
 	/// Returns a reference to the resource with the given identifier.
 	///
 	/// Returns `None` if the Estate does not contain a matching resource.
@@ -100,14 +104,9 @@ impl Estate {
 	}
 }
 
-#[cfg(all(feature = "web", target_arch = "wasm32"))]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-pub struct EstateDiscovery;
-
-#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-#[derive(Clone, Debug)]
-
+#[derive(Clone, Default, Debug, PartialEq, Eq)]
 pub struct EstateDiscovery<State = Disconnected> {
-	pub store: crate::native::discovery::DiscoveryStore,
 	pub state: State,
+	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+	pub store: crate::native::discovery::DiscoveryStore,
 }

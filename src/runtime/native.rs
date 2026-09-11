@@ -1,170 +1,23 @@
+/// ## [Review]
+/// 4 different spawn methods exist in the runtime namespace of the app.
+/// Each of them was added at some time for some reason.
+///
+/// The code compiles on all targeted platforms, web, server, native.
+///
+/// 1: NativeExecutor inherent method
+/// 2: NativeExecutor trait implementation.
+/// 3: NativeRuntime runtime trait implementation
+/// 3: NativeRuntime executor trait implementation
+///
 pub use crate::prelude::*;
 use crate::prelude::*;
 
 use std::sync::Mutex;
 use winit::event_loop::EventLoopProxy;
 
-/// ## NativeRuntime
-///
-/// Runtime of laptop/desktop instances of the application.
-///
-/// Differs from [`WebRuntime`](`crate::app::app_web`) in how background
-/// tasks are implemented by the underlying infrastructure.
-///
-
-#[derive(Clone, Debug)]
-pub struct NativeRuntime {
-	event_rx: Arc<Mutex<broadcast::Receiver<e::Event>>>,
-	pub handle: tokio::runtime::Handle,
-	proxy: Arc<Mutex<Option<EventLoopProxy<AppEvent>>>>,
-	pub events: EventBus,
-	pub session: Session,
-	pub state: Arc<RuntimeState>,
-	pub store: NativeStateStore,
-	pub tasks: Arc<RwLock<TaskManager>>,
-	pub state_service: Arc<StateService>,
-	// pub api: Box<dyn Api>,
-	pub session_service: Arc<SessionService>,
-	pub executor: NativeExecutor,
-	services: NativeServices,
-}
-
-impl NativeRuntime {
-	pub async fn new(handle: tokio::runtime::Handle) -> anyhow::Result<Self> {
-		let store = NativeStateStore::new()?;
-		let state_service = Arc::new(StateService::new(crate::STATE_PATH));
-		let session_service = Arc::new(SessionService::new(Arc::clone(&state_service)));
-		let state = store.load()?;
-		let runtime_state = RuntimeState::new(state);
-		let events = EventBus::new();
-		let event_rx = Arc::new(Mutex::new(events.subscribe()));
-		// let services = NativeServices::default();
-		let services = NativeServices::connect().await?;
-		// let runtime = services.clone().connect().await?;
-		let executor = NativeExecutor {
-			handle: handle.clone(),
-		};
-		Ok(Self {
-			event_rx,
-			events,
-			executor,
-			handle,
-			proxy: Arc::new(Mutex::new(None)),
-			services,
-			session_service,
-			session: Session::default(),
-			state_service,
-			state: Arc::new(runtime_state),
-			store,
-			tasks: Arc::new(RwLock::new(TaskManager::new())),
-		})
-	}
-	// pub async fn connect(self) -> anyhow::Result<NativeRuntime<Connected>> {
-	// 	let NativeRuntime {
-	// 		event_rx,
-	// 		handle,
-	// 		proxy,
-	// 		events,
-	// 		session,
-	// 		state,
-	// 		store,
-	// 		tasks,
-	// 		state_service,
-	// 		session_service,
-	// 		executor,
-	// 		services,
-	// 	} = self;
-	// 	let services = services.connect().await?;
-
-	// 	Ok(NativeRuntime {
-	// 		event_rx,
-	// 		handle,
-	// 		proxy,
-	// 		events,
-	// 		session,
-	// 		state,
-	// 		store,
-	// 		tasks,
-	// 		state_service,
-	// 		session_service,
-	// 		executor,
-	// 		services,
-	// 	})
-	// }
-	pub fn attach_event_proxy(&self, proxy: EventLoopProxy<AppEvent>) {
-		*self.proxy.lock().unwrap() = Some(proxy);
-	}
-
-	pub fn event_processed(&self) {
-		let mut state = self.state.write();
-		state.events_processed += 1;
-	}
-	/// ## Start Services
-	///
-	/// Starts Platform agnostic Services
-	pub fn start_services(&self) -> Result<()> {
-		println!("NativeRuntime start_services");
-		tracing::info!("NativeRuntime start_services");
-		Ok(())
-	}
-}
-
-/// ## NativeExecutor
-///
-/// Concrete implementation of the
-///
-/// Required executor to kick off background tasks using the [`tokio`]
-#[derive(Clone, Debug)]
-pub struct NativeExecutor {
-	pub handle: tokio::runtime::Handle,
-}
-
-/// INHERENT METHOD
-/// ============================================================
-///
-/// This method belongs directly to the concrete `NativeExecutor`
-/// type.
-///
-/// It is NOT a trait implementation.
-///
-/// Technical name:
-///   "inherent method" / "inherent impl"
-///
-/// Called when Rust has a concrete `NativeExecutor` value and
-/// method resolution selects this method.
-///
-/// Example:
-///
-///   let executor: NativeExecutor = ...;
-///   executor.spawn(future);
-///
-/// Because `spawn` exists directly on `NativeExecutor`, this
-/// inherent method takes precedence over a trait method with the
-/// same name when the receiver's concrete type is known.
-///
-/// This is useful for functionality that is specifically owned
-/// by the concrete type and doesn't need to participate in a
-/// generic trait abstraction.
-///
-impl NativeExecutor {
-	pub fn spawn<F>(&self, future: F)
-	where
-		F: Future<Output = ()> + Send + 'static,
-	{
-		println!("🔥 NativeExecutor::spawn CALLED");
-		// Nothing is actually spawned here yet.
-		//
-		// This is intentionally left as a case study.
-		//
-		// If we uncommented this:
-		//
-		// tokio::spawn(async move {
-		// 	println!("🔥 NativeRuntime task STARTED");
-		// 	future.await;
-		// });
-		//
-		// this would be a concrete NativeExecutor-specific
-		// implementation.
+impl EventReceiver for NativeEventReceiver {
+	fn try_recv(&mut self) -> Option<e::Event> {
+		self.rx.try_recv().ok()
 	}
 }
 
@@ -284,6 +137,86 @@ impl Executor for NativeRuntime {
 	//
 	// That would be explicit delegation, which is a different
 	// architectural choice.
+}
+
+impl NativeRuntime {
+	pub async fn new(handle: tokio::runtime::Handle) -> anyhow::Result<Self> {
+		let store = NativeStateStore::new()?;
+		let state_service = Arc::new(StateService::new(crate::STATE_PATH));
+		let session_service = Arc::new(SessionService::new(Arc::clone(&state_service)));
+		let state = store.load()?;
+		let runtime_state = RuntimeState::new(state);
+		let events = EventBus::new();
+		let event_rx = Arc::new(Mutex::new(events.subscribe()));
+		// let services = NativeServices::default();
+		let services = NativeServices::connect().await?;
+		// let runtime = services.clone().connect().await?;
+		let executor = NativeExecutor {
+			handle: handle.clone(),
+		};
+		Ok(Self {
+			event_rx,
+			events,
+			executor,
+			handle,
+			proxy: Arc::new(Mutex::new(None)),
+			services,
+			session_service,
+			session: Session::default(),
+			state_service,
+			state: Arc::new(runtime_state),
+			store,
+			tasks: Arc::new(RwLock::new(TaskManager::new())),
+		})
+	}
+	// pub async fn connect(self) -> anyhow::Result<NativeRuntime<Connected>> {
+	// 	let NativeRuntime {
+	// 		event_rx,
+	// 		handle,
+	// 		proxy,
+	// 		events,
+	// 		session,
+	// 		state,
+	// 		store,
+	// 		tasks,
+	// 		state_service,
+	// 		session_service,
+	// 		executor,
+	// 		services,
+	// 	} = self;
+	// 	let services = services.connect().await?;
+
+	// 	Ok(NativeRuntime {
+	// 		event_rx,
+	// 		handle,
+	// 		proxy,
+	// 		events,
+	// 		session,
+	// 		state,
+	// 		store,
+	// 		tasks,
+	// 		state_service,
+	// 		session_service,
+	// 		executor,
+	// 		services,
+	// 	})
+	// }
+	pub fn attach_event_proxy(&self, proxy: EventLoopProxy<AppEvent>) {
+		*self.proxy.lock().unwrap() = Some(proxy);
+	}
+
+	pub fn event_processed(&self) {
+		let mut state = self.state.write();
+		state.events_processed += 1;
+	}
+	/// ## Start Services
+	///
+	/// Starts Platform agnostic Services
+	pub fn start_services(&self) -> Result<()> {
+		println!("NativeRuntime start_services");
+		tracing::info!("NativeRuntime start_services");
+		Ok(())
+	}
 }
 
 // TRAIT IMPLEMENTATION: NativeRuntime -> Runtime
@@ -440,17 +373,54 @@ impl Runtime for NativeRuntime {
 	}
 }
 
-/// [Review]
-/// 4 different spawn methods exist in the runtime namespace of the app.
-/// Each of them was added at some time for some reason.
+/// INHERENT METHOD
+/// ============================================================
 ///
-/// The code compiles on all targetted platforms, web, server, native.
+/// This method belongs directly to the concrete `NativeExecutor`
+/// type.
 ///
+/// It is NOT a trait implementation.
 ///
-/// 1: NativeExecutor inherent method
-/// 2: NativeExecutor trait tmplementation.
-/// 3: NativeRuntime runtime trait implementation
-/// 3: NativeRuntime executor trait implementation
+/// Technical name:
+///   "inherent method" / "inherent impl"
+///
+/// Called when Rust has a concrete `NativeExecutor` value and
+/// method resolution selects this method.
+///
+/// Example:
+///
+///   let executor: NativeExecutor = ...;
+///   executor.spawn(future);
+///
+/// Because `spawn` exists directly on `NativeExecutor`, this
+/// inherent method takes precedence over a trait method with the
+/// same name when the receiver's concrete type is known.
+///
+/// This is useful for functionality that is specifically owned
+/// by the concrete type and doesn't need to participate in a
+/// generic trait abstraction.
+///
+impl NativeExecutor {
+	pub fn spawn<F>(&self, future: F)
+	where
+		F: Future<Output = ()> + Send + 'static,
+	{
+		println!("🔥 NativeExecutor::spawn CALLED");
+		// Nothing is actually spawned here yet.
+		//
+		// This is intentionally left as a case study.
+		//
+		// If we uncommented this:
+		//
+		// tokio::spawn(async move {
+		// 	println!("🔥 NativeRuntime task STARTED");
+		// 	future.await;
+		// });
+		//
+		// this would be a concrete NativeExecutor-specific
+		// implementation.
+	}
+}
 
 // pub struct NativeAppContext<'a, State>
 // where
@@ -493,17 +463,6 @@ impl Runtime for NativeRuntime {
 // 	}
 // }
 
-// #[derive(Clone)]
-pub struct NativeEventReceiver {
-	pub rx: broadcast::Receiver<e::Event>,
-}
-
-impl EventReceiver for NativeEventReceiver {
-	fn try_recv(&mut self) -> Option<e::Event> {
-		self.rx.try_recv().ok()
-	}
-}
-
 // impl AppHost<NativeRuntime> for NativeApp {
 // 	fn app(&mut self) -> &mut App<NativeRuntime> {
 // 		&mut self.app
@@ -515,3 +474,43 @@ impl EventReceiver for NativeEventReceiver {
 // 		tracing::info!("💀 NativeRuntime DROPPED");
 // 	}
 // }
+
+/// ## [NativeExecutor]
+///
+/// Concrete implementation of the
+///
+/// Required executor to kick off background tasks using the [tokio]
+/// 
+#[derive(Clone, Debug)]
+pub struct NativeExecutor {
+	pub handle: tokio::runtime::Handle,
+}
+
+/// ## [NativeRuntime]
+///
+/// Runtime of laptop/desktop instances of [Estate] Architecture.
+///
+/// Differs from [WebRuntime](app_web) in how background
+/// tasks are implemented by the underlying infrastructure.
+///
+#[derive(Clone, Debug)]
+pub struct NativeRuntime {
+	event_rx: Arc<Mutex<broadcast::Receiver<e::Event>>>,
+	pub handle: tokio::runtime::Handle,
+	proxy: Arc<Mutex<Option<EventLoopProxy<AppEvent>>>>,
+	pub events: EventBus,
+	pub session: Session,
+	pub state: Arc<RuntimeState>,
+	pub store: NativeStateStore,
+	pub tasks: Arc<RwLock<TaskManager>>,
+	pub state_service: Arc<StateService>,
+	// pub api: Box<dyn Api>,
+	pub session_service: Arc<SessionService>,
+	pub executor: NativeExecutor,
+	services: NativeServices,
+}
+
+// #[derive(Clone)]
+pub struct NativeEventReceiver {
+	pub rx: broadcast::Receiver<e::Event>,
+}

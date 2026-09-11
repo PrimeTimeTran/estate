@@ -7,14 +7,15 @@ struct Connected {
 	task_tx: mpsc::Sender<DiscoveryTask>,
 }
 
-impl Default for EstateDiscovery<Disconnected> {
-	fn default() -> Self {
-		Self {
-			store: DiscoveryStore::default(),
-			state: Disconnected,
-		}
-	}
-}
+// impl Default for EstateDiscovery<Disconnected> {
+// 	fn default() -> Self {
+// 		Self {
+// 			state: Disconnected,
+// 			store: DiscoveryStore::default(),
+// 		}
+// 	}
+// }
+
 impl EstateDiscovery<Disconnected> {
 	pub fn connect(self, handle: &tokio::runtime::Handle) -> EstateDiscovery<Connected> {
 		let (task_tx, rx) = mpsc::channel::<DiscoveryTask>(100);

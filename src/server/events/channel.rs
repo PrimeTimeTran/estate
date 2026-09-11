@@ -11,35 +11,11 @@ pub fn channel<T>(capacity: usize) -> (EventSender<T>, EventReceiver<T>) {
 	(EventSender { tx }, EventReceiver { rx })
 }
 
-#[derive(Debug)]
-pub struct EventSender<T> {
-	tx: tokio::sync::mpsc::Sender<T>,
-}
-
-#[derive(Debug)]
-pub struct EventReceiver<T> {
-	rx: tokio::sync::mpsc::Receiver<T>,
-}
-
 impl<T> Clone for EventSender<T> {
 	fn clone(&self) -> Self {
 		Self {
 			tx: self.tx.clone(),
 		}
-	}
-}
-
-impl<T> EventSender<T> {
-	pub async fn send(&self, event: T) -> Result<(), mpsc::error::SendError<T>> {
-		self.tx.send(event).await
-	}
-
-	pub fn try_send(&self, event: T) -> Result<(), mpsc::error::TrySendError<T>> {
-		self.tx.try_send(event)
-	}
-
-	pub fn blocking_send(&self, event: T) -> Result<(), mpsc::error::SendError<T>> {
-		self.tx.blocking_send(event)
 	}
 }
 
@@ -57,6 +33,28 @@ impl<T> EventReceiver<T> {
 	pub fn try_recv(&mut self) -> Result<T, TryRecvError> {
 		self.rx.try_recv()
 	}
+}
+
+impl<T> EventSender<T> {
+	pub async fn send(&self, event: T) -> Result<(), mpsc::error::SendError<T>> {
+		self.tx.send(event).await
+	}
+	pub fn try_send(&self, event: T) -> Result<(), mpsc::error::TrySendError<T>> {
+		self.tx.try_send(event)
+	}
+	pub fn blocking_send(&self, event: T) -> Result<(), mpsc::error::SendError<T>> {
+		self.tx.blocking_send(event)
+	}
+}
+
+#[derive(Debug)]
+pub struct EventSender<T> {
+	tx: tokio::sync::mpsc::Sender<T>,
+}
+
+#[derive(Debug)]
+pub struct EventReceiver<T> {
+	rx: tokio::sync::mpsc::Receiver<T>,
 }
 
 // pub struct NativeEventReceiver {

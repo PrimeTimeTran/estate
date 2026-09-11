@@ -30,7 +30,7 @@ pub use crate::prelude::*;
 ///
 /// ### Example
 ///
-/// ```rust
+/// ```ignore
 /// - e::create::app(e::EventKind::SessionStart)
 /// - create::app(e::EventKind::SessionStart)
 /// ```
@@ -63,21 +63,21 @@ pub mod create {
 ///
 #[derive(Debug)]
 pub enum AppEvent {
+	AppEvent,
+	Navigate(crate::ui::ViewType),
+	RuntimeEvent,
 	Shutdown,
+	TickClock(String),
+	CursorPosition {
+		x: f64,
+		y: f64,
+	},
 	ModifiersChanged {
 		alt: bool,
 		command: bool,
 		ctrl: bool,
 		shift: bool,
 	},
-	CursorPosition {
-		x: f64,
-		y: f64,
-	},
-	TickClock(String),
-	AppEvent,
-	Navigate(crate::ui::ViewType),
-	RuntimeEvent,
 }
 
 /// ## [EventKind]
