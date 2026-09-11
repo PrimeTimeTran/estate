@@ -113,12 +113,12 @@ impl Context for NativeApp {
 		&self.runtime
 	}
 
-	fn foo(&self, args: String) -> Result<()> {
-		NativeApp::foo(&self, args)
-	}
-	fn bar(&self, args: String) -> Result<()> {
-		NativeApp::bar(&self, args)
-	}
+	// fn foo(&self, args: String) -> Result<()> {
+	// 	NativeApp::foo(&self, args)
+	// }
+	// fn bar(&self, args: String) -> Result<()> {
+	// 	NativeApp::bar(&self, args)
+	// }
 }
 
 impl NativeApp {
@@ -196,7 +196,7 @@ impl NativeApp {
 		self.spawn_global_hotkey_daemon()?;
 		self.spawn_clock()?;
 		// Self::spawn_clock()?;
-		self.sspawn_cursor_daemon()?;
+		// self._spawn_cursor_daemon()?;
 
 		self
 			.runtime_old()
@@ -361,8 +361,7 @@ impl NativeApp {
 		self.hotkey_manager.start();
 		Ok(())
 	}
-	fn sspawn_cursor_daemon(&mut self) -> Result<()> {
-		// sspawn_global_cursor_daemon(proxy);
+	fn _spawn_cursor_daemon(&mut self) -> Result<()> {
 		Ok(())
 	}
 }

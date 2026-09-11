@@ -14,7 +14,7 @@ use crate::{RuntimeState, e, prelude::*};
 ///
 /// from runtime, host, platform
 ///
-/// ### [`Traits`](https://doc.rust-lang.org/rust-by-example/trait.html)
+/// ### [Traits](https://doc.rust-lang.org/rust-by-example/trait.html)
 ///
 /// - [Runtime](Context::Runtime): Platform specific runtime
 ///
@@ -51,9 +51,9 @@ pub trait Context: Sized {
 
 	fn run(&mut self, args: Self::Args) -> Result<()>;
 
-	fn foo(&self, args: String) -> Result<()>;
+	// fn foo(&self, args: String) -> Result<()>;
 
-	fn bar(&self, args: String) -> Result<()>;
+	// fn bar(&self, args: String) -> Result<()>;
 }
 
 pub trait State {}

@@ -15,13 +15,13 @@ use crate::prelude::*;
 
 /// ## [C]
 ///
-/// Type state placeholder for context.
+/// Type state placeholder for [Ctx] or [Context][traits::Context]
 ///
-/// Generic typing structs with C by default enables us to type safe methods quickly &
-/// easily with virtually no cost.
+/// Generic type state of structs with C by default enables
+/// more easily hiding and enabling of methods/params at compile time.
 ///
-/// When the abstract context has become concrete, then we can silo the capabilities
-/// for very little cost to make the code much safer.
+/// When the abstract context has become concrete silo it's capabilities
+/// for little cost to make code safer via documentation & preventing the app to even compile.
 ///
 pub struct C;
 
