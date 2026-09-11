@@ -48,9 +48,9 @@ impl Default for EstateState {
 impl Default for S<C> {
 	fn default() -> Self {
 		S {
-			view: ViewType::MarkdownScreen,
-			state: PhantomData,
 			context: PhantomData,
+			state: PhantomData,
+			view: ViewType::MarkdownScreen,
 		}
 	}
 }
@@ -89,7 +89,7 @@ impl<C, S> structs::Renderer<C, S> {
 	}
 }
 
-/// WIP
+/// [HostRenderer]
 ///
 /// It's unclear which of Eguis APIs work on all target platforms.
 ///
