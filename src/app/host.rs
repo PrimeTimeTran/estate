@@ -2,16 +2,16 @@ use crate::prelude::*;
 
 pub enum CargoFeature {
 	Native,
-	Web,
 	None,
+	Web,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TerminalHost {
-	VsCode,
-	Zed,
 	JetBrains,
 	Unknown,
+	VsCode,
+	Zed,
 }
 
 fn append_to_file(str: String) {}

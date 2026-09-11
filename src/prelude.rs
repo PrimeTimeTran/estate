@@ -31,7 +31,7 @@ pub use uuid::Uuid;
 ///
 pub use crate::{
 	api::*,
-	app::app_entry::{self, *},
+	app_entry::*,
 	app_macros,
 	app_prelude::*,
 	data::*,
@@ -43,15 +43,12 @@ pub use crate::{
 	share::{share_prelude::*, *},
 	structs::{self, *},
 	tool::{time::*, *},
-	traits,
-	traits::{Context, EventReceiver, *},
+	traits::{self, Context, EventReceiver, *},
 	ui::{config::*, theme::*, ui_prelude::*, ui_trait::*, *},
 };
 
 #[cfg(all(feature = "web", target_arch = "wasm32"))]
 pub use crate::web::*;
-// #[cfg(all(feature = "web", target_arch = "wasm32"))]
-// pub use crate::{app::app_web::*, web::*};
 
 #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 pub use crate::{

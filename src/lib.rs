@@ -30,6 +30,8 @@ pub mod api;
 pub mod app;
 pub mod data;
 pub mod helpers;
+#[path = "./[app].rs"]
+pub mod app_entry;
 #[path = "./[impl].rs"]
 pub mod impls;
 pub mod r#macro;

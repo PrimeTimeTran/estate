@@ -106,9 +106,3 @@ pub struct HostClock {
 #[cfg(feature = "web")]
 #[derive(Clone, Default)]
 pub struct HostClock;
-
-impl State {
-	pub fn new() -> Self {
-		Self {}
-	}
-}

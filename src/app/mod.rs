@@ -20,8 +20,6 @@
 /// ./src/mobile
 ///
 /// ./src/app/mod.rs
-#[path = "app.entry.rs"]
-pub mod app_entry;
 pub mod clock;
 pub mod context;
 pub mod event;

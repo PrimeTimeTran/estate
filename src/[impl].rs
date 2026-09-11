@@ -89,6 +89,12 @@ impl<C, S> structs::Renderer<C, S> {
 	}
 }
 
+impl structs::State {
+	pub fn new() -> Self {
+		Self {}
+	}
+}
+
 /// [HostRenderer]
 ///
 /// It's unclear which of Eguis APIs work on all target platforms.

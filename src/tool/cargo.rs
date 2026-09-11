@@ -1,12 +1,4 @@
 use crate::prelude::*;
-use std::{
-	path::{Path, PathBuf},
-	sync::mpsc,
-};
-
-// use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
-use serde::{Deserialize, Serialize};
-use tokio_util::sync::CancellationToken;
 
 fn read_cargo_toml() -> CargoToml {
 	let raw = fs::read_to_string("Cargo.toml").expect("failed to read Cargo.toml");
