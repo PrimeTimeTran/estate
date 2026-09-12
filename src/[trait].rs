@@ -77,9 +77,9 @@ pub trait ApiServices: Services {
 /// ## [Ctx]
 ///
 /// A type safe abstraction with room for growth via it's internal [associated types].
-/// 
+///
 /// ### [Types][associated types]
-/// 
+///
 /// - [State](Self::State).
 ///
 /// [associated types]: https://doc.rust-lang.org/rust-by-example/generics/assoc_items/types.html
@@ -425,7 +425,9 @@ pub trait Worker<C: Ctx> {
 	// 	Fut: Future<Output = ()> + 'static;
 }
 
-pub trait NativeCtx {
+pub trait CtxWeb {}
+pub trait CtxNative {}
+pub trait NativeContext {
 	fn handle(&self) -> tokio::runtime::Handle;
 	fn shutdown(self);
 	fn wait_for_shutdown(&self);

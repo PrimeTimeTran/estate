@@ -2,7 +2,7 @@
 
 Build a LeetCode-style problem-solving UI in:
 
-/Users/future/kb/project/crates/estate
+`/Users/future/kb/project/crates/estate`
 
 You must inspect the existing codebase and MODIFY the existing source files.
 Do not merely describe or suggest code.
@@ -13,7 +13,7 @@ Do not merely describe or suggest code.
 
 Implement the UI in:
 
-./src/ui/view/problem.rs
+`./src/ui/view/problem.rs`
 
 The resulting UI should have:
 
@@ -42,7 +42,7 @@ Before making changes, inspect these files:
 
 ### UI trait
 
-./src/ui/view/ve.rs
+`./src/ui/view/ve.rs`
 
 Read:
 
@@ -58,21 +58,22 @@ These define how UI views are rendered and interacted with in this application.
 
 ### Target view
 
-./src/ui/view/problem.rs
+`./src/ui/view/problem.rs`
 
 This is the primary file to modify.
 
-Inspect the existing implementation and integrate the new UI into its existing architecture rather than replacing the architecture unnecessarily.
+Inspect the existing implementation and integrate the new UI into its existing 
+architecture rather than replacing the architecture unnecessarily.
 
 ### Problem model
 
-./src/model/problem.rs
+`./src/model/problem.rs`
 
 Use this to understand the available problem data and types.
 
 ### Submission model
 
-./src/model/submission.rs
+`./src/model/submission.rs`
 
 Use this to understand submission-related data and types.
 
@@ -150,7 +151,9 @@ Do not say "next", "complete", or merely describe the changes.
 
 Your job is to inspect, implement, build/check, and fix the code.
 
-The filesystem is the deliverable. Apply the implementation directly to the repository. Your final response should briefly summarize what you changed and any build/test result. Do not paste the implementation into the response.
+The filesystem is the deliverable. Apply the implementation directly to the
+repository. Your final response should briefly summarize what you changed
+and any build/test result. Do not paste the implementation into the response.
 
 ## Scope
 
@@ -202,7 +205,7 @@ Modify:
 Build a LeetCode/VS Code-style coding interface:
 
 ```text
-┌────────────────────┬──────────────────────────────────────────┐
+┌─────────────────────┬──────────────────────────────────────────┐
 │ Problem             │                                          │
 │ Description         │                                          │
 │ Solutions           │             CODE EDITOR                  │
@@ -212,7 +215,7 @@ Build a LeetCode/VS Code-style coding interface:
 │                     │                                          │
 │ Problem information │                                          │
 │                     │                                          │
-└────────────────────┴──────────────────────────────────────────┘
+└─────────────────────┴──────────────────────────────────────────┘
 ```
 
 ### Left sidebar
@@ -235,7 +238,9 @@ The Problem tab should display the current problem's information/description usi
 
 Create a large central code-editor area.
 
-Use the existing editor implementation if one already exists in the project. If no editor exists, create an appropriate egui-based editable area/placeholder consistent with the existing architecture.
+Use the existing editor implementation if one already exists in the project. If
+no editor exists, create an appropriate egui-based editable area/placeholder
+consistent with the existing architecture.
 
 The editor should occupy most of the available window.
 

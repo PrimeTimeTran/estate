@@ -1,7 +1,9 @@
 # Task
 
+## Steps
+
 1. Watch the following file for changes
-   ./Cargo.toml
+   `./Cargo.toml`
 
 2. If changed. Check the value of this key, `default`.
 
@@ -16,25 +18,24 @@
 
    ```json
    {
-   	// Update this key to match.
-   	"rust-analyzer.cargo.features": ["web"]
+   	"rust-analyzer.cargo.features": ["native"]
    }
    ```
 
 4. Also update this file, `/Users/future/.config/zed/settings.json`
 
-   ```json
-   {
-   	// Update this key to match.
-   	"lsp": {
-   		"rust-analyzer": {
-   			"initialization_options": {
-   				"cargo": {
-   					// Update this key to match.
-   					"features": ["native"]
-   				}
-   			}
-   		}
-   	}
-   }
-   ```
+```json
+{
+	// Update this key to match.
+	"lsp": {
+		"rust-analyzer": {
+			"initialization_options": {
+				"cargo": {
+					// Update this key to match.
+					"features": ["native"]
+				}
+			}
+		}
+	}
+}
+```

@@ -2,8 +2,7 @@ use crate::prelude::{traits::Ctx, *};
 
 impl<C> App<C>
 where
-	C: Ctx
-	// C: Ctx + 'static,
+	C: Ctx, // C: Ctx + 'static,
 {
 	pub fn context(self) -> Arc<C> {
 		self.host.context()
@@ -48,7 +47,7 @@ where
 			let proxy = event_loop.create_proxy();
 			let _handle = self.start_app_events(proxy.clone());
 			let mut renderer =
-				structs::Renderer::<NativeContext, structs::S<structs::C>>::new(self.state.clone(), cancel);
+				structs::Renderer::<ContextNative, structs::S<structs::C>>::new(self.state.clone(), cancel);
 			let _loop = event_loop
 				.run_app(&mut renderer)
 				.map_err(|err| anyhow::anyhow!("GUI event loop failed: {err}"));

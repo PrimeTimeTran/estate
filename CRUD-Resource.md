@@ -1,6 +1,6 @@
 ## 1. Resource lifecycle
 
-The fundamental CRUD:
+The fundamental CRUD:   
 
 - `resource create`
 

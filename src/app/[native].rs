@@ -3,7 +3,7 @@ use crate::{
 	prelude::{traits::Ctx, *},
 };
 
-impl Ctx for NativeContext {
+impl Ctx for ContextNative {
 	type State = NativeState;
 
 	fn state(&self) -> &Self::State {
@@ -17,15 +17,15 @@ impl HostClock {
 	}
 }
 
-impl<NativeContext> Host<NativeContext>
+impl<ContextNative> Host<ContextNative>
 where
-	NativeContext: Ctx,
+	ContextNative: Ctx,
 {
 	pub fn clock(&self) -> &HostClock {
 		&self.clock
 	}
 
-	pub fn context(&self) -> Arc<NativeContext> {
+	pub fn context(&self) -> Arc<ContextNative> {
 		self.context.clone()
 	}
 
@@ -46,12 +46,12 @@ where
 		});
 	}
 
-	pub fn worker(&self) -> &HostWorker<NativeContext> {
+	pub fn worker(&self) -> &HostWorker<ContextNative> {
 		&self.worker
 	}
 }
 
-impl Host<NativeContext> {
+impl Host<ContextNative> {
 	// pub fn new(context: Arc<C>) -> anyhow::Result<Self> {
 	// 	let runtime = tokio::runtime::Runtime::new()?;
 	// 	let handle = runtime.handle().clone();
@@ -88,7 +88,7 @@ impl Host<NativeContext> {
 		let mut config = LogConfig::load()?;
 		config.apply_cli(&parsed);
 		logger::init_logging(&config)?;
-		let context = NativeContext::default();
+		let context = ContextNative::default();
 		Self::new(Arc::new(context))
 	}
 }
@@ -153,7 +153,7 @@ where
 }
 
 #[derive(Default)]
-pub struct NativeContext {
+pub struct ContextNative {
 	pub state: NativeState,
 	pub menu_bar: Option<MenuBar>,
 	pub tray_clock: Option<MenuBar>,
