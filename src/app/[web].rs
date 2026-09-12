@@ -4,6 +4,14 @@ use crate::{
 	ui, ui_prelude as gui,
 };
 
+#[async_trait::async_trait(?Send)]
+pub trait Api: Debug + 'static {
+	async fn load_problems(&self) -> anyhow::Result<Vec<StoredProblem>>;
+	async fn sample_problem(&self, request: SampleProblemRequest) -> anyhow::Result<StoredProblem>;
+	async fn load_problem(&self, id: i64) -> anyhow::Result<StoredProblem>;
+	fn clone_box(&self) -> Box<dyn Api>;
+}
+
 impl Ctx for WebContext {
 	type State = WebState;
 	fn state(&self) -> &Self::State {
@@ -85,3 +93,38 @@ pub struct WebContext;
 
 #[derive(Clone, Debug, Default)]
 pub struct WebState;
+
+/// ## WASM
+///
+/// Native Build needs client too.
+#[derive(Debug, Clone)]
+pub struct WebApiClient {
+	base_url: String,
+}
+
+impl WebApiClient {
+	pub fn new(base_url: impl Into<String>) -> Self {
+		Self {
+			base_url: base_url.into(),
+		}
+	}
+}
+
+#[async_trait::async_trait(?Send)]
+impl Api for WebApiClient {
+	fn clone_box(&self) -> Box<dyn Api> {
+		Box::new(self.clone())
+	}
+
+	async fn load_problems(&self) -> anyhow::Result<Vec<StoredProblem>> {
+		todo!("WebApiClient load_problems")
+	}
+
+	async fn sample_problem(&self, request: SampleProblemRequest) -> anyhow::Result<StoredProblem> {
+		todo!("WebApiClient sample_problem")
+	}
+
+	async fn load_problem(&self, id: i64) -> anyhow::Result<StoredProblem> {
+		todo!("WebApiClient load_problem")
+	}
+}

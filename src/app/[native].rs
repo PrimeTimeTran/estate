@@ -3,6 +3,20 @@ use crate::{
 	prelude::{traits::Ctx, *},
 };
 
+/// # Native
+///
+use crate::proto::{
+	problem_service_client::ProblemServiceClient, submission_service_client::SubmissionServiceClient,
+};
+
+#[async_trait::async_trait]
+pub trait Api: Debug + 'static {
+	async fn load_problems(&self) -> anyhow::Result<Vec<StoredProblem>>;
+	async fn sample_problem(&self, request: SampleProblemRequest) -> anyhow::Result<StoredProblem>;
+	async fn load_problem(&self, id: i64) -> anyhow::Result<StoredProblem>;
+	fn clone_box(&self) -> Box<dyn Api>;
+}
+
 impl Ctx for ContextNative {
 	type State = NativeState;
 
@@ -167,4 +181,63 @@ pub struct NativeState {
 	pub tray_clock: Option<MenuBar>,
 	// pub tray_cursor: Arc<Option<TrayIcon>>,
 	// pub windows: Vec<AppWindow>,
+}
+
+#[derive(Debug, Clone)]
+pub struct NativeApiClient {
+	pub problems: ProblemServiceClient<Channel>,
+	pub submissions: SubmissionServiceClient<Channel>,
+}
+
+impl NativeApiClient {
+	pub fn new(
+		problems: ProblemServiceClient<Channel>,
+		submissions: SubmissionServiceClient<Channel>,
+	) -> Self {
+		Self {
+			problems,
+			submissions,
+		}
+	}
+}
+
+impl NativeApiClient {
+	pub async fn connect() -> anyhow::Result<Self> {
+		let chan = Channel::from_static(crate::GRPC_SOCKET_CLIENT)
+			.connect()
+			.await?;
+
+		Ok(Self {
+			problems: ProblemServiceClient::new(chan.clone()),
+			submissions: SubmissionServiceClient::new(chan),
+		})
+	}
+}
+
+#[async_trait::async_trait]
+impl Api for NativeApiClient {
+	fn clone_box(&self) -> Box<dyn Api> {
+		Box::new(self.clone())
+	}
+
+	async fn load_problems(&self) -> anyhow::Result<Vec<StoredProblem>> {
+		todo!("NativeApiClient load_problems")
+	}
+
+	async fn load_problem(&self, id: i64) -> anyhow::Result<StoredProblem> {
+		todo!("NativeApiClient load_problem")
+	}
+
+	async fn sample_problem(&self, request: SampleProblemRequest) -> anyhow::Result<StoredProblem> {
+		println!("Native API Client sample_problem");
+		let request: crate::proto::types::SampleProblemRequest = request.into();
+		let response = self
+			.problems
+			.clone()
+			.sample_problem(request)
+			.await?
+			.into_inner();
+
+		StoredProblem::try_from(response)
+	}
 }
