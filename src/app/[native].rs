@@ -18,10 +18,15 @@ pub trait Api: Debug + 'static {
 }
 
 impl Ctx for ContextNative {
-	type State = NativeState;
+	type AppState = structs::S<ContextNative>;
+	type GuiState = NativeGuiState;
 
-	fn state(&self) -> &Self::State {
-		&self.state
+	fn initial_state() -> Self::AppState {
+		structs::S {
+			context: PhantomData,
+			state: PhantomData,
+			view: ViewType::MarkdownScreen,
+		}
 	}
 }
 
@@ -182,6 +187,11 @@ pub struct NativeState {
 	// pub tray_cursor: Arc<Option<TrayIcon>>,
 	// pub windows: Vec<AppWindow>,
 }
+#[derive(Clone, Debug, Default)]
+pub struct NativeGuiState {
+	pub menu_bar: Option<MenuBar>,
+	pub tray_clock: Option<MenuBar>,
+}
 
 #[derive(Debug, Clone)]
 pub struct NativeApiClient {
@@ -241,3 +251,5 @@ impl Api for NativeApiClient {
 		StoredProblem::try_from(response)
 	}
 }
+
+impl App<ContextNative> {}

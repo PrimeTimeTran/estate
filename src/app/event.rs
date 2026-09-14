@@ -30,10 +30,15 @@ pub use crate::prelude::*;
 ///
 /// ### Example
 ///
+/// All of these would work. They're made difference because in some places app may or may not be available.
+///
 /// ```ignore
 /// - e::create::app(e::EventKind::SessionStart)
 /// - create::app(e::EventKind::SessionStart)
 /// ```
+///
+/// Namespaces are used to make emitting of events easier
+/// in downstream code.
 ///
 pub mod create {
 	use crate::app::event::*;
@@ -183,15 +188,6 @@ impl From<ProtoProblem> for ProblemLoaded {
 	}
 }
 
-/// ## [Klass] (Alias of EventKind)
-///
-/// Represents full event lifecycle for representing initial, pending,
-/// failed, repeated when necessary.
-///
-pub type Klass = EventKind;
-
-pub type Problem = ProtoProblem;
-
 /// ## [Event]
 ///
 #[derive(Debug, Clone, Deserialize, Hash, Serialize)]
@@ -208,3 +204,12 @@ pub struct ProblemLoaded {
 	pub title: String,
 	pub slug: String,
 }
+
+/// ## [Klass] (Alias of EventKind)
+///
+/// Represents full event lifecycle for representing initial, pending,
+/// failed, repeated when necessary.
+///
+pub type Klass = EventKind;
+
+pub type Problem = ProtoProblem;

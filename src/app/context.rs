@@ -1,6 +1,8 @@
 use crate::{e, prelude::*};
 
-// The lifetimes 'a and 'static in your code tell a precise story about memory ownership, data borrows, and concurrency safety.
+// The lifetimes 'a and 'static in your code tell a precise story about memory ownership,
+// data borrows, and concurrency safety.
+//
 // Here is exactly what each lifetime communicates to the Rust compiler and to other developers:
 //
 // ## 1. What the 'a lifetime tells you
@@ -21,17 +23,24 @@ use crate::{e, prelude::*};
 // completely own its internal data (contain no references like &'b T) or only contain references that
 // live for the entire duration of the program (like &'static str).
 //
-// * Safe for Spawning Threads: Because your Runtime trait includes a spawn method (fn spawn<F>(&self, future: F) where F: ... + 'static), the compiler must guarantee that the runtime itself won't disappear while a background thread or async task is running. Requiring R: 'static ensures that clones of your runtime can be sent across threads safely without causing "use-after-free" bugs.
-// * Note on the contrast: While the wrapper AppContext is heavily constrained and short-lived due to 'a, the generic type R plugged into it must be infinitely long-lived ('static).
+// * Safe for Spawning Threads: Because your Runtime trait includes a spawn method (fn spawn<F>(&self, future: F)
+// where F: ... + 'static), the compiler must guarantee that the runtime itself won't disappear while a background
+// thread or async task is running. Requiring R: 'static ensures that clones of your runtime can be
+// sent across threads safely without causing "use-after-free" bugs.
+//
+// * Note on the contrast: While the wrapper AppContext is heavily constrained and short-lived due to 'a,
+// the generic type R plugged into it must be infinitely long-lived ('static).
 //
 // ## Summary of the Architecture
 //
 // Your lifetime design reveals a classic "Tick Loop" or "Command" pattern:
 //
 //    1. You have a long-lived, multi-threaded core structure (Runtime and AppRuntime).
-//    2. At specific moments (like an update loop or UI frame tick), you construct a temporary AppContext<'a> to gain exclusive, mutable access to the application state.
-//    3. Once that quick operations phase ends, AppContext is dropped, releasing the borrow so the application can continue running its background async tasks.
-
+//    2. At specific moments (like an update loop or UI frame tick),
+// 				you construct a temporary AppContext<'a> to gain exclusive, mutable access to the application state.
+//    3. Once that quick operations phase ends, AppContext is dropped, releasing the borrow so the application can
+// 				continue running its background async tasks.
+//
 /// ## [AppContext]
 ///
 /// Exposes runtime capabilities

@@ -55,6 +55,16 @@ impl Default for S<C> {
 	}
 }
 
+impl<C> S<C>
+where
+	C: Ctx,
+{
+	pub fn window_count(&self, context: &C) -> usize {
+		todo!("window_count")
+		// can't access `windows` here because Ctx doesn't guarantee it
+	}
+}
+
 impl EstateState {
 	pub fn save_workspace(path: &PathBuf) {
 		println!("💾 save_workspace not implemented yet: {:?}", path);

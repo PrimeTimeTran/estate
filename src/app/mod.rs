@@ -18,8 +18,6 @@
 /// ./src/native
 /// ./src/web
 /// ./src/mobile
-///
-/// ./src/app/mod.rs
 pub mod clock;
 pub mod context;
 pub mod event;

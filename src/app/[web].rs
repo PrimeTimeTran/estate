@@ -12,14 +12,20 @@ pub trait Api: Debug + 'static {
 	fn clone_box(&self) -> Box<dyn Api>;
 }
 
-impl Ctx for WebContext {
-	type State = WebState;
-	fn state(&self) -> &Self::State {
-		self.state()
+impl Ctx for ContextWeb {
+	type AppState = structs::S<ContextWeb>;
+	type GuiState = WebState;
+
+	fn initial_state() -> Self::AppState {
+		structs::S {
+			context: PhantomData,
+			state: PhantomData,
+			view: ViewType::MarkdownScreen,
+		}
 	}
 }
 
-impl Host<WebContext> {
+impl Host<ContextWeb> {
 	// pub fn new(context: Arc<C>) -> anyhow::Result<Self> {
 	// 	let clock = HostClock {};
 	// 	Ok(Self {
@@ -29,18 +35,18 @@ impl Host<WebContext> {
 	// 	})
 	// }
 	pub fn init() -> Result<Self> {
-		Self::new(Arc::new(WebContext::default()))
+		Self::new(Arc::new(ContextWeb::default()))
 	}
 }
 
-impl<WebContext> Host<WebContext>
+impl<ContextWeb> Host<ContextWeb>
 where
-	WebContext: Ctx,
+	ContextWeb: Ctx,
 {
 	pub fn clock(&self) -> &HostClock {
 		&self.clock
 	}
-	pub fn context(&self) -> Arc<WebContext> {
+	pub fn context(&self) -> Arc<ContextWeb> {
 		self.context.clone()
 	}
 	pub fn wait_for_shutdown(&self) {
@@ -55,7 +61,7 @@ where
 			});
 		}
 	}
-	pub fn worker(&self) -> &HostWorker<WebContext> {
+	pub fn worker(&self) -> &HostWorker<ContextWeb> {
 		&self.worker
 	}
 }
@@ -89,7 +95,7 @@ where
 }
 
 #[derive(Default)]
-pub struct WebContext;
+pub struct ContextWeb;
 
 #[derive(Clone, Debug, Default)]
 pub struct WebState;
@@ -128,3 +134,5 @@ impl Api for WebApiClient {
 		todo!("WebApiClient load_problem")
 	}
 }
+
+impl App<ContextWeb> {}

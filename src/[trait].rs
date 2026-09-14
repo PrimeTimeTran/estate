@@ -80,12 +80,13 @@ pub trait ApiServices: Services {
 ///
 /// ### [Types][associated types]
 ///
-/// - [State](Self::State).
+/// - [AppState](Self::AppState).
 ///
 /// [associated types]: https://doc.rust-lang.org/rust-by-example/generics/assoc_items/types.html
-pub trait Ctx: Default {
-	type State: Clone + Send + Sync + 'static;
-	fn state(&self) -> &Self::State;
+pub trait Ctx {
+	type AppState: Clone;
+	type GuiState;
+	fn initial_state() -> Self::AppState;
 }
 
 /// ## [Clock]

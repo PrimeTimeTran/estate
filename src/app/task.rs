@@ -28,5 +28,4 @@ impl TaskKind {
 	}
 }
 
-
 pub type TaskId = Uuid;

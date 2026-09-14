@@ -304,7 +304,7 @@ mod impls {
 				families: vec![],
 				gender: person.gender,
 				martial_status: person.martial_status,
-				name: person.name,
+				name: callsign.clone(),
 			};
 
 			Self {
@@ -321,25 +321,6 @@ mod impls {
 mod structs {
 	use super::{e, i, t, *};
 
-	#[derive(Clone, Default, Debug)]
-	pub struct CtxParent;
-	#[derive(Clone, Default, Debug)]
-	pub struct StateParent;
-	#[derive(Clone, Default, Debug)]
-	pub struct CtxChild;
-	#[derive(Clone, Default, Debug)]
-	pub struct StateChild;
-	#[derive(Clone, Default, Debug)]
-	pub struct CtxPerson;
-	#[derive(Clone, Default, Debug)]
-	pub struct StatePerson {
-		pub martial_status: e::RelationshipStatus,
-	}
-	#[derive(Clone, Default, Debug)]
-	pub struct CtxFamily;
-	#[derive(Clone, Default, Debug)]
-	pub struct StateFamily;
-
 	#[derive(Clone, Debug)]
 	pub struct Child<C, S> {
 		pub context: C,
@@ -349,7 +330,31 @@ mod structs {
 	}
 
 	#[derive(Clone, Copy, Debug, Default)]
-	pub struct Household;
+	pub struct Context;
+
+	#[derive(Clone, Default, Debug)]
+	pub struct CtxChild;
+	#[derive(Clone, Default, Debug)]
+	pub struct CtxFamily;
+	#[derive(Clone, Default, Debug)]
+	pub struct CtxParent;
+	#[derive(Clone, Default, Debug)]
+	pub struct CtxPerson;
+	#[derive(Clone, Copy, Debug, Default)]
+	pub struct CtxWork;
+
+	#[derive(Clone, Default, Debug)]
+	pub struct StateChild;
+	#[derive(Clone, Default, Debug)]
+	pub struct StateFamily;
+	#[derive(Clone, Default, Debug)]
+	pub struct StateParent;
+	#[derive(Clone, Default, Debug)]
+	pub struct StatePerson {
+		pub martial_status: e::RelationshipStatus,
+	}
+	#[derive(Clone, Copy, Debug, Default)]
+	pub struct StateWork;
 
 	/// In the context of me being a child of my parents,
 	/// The C and S of family is generic. But the C and S of "members", me, should be different.
@@ -389,7 +394,6 @@ mod structs {
 	pub struct Person<C, S> {
 		pub context: C,
 		pub state: S,
-		// pub state2: StatePerson,
 		pub name: String,
 		pub gender: e::Gender,
 		pub martial_status: e::RelationshipStatus,
@@ -415,9 +419,6 @@ mod structs {
 	}
 
 	#[derive(Clone, Copy, Debug, Default)]
-	pub struct Context;
-
-	#[derive(Clone, Copy, Debug, Default)]
 	pub struct State {
 		pub martial_status: e::RelationshipStatus,
 	}
@@ -440,12 +441,6 @@ mod structs {
 		pub person: Person<CtxWork, StateWork>,
 		pub name: String,
 	}
-
-	#[derive(Clone, Copy, Debug, Default)]
-	pub struct CtxWork;
-
-	#[derive(Clone, Copy, Debug, Default)]
-	pub struct StateWork;
 
 	pub struct WorkPerson<C, S> {
 		pub person: Person<C, S>,

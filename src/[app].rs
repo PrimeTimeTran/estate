@@ -25,7 +25,10 @@ where
 		Ok(())
 	}
 
-	pub fn run(&mut self) -> Result<()> {
+	pub fn run(&mut self) -> Result<()>
+	where
+		C::AppState: Send + Sync + 'static,
+	{
 		tracing::debug!("App run");
 		self.init_services()?;
 		#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
@@ -36,10 +39,15 @@ where
 		{
 			// self.host.run()?;
 		}
+
 		Ok(())
 	}
 
-	fn run_gui(&mut self) -> Result<()> {
+	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+	fn run_gui(&mut self) -> Result<()>
+	where
+		C::AppState: Send + Sync + 'static,
+	{
 		#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 		{
 			let cancel = CancellationToken::new();
@@ -47,12 +55,13 @@ where
 				.build()
 				.expect("failed to build GUI event loop");
 			let proxy = event_loop.create_proxy();
-			let _handle = self.start_app_events(proxy.clone());
+			let handle = self.start_app_events(proxy.clone())?;
+			self.workers.push(handle);
 			let mut renderer =
-				structs::Renderer::<ContextNative, structs::S<structs::C>>::new(self.state.clone(), cancel);
-			let _loop = event_loop
+				structs::Renderer::<ContextNative, C::AppState>::new(self.state.clone(), cancel);
+			event_loop
 				.run_app(&mut renderer)
-				.map_err(|err| anyhow::anyhow!("GUI event loop failed: {err}"));
+				.map_err(|err| anyhow::anyhow!("GUI event loop failed: {err}"))?;
 		}
 		Ok(())
 	}
@@ -192,7 +201,7 @@ where
 
 	pub fn new(host: Host<C>) -> Result<Self> {
 		tracing::debug!("App New");
-		let state = structs::S::default();
+		let state = C::initial_state();
 		#[cfg(all(feature = "web", target_arch = "wasm32"))]
 		{
 			return Ok(Self {
@@ -222,6 +231,6 @@ pub struct App<C: Ctx> {
 	pub cursor_event_tx: std::sync::mpsc::Sender<CursorEvent>,
 
 	pub host: Host<C>,
-	state: structs::S<structs::C>,
+	pub state: C::AppState,
 	pub workers: Vec<WorkHandle<C, tokio::task::JoinHandle<()>>>,
 }

@@ -96,8 +96,8 @@ pub struct Renderer<C, S> {
 ///
 #[derive(Debug)]
 pub struct S<C> {
-	pub context: PhantomData<C>,
-	pub state: PhantomData<C>,
+	pub context: PhantomData<fn() -> C>,
+	pub state: PhantomData<fn() -> C>,
 	pub view: ViewType,
 }
 
