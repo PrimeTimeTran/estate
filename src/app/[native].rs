@@ -9,6 +9,132 @@ use crate::proto::{
 	problem_service_client::ProblemServiceClient, submission_service_client::SubmissionServiceClient,
 };
 
+impl<C> App<C>
+where
+	C: Ctx,
+{
+	pub fn run_gui(&mut self) -> Result<()>
+	where
+		C::AppState: Send + Sync + 'static,
+	{
+		let cancel = CancellationToken::new();
+		let event_loop = EventLoop::<AppEvent>::with_user_event()
+			.build()
+			.expect("failed to build GUI event loop");
+		let proxy = event_loop.create_proxy();
+		let handle = self.start_app_events(proxy.clone())?;
+		self.workers.push(handle);
+		let mut renderer =
+			structs::Renderer::<ContextNative, C::AppState>::new(self.state.clone(), cancel);
+		event_loop
+			.run_app(&mut renderer)
+			.map_err(|err| anyhow::anyhow!("GUI event loop failed: {err}"))?;
+		Ok(())
+	}
+
+	pub fn start_app_events(
+		&mut self,
+		proxy: EventLoopProxy<AppEvent>,
+	) -> Result<WorkHandle<C, tokio::task::JoinHandle<()>>> {
+		let handle = self.host.worker().run_background(move |cancel| async move {
+			tracing::info!("🔥 APP EVENTS TASK STARTED");
+			loop {
+				tokio::select! {
+					_ = cancel.cancelled() => {
+						tracing::info!("🔥 APP EVENTS CANCELLED");
+						break;
+					}
+					_ = tokio::time::sleep(Duration::from_secs(5)) => {
+						tracing::info!("🔥 APP EVENTS SENDING");
+							match proxy.send_event(AppEvent::RuntimeEvent) {
+								Ok(()) => {
+									tracing::info!("🔥 RuntimeEvent SENT");
+								}
+								Err(err) => {
+									tracing::error!(?err, "🔥 RuntimeEvent FAILED");
+								}
+							}
+					}
+				}
+			}
+		});
+		Ok(handle)
+	}
+
+	pub fn start_cargo_watcher(&mut self) -> Result<WorkHandle<C, tokio::task::JoinHandle<()>>> {
+		tracing::debug!("cargo: entered");
+		let watcher = CargoWatcher::new().map_err(|error| {
+			tracing::error!("Failed to create Cargo watcher: {error}");
+			error
+		})?;
+		tracing::debug!("cargo: watcher created");
+		tracing::debug!("Watching Cargo.toml: {}", watcher.path().display());
+		let worker = self.worker();
+		tracing::debug!("cargo: watcher started");
+		Ok(worker.run_background_blocking(move |cancel| {
+			let (tx, rx) = std::sync::mpsc::channel();
+			let mut fs_watcher = match RecommendedWatcher::new(tx, Config::default()) {
+				Ok(watcher) => watcher,
+				Err(error) => {
+					tracing::error!("Failed to create Cargo watcher: {error}");
+					return;
+				}
+			};
+			if let Err(error) = fs_watcher.watch(watcher.path(), RecursiveMode::NonRecursive) {
+				tracing::error!("Failed to watch Cargo.toml: {error}");
+				return;
+			}
+			loop {
+				if cancel.is_cancelled() {
+					break;
+				}
+
+				match rx.recv_timeout(std::time::Duration::from_millis(100)) {
+					Ok(Ok(event)) => {
+						if matches!(
+							event.kind,
+							notify::EventKind::Modify(_) | notify::EventKind::Create(_)
+						) {
+							tracing::debug!("Cargo.toml changed");
+
+							if let Err(error) = watcher.run_once_sync() {
+								tracing::error!("Failed to process Cargo.toml: {error}");
+							}
+						}
+					}
+
+					Ok(Err(error)) => {
+						tracing::error!("Cargo watcher error: {error}");
+					}
+
+					Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+						// Allows us to check cancellation.
+					}
+
+					Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+						break;
+					}
+				}
+			}
+			tracing::debug!("Cargo watcher stopped");
+		}))
+	}
+
+	pub fn start_cursor_watcher_from_app(
+		&mut self,
+	) -> anyhow::Result<WorkHandle<C, tokio::task::JoinHandle<()>>> {
+		let sink = AppCursorSink {
+			tx: self.cursor_event_tx.clone(),
+		};
+
+		Ok(self.worker().run_background_blocking(move |cancel| {
+			if let Err(error) = CursorDaemon::new(sink, cancel).run() {
+				tracing::error!("Cursor daemon failed: {error}");
+			}
+		}))
+	}
+}
+
 #[async_trait::async_trait]
 pub trait Api: Debug + 'static {
 	async fn load_problems(&self) -> anyhow::Result<Vec<StoredProblem>>;
@@ -251,5 +377,3 @@ impl Api for NativeApiClient {
 		StoredProblem::try_from(response)
 	}
 }
-
-impl App<ContextNative> {}
