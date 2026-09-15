@@ -1,5 +1,35 @@
 [
   {
+    "number": 2472,
+    "normalized-name": "maximum-number-of-non-overlapping-palindrome-substrings",
+    "title": "Maximum Number of Non-overlapping Palindrome Substrings",
+    "difficulty": "hard",
+    "description": "You are given a string s and a positive integer k.\n\nSelect a set of non-overlapping substrings from the string s that satisfy the following conditions:",
+    "url": "https://leetcode.com/problems/maximum-number-of-non-overlapping-palindrome-substrings/",
+    "filename": "2472-maximum-number-of-non-overlapping-palindrome-substrings.py",
+    "description-raw": "<p>You are given a string <code>s</code> and a <strong>positive</strong> integer <code>k</code>.</p>\n<p>Select a set of <strong>non-overlapping</strong> substrings from the string <code>s</code> that satisfy the following conditions:</p>",
+    "test-cases": [
+      {
+        "index": 0,
+        "input": "s = \"abaccdbbd\", k = 3",
+        "output": "2",
+        "explanation": "We can select the substrings underlined in s = \"abaccdbbd\". Both \"aba\" and \"dbbd\" are palindromes and have a length of at least k = 3.\nIt can be shown that we cannot find a selection with more than two valid substrings."
+      },
+      {
+        "index": 1,
+        "input": "s = \"adbcda\", k = 2",
+        "output": "0",
+        "explanation": "There is no palindrome substring of length at least 2 in the string."
+      },
+      {
+        "index": 2,
+        "input": null,
+        "output": null,
+        "explanation": null
+      }
+    ]
+  },
+  {
     "number": 2265,
     "normalized-name": "count-nodes-equal-to-average-of-subtree",
     "title": "Count Nodes Equal to Average of Subtree",
