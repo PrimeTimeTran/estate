@@ -1,6 +1,5 @@
 use crate::{
-	native::native_prelude::*,
-	prelude::{traits::Ctx, *},
+	prelude::{*},
 	proto::{
 		problem_service_client::ProblemServiceClient,
 		submission_service_client::SubmissionServiceClient,
@@ -39,6 +38,23 @@ impl Api for NativeApiClient {
 	}
 }
 
+impl<C> App<C>
+where
+	C: Ctx,
+{
+	pub fn new(host: Host<C>) -> Result<Self> {
+		tracing::debug!("New App Native Context");
+		let state = C::initial_state();
+		let (cursor_event_tx, cursor_events) = std::sync::mpsc::channel();
+		return Ok(Self {
+			cursor_event_tx,
+			cursor_events,
+			host,
+			state,
+			workers: vec![],
+		});
+	}
+}
 impl<C> App<C>
 where
 	C: Ctx,
@@ -335,6 +351,14 @@ where
 
 		WorkHandle::new(cancel, join)
 	}
+}
+
+pub struct App<C: Ctx> {
+	pub cursor_events: std::sync::mpsc::Receiver<CursorEvent>,
+	pub cursor_event_tx: std::sync::mpsc::Sender<CursorEvent>,
+	pub host: Host<C>,
+	pub state: C::AppState,
+	pub workers: Vec<WorkHandle<C, tokio::task::JoinHandle<()>>>,
 }
 
 #[derive(Default)]

@@ -70,39 +70,4 @@ where
 	pub fn worker(&self) -> &HostWorker<C> {
 		self.host.worker()
 	}
-
-	pub fn new(host: Host<C>) -> Result<Self> {
-		tracing::debug!("App New");
-		let state = C::initial_state();
-		#[cfg(all(feature = "web", target_arch = "wasm32"))]
-		{
-			return Ok(Self {
-				state,
-				host,
-				workers: vec![],
-			});
-		}
-		#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-		{
-			let (cursor_event_tx, cursor_events) = std::sync::mpsc::channel();
-			return Ok(Self {
-				state,
-				host,
-				workers: vec![],
-				cursor_events,
-				cursor_event_tx,
-			});
-		}
-	}
-}
-
-pub struct App<C: Ctx> {
-	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-	pub cursor_events: std::sync::mpsc::Receiver<CursorEvent>,
-	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-	pub cursor_event_tx: std::sync::mpsc::Sender<CursorEvent>,
-
-	pub host: Host<C>,
-	pub state: C::AppState,
-	pub workers: Vec<WorkHandle<C, tokio::task::JoinHandle<()>>>,
 }

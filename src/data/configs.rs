@@ -3,38 +3,53 @@ use crate::{
 	ui::{PanelState, *},
 };
 
-pub static ROOT_DIR: &str = "/Users/future/KB/project/crates/estate";
-pub static HMR_CHART_JSON: &str = "/Users/future/kb/project/crates/estate/src/data/chart.json";
-pub static MARKDOWN: &str = "/Users/future/kb/project/crates/estate/src/data/corpus.md";
-pub static PIPELINE_DIAGRAM: &str =
-	"/Users/future/KB/project/crates/estate/estate/1-estate-diagram.md";
-pub static PIPELINE_ESTATE_WORKSPACE: &str =
-	"/Users/future/KB/project/crates/estate/estate/1-estate-workspace-with-persona.md";
-pub static TEMPLATE_PATH: &str = "/Users/future/KB/project/crates/estate/template";
+macro_rules! grpc_endpoint {
+	($host:literal, $port:literal) => {
+		(
+			concat!($host, ":", $port),
+			concat!("http://", $host, ":", $port),
+		)
+	};
+}
+
+pub static SCHEMA_VERSION: u32 = 1;
+pub static NEXT_PROBLEM_ID: AtomicI64 = AtomicI64::new(1);
 
 pub static START_APP_CLOCK: bool = true;
-pub static START_WINDOW: WindowType = WindowType::ProblemScreen;
-pub static START_VIEW: ViewType = ViewType::ProblemScreen;
 // Unsafe territory
 // pub static mut START_VIEW: ViewType = ...;
-pub const GRPC_SOCKET: &str = "127.0.0.1:50051";
-pub const GRPC_SOCKET_CLIENT: &str = "http://127.0.0.1:50051";
+pub static START_VIEW: ViewType = ViewType::ProblemScreen;
+pub static START_WINDOW: WindowType = WindowType::ProblemScreen;
 
 pub static AGENT_GEN_URL: &str = "http://localhost:11434/api/generate";
-pub static DEFAULT_PROBLEM: &str = "../data/problems/two-sum";
 pub static ESTATE_VERSION: &str = env!("CARGO_PKG_VERSION");
-pub static GRPC_PROBLEMS_PATH: &str = "src/data/problems";
-pub static GRPC_SUBMISSIONS_PATH: &str = "src/data/submissions";
+pub static HMR_CHART_JSON: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/src/data/chart.json");
 pub static HOME_DIR: &str = ".config/estate";
 pub static INDEX_PATH: &str = ".config/estate/master.json";
 pub static INTRINSIC_FILES: [&str; 3] = ["default.settings.json", "settings.json", "key-map.json"];
-pub static NEXT_PROBLEM_ID: AtomicI64 = AtomicI64::new(1);
-pub static PID_PATH: &str = "/tmp/estate-daemon.pid";
-pub static SCHEMA_VERSION: u32 = 1;
+pub static MARKDOWN: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/src/data/corpus.md");
+pub static PATH_PID: &str = "/tmp/estate-daemon.pid";
+pub static PATH_SOCKET: &str = "/tmp/estate-daemon.sock";
+pub static PIPELINE_DIAGRAM: &str =
+	concat!(env!("CARGO_MANIFEST_DIR"), "/estate/1-estate-diagram.md");
+
+pub static PIPELINE_ESTATE_WORKSPACE: &str = concat!(
+	env!("CARGO_MANIFEST_DIR"),
+	"/estate/1-estate-workspace-with-persona.md"
+);
+pub static ROOT_DIR: &str = env!("CARGO_MANIFEST_DIR");
 pub static SERVER_URL: &str = "http://localhost:50051";
-pub static SOCKET_PATH: &str = "/tmp/estate-daemon.sock";
 pub static STATE_PATH: &str = "/Users/future/Library/Application Support/estate/state.json";
+pub static TEMPLATE_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/template");
 pub static WORKSPACE_SETTINGS: &str = ".estate/settings.json";
+
+const GRPC_ENDPOINT: (&str, &str) = grpc_endpoint!("127.0.0.1", "50051");
+
+pub const GRPC_SOCKET: &str = GRPC_ENDPOINT.0;
+pub const GRPC_SOCKET_CLIENT: &str = GRPC_ENDPOINT.1;
+
+pub static GRPC_PROBLEMS_PATH: &str = "src/data/problems";
+pub static GRPC_SUBMISSIONS_PATH: &str = "src/data/submissions";
 
 pub const TICK_ITEMS: [ViewType; 8] = [
 	ViewType::ProblemScreen,
@@ -48,7 +63,7 @@ pub const TICK_ITEMS: [ViewType; 8] = [
 ];
 pub const TICK_ITEMS_LENGTH: usize = TICK_ITEMS.len();
 
-pub(crate) struct VeConfig {
+pub struct VeConfig {
 	pub bg: Color32,
 	pub surface: Color32,
 	pub activity_bar: PanelState,

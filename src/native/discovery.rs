@@ -22,6 +22,7 @@ pub enum DiscoveryItem {
 }
 
 /// Async tasks triggered by events
+/// 
 #[derive(Debug)]
 pub enum DiscoveryTask {
 	Index(PathBuf),
@@ -494,7 +495,6 @@ impl EstateDiscovery {
 	}
 }
 impl EstateDiscovery {
-	// #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 	pub fn init() -> std::io::Result<DiscoveryStore> {
 		let cwd = std::env::current_dir()?;
 		let mut discovery = Self::default();
@@ -516,7 +516,6 @@ impl EstateDiscovery {
 		walk_root_to_path(cwd, |dir| {
 			let path = dir.join(WORKSPACE_SETTINGS);
 			if path.is_file() {
-				// tracing::info!(?path, "discovered workspace config");
 				self.store.items.push(DiscoveryItem::Config(path));
 			}
 			WalkControl::Continue

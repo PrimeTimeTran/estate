@@ -2,7 +2,7 @@
 //!
 //! The collection of traits used through the codebase
 //!
-use crate::{RuntimeState, e, prelude::*};
+use crate::{prelude::*};
 
 // https://github.com/rust-lang/rust/issues/41517
 // https://github.com/rust-lang/rust/issues/55628
@@ -19,7 +19,6 @@ use crate::{RuntimeState, e, prelude::*};
 /// ### Methods
 ///
 /// - [runtime](Context::runtime) to [`spawn`](Executor::spawn).
-///
 ///
 /// [traits]: https://doc.rust-lang.org/rust-by-example/trait.html
 pub trait Context: Sized {
@@ -46,32 +45,9 @@ pub trait Context: Sized {
 	/// The returned type is [`Self::Runtime`], i.e. the associated type selected
 	/// by the concrete [`Context`] implementation.
 	fn runtime(&self) -> &Self::Runtime;
-
 	type Args;
-
 	fn new() -> Result<Self>;
-
 	fn run(&mut self, args: Self::Args) -> Result<()>;
-
-	// fn foo(&self, args: String) -> Result<()>;
-
-	// fn bar(&self, args: String) -> Result<()>;
-}
-
-// pub trait State {}
-
-pub trait ApiServices: Services {
-	type Client: Api;
-	/// ## Platform Generic API
-	///
-	/// Exposes capabilities for business logic to access server side resources
-	///
-	/// - [GRPC]
-	///
-	/// Has [`Native`] & [`Web`] implementations
-	fn foo(&self);
-	// fn api(&self) -> &Self::Client;
-	// fn api(&self) -> Option<&Self::Client>;
 }
 
 /// ## [Ctx]
@@ -424,14 +400,6 @@ pub trait Worker<C: Ctx> {
 	// where
 	// 	F: Fn(CancellationToken) -> Fut + 'static,
 	// 	Fut: Future<Output = ()> + 'static;
-}
-
-pub trait CtxWeb {}
-pub trait CtxNative {}
-pub trait NativeContext {
-	fn handle(&self) -> tokio::runtime::Handle;
-	fn shutdown(self);
-	fn wait_for_shutdown(&self);
 }
 
 pub trait StateStore: Send + Sync {

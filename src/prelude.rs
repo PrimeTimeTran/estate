@@ -23,9 +23,9 @@ pub use uuid::Uuid;
 
 /// ## Warning
 ///
-/// Disabling lint suppressions in lib.rs makes this blow up.
+/// Disabling lint suppressions in lib.rs makes this blow up with warnings.
 ///
-/// Don't touch this unless all 3 platforms have been built & run using the following script.
+/// Don't touch this unless all 3 platforms have build & run using the smoke testing script below
 ///
 /// [../script/git-precommit-hook.sh]
 ///

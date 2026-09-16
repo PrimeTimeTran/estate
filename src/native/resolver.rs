@@ -10,7 +10,7 @@ pub fn home_dir() -> Result<PathBuf> {
 /// User global estate.
 /// Example:
 /// ~/.estate
-pub(crate) fn global_estate_dir() -> Result<PathBuf> {
+pub fn global_estate_dir() -> Result<PathBuf> {
 	Ok(home_dir()?.join(".estate"))
 }
 

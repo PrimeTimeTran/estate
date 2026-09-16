@@ -372,16 +372,16 @@ impl ConsoleTheme {
 	}
 }
 pub struct DaemonClient {
-	socket_path: &'static str,
+	PATH_SOCKET: &'static str,
 }
 impl DaemonClient {
 	pub fn new() -> Self {
 		Self {
-			socket_path: SOCKET_PATH,
+			PATH_SOCKET: PATH_SOCKET,
 		}
 	}
 	pub async fn execute(&self, action: ActionRequest) -> Result<DaemonResponse> {
-		let mut stream = UnixStream::connect(self.socket_path).await?;
+		let mut stream = UnixStream::connect(self.PATH_SOCKET).await?;
 		let request = serde_json::to_string(&action)?;
 		stream.write_all(request.as_bytes()).await?;
 		stream.write_all(b"\n").await?;

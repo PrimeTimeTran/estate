@@ -12,6 +12,23 @@ pub trait Api: Debug + 'static {
 	fn clone_box(&self) -> Box<dyn Api>;
 }
 
+impl<C> App<C>
+where
+	C: Ctx,
+{
+	pub fn new(host: Host<C>) -> Result<Self> {
+		tracing::debug!("New App Web Context");
+		let state = C::initial_state();
+		{
+			return Ok(Self {
+				state,
+				host,
+				workers: vec![],
+			});
+		}
+	}
+}
+
 impl Ctx for ContextWeb {
 	type AppState = structs::S<ContextWeb>;
 	type GuiState = WebState;
@@ -92,6 +109,12 @@ where
 	{
 		task();
 	}
+}
+
+pub struct App<C: Ctx> {
+	pub host: Host<C>,
+	pub state: C::AppState,
+	pub workers: Vec<WorkHandle<C, tokio::task::JoinHandle<()>>>,
 }
 
 #[derive(Default)]

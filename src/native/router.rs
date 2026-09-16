@@ -91,7 +91,7 @@ pub async fn execute<R: Runtime>(
 				          process      application
 			"#
 			);
-			let mut stream = match UnixStream::connect(SOCKET_PATH).await {
+			let mut stream = match UnixStream::connect(PATH_SOCKET).await {
 				Ok(s) => s,
 				Err(e) => {
 					return Err(anyhow::anyhow!(
