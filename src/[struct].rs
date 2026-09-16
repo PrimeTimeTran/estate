@@ -114,3 +114,9 @@ pub struct Windows;
 pub struct BroadcastReceiver<T> {
 	pub rx: tokio::sync::broadcast::Receiver<T>,
 }
+
+impl ReceivesEvents for BroadcastReceiver<e::Event> {
+fn try_recv(&mut self) -> Option<e::Event> {
+		self.try_recv().ok()
+	}
+}

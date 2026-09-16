@@ -87,7 +87,6 @@ where
 	}
 
 	pub fn next_event(&mut self) -> Option<e::Event> {
-		todo!("next_event");
-		// self.event_rx.try_recv()
+		self.event_rx.try_recv()
 	}
 }

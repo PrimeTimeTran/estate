@@ -212,8 +212,8 @@ where
 			instance: window,
 			kind: WindowType::MarkdownScreen,
 			needs_resize: false,
-			occluded: true,
-			pending_textures: gui::TexturesDelta::default(),
+			occluded: false,
+			// pending_textures: gui::TexturesDelta::default(),
 			queue,
 			renderer,
 			surface,
@@ -229,14 +229,16 @@ where
 	}
 
 	pub fn draw(&mut self, ctx: &mut AppContext<'_, C, S>) -> Result<()> {
-		self.begin_egui();
-
-		let output = self.build_ui(ctx);
+		tracing::info!("drawdrawdraw window before begin_egui");
 
 		let Some(surface_texture) = self.acquire_surface()? else {
 			tracing::warn!("NO SURFACE");
 			return Ok(());
 		};
+
+		self.begin_egui();
+
+		let output = self.build_ui(ctx);
 
 		self.render_egui(surface_texture, output)?;
 
@@ -251,7 +253,7 @@ where
 		);
 
 		gui::Frame::NONE.show(&mut ui, |ui| {
-			// tracing::info!("Window → ScreenInstance::draw");
+			tracing::info!("Window → ScreenInstance::draw");
 			self.screen.draw(ui, ctx);
 		});
 
@@ -295,15 +297,17 @@ where
 			pixels_per_point,
 			platform_output: _,
 			shapes,
-			textures_delta,
+			mut textures_delta,
 			viewport_output: _,
 			..
 		} = output;
-		self.pending_textures.append(textures_delta);
+
 		let view = surface_texture
 			.texture
 			.create_view(&wgpu::TextureViewDescriptor::default());
+
 		let clipped_primitives = self.gui_ctx.tessellate(shapes, pixels_per_point);
+
 		let screen_descriptor = egui_wgpu::ScreenDescriptor {
 			size_in_pixels: [
 				self.instance.inner_size().width,
@@ -311,12 +315,22 @@ where
 			],
 			pixels_per_point,
 		};
-		self.upload_textures();
-		let mut encoder = self.device.create_command_encoder(
-			&(wgpu::CommandEncoderDescriptor {
+
+		let mut encoder = self
+			.device
+			.create_command_encoder(&wgpu::CommandEncoderDescriptor {
 				label: Some("egui-render"),
-			}),
-		);
+			});
+
+		// Apply each texture update individually.
+		for (id, deltas) in &textures_delta.set {
+			for delta in deltas {
+				self
+					.renderer
+					.update_texture(&self.device, &self.queue, *id, delta);
+			}
+		}
+
 		self.renderer.update_buffers(
 			&self.device,
 			&self.queue,
@@ -324,21 +338,19 @@ where
 			&clipped_primitives,
 			&screen_descriptor,
 		);
+
 		self.render_pass(&mut encoder, &view, &clipped_primitives, &screen_descriptor);
+
 		self.queue.submit(Some(encoder.finish()));
+
+		for id in &textures_delta.free {
+			self.renderer.free_texture(id);
+		}
 		self.queue.present(surface_texture);
+		textures_delta.clear();
 		Ok(())
 	}
-	fn upload_textures(&mut self) {
-		for (id, image_deltas) in &self.pending_textures.set {
-			for image_delta in image_deltas {
-				self
-					.renderer
-					.update_texture(&self.device, &self.queue, *id, image_delta);
-			}
-		}
-		self.pending_textures.clear();
-	}
+
 	fn render_pass(
 		&mut self,
 		encoder: &mut wgpu::CommandEncoder,
@@ -452,6 +464,16 @@ where
 			tracing::debug!("🖼️ Window view change: {:?} → {:?}", self.screen.kind, view);
 			self.screen = ui::ScreenInstance::new(view);
 		}
+	}
+	pub fn resize(&mut self, size: PhysicalSize<u32>) {
+		if size.width == 0 || size.height == 0 {
+			return;
+		}
+
+		self.config.width = size.width;
+		self.config.height = size.height;
+
+		self.surface.configure(&self.device, &self.config);
 	}
 }
 impl<C, S> Window<C, S>
@@ -785,7 +807,7 @@ where
 	pub needs_resize: bool,
 	pub occluded: bool,
 
-	pending_textures: gui::TexturesDelta,
+	// pending_textures: gui::TexturesDelta,
 	queue: wgpu::Queue,
 	renderer: egui_wgpu::Renderer,
 }

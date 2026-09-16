@@ -300,7 +300,7 @@ where
 		window_id: WindowId,
 		event: WindowEvent,
 	) {
-		tracing::debug!("window_event");
+		tracing::debug!("window_event: {:?}", event);
 
 		let Some(window) = self
 			.windows
@@ -320,10 +320,16 @@ where
 		}
 
 		match event {
+			WindowEvent::Resized(size) => {
+				window.window.resize(size);
+				window.window.instance.request_redraw();
+			}
+
 			WindowEvent::RedrawRequested => {
 				if window.window.occluded {
 					return;
 				}
+
 				let mut ctx = AppContext {
 					context: self.context.as_ref(),
 					state: &mut self.state,
@@ -331,10 +337,12 @@ where
 					input: IOState::default(),
 					last_revision: 0,
 				};
+
 				if let Err(e) = window.window.draw(&mut ctx) {
 					tracing::error!("DEV >>> draw failed: {e:#}");
 				}
 			}
+
 			_ => {}
 		}
 	}

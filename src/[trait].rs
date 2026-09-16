@@ -2,7 +2,7 @@
 //!
 //! The collection of traits used through the codebase
 //!
-use crate::{prelude::*};
+use crate::prelude::*;
 
 // https://github.com/rust-lang/rust/issues/41517
 // https://github.com/rust-lang/rust/issues/55628
@@ -62,9 +62,11 @@ pub trait Context: Sized {
 pub trait Ctx {
 	type AppState: Clone;
 	type GuiState;
-	type EventReceiver;
-	// BroadcastReceiver<app::event::Event>
+	type EventReceiver: ReceivesEvents;
 	fn initial_state() -> Self::AppState;
+}
+pub trait ReceivesEvents {
+	fn try_recv(&mut self) -> Option<e::Event>;
 }
 
 /// ## [Clock]
