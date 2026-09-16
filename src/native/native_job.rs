@@ -10,11 +10,14 @@ use crate::{native::agent::AgentContext, prelude::*};
 
 use notify::{Event, EventKind};
 
-#[derive(Debug)]
-pub struct TaskManagerRuntime {
-	watcher: notify::RecommendedWatcher,
-	pub rx: mpsc::Receiver<()>,
+#[derive(Debug, Clone)]
+pub enum Artifact {
+	FileRead { path: String, content: String },
+	FileWrite { path: String },
+	Observation(String),
+	ToolOutput(String),
 }
+
 impl TaskManagerRuntime {
 	pub fn new(path: &Path) -> Result<Self> {
 		let (tx, rx) = mpsc::channel::<()>(1);
@@ -34,29 +37,6 @@ impl TaskManagerRuntime {
 
 		Ok(Self { watcher, rx })
 	}
-}
-
-#[derive(Debug, Clone)]
-pub struct AgentTask {
-	pub id: String,
-	pub prompt: String,
-}
-
-#[derive(Debug, Clone)]
-pub struct TaskResult {
-	pub artifacts: Vec<Artifact>,
-	pub chat: Option<String>,
-	pub logs: Vec<String>,
-	pub spawned_tasks: Vec<AgentTask>,
-	pub status: TaskStatus,
-	pub summary: Option<String>,
-	pub task_id: String,
-}
-pub struct TaskContext {
-	pub task_id: String,
-	pub artifacts: Vec<Artifact>,
-	pub logs: Vec<String>,
-	pub spawned_tasks: Vec<AgentTask>,
 }
 impl TaskResult {
 	pub fn completed_chat(task_id: String, ctx: AgentContext, chat: String) -> Self {
@@ -100,9 +80,28 @@ impl TaskResult {
 }
 
 #[derive(Debug, Clone)]
-pub enum Artifact {
-	FileRead { path: String, content: String },
-	FileWrite { path: String },
-	Observation(String),
-	ToolOutput(String),
+pub struct AgentTask {
+	pub id: String,
+	pub prompt: String,
+}
+pub struct TaskContext {
+	pub task_id: String,
+	pub artifacts: Vec<Artifact>,
+	pub logs: Vec<String>,
+	pub spawned_tasks: Vec<AgentTask>,
+}
+#[derive(Debug)]
+pub struct TaskManagerRuntime {
+	watcher: notify::RecommendedWatcher,
+	pub rx: mpsc::Receiver<()>,
+}
+#[derive(Debug, Clone)]
+pub struct TaskResult {
+	pub artifacts: Vec<Artifact>,
+	pub chat: Option<String>,
+	pub logs: Vec<String>,
+	pub spawned_tasks: Vec<AgentTask>,
+	pub status: TaskStatus,
+	pub summary: Option<String>,
+	pub task_id: String,
 }
