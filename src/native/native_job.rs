@@ -93,7 +93,7 @@ pub struct TaskContext {
 #[derive(Debug)]
 pub struct TaskManagerRuntime {
 	watcher: notify::RecommendedWatcher,
-	pub rx: mpsc::Receiver<()>,
+	pub rx: tokio::sync::mpsc::Receiver<()>,
 }
 #[derive(Debug, Clone)]
 pub struct TaskResult {

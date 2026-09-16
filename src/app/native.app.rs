@@ -148,18 +148,6 @@ impl NativeApp {
 			windows: vec![],
 		})
 	}
-	// pub fn run(&mut self, cli: Cli) -> Result<()> {
-	// 	tracing::debug!(">>> NativeApp::run entered");
-	// 	let result = match cli.command {
-	// 		None | Some(Command::Start { .. }) | Some(Command::Tray) => self.start(),
-	// 		Some(_) => self.tokio.block_on(async {
-	// 			let ctx = cli::context::Context::new();
-	// 			router::execute(cli, ctx, self.app.engine.clone()).await
-	// 		}),
-	// 	};
-	// 	tracing::debug!(">>> NativeApp::run returning");
-	// 	result
-	// }
 }
 impl NativeApp {
 	pub fn runtime(&self) -> &NativeRuntime {
