@@ -49,53 +49,45 @@ use crate::{e, prelude::*};
 ///
 /// - [app](crate::runtime::app_runtime)
 ///
-pub struct AppContext<'a, R: Runtime, E> {
-	// This is about a particular borrow.
-	// These three 'static/'as are not the same thing.
-	pub app: &'a mut AppRuntime<R, E>,
-	pub last_revision: u64,
-	pub event_rx: R::EventReceiver,
+pub struct AppContext<'a, C, S>
+where
+	C: Ctx,
+{
+	pub context: &'a C,
+	pub state: &'a mut S,
+	pub event_rx: &'a mut C::EventReceiver,
 	pub input: IOState,
-	// #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+	pub last_revision: u64,
 }
-
 // ## 2. What the 'static constraint tells you
 // The + 'static on impl<'a, R: Runtime + 'static> AppContext<'a, R> tells
 // us that the underlying runtime implementation (R) must be completely free of short-lived borrows.
-impl<'a, R: Runtime + 'static, E: traits::Executor> AppContext<'a, R, E> {
+impl<'a, C, S> AppContext<'a, C, S>
+where
+	C: Ctx,
+{
 	pub fn load_problems(&mut self) {
 		tracing::info!("load_problems");
-		self.app.load_problems()
+		// TODO: implement through Context/State
 	}
+
 	pub fn sample_problem(&mut self) {
 		tracing::info!("sample_problem");
-		self.app.sample_problem()
+		// TODO: implement through Context/State
 	}
-	pub fn load_problem(&mut self) {
-		tracing::info!("sample_problem");
-		// self.app.load_problem()
-	}
-}
 
-impl<'a, R: Runtime, E> AppContext<'a, R, E> {
-	// pub fn api(&self) -> Option<&dyn Api> {
-	// 	self.app.api()
-	// }
-	pub fn state(&self) -> std::sync::RwLockReadGuard<'_, EstateState> {
-		self.app.state()
+	pub fn load_problem(&mut self) {
+		tracing::info!("load_problem");
+		// TODO: implement through Context/State
 	}
 
 	pub fn state_changed(&mut self) -> bool {
-		let revision = self.app.runtime().state().revision();
-		if revision != self.last_revision {
-			self.last_revision = revision;
-			true
-		} else {
-			false
-		}
+		// TODO: determine the revision from the new State abstraction.
+		false
 	}
-	// #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+
 	pub fn next_event(&mut self) -> Option<e::Event> {
-		self.event_rx.try_recv()
+		todo!("next_event");
+		// self.event_rx.try_recv()
 	}
 }

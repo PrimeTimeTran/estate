@@ -8,7 +8,7 @@ use crate::{
 use egui::{ScrollArea, Ui};
 
 #[derive(Debug, Default)]
-pub struct ProblemScreen<R: Runtime> {
+pub struct ProblemScreen<C> {
 	idx: i32,
 	source: String,
 	submission_status: Option<SubmissionStatus>,
@@ -16,9 +16,9 @@ pub struct ProblemScreen<R: Runtime> {
 	submissions: Vec<StoredSubmission>,
 	ticker: usize,
 
-	_marker: std::marker::PhantomData<R>,
+	_marker: std::marker::PhantomData<C>,
 }
-impl<R: Runtime> ProblemScreen<R> {
+impl<C> ProblemScreen<C> {
 	pub fn new() -> Self {
 		tracing::debug!("ProblemScreen new");
 		Self {
@@ -33,38 +33,44 @@ impl<R: Runtime> ProblemScreen<R> {
 	}
 }
 
-impl<R: Runtime, E: Executor> ViewTrait<R, E> for ProblemScreen<R> {
-	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, R, E>) {
+impl<C, S> ViewTrait<C, S> for ProblemScreen<C>
+where
+	C: Ctx,
+{
+	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, C, S>) {
 		// println!("Problem Screen view draw")
 	}
-	fn update(&mut self, ctx: &mut AppContext<'_, R, E>) {
+	fn update(&mut self, ctx: &mut AppContext<'_, C, S>) {
 		println!("Problem Screen view update")
 	}
-	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R, E>) {
+	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, C, S>) {
 		println!("Problem Screen view event")
 	}
 }
-impl<R: Runtime, E: Executor> Screen<R, E> for ProblemScreen<R> {
-	fn configure(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
+impl<C, S> Screen<C, S> for ProblemScreen<C>
+where
+	C: Ctx,
+{
+	fn configure(&mut self, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {
 		println!("Problem Screen configure")
 		// Configure the regions this screen uses.
 	}
-	fn update(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
+	fn update(&mut self, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {
 		println!("Problem Screen update")
 	}
-	fn event(&mut self, event: &e::Event, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
+	fn event(&mut self, event: &e::Event, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {
 		println!("Problem Screen screen eventupdate")
 	}
 }
 
 #[derive(Debug, Default)]
-pub struct ProblemViewSidebar<R: Runtime> {
+pub struct ProblemViewSidebar<C> {
 	active_tab: Tab,
 	solutions: Vec<StoredSolution>,
 	submissions: Vec<StoredSubmission>,
-	_marker: std::marker::PhantomData<R>,
+	_marker: std::marker::PhantomData<C>,
 }
-impl<R: Runtime> ProblemViewSidebar<R> {
+impl<C> ProblemViewSidebar<C> {
 	pub fn new() -> Self {
 		Self {
 			active_tab: Tab::Problem,
@@ -74,17 +80,20 @@ impl<R: Runtime> ProblemViewSidebar<R> {
 		}
 	}
 }
-impl<R: Runtime, E: Executor> ViewTrait<R, E> for ProblemViewSidebar<R> {
-	fn draw(&mut self, ui: &mut Ui, _ctx: &mut AppContext<'_, R, E>) {
+impl<C, S> ViewTrait<C, S> for ProblemViewSidebar<C>
+where
+	C: Ctx,
+{
+	fn draw(&mut self, ui: &mut Ui, _ctx: &mut AppContext<'_, C, S>) {
 		ui.heading("Problem");
 		ui.separator();
 		self.draw_solutions(ui);
 		self.draw_submissions(ui);
 	}
-	fn update(&mut self, _ctx: &mut AppContext<'_, R, E>) {}
-	fn event(&mut self, _event: &e::Event, _ctx: &mut AppContext<'_, R, E>) {}
+	fn update(&mut self, _ctx: &mut AppContext<'_, C, S>) {}
+	fn event(&mut self, _event: &e::Event, _ctx: &mut AppContext<'_, C, S>) {}
 }
-impl<R: Runtime> ProblemViewSidebar<R> {
+impl<C> ProblemViewSidebar<C> {
 	fn draw_solutions(&self, ui: &mut Ui) {
 		ui.heading("Solutions");
 		if self.solutions.is_empty() {
@@ -211,27 +220,30 @@ impl<R: Runtime> ProblemViewSidebar<R> {
 	}
 }
 #[derive(Debug, Default)]
-pub struct ProblemViewBottomPanel<R: Runtime> {
-	_marker: std::marker::PhantomData<R>,
+pub struct ProblemViewBottomPanel<C> {
+	_marker: std::marker::PhantomData<C>,
 }
-impl<R: Runtime> ProblemViewBottomPanel<R> {
+impl<C> ProblemViewBottomPanel<C> {
 	pub fn new() -> Self {
 		Self {
 			_marker: std::marker::PhantomData,
 		}
 	}
 }
-impl<R: Runtime, E: Executor> ViewTrait<R, E> for ProblemViewBottomPanel<R> {
-	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, R, E>) {}
-	fn update(&mut self, ctx: &mut AppContext<'_, R, E>) {}
-	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R, E>) {}
+impl<C, S> ViewTrait<C, S> for ProblemViewBottomPanel<C>
+where
+	C: Ctx,
+{
+	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, C, S>) {}
+	fn update(&mut self, ctx: &mut AppContext<'_, C, S>) {}
+	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, C, S>) {}
 }
 #[derive(Debug, Default)]
-pub struct ProblemView<R: Runtime> {
+pub struct ProblemView<C, S> {
 	ticker: usize,
-	_marker: std::marker::PhantomData<R>,
+	_marker: std::marker::PhantomData<(C, S)>,
 }
-impl<R: Runtime> ProblemView<R> {
+impl<C, S> ProblemView<C, S> {
 	pub fn new() -> Self {
 		Self {
 			ticker: 0,
@@ -239,8 +251,11 @@ impl<R: Runtime> ProblemView<R> {
 		}
 	}
 }
-impl<R: Runtime, E: Executor> ViewTrait<R, E> for ProblemView<R> {
-	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, R, E>) {
+impl<C, S> ViewTrait<C, S> for ProblemView<C, S>
+where
+	C: Ctx,
+{
+	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, C, S>) {
 		ui.vertical_centered(|ui| {
 			ui.add_space(16.0);
 
@@ -364,7 +379,7 @@ impl<R: Runtime, E: Executor> ViewTrait<R, E> for ProblemView<R> {
 
 			ui.add_space(8.0);
 
-			let api = ctx.app.runtime().services().api();
+			// let api = ctx.app.runtime().services().api();
 
 			ui.horizontal_wrapped(|ui| {
 				if ui
@@ -390,14 +405,14 @@ impl<R: Runtime, E: Executor> ViewTrait<R, E> for ProblemView<R> {
 			});
 
 			// Prevent unused-variable warning until the API calls are wired.
-			let _ = api;
+			// let _ = api;
 		});
 	}
-	fn update(&mut self, _ctx: &mut AppContext<'_, R, E>) {}
-	fn event(&mut self, _event: &e::Event, _ctx: &mut AppContext<'_, R, E>) {}
+	fn update(&mut self, _ctx: &mut AppContext<'_, C, S>) {}
+	fn event(&mut self, _event: &e::Event, _ctx: &mut AppContext<'_, C, S>) {}
 }
 
-impl<R: Runtime> ProblemView<R> {
+impl<C, S> ProblemView<C, S> {
 	fn draw_problem(&self, ui: &mut Ui, problem: &StoredProblem) {
 		egui::Frame::group(ui.style()).show(ui, |ui| {
 			ui.horizontal(|ui| {
@@ -409,8 +424,11 @@ impl<R: Runtime> ProblemView<R> {
 		});
 	}
 }
-impl<R: Runtime> ProblemView<R> {
-	fn draw<E: Executor>(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, R, E>) {
+impl<C, S> ProblemView<C, S>
+where
+	C: Ctx,
+{
+	fn draw<E: Executor>(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, C, S>) {
 		ui.heading("Problem View");
 
 		ui.horizontal(|ui| {
@@ -475,7 +493,7 @@ impl<R: Runtime> ProblemView<R> {
 		});
 	}
 }
-// impl<R: Runtime> ProblemView<R> {
+// impl<C> ProblemView<C> {
 // 	// fn draw_problem(&self, ui: &mut egui::Ui, problem: &StoredProblem) {
 // 	// 	egui::Frame::group(ui.style()).show(ui, |ui| {
 // 	// 		ui.horizontal(|ui| {

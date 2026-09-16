@@ -59,6 +59,7 @@ pub struct EventSender<T> {
 #[derive(Debug)]
 pub struct EventReceiver<T> {
 	rx: TokioReceiver<T>,
+	// rx: tokio::sync::broadcast::Receiver<T>,
 }
 
 // pub struct NativeEventReceiver {
@@ -70,3 +71,21 @@ pub struct EventReceiver<T> {
 // 		self.rx.try_recv()
 // 	}
 // }
+
+impl<T: Clone> BroadcastReceiver<T> {
+	pub fn new(rx: tokio::sync::broadcast::Receiver<T>) -> Self {
+		Self { rx }
+	}
+
+	pub fn poll(&mut self) -> Option<T> {
+		self.rx.try_recv().ok()
+	}
+
+	pub fn drain(&mut self) -> impl Iterator<Item = T> + '_ {
+		std::iter::from_fn(|| self.rx.try_recv().ok())
+	}
+
+	pub fn try_recv(&mut self) -> Result<T, tokio::sync::broadcast::error::TryRecvError> {
+		self.rx.try_recv()
+	}
+}

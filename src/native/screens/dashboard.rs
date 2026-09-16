@@ -28,14 +28,17 @@ pub struct DashboardScreen {
 	pub active_focus: FocusedPane,
 	pub secondary_scroll_offset: f32,
 }
-impl<R: Runtime, E: Executor> Screen<R, E> for DashboardScreen {
-	fn configure(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
+impl<C, S> Screen<C, S> for DashboardScreen
+where
+	C: Ctx,
+{
+	fn configure(&mut self, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {
 		// Configure the regions this screen uses.
 	}
 
-	fn update(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {}
+	fn update(&mut self, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {}
 
-	fn event(&mut self, event: &e::Event, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
+	fn event(&mut self, event: &e::Event, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {
 	}
 }
 impl DashboardScreen {
@@ -246,7 +249,7 @@ impl DashboardScreen {
 	}
 }
 impl DashboardScreen {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, NativeRuntime, NativeExecutor>) {
+	fn draw<C: Ctx, S>(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, C, S>) {
 		// 1. Poll the channel for file changes on every frame render tick
 		#[cfg(not(target_arch = "wasm32"))]
 		self.check_for_changes(ui.ctx());

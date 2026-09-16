@@ -4,26 +4,27 @@ use strum::IntoStaticStr;
 
 use crate::{prelude::*, ui::Layout};
 
-pub struct ScreenInstance<R: Runtime, E: Executor> {
+pub struct ScreenInstance<C, S> {
 	pub kind: ViewType,
-	pub screen: Box<dyn Screen<R, E>>,
-	pub layout: Layout<R, E>,
-	// pub kind: ViewType,
-	// pub screen: Box<dyn Screen<R, E>>,
-	// pub layout: Layout<R, E>,
+	pub screen: Box<dyn Screen<C, S>>,
+	pub layout: Layout<C, S>,
 }
 
-impl<R: Runtime, E: Executor> fmt::Debug for ScreenInstance<R, E> {
+impl<C, S> fmt::Debug for ScreenInstance<C, S> {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		f.debug_struct("View").field("kind", &self.kind).finish()
 	}
 }
 
-impl<R: Runtime, E: Executor> ScreenInstance<R, E> {
+impl<C, S> ScreenInstance<C, S>
+where
+	C: Ctx + 'static,
+	S: 'static,
+{
 	pub fn new(kind: ViewType) -> Self {
 		tracing::debug!("📺 Screen Instance {:?}", kind);
-		let screen: Box<dyn Screen<R, E>> = match kind {
-			// ViewType::DashboardScreen => Box::new(DashboardScreen::new()),
+
+		let screen: Box<dyn Screen<C, S>> = match kind {
 			ViewType::MarkdownView => Box::new(MarkdownScreen::new(crate::MARKDOWN)),
 			ViewType::ProblemScreen => Box::new(ProblemScreen::new()),
 			ViewType::ProblemsScreen => Box::new(ProblemsScreen::new()),
@@ -31,13 +32,15 @@ impl<R: Runtime, E: Executor> ScreenInstance<R, E> {
 			ViewType::WaterfallScreen => Box::new(WaterfallScreen::new()),
 			_ => Box::new(MarkdownScreen::new(crate::MARKDOWN)),
 		};
+
 		Self {
 			kind,
 			screen,
 			layout: Layout::new(),
 		}
 	}
-	pub fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R, E>) {
+
+	pub fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, C, S>) {
 		self.layout.draw(ui, ctx);
 	}
 }
@@ -132,7 +135,7 @@ pub fn draw_tabbed_sidebar<T, F>(
 // 		Self { kind, content }
 // 	}
 
-// 	pub fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R, E>) {
+// 	pub fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, C, S>) {
 // 		self.content.draw(ui, ctx);
 // 	}
 // }

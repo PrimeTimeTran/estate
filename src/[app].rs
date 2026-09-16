@@ -1,6 +1,6 @@
 //! The [crate::App]
 //!
-use crate::prelude::{traits::Ctx, *};
+use crate::prelude::*;
 
 // https://www.youtube.com/watch?v=VwEV0UesMH0
 
@@ -24,24 +24,6 @@ where
 			self.workers.push(handle);
 		}
 		tracing::debug!("App init services complete");
-		Ok(())
-	}
-
-	pub fn run(&mut self) -> Result<()>
-	where
-		C::AppState: Send + Sync + 'static,
-	{
-		tracing::debug!("App run");
-		self.init_services()?;
-		#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-		{
-			self.run_gui()?;
-		}
-		#[cfg(target_arch = "wasm32")]
-		{
-			// self.host.run()?;
-		}
-
 		Ok(())
 	}
 

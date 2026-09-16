@@ -1,5 +1,7 @@
 use crate::prelude::*;
 
+use tokio::runtime::Runtime;
+
 pub enum CargoFeature {
 	Native,
 	None,
@@ -67,7 +69,7 @@ impl Clock for HostClock {
 	}
 	fn run_once(&self) -> String {
 		let now = self.now();
-		tracing::info!("HostClock Tick: {}", now);
+		tracing::debug!("HostClock Tick: {}", now);
 		now
 	}
 
@@ -96,8 +98,7 @@ impl Clock for HostClock {
 				}
 
 				let now = clock.run_once();
-				tracing::info!("{msg}: {now}");
-
+				tracing::debug!("{msg}: {now}");
 				tokio::select! {
 						_ = task_cancel.cancelled() => break,
 						_ = tokio::time::sleep(interval) => {}
@@ -149,8 +150,10 @@ impl<C: Ctx> Host<C> {
 	pub fn new(context: Arc<C>) -> anyhow::Result<Self> {
 		let runtime = tokio::runtime::Runtime::new()?;
 		let handle = runtime.handle().clone();
+		let event_bus = EventBus::new();
 		Ok(Self {
 			context,
+			event_bus,
 			worker: HostWorker::new(),
 			clock: HostClock::new(handle),
 			runtime,
@@ -251,6 +254,8 @@ where
 	pub context: Arc<C>,
 	pub clock: HostClock,
 	pub worker: HostWorker<C>,
+	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+	pub event_bus: EventBus,
 
 	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 	pub runtime: tokio::runtime::Runtime,

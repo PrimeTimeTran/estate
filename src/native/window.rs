@@ -193,7 +193,11 @@ impl GlobalHotkeys {
 		self.shutdown.store(true, Ordering::Relaxed);
 	}
 }
-impl Window {
+impl<C, S> Window<C, S>
+where
+	C: Ctx + 'static,
+	S: 'static,
+{
 	pub fn new(event_loop: &ActiveEventLoop, view: ViewType) -> Result<Self> {
 		let (gui_ctx, gui_state) = build_egui(event_loop);
 		let (window, instance, surface) = create_gpu_surface(event_loop)?;
@@ -224,20 +228,21 @@ impl Window {
 		// self.view = Ve::new(view);
 	}
 
-	pub fn draw(&mut self, ctx: &mut AppContext<'_, NativeRuntime, NativeExecutor>) -> Result<()> {
+	pub fn draw(&mut self, ctx: &mut AppContext<'_, C, S>) -> Result<()> {
 		self.begin_egui();
+
 		let output = self.build_ui(ctx);
+
 		let Some(surface_texture) = self.acquire_surface()? else {
 			tracing::warn!("NO SURFACE");
 			return Ok(());
 		};
+
 		self.render_egui(surface_texture, output)?;
+
 		Ok(())
 	}
-	fn build_ui(
-		&mut self,
-		ctx: &mut AppContext<'_, NativeRuntime, NativeExecutor>,
-	) -> gui::FullOutput {
+	fn build_ui(&mut self, ctx: &mut AppContext<'_, C, S>) -> gui::FullOutput {
 		// tracing::info!("Window::build_ui");
 		let mut ui = gui::Ui::new(
 			self.gui_ctx.clone(),
@@ -437,15 +442,22 @@ impl Window {
 		);
 	}
 }
-impl Window {
-	pub fn sync_view(&mut self, view: ViewType, api: Arc<NativeApiClient>) {
+impl<C, S> Window<C, S>
+where
+	C: Ctx + 'static,
+	S: 'static,
+{
+	pub fn sync_view(&mut self, view: ViewType) {
 		if self.screen.kind != view {
 			tracing::debug!("🖼️ Window view change: {:?} → {:?}", self.screen.kind, view);
 			self.screen = ui::ScreenInstance::new(view);
 		}
 	}
 }
-impl Window {
+impl<C, S> Window<C, S>
+where
+	C: Ctx,
+{
 	fn doc_todo() {
 		doc!(
 			r#"
@@ -731,11 +743,14 @@ impl Window {
 	}
 }
 
-pub struct AppWindow {
+pub struct AppWindow<C, S>
+where
+	C: Ctx,
+{
 	// pub runtime: NativeRuntime,
 	pub kind: WindowType,
 	pub view: ViewType,
-	pub window: Window,
+	pub window: Window<C, S>,
 }
 pub struct GlobalHotkeys {
 	hotkey_id: u32,
@@ -754,8 +769,11 @@ pub struct TrayMenu {
 	pub tasks: Submenu,
 	pub oracle: MenuItem,
 }
-pub struct Window {
-	screen: ui::ScreenInstance<NativeRuntime, NativeExecutor>,
+pub struct Window<C, S>
+where
+	C: Ctx,
+{
+	screen: ui::ScreenInstance<C, S>,
 	// This Surface contains/borrows something that is guaranteed to be valid for the 'static lifetime.
 	pub surface: gui::wgpu::Surface<'static>,
 	pub config: gui::wgpu::SurfaceConfiguration,

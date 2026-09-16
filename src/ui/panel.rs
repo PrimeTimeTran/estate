@@ -1,14 +1,17 @@
 use crate::{e, prelude::*};
 
-pub struct Panel<R: Runtime, E> {
+pub struct Panel<C, S> {
 	pub region: Region,
-	pub content: Box<dyn ViewTrait<R, E>>,
+	pub content: Box<dyn ViewTrait<C, S>>,
 	pub open: bool,
 	pub overlay: bool,
 	pub auto_hide: bool,
 }
-impl<R: Runtime, E: Executor> Panel<R, E> {
-	pub fn draw(&mut self, ui: &mut egui::Ui, rect: egui::Rect, ctx: &mut AppContext<'_, R, E>) {
+impl<C, S> Panel<C, S>
+where
+	C: Ctx,
+{
+	pub fn draw(&mut self, ui: &mut egui::Ui, rect: egui::Rect, ctx: &mut AppContext<'_, C, S>) {
 		if !self.open {
 			return;
 		}
@@ -19,8 +22,11 @@ impl<R: Runtime, E: Executor> Panel<R, E> {
 		self.content.draw(&mut child_ui, ctx);
 	}
 }
-impl<R: Runtime, E: Executor> Panel<R, E> {
-	pub fn new(content: impl ViewTrait<R, E> + 'static, region: Region) -> Self {
+impl<C, S> Panel<C, S>
+where
+	C: Ctx,
+{
+	pub fn new(content: impl ViewTrait<C, S> + 'static, region: Region) -> Self {
 		Self {
 			region,
 			content: Box::new(content),
@@ -30,7 +36,7 @@ impl<R: Runtime, E: Executor> Panel<R, E> {
 		}
 	}
 	pub fn from_config(
-		content: impl ViewTrait<R, E> + 'static,
+		content: impl ViewTrait<C, S> + 'static,
 		region: Region,
 		config: &PanelState,
 	) -> Self {
@@ -61,12 +67,15 @@ impl<R: Runtime, E: Executor> Panel<R, E> {
 		self.open
 	}
 }
-impl<R: Runtime, E: Executor> ViewTrait<R, E> for Panel<R, E> {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R, E>) {
+impl<C, S> ViewTrait<C, S> for Panel<C, S>
+where
+	C: Ctx,
+{
+	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, C, S>) {
 		self.content.draw(ui, ctx);
 	}
-	fn update(&mut self, ctx: &mut AppContext<'_, R, E>) {}
-	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R, E>) {}
+	fn update(&mut self, ctx: &mut AppContext<'_, C, S>) {}
+	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, C, S>) {}
 }
 
 // A named, interactive view that occupies a region.
@@ -83,8 +92,11 @@ impl DebugPanel {
 		}
 	}
 }
-impl<R: Runtime, E: Executor> ViewTrait<R, E> for DebugPanel {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R, E>) {
+impl<C, S> ViewTrait<C, S> for DebugPanel
+where
+	C: Ctx,
+{
+	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, C, S>) {
 		ui.vertical_centered(|ui| {
 			ui.heading(&self.title);
 			ui.separator();
@@ -95,7 +107,7 @@ impl<R: Runtime, E: Executor> ViewTrait<R, E> for DebugPanel {
 			));
 		});
 	}
-	fn update(&mut self, ctx: &mut AppContext<'_, R, E>) {}
+	fn update(&mut self, ctx: &mut AppContext<'_, C, S>) {}
 
-	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R, E>) {}
+	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, C, S>) {}
 }

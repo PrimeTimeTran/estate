@@ -137,9 +137,9 @@ impl PanelState {
 	pub const fn new(active: bool, size: f32) -> Self {
 		Self {
 			active,
-			size,
-			resizable: true,
 			docked: true,
+			resizable: true,
+			size,
 		}
 	}
 	pub const fn size(&self) -> f32 {
@@ -187,27 +187,32 @@ impl ActivityBar {
 		Self { buttons: vec![] }
 	}
 }
-impl<R: Runtime, E: Executor> ViewTrait<R, E> for ActivityBar {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R, E>) {
+impl<C, S> ViewTrait<C, S> for ActivityBar where
+	C: Ctx,
+{
+	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, C, S>) {
 		ui.vertical(|ui| {
 			// buttons
 		});
 	}
-	fn update(&mut self, ctx: &mut AppContext<'_, R, E>) {}
+	fn update(&mut self, ctx: &mut AppContext<'_, C, S>) {}
 
-	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R, E>) {}
+	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, C, S>) {}
 }
 
 pub struct PrimaryBar {
 	buttons: Vec<&'static str>,
 }
-impl<R: Runtime, E: Executor> ViewTrait<R, E> for PrimaryBar {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R, E>) {
+impl<C, S> ViewTrait<C, S> for PrimaryBar where
+	C: Ctx,
+{
+	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, C, S>) {
 		ui.horizontal(|ui| {
 			// buttons
 		});
 	}
-	fn update(&mut self, ctx: &mut AppContext<'_, R, E>) {}
 
-	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R, E>) {}
+	fn update(&mut self, ctx: &mut AppContext<'_, C, S>) {}
+
+	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, C, S>) {}
 }

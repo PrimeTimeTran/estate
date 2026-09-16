@@ -62,6 +62,8 @@ pub trait Context: Sized {
 pub trait Ctx {
 	type AppState: Clone;
 	type GuiState;
+	type EventReceiver;
+	// BroadcastReceiver<app::event::Event>
 	fn initial_state() -> Self::AppState;
 }
 

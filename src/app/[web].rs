@@ -1,8 +1,4 @@
-use crate::{
-	doc,
-	prelude::{traits::Ctx, *},
-	ui, ui_prelude as gui,
-};
+use crate::{doc, prelude::*, ui, ui_prelude as gui};
 
 #[async_trait::async_trait(?Send)]
 pub trait Api: Debug + 'static {
@@ -29,9 +25,19 @@ where
 	}
 }
 
+impl App<ContextWeb> {
+	pub fn run(&mut self) -> Result<()> {
+		tracing::debug!("App run");
+		self.init_services()?;
+		// self.run_gui()?;
+		Ok(())
+	}
+}
+
 impl Ctx for ContextWeb {
 	type AppState = structs::S<ContextWeb>;
 	type GuiState = WebState;
+	type EventReceiver = structs::BroadcastReceiver<e::Event>;
 
 	fn initial_state() -> Self::AppState {
 		structs::S {

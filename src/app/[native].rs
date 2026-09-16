@@ -6,6 +6,8 @@ use crate::{
 	},
 };
 
+use tokio::runtime::Runtime;
+
 #[async_trait::async_trait]
 pub trait Api: Debug + 'static {
 	async fn load_problems(&self) -> anyhow::Result<Vec<StoredProblem>>;
@@ -55,14 +57,15 @@ where
 		});
 	}
 }
-impl<C> App<C>
-where
-	C: Ctx,
-{
-	pub fn run_gui(&mut self) -> Result<()>
-	where
-		C::AppState: Send + Sync + 'static,
-	{
+
+impl App<ContextNative> {
+	pub fn run(&mut self) -> Result<()> {
+		tracing::debug!("App run");
+		self.init_services()?;
+		self.run_gui()?;
+		Ok(())
+	}
+	pub fn run_gui(&mut self) -> Result<()> {
 		let cancel = CancellationToken::new();
 		let event_loop = EventLoop::<AppEvent>::with_user_event()
 			.build()
@@ -70,39 +73,74 @@ where
 		let proxy = event_loop.create_proxy();
 		let handle = self.start_app_events(proxy.clone())?;
 		self.workers.push(handle);
-		let mut renderer =
-			structs::Renderer::<ContextNative, C::AppState>::new(self.state.clone(), cancel);
+		let event_rx = self.host.event_bus.subscribe_broadcast();
+		let mut renderer = Renderer::<ContextNative, <ContextNative as Ctx>::AppState>::new(
+			self.host.context(),
+			self.state.clone(),
+			cancel,
+			event_rx,
+		);
 		event_loop
 			.run_app(&mut renderer)
 			.map_err(|err| anyhow::anyhow!("GUI event loop failed: {err}"))?;
 		Ok(())
 	}
+}
+
+impl<C> App<C>
+where
+	C: Ctx,
+{
 	pub fn start_app_events(
 		&mut self,
 		proxy: EventLoopProxy<AppEvent>,
 	) -> Result<WorkHandle<C, tokio::task::JoinHandle<()>>> {
 		let handle = self.host.worker().run_background(move |cancel| async move {
-			tracing::info!("🔥 APP EVENTS TASK STARTED");
+			tracing::debug!("🔥 APP EVENTS TASK STARTED");
+
+			let mut view_idx = 0;
+			let mut current_time = 3;
+
 			loop {
 				tokio::select! {
 					_ = cancel.cancelled() => {
-						tracing::info!("🔥 APP EVENTS CANCELLED");
+						tracing::debug!("🔥 APP EVENTS CANCELLED");
 						break;
 					}
-					_ = tokio::time::sleep(Duration::from_secs(5)) => {
-						tracing::info!("🔥 APP EVENTS SENDING");
-							match proxy.send_event(AppEvent::RuntimeEvent) {
+
+					_ = tokio::time::sleep(Duration::from_secs(1)) => {
+						if current_time == 0 {
+							current_time = 3;
+							view_idx = (view_idx + 1) % TICK_ITEMS_LENGTH;
+
+							let view = TICK_ITEMS[view_idx];
+
+							tracing::info!(
+								"🔥 APP EVENTS NAVIGATING TO {:?}",
+								view,
+							);
+
+							match proxy.send_event(AppEvent::Navigate(view)) {
 								Ok(()) => {
-									tracing::info!("🔥 RuntimeEvent SENT");
+									tracing::info!("🔥 Navigate SENT");
 								}
+
 								Err(err) => {
-									tracing::error!(?err, "🔥 RuntimeEvent FAILED");
+									tracing::error!(?err, "🔥 Navigate FAILED");
 								}
 							}
+						} else {
+							current_time -= 1;
+
+							tracing::debug!(
+								"⏰ APP EVENTS CLOCK TICK: {current_time}",
+							);
+						}
 					}
 				}
 			}
 		});
+
 		Ok(handle)
 	}
 	pub fn start_cargo_watcher(&mut self) -> Result<WorkHandle<C, tokio::task::JoinHandle<()>>> {
@@ -188,6 +226,119 @@ where
 		}))
 	}
 }
+impl<NativeCtx, S> ApplicationHandler<AppEvent> for structs::Renderer<NativeCtx, S>
+where
+	NativeCtx: Ctx + 'static,
+	S: Send + Sync + 'static,
+{
+	fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+		tracing::debug!("about_to_wait");
+		// self.app.update();
+		#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+		while let Ok(event) = MenuEvent::receiver().try_recv() {
+			tracing::info!("MenuEvent::receiver");
+			println!("MenuEvent::receiver");
+			self.handle_event(event, event_loop);
+		}
+	}
+	fn device_event(
+		&mut self,
+		event_loop: &ActiveEventLoop,
+		device_id: winit::event::DeviceId,
+		event: winit::event::DeviceEvent,
+	) {
+		tracing::debug!("device_event");
+	}
+	fn exiting(&mut self, event_loop: &ActiveEventLoop) {
+		tracing::debug!("exiting")
+	}
+	fn memory_warning(&mut self, event_loop: &ActiveEventLoop) {
+		tracing::debug!("memory_warning")
+	}
+	fn new_events(&mut self, event_loop: &ActiveEventLoop, cause: winit::event::StartCause) {
+		tracing::debug!("new_events")
+	}
+	fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+		tracing::debug!("🔥 RESUMED");
+		if self.windows.is_empty() {
+			self.open_window(event_loop, crate::START_WINDOW);
+		}
+	}
+	fn suspended(&mut self, event_loop: &ActiveEventLoop) {
+		tracing::info!("suspended")
+	}
+	fn user_event(&mut self, event_loop: &ActiveEventLoop, event: AppEvent) {
+		tracing::debug!("user_event");
+		match event {
+			AppEvent::Navigate(view) => {
+				self.navigate_to(view);
+			}
+
+			AppEvent::RuntimeEvent => {
+				tracing::info!("user_event RuntimeEvent");
+				self.sync_views();
+			}
+			AppEvent::Shutdown => {
+				tracing::debug!(">>> shutdown event received");
+				tracing::debug!(">>> event_loop.exit() called");
+			}
+			AppEvent::ModifiersChanged {
+				alt,
+				command,
+				ctrl,
+				shift,
+			} => {
+				tracing::info!("Modifiers Changed")
+			}
+			_ => {}
+		}
+	}
+
+	fn window_event(
+		&mut self,
+		event_loop: &ActiveEventLoop,
+		window_id: WindowId,
+		event: WindowEvent,
+	) {
+		tracing::debug!("window_event");
+
+		let Some(window) = self
+			.windows
+			.iter_mut()
+			.find(|window| window.window.instance.id() == window_id)
+		else {
+			return;
+		};
+
+		let response = window
+			.window
+			.gui_state
+			.on_window_event(&window.window.instance, &event);
+
+		if response.repaint {
+			window.window.instance.request_redraw();
+		}
+
+		match event {
+			WindowEvent::RedrawRequested => {
+				if window.window.occluded {
+					return;
+				}
+				let mut ctx = AppContext {
+					context: self.context.as_ref(),
+					state: &mut self.state,
+					event_rx: &mut self.event_rx,
+					input: IOState::default(),
+					last_revision: 0,
+				};
+				if let Err(e) = window.window.draw(&mut ctx) {
+					tracing::error!("DEV >>> draw failed: {e:#}");
+				}
+			}
+			_ => {}
+		}
+	}
+}
 
 impl Ctx for ContextNative {
 	fn initial_state() -> Self::AppState {
@@ -199,6 +350,7 @@ impl Ctx for ContextNative {
 	}
 	type AppState = structs::S<ContextNative>;
 	type GuiState = NativeGuiState;
+	type EventReceiver = structs::BroadcastReceiver<e::Event>;
 }
 
 impl<ContextNative> Host<ContextNative>
@@ -232,6 +384,9 @@ where
 
 	pub fn worker(&self) -> &HostWorker<ContextNative> {
 		&self.worker
+	}
+	pub fn subscribe(&self) -> structs::BroadcastReceiver<e::Event> {
+		self.event_bus.subscribe_broadcast()
 	}
 }
 
@@ -280,6 +435,68 @@ impl Host<ContextNative> {
 impl HostClock {
 	pub fn new(handle: tokio::runtime::Handle) -> Self {
 		Self { handle }
+	}
+}
+
+impl<NativeCtx, S> structs::Renderer<NativeCtx, S>
+where
+	NativeCtx: Ctx + 'static,
+	S: 'static,
+{
+	fn window_by_type(&mut self, kind: WindowType) -> Option<&mut AppWindow<NativeCtx, S>> {
+		self.windows.iter_mut().find(|window| window.kind == kind)
+	}
+	fn open_window(&mut self, event_loop: &ActiveEventLoop, kind: WindowType) {
+		tracing::info!(" open window start");
+		if self.window_by_type(kind).is_some() {
+			return;
+		}
+		match Window::new(event_loop, self.view) {
+			Ok(window) => {
+				tracing::info!(" open window end, new window");
+				window.instance.set_title(self.view.name().into());
+				self.windows.push(AppWindow {
+					// runtime: self.runtime.clone(),
+					kind,
+					view: self.view,
+					window,
+				});
+			}
+			Err(error) => {
+				tracing::error!("failed to create window: {error}");
+			}
+		}
+	}
+	fn handle_event(&mut self, event: MenuEvent, event_loop: &ActiveEventLoop) {
+		tracing::info!("handle_event");
+
+		// match event {
+		// 	MenuEvent::Navigate(view) => {
+		// 		// self.navigate_to(view);
+		// 	} // Other menu events...
+		// 	  // MenuEvent::OpenWindow(kind) => {
+		// 	  //   self.open_window(event_loop, kind);
+		// 	  // }
+		// }
+	}
+}
+impl<NativeCtx, S> structs::Renderer<NativeCtx, S>
+where
+	NativeCtx: Ctx + 'static,
+	S: 'static,
+{
+	fn sync_views(&mut self) {
+		for window in &mut self.windows {
+			window.view = self.view;
+			window.window.sync_view(window.view);
+			window.window.instance.set_title(self.view.name());
+			window.window.instance.request_redraw();
+		}
+	}
+	fn navigate_to(&mut self, view: ViewType) {
+		tracing::info!("navigating from {:?} to {:?}", self.view, view,);
+		self.view = view;
+		self.sync_views();
 	}
 }
 
@@ -346,7 +563,7 @@ where
 	///
 	/// The task must be `'static` because Tokio may outlive the current stack
 	/// frame while executing it.
-	/// 
+	///
 	fn run_background_blocking<F>(&self, task: F) -> Self::Handle
 	where
 		F: FnOnce(CancellationToken) + Send + 'static,
@@ -399,7 +616,17 @@ pub struct ContextNative {
 	pub menu_bar: Option<MenuBar>,
 	pub tray_clock: Option<MenuBar>,
 	pub tray_cursor: Option<TrayIcon>,
-	pub windows: Vec<AppWindow>,
+}
+
+#[derive(Debug, Clone)]
+pub struct CursorDaemon<S> {
+	pub sink: S,
+	pub cancel: CancellationToken,
+}
+#[derive(Debug, Clone, Copy)]
+pub struct CursorPosition {
+	pub x: f64,
+	pub y: f64,
 }
 
 #[derive(Clone, Debug, Default)]

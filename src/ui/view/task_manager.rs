@@ -16,24 +16,26 @@ impl TaskManagerScreen {
 	}
 }
 
-impl<R: Runtime, E: Executor> Screen<R, E> for TaskManagerScreen {
-	fn configure(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
+impl<C, S> Screen<C, S> for TaskManagerScreen where
+	C: Ctx,
+{
+	fn configure(&mut self, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {
 		// Put TaskManagerView into the appropriate region/panel.
 	}
 
-	fn update(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
+	fn update(&mut self, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {
 		// self.manager.poll_changes();
 		self.view.update(ctx);
 	}
 
-	fn event(&mut self, event: &e::Event, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
+	fn event(&mut self, event: &e::Event, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {
 		// Feature-level event handling.
 		//
 		// e.g. TaskCreated, TaskDeleted, etc.
 	}
 }
 // impl<R: Runtime> TaskManagerScreen {
-// 	fn event(&mut self, event: &e::Event, _ctx: &mut AppContext<'_, R, E>) {
+// 	fn event(&mut self, event: &e::Event, _ctx: &mut AppContext<'_, C, S>) {
 // 		if let e::EventKind::TaskCreated { .. } = event.kind {}
 // 	}
 // }
@@ -212,13 +214,15 @@ impl TaskManagerView {
 		}
 	}
 }
-impl<R: Runtime, E: Executor> ViewTrait<R, E> for TaskManagerView {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, R, E>) {
+impl<C, S> ViewTrait<C, S> for TaskManagerView where
+	C: Ctx,
+{
+	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, C, S>) {
 		// compose child views
 	}
-	fn update(&mut self, ctx: &mut AppContext<'_, R, E>) {}
+	fn update(&mut self, ctx: &mut AppContext<'_, C, S>) {}
 
-	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, R, E>) {}
+	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, C, S>) {}
 }
 
 fn render_graphs(

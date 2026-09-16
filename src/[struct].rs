@@ -74,15 +74,19 @@ pub struct ProblemState {
 	pub loading: bool,
 	pub value: Option<StoredProblem>,
 }
-pub struct Renderer<C, S> {
-	pub phantom: PhantomData<C>,
+pub struct Renderer<C, S>
+where
+	C: Ctx,
+{
+	pub context: Arc<C>,
 	pub state: S,
 	pub view: ViewType,
 	pub cancel: CancellationToken,
-	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-	pub windows: Vec<AppWindow>,
-}
+	pub event_rx: C::EventReceiver,
 
+	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+	pub windows: Vec<AppWindow<C, S>>,
+}
 /// ## [S]
 ///
 /// Typestate placeholder for state.
@@ -105,3 +109,8 @@ pub struct S<C> {
 pub struct State;
 
 pub struct Windows;
+
+#[derive(Debug)]
+pub struct BroadcastReceiver<T> {
+	pub rx: tokio::sync::broadcast::Receiver<T>,
+}

@@ -86,12 +86,21 @@ where
 	}
 }
 
-impl<C, S> structs::Renderer<C, S> {
-	pub fn new(state: S, cancel: CancellationToken) -> Self {
+impl<C, S> structs::Renderer<C, S>
+where
+	C: Ctx,
+{
+	pub fn new(
+		context: Arc<C>,
+		state: S,
+		cancel: CancellationToken,
+		event_rx: C::EventReceiver,
+	) -> Self {
 		Self {
 			cancel,
 			state,
-			phantom: PhantomData,
+			event_rx,
+			context,
 			view: ViewType::MarkdownScreen,
 			#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 			windows: vec![],

@@ -30,6 +30,9 @@ impl EventBus {
 	pub fn subscribe(&self) -> broadcast::Receiver<e::Event> {
 		self.sender.subscribe()
 	}
+	pub fn subscribe_broadcast(&self) -> structs::BroadcastReceiver<e::Event> {
+		structs::BroadcastReceiver::new(self.sender.subscribe())
+	}
 }
 
 /// ## [EventDispatcher]

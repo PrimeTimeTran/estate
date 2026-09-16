@@ -28,14 +28,14 @@ pub struct DashboardScreen {
 	pub active_focus: FocusedPane,
 	pub secondary_scroll_offset: f32,
 }
-impl<R: Runtime, E: Executor> Screen<R, E> for DashboardScreen {
-	fn configure(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
+impl<C, S> Screen<C, S> for DashboardScreen {
+	fn configure(&mut self, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {
 		// Configure the regions this screen uses.
 	}
 
-	fn update(&mut self, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {}
+	fn update(&mut self, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {}
 
-	fn event(&mut self, event: &e::Event, layout: &mut Layout<R, E>, ctx: &mut AppContext<'_, R, E>) {
+	fn event(&mut self, event: &e::Event, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {
 	}
 }
 impl DashboardScreen {
@@ -285,8 +285,7 @@ impl DashboardScreen {
 				ui.label("Not loaded yet");
 			}
 			// Request a continuous repaint so the timer increments live every second
-			ui.ctx()
-				.request_repaint_after(Duration::from_secs(1));
+			ui.ctx().request_repaint_after(Duration::from_secs(1));
 		});
 	}
 }
