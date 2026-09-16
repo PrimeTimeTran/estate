@@ -3,20 +3,16 @@ use crate::{
 	structs::{AppState, EstateState},
 };
 
-/// ## [AppRuntime]
-///
-/// Wraps concrete Web & Native to expose runtime implementation to shared capabilities
-/// on both platforms more easily making the architecture more robust to changes.
-///
-#[derive(Debug, Clone)]
-pub struct AppRuntime<R: Runtime, E> {
-	pub engine: EstateEngine<R>,
-	pub view: ViewType,
-	pub state: AppState,
-	events: R::EventReceiver,
-	pub executor: E,
-}
 impl<R: Runtime, E> AppRuntime<R, E> {
+	pub fn start_services(&self) -> Result<()> {
+		println!("AppRuntime start_services");
+		// self
+		// 	.engine
+		// 	.runtime
+		// 	.emit(e::Event::app(e::Klass::SessionStart {}));
+		// tracing::info!("AppRuntime start_services");
+		Ok(())
+	}
 	pub fn new(engine: EstateEngine<R>, executor: E) -> Self {
 		let events = engine.runtime.subscribe();
 		// engine.
@@ -28,41 +24,27 @@ impl<R: Runtime, E> AppRuntime<R, E> {
 			view: crate::START_VIEW,
 		}
 	}
-	pub fn start_services(&self) -> Result<()> {
-		println!("AppRuntime start_services");
-		// self
-		// 	.engine
-		// 	.runtime
-		// 	.emit(e::Event::app(e::Klass::SessionStart {}));
-		// tracing::info!("AppRuntime start_services");
-		Ok(())
-	}
 }
 impl<R: Runtime + 'static, E: Executor> AppRuntime<R, E> {
-	pub fn start(&self) {
-		if !START_APP_CLOCK {
+	pub fn api(&self) -> &Option<<R::Services as Services>::Client> {
+		self.engine.runtime.services().api()
+	}
+	pub fn load_problems(&mut self) {
+		if !self.start_problems_request() {
 			return;
 		}
 		let runtime = self.engine.runtime.clone();
-		let task_runtime = runtime.clone();
-		self.executor.spawn(async move {
-			let mut view_idx = 0;
-			let mut current_time = 5;
-			loop {
-				task_runtime.sleep(Duration::from_secs(1)).await;
-				if current_time == 0 {
-					current_time = 5;
-					view_idx = (view_idx + 1) % TICK_ITEMS_LENGTH;
-					task_runtime.emit(e::Event::app(e::Klass::Navigate(TICK_ITEMS[view_idx])));
-				} else {
-					current_time -= 1;
-					println!("⏰ AppRuntime CLOCK TICK: {current_time}");
-				}
-			}
-		});
-	}
-	pub fn api(&self) -> &Option<<R::Services as Services>::Client> {
-		self.engine.runtime.services().api()
+		// self.executor.spawn(async move {
+		// 	let problems = runtime.services().api().load_problems().await;
+		// 	match problems {
+		// 		Ok(problems) => {
+		// 			runtime.emit(e::Event::app(e::Klass::ProblemsLoaded(problems)));
+		// 		}
+		// 		Err(error) => {
+		// 			runtime.emit(e::Event::app(e::Klass::ApiError(error.to_string())));
+		// 		}
+		// 	}
+		// });
 	}
 	pub fn sample_problem(&mut self) {
 		if !self.start_problems_request() {
@@ -92,25 +74,29 @@ impl<R: Runtime + 'static, E: Executor> AppRuntime<R, E> {
 		// 	}
 		// });
 	}
-	pub fn load_problems(&mut self) {
-		if !self.start_problems_request() {
+	pub fn start(&self) {
+		if !START_APP_CLOCK {
 			return;
 		}
 		let runtime = self.engine.runtime.clone();
-		// self.executor.spawn(async move {
-		// 	let problems = runtime.services().api().load_problems().await;
-		// 	match problems {
-		// 		Ok(problems) => {
-		// 			runtime.emit(e::Event::app(e::Klass::ProblemsLoaded(problems)));
-		// 		}
-		// 		Err(error) => {
-		// 			runtime.emit(e::Event::app(e::Klass::ApiError(error.to_string())));
-		// 		}
-		// 	}
-		// });
+		let task_runtime = runtime.clone();
+		self.executor.spawn(async move {
+			let mut view_idx = 0;
+			let mut current_time = 5;
+			loop {
+				task_runtime.sleep(Duration::from_secs(1)).await;
+				if current_time == 0 {
+					current_time = 5;
+					view_idx = (view_idx + 1) % TICK_ITEMS_LENGTH;
+					task_runtime.emit(e::Event::app(e::Klass::Navigate(TICK_ITEMS[view_idx])));
+				} else {
+					current_time -= 1;
+					println!("⏰ AppRuntime CLOCK TICK: {current_time}");
+				}
+			}
+		});
 	}
 }
-
 impl<R: Runtime, E> AppRuntime<R, E> {
 	/// Runtime Reference
 	///
@@ -174,25 +160,17 @@ impl<R: Runtime, E> AppRuntime<R, E> {
 	}
 }
 impl<R: Runtime, E> AppRuntime<R, E> {
-	pub fn state(&self) -> std::sync::RwLockReadGuard<'_, EstateState> {
-		self.engine.runtime.state().read()
-	}
 	pub fn app_state(&self) -> &AppState {
 		&self.state
 	}
 	pub fn jobs(&self) -> std::sync::RwLockReadGuard<'_, EstateState> {
 		self.state()
 	}
+	pub fn state(&self) -> std::sync::RwLockReadGuard<'_, EstateState> {
+		self.engine.runtime.state().read()
+	}
 }
 impl<R: Runtime, E> AppRuntime<R, E> {
-	pub fn new_task(&mut self) {
-		self
-			.engine
-			.runtime
-			.emit(e::Event::app(e::Klass::TaskRequested {
-				request: TaskRequest::Create(TaskKind::SyncBookmarks),
-			}));
-	}
 	pub fn clear_tasks(&mut self) {
 		self
 			.engine
@@ -201,10 +179,13 @@ impl<R: Runtime, E> AppRuntime<R, E> {
 				command: "task_clear".into(),
 			}));
 	}
-	pub fn stop_session(&mut self) {
-		// self.session_service.end().await.unwrap_or_else(|e| {
-		// 	tracing::error!("Error occurred while ending session: {}", e);
-		// });
+	pub fn new_task(&mut self) {
+		self
+			.engine
+			.runtime
+			.emit(e::Event::app(e::Klass::TaskRequested {
+				request: TaskRequest::Create(TaskKind::SyncBookmarks),
+			}));
 	}
 	pub fn show_tasks(&mut self) {
 		self.show_view(ViewType::TaskManagerScreen);
@@ -215,14 +196,18 @@ impl<R: Runtime, E> AppRuntime<R, E> {
 				command: "task_list".into(),
 			}));
 	}
-	pub fn view(&self) -> ViewType {
-		self.view
-	}
 	pub fn show_view(&mut self, view: ViewType) {
 		self.view = view;
 	}
+	pub fn stop_session(&mut self) {
+		// self.session_service.end().await.unwrap_or_else(|e| {
+		// 	tracing::error!("Error occurred while ending session: {}", e);
+		// });
+	}
+	pub fn view(&self) -> ViewType {
+		self.view
+	}
 }
-
 impl<R: Runtime + 'static, E: Executor> AppRuntime<R, E> {
 	fn start_problems_request(&mut self) -> bool {
 		if self.state.problems.loading {
@@ -243,9 +228,21 @@ impl<R: Runtime + 'static, E: Executor> AppRuntime<R, E> {
 		true
 	}
 }
-
 impl<R: Runtime, E> Drop for AppRuntime<R, E> {
 	fn drop(&mut self) {
 		tracing::info!("💀 AppRuntime Drop");
 	}
+}
+/// ## [AppRuntime]
+///
+/// Wraps concrete Web & Native to expose runtime implementation to shared capabilities
+/// on both platforms more easily making the architecture more robust to changes.
+///
+#[derive(Debug, Clone)]
+pub struct AppRuntime<R: Runtime, E> {
+	pub engine: EstateEngine<R>,
+	events: R::EventReceiver,
+	pub executor: E,
+	pub state: AppState,
+	pub view: ViewType,
 }

@@ -2,11 +2,11 @@ use crate::prelude::*;
 
 use owo_colors::OwoColorize;
 
-pub fn print(level: Level, message: impl std::fmt::Display) {
+pub fn print(level: Level, message: impl Display) {
 	println!("{} {}", level.format(level.label()), message,);
 }
 
-pub fn print_debug<T: std::fmt::Debug>(level: Level, name: &str, value: &T) {
+pub fn print_debug<T: Debug>(level: Level, name: &str, value: &T) {
 	println!("{} {} = {:#?}", level.format(level.label()), name, value,);
 }
 
@@ -71,7 +71,7 @@ impl Level {
 }
 
 impl Level {
-	pub fn format(self, text: impl std::fmt::Display) -> String {
+	pub fn format(self, text: impl Display) -> String {
 		match self {
 			Self::Trace => text.dimmed().to_string(),
 			Self::Debug => text.magenta().to_string(),
@@ -83,31 +83,31 @@ impl Level {
 	}
 }
 
-pub fn success<T: std::fmt::Display>(value: T) -> String {
+pub fn success<T: Display>(value: T) -> String {
 	value.green().to_string()
 }
 
-pub fn error<T: std::fmt::Display>(value: T) -> String {
+pub fn error<T: Display>(value: T) -> String {
 	value.red().to_string()
 }
 
-pub fn warning<T: std::fmt::Display>(value: T) -> String {
+pub fn warning<T: Display>(value: T) -> String {
 	value.yellow().to_string()
 }
 
-pub fn info<T: std::fmt::Display>(value: T) -> String {
+pub fn info<T: Display>(value: T) -> String {
 	value.cyan().to_string()
 }
 
-pub fn debug<T: std::fmt::Display>(value: T) -> String {
+pub fn debug<T: Display>(value: T) -> String {
 	value.magenta().to_string()
 }
 
-pub fn muted<T: std::fmt::Display>(value: T) -> String {
+pub fn muted<T: Display>(value: T) -> String {
 	value.dimmed().to_string()
 }
 
-pub fn bold<T: std::fmt::Display>(value: T) -> String {
+pub fn bold<T: Display>(value: T) -> String {
 	value.bold().to_string()
 }
 

@@ -9,11 +9,8 @@
 /// 3: NativeRuntime runtime trait implementation
 /// 3: NativeRuntime executor trait implementation
 ///
-pub use crate::prelude::*;
 use crate::prelude::*;
 
-use std::sync::Mutex;
-use winit::event_loop::EventLoopProxy;
 
 impl EventReceiver for NativeEventReceiver {
 	fn try_recv(&mut self) -> Option<e::Event> {
@@ -148,9 +145,7 @@ impl NativeRuntime {
 		let runtime_state = RuntimeState::new(state);
 		let events = EventBus::new();
 		let event_rx = Arc::new(Mutex::new(events.subscribe()));
-		// let services = NativeServices::default();
 		let services = NativeServices::connect().await?;
-		// let runtime = services.clone().connect().await?;
 		let executor = NativeExecutor {
 			handle: handle.clone(),
 		};
@@ -169,38 +164,6 @@ impl NativeRuntime {
 			tasks: Arc::new(RwLock::new(TaskManager::new())),
 		})
 	}
-	// pub async fn connect(self) -> anyhow::Result<NativeRuntime<Connected>> {
-	// 	let NativeRuntime {
-	// 		event_rx,
-	// 		handle,
-	// 		proxy,
-	// 		events,
-	// 		session,
-	// 		state,
-	// 		store,
-	// 		tasks,
-	// 		state_service,
-	// 		session_service,
-	// 		executor,
-	// 		services,
-	// 	} = self;
-	// 	let services = services.connect().await?;
-
-	// 	Ok(NativeRuntime {
-	// 		event_rx,
-	// 		handle,
-	// 		proxy,
-	// 		events,
-	// 		session,
-	// 		state,
-	// 		store,
-	// 		tasks,
-	// 		state_service,
-	// 		session_service,
-	// 		executor,
-	// 		services,
-	// 	})
-	// }
 	pub fn attach_event_proxy(&self, proxy: EventLoopProxy<AppEvent>) {
 		*self.proxy.lock().unwrap() = Some(proxy);
 	}
@@ -480,7 +443,7 @@ impl NativeExecutor {
 /// Concrete implementation of the
 ///
 /// Required executor to kick off background tasks using the [tokio]
-/// 
+///
 #[derive(Clone, Debug)]
 pub struct NativeExecutor {
 	pub handle: tokio::runtime::Handle,
