@@ -1,13 +1,43 @@
 use crate::{
 	native::native_prelude::*,
 	prelude::{traits::Ctx, *},
+	proto::{
+		problem_service_client::ProblemServiceClient,
+		submission_service_client::SubmissionServiceClient,
+	},
 };
 
-/// # Native
-///
-use crate::proto::{
-	problem_service_client::ProblemServiceClient, submission_service_client::SubmissionServiceClient,
-};
+#[async_trait::async_trait]
+pub trait Api: Debug + 'static {
+	async fn load_problems(&self) -> anyhow::Result<Vec<StoredProblem>>;
+	async fn sample_problem(&self, request: SampleProblemRequest) -> anyhow::Result<StoredProblem>;
+	async fn load_problem(&self, id: i64) -> anyhow::Result<StoredProblem>;
+	fn clone_box(&self) -> Box<dyn Api>;
+}
+
+#[async_trait::async_trait]
+impl Api for NativeApiClient {
+	fn clone_box(&self) -> Box<dyn Api> {
+		Box::new(self.clone())
+	}
+	async fn load_problems(&self) -> anyhow::Result<Vec<StoredProblem>> {
+		todo!("NativeApiClient load_problems")
+	}
+	async fn load_problem(&self, id: i64) -> anyhow::Result<StoredProblem> {
+		todo!("NativeApiClient load_problem")
+	}
+	async fn sample_problem(&self, request: SampleProblemRequest) -> anyhow::Result<StoredProblem> {
+		// println!("Native API Client sample_problem");
+		let request: crate::proto::types::SampleProblemRequest = request.into();
+		let response = self
+			.problems
+			.clone()
+			.sample_problem(request)
+			.await?
+			.into_inner();
+		StoredProblem::try_from(response)
+	}
+}
 
 impl<C> App<C>
 where
@@ -31,7 +61,6 @@ where
 			.map_err(|err| anyhow::anyhow!("GUI event loop failed: {err}"))?;
 		Ok(())
 	}
-
 	pub fn start_app_events(
 		&mut self,
 		proxy: EventLoopProxy<AppEvent>,
@@ -60,7 +89,6 @@ where
 		});
 		Ok(handle)
 	}
-
 	pub fn start_cargo_watcher(&mut self) -> Result<WorkHandle<C, tokio::task::JoinHandle<()>>> {
 		tracing::debug!("cargo: entered");
 		let watcher = CargoWatcher::new().map_err(|error| {
@@ -119,7 +147,6 @@ where
 			tracing::debug!("Cargo watcher stopped");
 		}))
 	}
-
 	pub fn start_cursor_watcher_from_app(
 		&mut self,
 	) -> anyhow::Result<WorkHandle<C, tokio::task::JoinHandle<()>>> {
@@ -135,18 +162,7 @@ where
 	}
 }
 
-#[async_trait::async_trait]
-pub trait Api: Debug + 'static {
-	async fn load_problems(&self) -> anyhow::Result<Vec<StoredProblem>>;
-	async fn sample_problem(&self, request: SampleProblemRequest) -> anyhow::Result<StoredProblem>;
-	async fn load_problem(&self, id: i64) -> anyhow::Result<StoredProblem>;
-	fn clone_box(&self) -> Box<dyn Api>;
-}
-
 impl Ctx for ContextNative {
-	type AppState = structs::S<ContextNative>;
-	type GuiState = NativeGuiState;
-
 	fn initial_state() -> Self::AppState {
 		structs::S {
 			context: PhantomData,
@@ -154,12 +170,8 @@ impl Ctx for ContextNative {
 			view: ViewType::MarkdownScreen,
 		}
 	}
-}
-
-impl HostClock {
-	pub fn new(handle: tokio::runtime::Handle) -> Self {
-		Self { handle }
-	}
+	type AppState = structs::S<ContextNative>;
+	type GuiState = NativeGuiState;
 }
 
 impl<ContextNative> Host<ContextNative>
@@ -235,6 +247,34 @@ impl Host<ContextNative> {
 		logger::init_logging(&config)?;
 		let context = ContextNative::default();
 		Self::new(Arc::new(context))
+	}
+}
+
+impl HostClock {
+	pub fn new(handle: tokio::runtime::Handle) -> Self {
+		Self { handle }
+	}
+}
+
+impl NativeApiClient {
+	pub async fn connect() -> anyhow::Result<Self> {
+		let chan = Channel::from_static(crate::GRPC_SOCKET_CLIENT)
+			.connect()
+			.await?;
+
+		Ok(Self {
+			problems: ProblemServiceClient::new(chan.clone()),
+			submissions: SubmissionServiceClient::new(chan),
+		})
+	}
+	pub fn new(
+		problems: ProblemServiceClient<Channel>,
+		submissions: SubmissionServiceClient<Channel>,
+	) -> Self {
+		Self {
+			problems,
+			submissions,
+		}
 	}
 }
 
@@ -323,57 +363,4 @@ pub struct NativeGuiState {
 pub struct NativeApiClient {
 	pub problems: ProblemServiceClient<Channel>,
 	pub submissions: SubmissionServiceClient<Channel>,
-}
-
-impl NativeApiClient {
-	pub fn new(
-		problems: ProblemServiceClient<Channel>,
-		submissions: SubmissionServiceClient<Channel>,
-	) -> Self {
-		Self {
-			problems,
-			submissions,
-		}
-	}
-}
-
-impl NativeApiClient {
-	pub async fn connect() -> anyhow::Result<Self> {
-		let chan = Channel::from_static(crate::GRPC_SOCKET_CLIENT)
-			.connect()
-			.await?;
-
-		Ok(Self {
-			problems: ProblemServiceClient::new(chan.clone()),
-			submissions: SubmissionServiceClient::new(chan),
-		})
-	}
-}
-
-#[async_trait::async_trait]
-impl Api for NativeApiClient {
-	fn clone_box(&self) -> Box<dyn Api> {
-		Box::new(self.clone())
-	}
-
-	async fn load_problems(&self) -> anyhow::Result<Vec<StoredProblem>> {
-		todo!("NativeApiClient load_problems")
-	}
-
-	async fn load_problem(&self, id: i64) -> anyhow::Result<StoredProblem> {
-		todo!("NativeApiClient load_problem")
-	}
-
-	async fn sample_problem(&self, request: SampleProblemRequest) -> anyhow::Result<StoredProblem> {
-		println!("Native API Client sample_problem");
-		let request: crate::proto::types::SampleProblemRequest = request.into();
-		let response = self
-			.problems
-			.clone()
-			.sample_problem(request)
-			.await?
-			.into_inner();
-
-		StoredProblem::try_from(response)
-	}
 }

@@ -1,5 +1,7 @@
 [tool.pyright]
 typeCheckingMode = "off"
+diagnosticMode = "openFilesOnly"
+reportUndefinedVariable = "none"
 
 [tool.ruff]
 indent-width = 2

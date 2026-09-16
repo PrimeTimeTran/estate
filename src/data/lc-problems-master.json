@@ -1,5 +1,53 @@
 [
   {
+    "number": 1621,
+    "normalized-name": "number-of-sets-of-k-non-overlapping-line-segments",
+    "title": "Number of Sets of K Non-Overlapping Line Segments",
+    "difficulty": "medium",
+    "description": "Given n points on a 1-D plane, where the ith point (from 0 to n-1) is at x = i, find the number of ways we can draw exactly k non-overlapping line segments such that each segment covers two or more points. The endpoints of each segment must have integral coordinates. The k line segments do not have to cover all n points, and they are allowed to share endpoints.\n\nReturn the number of ways we can draw k non-overlapping line segments. Since this number can be huge, return it modulo 109 + 7.",
+    "url": "https://leetcode.com/problems/number-of-sets-of-k-non-overlapping-line-segments/",
+    "filename": "1621-number-of-sets-of-k-non-overlapping-line-segments.py",
+    "description-raw": "<p>Given <code>n</code> points on a 1-D plane, where the <code>i<sup>th</sup></code> point (from <code>0</code> to <code>n-1</code>) is at <code>x = i</code>, find the number of ways we can draw <strong>exactly</strong> <code>k</code> <strong>non-overlapping</strong> line segments such that each segment covers two or more points. The endpoints of each segment must have <strong>integral coordinates</strong>. The <code>k</code> line segments <strong>do not</strong> have to cover all <code>n</code> points, and they are <strong>allowed</strong> to share endpoints.</p>\n<p>Return <em>the number of ways we can draw </em><code>k</code><em> non-overlapping line segments</em><em>.</em> Since this number can be huge, return it <strong>modulo</strong> <code>10<sup>9</sup> + 7</code>.</p>",
+    "test-cases": [
+      {
+        "index": 0,
+        "input": "n = 4, k = 2",
+        "output": "5",
+        "explanation": "The two line segments are shown in red and blue.\nThe image above shows the 5 different ways {(0,2),(2,3)}, {(0,1),(1,3)}, {(0,1),(2,3)}, {(1,2),(2,3)}, {(0,1),(1,2)}."
+      },
+      {
+        "index": 1,
+        "input": "n = 3, k = 1",
+        "output": "3",
+        "explanation": "The 3 ways are {(0,1)}, {(0,2)}, {(1,2)}."
+      },
+      {
+        "index": 2,
+        "input": "n = 30, k = 7",
+        "output": "796297179",
+        "explanation": "The total number of possible ways to draw 7 line segments is 3796297200. Taking this number modulo 109 + 7 gives us 796297179."
+      },
+      {
+        "index": 3,
+        "input": null,
+        "output": null,
+        "explanation": null
+      },
+      {
+        "index": 4,
+        "input": null,
+        "output": null,
+        "explanation": null
+      },
+      {
+        "index": 5,
+        "input": null,
+        "output": null,
+        "explanation": null
+      }
+    ]
+  },
+  {
     "number": 2472,
     "normalized-name": "maximum-number-of-non-overlapping-palindrome-substrings",
     "title": "Maximum Number of Non-overlapping Palindrome Substrings",
