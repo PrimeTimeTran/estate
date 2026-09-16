@@ -1,5 +1,5 @@
 use crate::{
-	prelude::{*},
+	prelude::*,
 	proto::{
 		problem_service_client::ProblemServiceClient,
 		submission_service_client::SubmissionServiceClient,
@@ -163,6 +163,17 @@ where
 			tracing::debug!("Cargo watcher stopped");
 		}))
 	}
+
+	/// ## `App::start_cursor_watcher_from_app`
+	///
+	/// Starts a blocking background worker that runs the native cursor daemon.
+	///
+	/// Cursor events are forwarded to the app's cursor-event channel through
+	/// [AppCursorSink]. The returned [WorkHandle] owns a cancellation token
+	/// and the Tokio join handle for the worker.
+	///
+	/// The cursor daemon is responsible for observing the cancellation token and
+	/// returning when cancellation is requested.
 	pub fn start_cursor_watcher_from_app(
 		&mut self,
 	) -> anyhow::Result<WorkHandle<C, tokio::task::JoinHandle<()>>> {
@@ -324,6 +335,18 @@ where
 		WorkHandle::new(cancel, join)
 	}
 
+	/// Runs a blocking task on Tokio's blocking thread pool.
+	///
+	/// The task receives a [CancellationToken] which is also retained by the
+	/// returned [WorkHandle]. Cancelling the handle signals the task to stop;
+	/// it does not forcibly terminate the running task.
+	///
+	/// The returned handle owns the Tokio join handle, allowing the caller to
+	/// await the worker's completion during shutdown.
+	///
+	/// The task must be `'static` because Tokio may outlive the current stack
+	/// frame while executing it.
+	/// 
 	fn run_background_blocking<F>(&self, task: F) -> Self::Handle
 	where
 		F: FnOnce(CancellationToken) + Send + 'static,
@@ -353,6 +376,15 @@ where
 	}
 }
 
+/// ## [App]
+///
+/// App's root in the native context
+///
+/// ### Properties
+///
+/// - [cursor_events][App::cursor_events]: Detect cursor position for teleporting cursor on shift+scroll.
+/// - [cursor_event_tx][App::cursor_event_tx]: Send events through this channel.
+///
 pub struct App<C: Ctx> {
 	pub cursor_events: std::sync::mpsc::Receiver<CursorEvent>,
 	pub cursor_event_tx: std::sync::mpsc::Sender<CursorEvent>,

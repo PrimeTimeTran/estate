@@ -1,3 +1,5 @@
+//! The [crate::App]
+//!
 use crate::prelude::{traits::Ctx, *};
 
 // https://www.youtube.com/watch?v=VwEV0UesMH0

@@ -31,11 +31,13 @@ pub use uuid::Uuid;
 ///
 pub use crate::{
 	api::*,
+	// The app prefix prevents collision warnings from the ./src/app directory use/import of ./lib/mod.rs
 	app_entry::*,
 	app_macros,
 	app_prelude::*,
 	data::*,
-	e, impls,
+	e,
+	impls,
 	r#macro::*,
 	model::*,
 	runtime::*,
@@ -43,6 +45,7 @@ pub use crate::{
 	share::{share_prelude::*, *},
 	structs::{self, *},
 	tool::{time::*, *},
+	// Verbosely use/export intrinsic traits when their name collides with external ones.
 	traits::{self, Context, EventReceiver, *},
 	ui::{config::*, theme::*, ui_prelude::*, ui_trait::*, *},
 };

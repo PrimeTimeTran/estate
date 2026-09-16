@@ -9,6 +9,7 @@ where
 		self.join()
 	}
 }
+
 #[cfg(not(target_arch = "wasm32"))]
 impl<C> WorkHandle<C, tokio::task::JoinHandle<()>>
 where
