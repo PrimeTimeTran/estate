@@ -18,16 +18,15 @@ Every value in Rust has:
 
 The fundamental relationship is:
 
-```sh
-Ownership
-   │
-   ├── Move
-   ├── Borrow
-   │    ├── Shared (&T)
-   │    └── Mutable (&mut T)
-   │
-   ├── Clone
-   └── Drop
+```mermaid
+flowchart TD
+    O["Ownership"]
+    O --> M["Move"]
+    O --> B["Borrow"]
+    B --> S["Shared (&T)"]
+    B --> MM["Mutable (&mut T)"]
+    O --> C["Clone"]
+    O --> D["Drop"]
 ```
 
 Rust enforces these relationships **at compile time**.
@@ -40,9 +39,10 @@ The three foundational ownership rules are:
 
 Borrowing adds the access rules:
 
-```text
-&T      → many readers
-&mut T  → one writer
+```mermaid
+flowchart LR
+    T1["&T"] --> R1["many readers"]
+    T2["&mut T"] --> R2["one writer"]
 ```
 
 These cannot overlap in a way that permits data races.
@@ -59,8 +59,9 @@ let name = String::from("Alice");
 
 There are two useful concepts here:
 
-```text
-name ──────owns──────> String("Alice")
+```mermaid
+flowchart LR
+    name["name"] --> value["String: Alice"]
 ```
 
 `name` is a **binding**.
@@ -83,14 +84,47 @@ Ownership becomes especially important when values contain heap allocation.
 let x = 42;
 ```
 
-Conceptually:
+The simplified picture is:
 
-```text
-stack
-┌──────────┐
-│ x = 42   │
-└──────────┘
+```mermaid
+flowchart BT
+    process["Process"]
+    thread["Thread"]
+    stack["Stack"]
+    frame["Stack frame<br/>x = 42"]
+
+    process --> thread
+    thread --> stack
+    stack --> frame
 ```
+
+<details>
+
+<summary>Click to view the broader process memory picture</summary>
+
+```mermaid
+flowchart BT
+    process["Process"]
+
+    thread["Thread"]
+    heap["Heap"]
+    code["Code / text"]
+
+    stack["Thread's stack"]
+    frame["Stack frame<br/>x: i32 = 42"]
+
+    process --> thread
+    process --> heap
+    process --> code
+    thread --> stack
+    stack --> frame
+```
+
+This simplified diagram focuses on the **stack hierarchy**: a process contains threads, each thread has its own stack, and the stack contains stack frames for active function calls.
+
+The expanded diagram places the stack in the larger picture: the process also has regions such as the **heap** and **program code**, while each thread maintains its own stack.
+
+</details>
 
 ### Heap-owning value
 
@@ -100,15 +134,34 @@ let name = String::from("Alice");
 
 Conceptually:
 
-```text
-stack                    heap
-┌──────────────┐         ┌─────────┐
-│ name         │────────>│ Alice   │
-│ ptr          │         └─────────┘
-│ len          │
-│ capacity     │
-└──────────────┘
+```mermaid
+flowchart LR
+    stack["Stack<br/>name<br/>ptr<br/>len<br/>capacity"] --> heap["Heap<br/>Alice"]
 ```
+
+| Field      | Meaning                                                      |
+| ---------- | ------------------------------------------------------------ |
+| `ptr`      | Address pointing to the heap allocation containing `"Alice"` |
+| `len`      | Number of bytes currently used by the string                 |
+| `capacity` | Number of bytes allocated in the heap buffer                 |
+
+<details>
+
+<summary>Click to view the broader process memory picture</summary>
+
+```mermaid
+flowchart LR
+    stack["Stack"]
+    string["String<br/>ptr<br/>len<br/>capacity"]
+    heap["Heap"]
+    data["Alice"]
+
+    stack --> string
+    string --> data
+    heap --> data
+```
+
+</details>
 
 The `String` value itself lives on the stack, but it **owns an allocation on the heap**.
 
@@ -122,40 +175,66 @@ A **move transfers ownership**.
 
 ```rust
 let a = String::from("hello");
+
+let b = a;
+a = String::from("goodbye"); // ❌
+```
+
+The first statement creates a `String` and binds its ownership to `a`:
+
+```mermaid
+flowchart LR
+    a["a"] --> string["“hello”"]
+    string --> allocation["heap allocation"]
+```
+
+Then:
+
+```rust
 let b = a;
 ```
 
-After this:
+moves the value currently bound to `a` to `b`:
 
-```text
-a ──X
+`a` is no longer usable:
 
-b ──────owns──────> "hello"
+```mermaid
+flowchart LR
+    a["a"] -->|1. owns| string1[“hello”]
+    a -->|2. move| b["b"]
+    b -->|3. now owns| string1[“hello”]
+    string1 --> allocation["heap allocation"]
 ```
 
-`a` is no longer usable.
+1. A owned "hello"
+2. A moved to "B"
+3. B now "owns" "hello"
+
+Conceptually, you can think of it as:
+
+```text
+let a = String::from("hello");
+│
+├── a owns a String value
+│   ├── ptr ──────────┐
+│   ├── len = 5       │
+│   └── capacity = 5  │
+│                     ▼
+│                 "hello"
+│                 (heap)
+│
+let b = a;
+│
+└── ownership moves from a → b
+```
 
 ```rust
 println!("{b}"); // okay
+
 println!("{a}"); // error
 ```
 
-The important thing is that Rust does not need to copy the heap allocation.
-
-It can simply transfer ownership of the `String`'s representation.
-
-```text
-Before:
-
-a ──────> allocation
-
-
-After:
-
-b ──────> allocation
-```
-
-This is why moves are cheap for many heap-owning types.
+The important thing is that Rust does **not** need to copy the heap allocation. The `String`'s ownership is transferred to `b`; the underlying allocation remains where it is.
 
 ---
 
@@ -175,12 +254,10 @@ Both remain valid.
 
 The distinction is:
 
-```text
-Move:
-ownership transfers
-
-Copy:
-value is duplicated implicitly
+```mermaid
+flowchart TD
+    M["Move"] --> T1["ownership transfers"]
+    C["Copy"] --> T2["value is duplicated implicitly"]
 ```
 
 Primitive types such as integers, booleans, and characters are commonly `Copy`.
@@ -200,19 +277,21 @@ let b = a.clone();
 
 Now:
 
-```text
-a ──────> allocation A
-b ──────> allocation B
+```mermaid
+flowchart LR
+    a["a"] --> allocA["allocation A"]
+    b["b"] --> allocB["allocation B"]
 ```
 
 Unlike a move, cloning can require an actual allocation and data copy.
 
 Therefore:
 
-```text
-Copy  → implicit duplication
-Clone → explicit duplication
-Move  → ownership transfer
+```mermaid
+flowchart TD
+    COPY["Copy"] --> IMPLICIT["implicit duplication"]
+    CLONE["Clone"] --> EXPLICIT["explicit duplication"]
+    MOVE["Move"] --> TRANSFER["ownership transfer"]
 ```
 
 These are fundamentally different operations.
@@ -221,29 +300,40 @@ These are fundamentally different operations.
 
 ## 7. Drop
 
-When an owner goes out of scope, Rust automatically calls `Drop`.
+When an owner goes out of scope, Rust automatically **drops the value**.
 
 ```rust
 {
     let name = String::from("Alice");
-} // name is dropped here
+
+} // name goes out of scope
 ```
 
 Conceptually:
 
-```text
-create
-  ↓
-own
-  ↓
-use
-  ↓
-scope ends
-  ↓
-drop
+```mermaid
+flowchart TD
+    create["create String"]
+    owner["name owns String"]
+    resource["heap allocation<br/>“Alice”"]
+    scope["scope ends"]
+    drop["String::drop"]
+    cleanup["heap allocation<br/>released"]
+
+    create --> owner
+    owner --> resource
+    owner --> scope
+    scope --> drop
+    drop --> cleanup
 ```
 
-This is the foundation of **RAII** in Rust.
+The important relationship is:
+
+> **When the owner goes out of scope, the owned value is dropped.**
+
+Dropping a value may release the resources associated with it.
+
+This is the foundation of **RAII (Resource Acquisition Is Initialization)** in Rust.
 
 Resources such as:
 
@@ -293,9 +383,10 @@ let reference = &name;
 
 Ownership remains:
 
-```text
-name ──────owns──────> String
-reference ──borrows──> String
+```mermaid
+flowchart LR
+    name["name"] --> owner["owns String"]
+    reference["reference"] --> borrow["borrows String"]
 ```
 
 The reference does not destroy the value.
@@ -318,11 +409,12 @@ let c = &name;
 
 Multiple shared references are allowed.
 
-```text
-        ┌── &name
-        ├── &name
-String ─┼── &name
-        └── owner
+```mermaid
+flowchart LR
+    str["String"] --> owner["owner"]
+    str --> a["&name"]
+    str --> b["&name"]
+    str --> c["&name"]
 ```
 
 The rule is:
@@ -344,10 +436,10 @@ reference.push_str(" Smith");
 
 A mutable borrow provides exclusive access.
 
-```text
-        ┌── &mut T
-String ─┤
-        └── owner
+```mermaid
+flowchart LR
+    str["String"] --> owner["owner"]
+    str --> mutref["&mut T"]
 ```
 
 The rule is:
@@ -362,17 +454,17 @@ While a mutable reference is active, incompatible accesses are prohibited.
 
 The core borrowing rule can be expressed as:
 
-```text
-many &T
-    XOR
-one &mut T
+```mermaid
+flowchart TD
+    many["many &T"] --> xor["XOR"]
+    one["one &mut T"] --> xor
 ```
 
 Not simultaneously.
 
 That means:
 
-```text
+```rust
 &value
 &value
 &value
@@ -382,7 +474,7 @@ is valid.
 
 And:
 
-```text
+```rust
 &mut value
 ```
 
@@ -390,7 +482,7 @@ is valid.
 
 But:
 
-```text
+```rust
 &value
 &mut value
 ```
@@ -435,10 +527,11 @@ inspect(&name);
 
 The distinction is fundamental:
 
-```text
-T       → ownership
-&T      → shared access
-&mut T  → exclusive access
+```mermaid
+flowchart TD
+    T["T"] --> OWN["ownership"]
+    ST["&T"] --> B["shared access"]
+    MT["&mut T"] --> E["exclusive access"]
 ```
 
 ---
@@ -511,13 +604,10 @@ let value = create();
 
 Conceptually:
 
-```text
-create()
-   │
-   └── creates value
-          │
-          ▼
-       caller owns it
+```mermaid
+flowchart LR
+    create["create()"] --> val["creates value"]
+    val --> caller["caller owns it"]
 ```
 
 Likewise:
@@ -551,14 +641,10 @@ a.into()
 
 Conceptually:
 
-```text
-a
-│
-└── into()
-      │
-      └── ownership consumed
-              ↓
-          new value
+```mermaid
+flowchart LR
+    a["a"] --> into["into()"]
+    into --> new["new value"]
 ```
 
 This is different from borrowing methods such as:
@@ -584,21 +670,21 @@ let old = value.take();
 
 Afterward:
 
-```text
-value → None
-old   → Some("hello")
+```mermaid
+flowchart LR
+    field["field"] --> old["old value -> caller"]
+    field --> replacement["replacement -> Default"]
 ```
 
 This is useful when ownership must be extracted from a field without moving the entire containing object.
 
 Conceptually:
 
-```text
-field
-  │
-  ├── old value → caller
-  │
-  └── replacement → Default
+```mermaid
+flowchart TD
+    field["field"] --> old["old value"]
+    field --> default["Default"]
+    old --> caller["caller"]
 ```
 
 ---
@@ -615,9 +701,10 @@ let old = std::mem::take(&mut value);
 
 Afterward:
 
-```text
-old   → [1, 2, 3]
-value → []
+```mermaid
+flowchart LR
+    old["old"] --> arr["[1, 2, 3]"]
+    value["value"] --> empty["[]"]
 ```
 
 It requires:
@@ -628,9 +715,10 @@ T: Default
 
 The operation is essentially:
 
-```text
-replace value with T::default()
-return old value
+```mermaid
+flowchart TD
+    val["value"] --> default["T::default()"]
+    val --> old["return old value"]
 ```
 
 ---
@@ -650,18 +738,18 @@ let old = std::mem::replace(
 
 Result:
 
-```text
-old     → "old"
-value   → "new"
+```mermaid
+flowchart LR
+    old["old"] --> oldv["\"old\""]
+    value["value"] --> newv["\"new\""]
 ```
 
 The important ownership pattern is:
 
-```text
-&mut value
-     │
-     ├── extract old ownership
-     └── install new ownership
+```mermaid
+flowchart LR
+    mutref["&mut value"] --> extract["extract old ownership"]
+    mutref --> install["install new ownership"]
 ```
 
 This is particularly useful when working with struct fields.
@@ -682,13 +770,10 @@ The `Option` is consumed and the inner `String` is returned.
 
 Conceptually:
 
-```text
-Option<String>
-      │
-   unwrap()
-      │
-      ▼
-   String
+```mermaid
+flowchart LR
+    opt["Option<String>"] --> unwrap["unwrap()"]
+    unwrap --> owned["String"]
 ```
 
 `unwrap()` is therefore an **ownership-consuming operation**.
@@ -711,14 +796,12 @@ The elements are moved out of the collection.
 
 Conceptually:
 
-```text
-Vec
-│
-├── element → iterator
-├── element → iterator
-└── element → iterator
-
-Vec becomes empty
+```mermaid
+flowchart LR
+    vec["Vec"] --> e1["element -> iterator"]
+    vec --> e2["element -> iterator"]
+    vec --> e3["element -> iterator"]
+    vec --> empty["Vec becomes empty"]
 ```
 
 This is different from:
@@ -743,12 +826,11 @@ for value in values.iter() {
 
 Conceptually:
 
-```text
-Vec<T>
-  │
-  ├── &T
-  ├── &T
-  └── &T
+```mermaid
+flowchart LR
+    vec["Vec<T>"] --> r1["&T"]
+    vec --> r2["&T"]
+    vec --> r3["&T"]
 ```
 
 Nothing is moved out.
@@ -767,12 +849,11 @@ for value in values.iter_mut() {
 
 Conceptually:
 
-```text
-Vec<T>
-  │
-  ├── &mut T
-  ├── &mut T
-  └── &mut T
+```mermaid
+flowchart LR
+    vec["Vec<T>"] --> m1["&mut T"]
+    vec --> m2["&mut T"]
+    vec --> m3["&mut T"]
 ```
 
 The collection retains ownership.
@@ -795,10 +876,11 @@ for value in values.into_iter() {
 
 Conceptually:
 
-```text
-iter()       → &T
-iter_mut()   → &mut T
-into_iter()  → T
+```mermaid
+flowchart TD
+    iter["iter()"] --> shared["&T"]
+    iter_mut["iter_mut()"] --> unique["&mut T"]
+    into_iter["into_iter()"] --> owned["T"]
 ```
 
 This distinction is one of the most useful ownership patterns in Rust.
@@ -819,9 +901,9 @@ let reference = value.as_ref();
 
 Now:
 
-```text
-value     → owns String
-reference → borrows String
+```mermaid
+flowchart LR
+    value["value -> owns String"] --> ref["reference -> borrows String"]
 ```
 
 The original container remains usable.
@@ -838,6 +920,12 @@ let mut value = Some(String::from("hello"));
 if let Some(value) = value.as_mut() {
     value.push('!');
 }
+```
+
+```mermaid
+flowchart LR
+    option["Option<String>"] --> owner["owner"]
+    option --> ref["&mut String"]
 ```
 
 The `Option` remains the owner.
@@ -860,12 +948,10 @@ let reference: Option<&str> = value.as_deref();
 
 Conceptually:
 
-```text
-Option<String>
-      │
-   as_deref()
-      ▼
-Option<&str>
+```mermaid
+flowchart LR
+    owner["Option<String>"] --> deref["as_deref()"]
+    deref --> borrowed["Option<&str>"]
 ```
 
 This is particularly useful when APIs expect borrowed string slices instead of owned `String`s.
@@ -890,12 +976,10 @@ It expresses a conversion from an owned representation into a borrowed represent
 
 The broader concept is:
 
-```text
-owned representation
-        │
-      borrow
-        ▼
-borrowed representation
+```mermaid
+flowchart LR
+    owned["owned representation"] --> borrow["borrow()"]
+    borrow --> borrowed["borrowed representation"]
 ```
 
 ---
@@ -926,10 +1010,10 @@ inspect(&value);
 
 Rust can automatically convert:
 
-```text
-&String
-  ↓ deref coercion
-&str
+```mermaid
+flowchart LR
+    s1["&String"] --> coercion["deref coercion"]
+    coercion --> s2["&str"]
 ```
 
 ---
@@ -963,12 +1047,10 @@ let owned: String = slice.to_owned();
 
 A useful mental distinction:
 
-```text
-Clone
-  → duplicate this value
-
-ToOwned
-  → create the owned form of this borrowed form
+```mermaid
+flowchart TD
+    clone["Clone"] --> dup["duplicate this value"]
+    to_owned["ToOwned"] --> owned["create the owned form of a borrowed form"]
 ```
 
 ---
@@ -994,12 +1076,10 @@ It creates owned data.
 
 Thus:
 
-```text
-&str
- │
- └── to_string()
-          ↓
-       String
+```mermaid
+flowchart LR
+    s["&str"] --> to_string["to_string()"]
+    to_string --> owned["String"]
 ```
 
 ---
@@ -1016,12 +1096,10 @@ let owned = values.to_vec();
 
 Conceptually:
 
-```text
-&[T]
- │
- └── to_vec()
-       ↓
-     Vec<T>
+```mermaid
+flowchart LR
+    slice["&[T]"] --> vec["to_vec()"]
+    vec --> owned["Vec<T>"]
 ```
 
 The resulting vector owns its elements.
@@ -1043,12 +1121,10 @@ let b = Arc::clone(&value);
 
 Conceptually:
 
-```text
-             ┌── Arc
-             │
-allocation ──┼── Arc
-             │
-             └── Arc
+```mermaid
+flowchart LR
+    alloc["allocation"] --> a["Arc"]
+    alloc --> b["Arc"]
 ```
 
 The allocation remains alive until the final `Arc` owner disappears.
@@ -1066,10 +1142,10 @@ let b = Arc::clone(&a);
 
 Both point to the same allocation.
 
-```text
-a ──┐
-    ├──> T
-b ──┘
+```mermaid
+flowchart LR
+    a["a"] --> shared["T"]
+    b["b"] --> shared
 ```
 
 Only the reference count is incremented.
@@ -1098,12 +1174,10 @@ This succeeds only when there is a single strong owner.
 
 Conceptually:
 
-```text
-Arc<T>
- │
- ├── one owner → T
- │
- └── many owners → cannot unwrap
+```mermaid
+flowchart TD
+    arc["Arc<T>"] --> one["one owner -> T"]
+    arc --> many["many owners -> cannot unwrap"]
 ```
 
 This expresses:
@@ -1122,10 +1196,9 @@ let value = Box::new(String::from("hello"));
 
 Conceptually:
 
-```text
-Box
- │
- └────owns────> heap allocation
+```mermaid
+flowchart LR
+    box["Box"] --> heap["owns heap allocation"]
 ```
 
 Unlike `Arc`, a `Box` has a single owner.
@@ -1138,12 +1211,10 @@ Unlike `Arc`, a `Box` has a single owner.
 
 Conceptually:
 
-```text
-Box<T>
-  │
-  └── into_inner()
-          ↓
-          T
+```mermaid
+flowchart LR
+    box["Box<T>"] --> into["into_inner()"]
+    into --> owned["T"]
 ```
 
 Ownership moves from the heap allocation into the returned value.
@@ -1162,12 +1233,10 @@ let reference: &'static String = Box::leak(value);
 
 Conceptually:
 
-```text
-Box<T>
-  │
-  └── leak()
-        ↓
-      &'static T
+```mermaid
+flowchart LR
+    box["Box<T>"] --> leak["leak()"]
+    leak --> staticref["&'static T"]
 ```
 
 The allocation is no longer automatically reclaimed through the original `Box`.
@@ -1190,9 +1259,11 @@ fn inspect<'a>(value: &'a String) -> &'a String {
 
 It says:
 
-```text
-the returned reference cannot outlive
-the reference it came from
+```mermaid
+flowchart LR
+    in["input reference"] --> a["'a"]
+    out["output reference"] --> a
+    a --> rule["cannot outlive source reference"]
 ```
 
 Lifetimes do not normally represent how long the owned value itself exists.
@@ -1213,8 +1284,9 @@ String literals are `'static` because they are embedded in the program's binary.
 
 But:
 
-```text
-'static
+```mermaid
+flowchart TD
+    static["'static"] --> meaning["reference valid for entire program lifetime"]
 ```
 
 does **not** simply mean:
@@ -1259,24 +1331,14 @@ Explicit lifetime annotations are primarily necessary when Rust needs help under
 
 The cleanest distinction is:
 
-```text
-OWNERSHIP
-    "I am responsible for this value."
-
-BORROWING
-    "I temporarily have access to this value."
-
-MOVE
-    "I transfer responsibility."
-
-CLONE
-    "I create another value."
-
-DROP
-    "I finish responsibility."
-
-REFERENCE
-    "I have access without responsibility."
+```mermaid
+flowchart TD
+    ownership["OWNERSHIP"] --> text1["I am responsible for this value."]
+    borrowing["BORROWING"] --> text2["I temporarily have access to this value."]
+    move["MOVE"] --> text3["I transfer responsibility."]
+    clone["CLONE"] --> text4["I create another value."]
+    drop["DROP"] --> text5["I finish responsibility."]
+    ref["REFERENCE"] --> text6["I have access without responsibility."]
 ```
 
 ---
@@ -1297,8 +1359,9 @@ fn consume(self)
 
 Think:
 
-```text
-ownership → method
+```mermaid
+flowchart LR
+    self["self"] --> method["ownership -> method"]
 ```
 
 Examples:
@@ -1319,10 +1382,9 @@ fn inspect(&self)
 
 Think:
 
-```text
-ownership
-    ↓
-temporary read access
+```mermaid
+flowchart LR
+    ownership["ownership"] --> read["temporary read access"]
 ```
 
 Examples:
@@ -1343,10 +1405,9 @@ fn modify(&mut self)
 
 Think:
 
-```text
-ownership
-    ↓
-temporary exclusive access
+```mermaid
+flowchart LR
+    ownership["ownership"] --> write["temporary exclusive access"]
 ```
 
 Examples:
@@ -1362,29 +1423,23 @@ This is one of the most powerful ways to understand Rust APIs.
 
 ## 44. A Method Receiver Cheat Sheet
 
-```text
-self
-│
-└── consumes ownership
-
-&self
-│
-└── shared borrow
-
-&mut self
-│
-└── mutable borrow
+```mermaid
+flowchart TD
+    self["self"] --> consume["consumes ownership"]
+    ref["&self"] --> shared["shared borrow"]
+    mutref["&mut self"] --> mutable["mutable borrow"]
 ```
 
 And therefore:
 
-```text
-foo.into()       → likely consumes foo
-foo.as_ref()     → likely borrows foo
-foo.as_mut()     → likely mutably borrows foo
-foo.iter()       → borrows elements
-foo.iter_mut()   → mutably borrows elements
-foo.into_iter()  → consumes foo
+```mermaid
+flowchart TD
+    a["foo.into()"] --> cons["likely consumes foo"]
+    b["foo.as_ref()"] --> sh["likely borrows foo"]
+    c["foo.as_mut()"] --> mut["likely mutably borrows foo"]
+    d["foo.iter()"] --> borrow["borrows elements"]
+    e["foo.iter_mut()"] --> mutel["mutably borrows elements"]
+    f["foo.into_iter()"] --> own["consumes foo"]
 ```
 
 ---
@@ -1419,12 +1474,10 @@ fn take_value(state: &mut State) -> String {
 
 The pattern is:
 
-```text
-borrow structure mutably
-        ↓
-temporarily own field
-        ↓
-leave valid replacement behind
+```mermaid
+flowchart TD
+    borrow["borrow structure mutably"] --> own["temporarily own field"]
+    own --> valid["leave valid replacement behind"]
 ```
 
 This pattern appears constantly in real Rust code.
@@ -1444,11 +1497,10 @@ let mut values = vec![
 
 The vector owns its elements:
 
-```text
-Vec
- │
- ├── owns String
- └── owns String
+```mermaid
+flowchart LR
+    vec["Vec"] --> s1["owns String"]
+    vec --> s2["owns String"]
 ```
 
 Then:
@@ -1489,12 +1541,11 @@ String
 
 The entire distinction is:
 
-```text
-           access to elements
-
-iter()      → borrow
-iter_mut()  → mutable borrow
-into_iter() → ownership
+```mermaid
+flowchart TD
+    iter["iter()"] --> borrow["borrow"]
+    iter_mut["iter_mut()"] --> mutborrow["mutable borrow"]
+    into_iter["into_iter()"] --> own["ownership"]
 ```
 
 ---
@@ -1518,21 +1569,18 @@ accesses the value behind the reference.
 
 Conceptually:
 
-```text
-reference
-    │
-    ▼
-  value
+```mermaid
+flowchart LR
+    reference["reference"] --> value["value"]
 ```
 
 `&` creates a reference.
 
 `*` dereferences one.
 
-```text
-&T
- │
- └── * → T
+```mermaid
+flowchart LR
+    t["&T"] --> d["* -> T"]
 ```
 
 In expressions, Rust automatically inserts some borrowing and dereferencing through coercion and method lookup.
@@ -1543,24 +1591,13 @@ In expressions, Rust automatically inserts some borrowing and dereferencing thro
 
 Rust's pointer types encode different ownership models.
 
-```text
-Box<T>
-  → one owner
-  → heap allocation
-
-Rc<T>
-  → shared ownership
-  → single-threaded
-
-Arc<T>
-  → shared ownership
-  → thread-safe reference counting
-
-& T
-  → borrowed access
-
-&mut T
-  → exclusive borrowed access
+```mermaid
+flowchart TD
+    box["Box<T>"] --> boxo["one owner"]
+    rc["Rc<T>"] --> rco["shared ownership, single-threaded"]
+    arc["Arc<T>"] --> arcc["shared ownership, thread-safe"]
+    shared["&T"] --> sh["borrowed access"]
+    mut["&mut T"] --> mu["exclusive borrowed access"]
 ```
 
 These are not merely different pointer implementations.
@@ -1587,19 +1624,20 @@ let b = Arc::clone(&a);
 
 Conceptually:
 
-```text
-Rc<T> / Arc<T>
-      │
-      ├── owner
-      ├── owner
-      └── shared T
+```mermaid
+flowchart LR
+    rc["Rc<T> / Arc<T>"] --> owner1["owner"]
+    rc --> owner2["owner"]
+    owner1 --> shared["shared T"]
+    owner2 --> shared
 ```
 
 The difference is primarily the environment in which ownership is safe:
 
-```text
-Rc  → single-threaded
-Arc → thread-safe sharing
+```mermaid
+flowchart TD
+    rc["Rc"] --> single["single-threaded"]
+    arc["Arc"] --> safe["thread-safe sharing"]
 ```
 
 ---
@@ -1608,47 +1646,40 @@ Arc → thread-safe sharing
 
 A useful vocabulary map:
 
-```text
-MOVE
-  into()
-  unwrap()
-  into_iter()
-  drain()
-  Box::into_inner()
-  Arc::try_unwrap()
+```mermaid
+flowchart TD
+    move["MOVE"] --> m1["into()"]
+    move --> m2["unwrap()"]
+    move --> m3["into_iter()"]
+    move --> m4["drain()"]
+    move --> m5["Box::into_inner()"]
+    move --> m6["Arc::try_unwrap()"]
 
-COPY
-  implicit for Copy types
+    copy["COPY"] --> c1["implicit for Copy types"]
 
-CLONE
-  clone()
-  Rc::clone()
-  Arc::clone()
+    clone["CLONE"] --> cl1["clone()"]
+    clone --> cl2["Rc::clone()"]
+    clone --> cl3["Arc::clone()"]
 
-BORROW
-  &value
-  iter()
-  as_ref()
-  borrow()
-  deref()
+    borrow["BORROW"] --> b1["&value"]
+    borrow --> b2["iter()"]
+    borrow --> b3["as_ref()"]
+    borrow --> b4["borrow()"]
+    borrow --> b5["deref()"]
 
-MUTABLY BORROW
-  &mut value
-  iter_mut()
-  as_mut()
+    mutborrow["MUTABLY BORROW"] --> mb1["&mut value"]
+    mutborrow --> mb2["iter_mut()"]
+    mutborrow --> mb3["as_mut()"]
 
-CREATE OWNED VALUE
-  to_owned()
-  to_string()
-  to_vec()
+    create["CREATE OWNED VALUE"] --> cr1["to_owned()"]
+    create --> cr2["to_string()"]
+    create --> cr3["to_vec()"]
 
-REPLACE OWNED VALUE
-  mem::take()
-  mem::replace()
-  Option::take()
+    replace["REPLACE OWNED VALUE"] --> r1["mem::take()"]
+    replace --> r2["mem::replace()"]
+    replace --> r3["Option::take()"]
 
-ESCAPE OWNERSHIP
-  Box::leak()
+    escape["ESCAPE OWNERSHIP"] --> e1["Box::leak()"]
 ```
 
 ---
@@ -1665,20 +1696,19 @@ Ask:
 
 For every operation, classify it:
 
-```text
-Does it...
-
-[ ] Move the value?
-[ ] Copy the value?
-[ ] Clone the value?
-[ ] Borrow the value?
-[ ] Mutably borrow the value?
-[ ] Consume the owner?
-[ ] Extract ownership from somewhere?
-[ ] Create a new owner?
-[ ] Replace an existing value?
-[ ] Extend a reference's lifetime?
-[ ] Drop a value?
+```mermaid
+flowchart TD
+    q["Does it..."] --> m["Move the value?"]
+    q --> c["Copy the value?"]
+    q --> cl["Clone the value?"]
+    q --> b["Borrow the value?"]
+    q --> mb["Mutably borrow the value?"]
+    q --> con["Consume the owner?"]
+    q --> ext["Extract ownership from somewhere?"]
+    q --> new["Create a new owner?"]
+    q --> replace["Replace an existing value?"]
+    q --> life["Extend a reference's lifetime?"]
+    q --> drop["Drop a value?"]
 ```
 
 Once this becomes automatic, much of Rust's syntax becomes predictable.
@@ -1689,25 +1719,23 @@ Once this becomes automatic, much of Rust's syntax becomes predictable.
 
 A value can be understood as moving through this lifecycle:
 
-```text
-                 CREATE
-                    │
-                    ▼
-                OWNERSHIP
-                    │
-          ┌─────────┼─────────┐
-          │         │         │
-        BORROW     MOVE      CLONE
-          │         │         │
-          │         ▼         ▼
-          │      NEW OWNER  NEW VALUE
-          │
-          ├── &T
-          │
-          └── &mut T
-                    │
-                    ▼
-                  DROP
+```mermaid
+flowchart TD
+    create["CREATE"] --> own["OWNERSHIP"]
+    own --> move["MOVE"]
+    own --> borrow["BORROW"]
+    own --> clone["CLONE"]
+
+    borrow --> shared["&T"]
+    borrow --> unique["&mut T"]
+
+    move --> newowner["NEW OWNER"]
+    clone --> newvalue["NEW VALUE"]
+
+    shared --> drop["DROP"]
+    unique --> drop
+    newowner --> drop
+    newvalue --> drop
 ```
 
 The compiler's job is largely to ensure that these transitions are valid.
@@ -1720,28 +1748,31 @@ When confused by Rust ownership, reduce the problem to three questions:
 
 ### 1. Who owns this value?
 
-```text
-variable?
-struct field?
-Box?
-Rc?
-Arc?
+```mermaid
+flowchart TD
+    q1["Who owns this value?"] --> var["variable?"]
+    q1 --> field["struct field?"]
+    q1 --> box["Box?"]
+    q1 --> rc["Rc?"]
+    q1 --> arc["Arc?"]
 ```
 
 ### 2. Who currently has access?
 
-```text
-owner?
-&T?
-&mut T?
+```mermaid
+flowchart TD
+    q2["Who currently has access?"] --> owner["owner?"]
+    q2 --> shared["&T?"]
+    q2 --> mut["&mut T?"]
 ```
 
 ### 3. When does that access end?
 
-```text
-scope?
-last use?
-explicit lifetime relationship?
+```mermaid
+flowchart TD
+    q3["When does that access end?"] --> scope["scope?"]
+    q3 --> last["last use?"]
+    q3 --> lifetime["explicit lifetime relationship?"]
 ```
 
 If you can answer those three questions, most borrow-checker errors become understandable.
@@ -1752,41 +1783,40 @@ If you can answer those three questions, most borrow-checker errors become under
 
 The entire ownership system can be compressed into this:
 
-```text
-                 VALUE
-                   │
-          ┌────────┴────────┐
-          │                 │
-       OWNED              BORROWED
-          │                 │
-     ┌────┴────┐       ┌────┴────┐
-     │         │       │         │
-   unique    shared    &T       &mut T
-     │         │       │         │
-    Box       Rc/Arc   many      one
-     │
-     ▼
-   Drop
+```mermaid
+flowchart TD
+    value["VALUE"] --> owned["OWNED"]
+    value --> borrowed["BORROWED"]
+
+    owned --> unique["unique"]
+    owned --> shared["shared"]
+
+    unique --> box["Box"]
+    shared --> rc["Rc/Arc"]
+
+    borrowed --> ref["&T"]
+    borrowed --> mutref["&mut T"]
+
+    box --> drop["Drop"]
+    rc --> drop
 ```
 
 Or, more simply:
 
-```text
-              Ownership
-                  │
-       ┌──────────┼──────────┐
-       │          │          │
-      Move      Borrow     Clone
-       │          │          │
-       │      ┌───┴───┐      │
-       │      │       │      │
-       │     &T     &mut T   │
-       │      │       │      │
-       │    shared  exclusive│
-       │                      │
-       └──────────┬───────────┘
-                  │
-                 Drop
+```mermaid
+flowchart TD
+    O["Ownership"] --> M["Move"]
+    O --> B["Borrow"]
+    O --> C["Clone"]
+
+    B --> S["&T"]
+    B --> U["&mut T"]
+
+    S --> SH["shared"]
+    U --> EX["exclusive"]
+
+    M --> D["Drop"]
+    C --> D
 ```
 
 > **Rust's ownership system is fundamentally a system for controlling who may access a value, who is responsible for destroying it, and how those responsibilities move over time.**

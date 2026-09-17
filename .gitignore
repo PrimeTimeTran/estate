@@ -1,6 +1,6 @@
 dist/
-tmp/
-target/
+fixtures/
 omit/
-fixtures/
-fixtures/
+private/
+target/
+tmp/

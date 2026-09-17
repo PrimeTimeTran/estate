@@ -35,10 +35,6 @@ impl EventBus {
 	}
 }
 
-/// ## [EventDispatcher]
-///
-/// Dispatcher
-///
 impl<R: Runtime> EventDispatcher<R> {
 	/// ## [EventDispatcher::dispatch]
 	///
@@ -56,8 +52,7 @@ impl<R: Runtime> EventDispatcher<R> {
 
 	/// ## [EventDispatcher::register]
 	///
-	/// Register a handler which listens for events which handles business logic
-	/// work for that specific event.
+	/// Initialize handlers which implement business logic for events.
 	///
 	pub fn register<H>(&mut self, handler: H)
 	where
@@ -95,6 +90,7 @@ impl<R: Runtime> EventDispatcher<R> {
 		}
 	}
 }
+
 impl std::hash::Hash for EventBus {
 	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
 		self.sender.same_channel(&self.sender).hash(state);
@@ -103,7 +99,8 @@ impl std::hash::Hash for EventBus {
 
 /// [EventBus]
 ///
-/// Handles Sending
+/// Enables disparate modules to talk to
+/// each other by sending and receiving messages called events.
 ///
 #[derive(Debug, Clone)]
 pub struct EventBus {
@@ -112,12 +109,13 @@ pub struct EventBus {
 
 /// ## [EventDispatcher]
 ///
-/// Works with an event bus to handle background job system.
+/// Component that manages and triggers notifications—called
+/// events—when specific actions or state changes occur in an application.
 ///
 /// ### Methods
 ///
-/// - [new][EventDispatcher::new]
-/// - [register][EventDispatcher::register]
+/// - [new][EventDispatcher::new]: Initialize a new dispatcher (used to bind a dispatcher to a specific domain).
+/// - [register][EventDispatcher::register]: Binds a handler to a dispatcher
 /// - [dispatch][EventDispatcher::dispatch]
 /// - [run][EventDispatcher::run]
 ///

@@ -116,7 +116,7 @@ pub struct BroadcastReceiver<T> {
 }
 
 impl ReceivesEvents for BroadcastReceiver<e::Event> {
-fn try_recv(&mut self) -> Option<e::Event> {
-		self.try_recv().ok()
+	fn try_recv(&mut self) -> Option<e::Event> {
+		self.rx.try_recv().ok()
 	}
 }

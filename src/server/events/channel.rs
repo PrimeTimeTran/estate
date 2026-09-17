@@ -35,7 +35,15 @@ impl<T> EventReceiver<T> {
 	}
 
 	pub fn try_recv(&mut self) -> Result<T, TryRecvError> {
-		self.rx.try_recv()
+		#[cfg(not(target_arch = "wasm32"))]
+		{
+			self.rx.try_recv()
+		}
+
+		#[cfg(target_arch = "wasm32")]
+		{
+			self.rx.try_recv().ok_or(TryRecvError::Empty)
+		}
 	}
 }
 
@@ -61,16 +69,6 @@ pub struct EventReceiver<T> {
 	rx: TokioReceiver<T>,
 	// rx: tokio::sync::broadcast::Receiver<T>,
 }
-
-// pub struct NativeEventReceiver {
-// 	rx: tokio::sync::broadcast::Receiver<e::Event>,
-// }
-
-// impl NativeEventReceiver {
-// 	pub fn try_recv(&mut self) -> Result<e::Event, tokio::sync::broadcast::error::TryRecvError> {
-// 		self.rx.try_recv()
-// 	}
-// }
 
 impl<T: Clone> BroadcastReceiver<T> {
 	pub fn new(rx: tokio::sync::broadcast::Receiver<T>) -> Self {

@@ -1,4 +1,5 @@
 #![allow(warnings)]
+#![feature(type_changing_struct_update)]
 // https://www.youtube.com/watch?v=3biW5NkNnrk
 
 use std::{
@@ -181,7 +182,9 @@ mod impls {
 			self.martial_status = e::RelationshipStatus::Married;
 			self
 		}
+
 		pub fn in_ctx<NC>(self, context: NC) -> s::Person<NC, S> {
+			// ~1. Stable
 			s::Person {
 				context,
 				state: self.state,
@@ -191,6 +194,10 @@ mod impls {
 				children: self.children,
 				martial_status: self.martial_status,
 			}
+			// ~2. Unstable Nightly
+			// #![feature(type_changing_struct_update)]
+			// https://github.com/rust-lang/rust/issues/86555
+			// s::Person { context, ..self }
 		}
 		pub fn in_state<NS>(self, state: NS) -> s::Person<C, NS> {
 			s::Person {

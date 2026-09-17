@@ -11,7 +11,6 @@
 ///
 use crate::prelude::*;
 
-
 impl EventReceiver for NativeEventReceiver {
 	fn try_recv(&mut self) -> Option<e::Event> {
 		self.rx.try_recv().ok()
