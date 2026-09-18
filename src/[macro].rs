@@ -3,6 +3,11 @@
 //! The macros used throughout our crate which are as generic as can be made
 //!
 
+#[macro_export]
+macro_rules! doc {
+	($text:expr) => {{ $text }};
+}
+
 /// ## [awe!]
 ///
 /// Acknowledge your awe are the state of affairs.

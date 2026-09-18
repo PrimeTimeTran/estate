@@ -55,7 +55,7 @@ async fn run() -> anyhow::Result<()> {
 	let backend = env::var("RUNNER").unwrap_or_else(|_| "native".into());
 	tracing::info!("Language {:?}", language);
 	tracing::info!("Execution environment {:?}", backend);
-	let problem = Problem::load("two-sum", language).await?;
+	let problem = Problems::load("two-sum", language).await?;
 	// let submission = Submission::for_success(&problem, language);
 	// let input = RunInput::new(submission.source, &problem)?;
 	let submission = Submission::for_success(&problem, language)?;
@@ -124,7 +124,7 @@ impl Run {
 		&self,
 		mut results: Vec<TestResult>,
 		runner: Box<dyn Runner>,
-		problem: &Problem,
+		problem: &Problems,
 		language: Language,
 	) -> Result<Vec<TestResult>> {
 		for (index, test_case) in problem.test_cases.iter().enumerate() {
@@ -498,13 +498,13 @@ struct ContainerResult {
 }
 
 #[derive(Clone, Debug)]
-pub struct Problem {
+pub struct Problems {
 	pub id: i64,
 	pub slug: String,
 	pub test_cases: Vec<TestCase>,
 }
 
-impl Problem {
+impl Problems {
 	pub async fn load(slug: impl Into<String>, language: Language) -> anyhow::Result<Self> {
 		let slug = slug.into();
 
@@ -570,7 +570,7 @@ pub struct RunInput {
 }
 
 impl RunInput {
-	pub fn new(solution: String, problem: &Problem) -> anyhow::Result<Self> {
+	pub fn new(solution: String, problem: &Problems) -> anyhow::Result<Self> {
 		anyhow::ensure!(
 			!problem.test_cases.is_empty(),
 			"cannot run solution without test cases"
@@ -594,23 +594,23 @@ pub struct TestResult {
 
 pub struct Submission<'p> {
 	pub id: Uuid,
-	pub problem: &'p Problem,
+	pub problem: &'p Problems,
 	pub source: String,
 }
 
 impl<'p> Submission<'p> {
-	pub fn new(problem: &'p Problem, source: impl Into<String>) -> Self {
+	pub fn new(problem: &'p Problems, source: impl Into<String>) -> Self {
 		Self {
 			id: Uuid::new_v4(),
 			problem,
 			source: source.into(),
 		}
 	}
-	pub fn for_success(problem: &'p Problem, language: Language) -> anyhow::Result<Self> {
+	pub fn for_success(problem: &'p Problems, language: Language) -> anyhow::Result<Self> {
 		let source = problem.success_source(language)?;
 		Ok(Self::new(problem, source))
 	}
-	pub fn for_failure(problem: &'p Problem, language: Language) -> Self {
+	pub fn for_failure(problem: &'p Problems, language: Language) -> Self {
 		Self::new(
 			problem,
 			match language {
@@ -634,7 +634,7 @@ throw new Error("intentional failure");
 			},
 		)
 	}
-	pub fn for_wrong_answer(problem: &'p Problem, language: Language) -> Self {
+	pub fn for_wrong_answer(problem: &'p Problems, language: Language) -> Self {
 		Self::new(
 			problem,
 			match language {

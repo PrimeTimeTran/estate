@@ -120,7 +120,7 @@ impl<C> BottomPanel<C> {
 		}
 	}
 }
-impl<C> Sidebar<C> {
+impl<C> ProblemSidebar<C> {
 	pub fn new() -> Self {
 		Self {
 			active_tab: Tab::Problem,
@@ -130,7 +130,7 @@ impl<C> Sidebar<C> {
 		}
 	}
 }
-impl<C> Sidebar<C> {
+impl<C> ProblemSidebar<C> {
 	fn draw_solutions(&self, ui: &mut Ui) {
 		ui.heading("Solutions");
 		if self.solutions.is_empty() {
@@ -522,7 +522,7 @@ where
 	fn update(&mut self, _ctx: &mut AppContext<'_, C, S>) {}
 	fn event(&mut self, _event: &e::Event, _ctx: &mut AppContext<'_, C, S>) {}
 }
-impl<C, S> t::View<C, S> for Sidebar<C>
+impl<C, S> t::View<C, S> for ProblemSidebar<C>
 where
 	C: Ctx,
 {
@@ -560,7 +560,7 @@ pub struct BottomPanel<C> {
 	_marker: std::marker::PhantomData<C>,
 }
 #[derive(Debug, Default)]
-pub struct Sidebar<C> {
+pub struct ProblemSidebar<C> {
 	active_tab: Tab,
 	solutions: Vec<StoredSolution>,
 	submissions: Vec<StoredSubmission>,

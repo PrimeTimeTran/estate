@@ -81,14 +81,16 @@
 //! The module structure is intentionally subject to change while the daemon
 //! architecture is being refined. Consumers should prefer the re-exported
 //! API where possible.
-// pub mod bootstrap;
-// pub mod daemon_config;
+pub use crate::prelude::*;
+
 pub mod initialize;
-pub mod lint;
+
+#[path = "./lint.rs"]
+pub mod linter;
 pub mod projection;
 pub mod shell;
 
-pub use lint::*;
+pub use linter::*;
 pub use shell::*;
 
 use cli::prelude::Context as CliContext;

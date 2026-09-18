@@ -28,7 +28,7 @@ where
 	// without a garbage collector.
 	pub fn new() -> Self {
 		let main = Main::new();
-		let dock_left = problem_screen::Sidebar::new();
+		let dock_left = problem_screen::ProblemSidebar::new();
 		let bottom_panel = BottomPanel::new();
 		Self {
 			main: Panel::from_config(main, Region::content(), &PanelState::new(true, 0.0)),

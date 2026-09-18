@@ -49,7 +49,6 @@ pub mod service;
 pub mod share;
 #[path = "./[struct].rs"]
 pub mod structs;
-pub mod tool;
 #[path = "./[trait].rs"]
 pub mod traits;
 pub mod ui;
@@ -60,10 +59,10 @@ pub use crate::{
 	ui::*,
 };
 
-#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+#[cfg(not(target_arch = "wasm32"))]
 pub mod native;
 
-#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+#[cfg(not(target_arch = "wasm32"))]
 pub mod server;
 
 #[cfg(all(feature = "web", target_arch = "wasm32"))]

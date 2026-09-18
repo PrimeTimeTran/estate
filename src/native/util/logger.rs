@@ -1,4 +1,9 @@
-use crate::{native::resolver::engine_data_dir, prelude::*};
+use crate::prelude::*;
+
+// #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+#[cfg(not(target_arch = "wasm32"))]
+pub use crate::native;
+
 /// Sorting order of VSCode
 ///
 /// Enum > Macros > Functions > Impl > Structs
@@ -54,7 +59,7 @@ pub fn init_logging(config: &LogConfig) -> Result<()> {
 	// 	.with_target(true)
 	// 	.with_thread_ids(false)
 	let file = if config.file.enabled {
-		let path = engine_data_dir()?.join("estate.log");
+		let path = crate::native::resolver::engine_data_dir()?.join("estate.log");
 		let writer = OpenOptions::new().create(true).append(true).open(path)?;
 		Some(
 			fmt::layer()

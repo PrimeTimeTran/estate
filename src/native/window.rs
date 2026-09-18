@@ -2,7 +2,7 @@ use crate::{
 	doc,
 	prelude::anyhow::anyhow,
 	prelude::*,
-	ui::{self, prelude as gui},
+	ui::{self, prelude_ui as gui},
 };
 
 use objc2_app_kit::{NSApplication, NSApplicationActivationPolicy};

@@ -11,9 +11,9 @@ use crate::prelude::*;
 pub mod events;
 pub mod fs;
 pub mod json;
-pub mod native;
 pub mod problem;
 pub mod repo;
+pub mod services;
 pub mod submission;
 
 pub use crate::proto::{

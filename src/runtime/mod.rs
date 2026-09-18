@@ -1,9 +1,3 @@
-#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-pub mod native;
-
-#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-pub use native::*;
-
 use crate::prelude::*;
 
 #[derive(Debug)]

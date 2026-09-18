@@ -7,6 +7,8 @@
 //! - [Clock]:
 //! - [Provide]:
 //!
+#[path = "./task.rs"]
+pub mod app_task;
 /// Generic traits defined in ./src/trait module
 /// Platform implementations for native, mobile, web should exist in their own respective namespaces
 ///
@@ -17,7 +19,6 @@ pub mod context;
 pub mod event;
 pub mod host;
 pub mod job;
-pub mod task;
 pub mod worker;
 
 #[path = "./[prelude].rs"]

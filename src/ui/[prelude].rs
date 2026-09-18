@@ -28,10 +28,11 @@ pub use winit::{
 };
 
 pub use crate::{
+	model::common::{Difficulty, Language},
 	prelude::*,
 	proto::{types::*, *},
 	traits::Runtime,
-		ui::{
+	ui::{
 		layout::*,
 		panel::*,
 		primitive::*,
@@ -41,4 +42,3 @@ pub use crate::{
 		view::*,
 	},
 };
-		
