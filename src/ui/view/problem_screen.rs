@@ -258,11 +258,11 @@ impl<C, S> Screen<C, S> for ProblemScreen<C>
 where
 	C: Ctx,
 {
-	fn configure(&mut self, layout: &mut Layout<C, S>, _ctx: &mut AppContext<'_, C, S>) {
+	fn configure(&mut self, _layout: &mut Layout<C, S>, _ctx: &mut AppContext<'_, C, S>) {
 		tracing::info!("Problem Screen configure")
 		// Configure the regions this screen uses.
 	}
-	fn update(&mut self, layout: &mut Layout<C, S>, _ctx: &mut AppContext<'_, C, S>) {
+	fn update(&mut self, _layout: &mut Layout<C, S>, _ctx: &mut AppContext<'_, C, S>) {
 		tracing::info!("Problem Screen update")
 	}
 	fn event(
@@ -279,13 +279,13 @@ impl<C, S> t::View<C, S> for ProblemScreen<C>
 where
 	C: Ctx,
 {
-	fn draw(&mut self, ui: &mut Ui, _ctx: &mut AppContext<'_, C, S>) {
+	fn draw(&mut self, _ui: &mut Ui, _ctx: &mut AppContext<'_, C, S>) {
 		tracing::info!("Problem Screen view trait draw")
 	}
 	fn update(&mut self, _ctx: &mut AppContext<'_, C, S>) {
 		tracing::info!("Problem Screen view trait update")
 	}
-	fn event(&mut self, event: &e::Event, _ctx: &mut AppContext<'_, C, S>) {
+	fn event(&mut self, _event: &e::Event, _ctx: &mut AppContext<'_, C, S>) {
 		tracing::info!("Problem Screen view trait event")
 	}
 }

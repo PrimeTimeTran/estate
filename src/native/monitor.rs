@@ -1,6 +1,6 @@
 use notify::{Event, EventKind};
 
-use crate::{app::*, prelude::*};
+use crate::prelude::*;
 
 pub trait Monitor {
 	fn watch(&mut self);
@@ -97,7 +97,7 @@ pub struct NativeMonitor {
 impl NativeMonitor {
 	pub fn new() -> Result<Self> {
 		let (tx, rx) = mpsc::channel(1);
-		let mut watcher = RecommendedWatcher::new(
+		let watcher = RecommendedWatcher::new(
 			move |result: Result<Event, notify::Error>| {
 				let Ok(event) = result else {
 					return;

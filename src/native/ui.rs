@@ -1,4 +1,3 @@
-// use crate::{app::app_state::EstateState, e, prelude::*};
 use crate::prelude::*;
 
 // The first concrete implementation of Veable is here.
@@ -18,18 +17,18 @@ impl<C, S> Screen<C, S> for EguiVeable
 where
 	C: Ctx,
 {
-	fn configure(&mut self, layout: &mut Layout<C, S>, _ctx: &mut AppContext<'_, C, S>) {
+	fn configure(&mut self, _layout: &mut Layout<C, S>, _ctx: &mut AppContext<'_, C, S>) {
 		todo!("")
 	}
 
-	fn update(&mut self, layout: &mut Layout<C, S>, _ctx: &mut AppContext<'_, C, S>) {
+	fn update(&mut self, _layout: &mut Layout<C, S>, _ctx: &mut AppContext<'_, C, S>) {
 		todo!("")
 	}
 
 	fn event(
 		&mut self,
-		event: &e::Event,
-		layout: &mut Layout<C, S>,
+		_event: &e::Event,
+		_layout: &mut Layout<C, S>,
 		_ctx: &mut AppContext<'_, C, S>,
 	) {
 		todo!("")
@@ -329,7 +328,7 @@ impl<C, S> Screen<C, S> for Sidebar
 where
 	C: Ctx,
 {
-	fn configure(&mut self, layout: &mut Layout<C, S>, _ctx: &mut AppContext<'_, C, S>) {
+	fn configure(&mut self, _layout: &mut Layout<C, S>, _ctx: &mut AppContext<'_, C, S>) {
 		// Configure the regions this screen uses.
 	}
 

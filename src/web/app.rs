@@ -1,8 +1,4 @@
-use crate::{
-	doc,
-	prelude::*,
-	ui::{self, prelude as gui},
-};
+use crate::prelude::*;
 
 #[async_trait::async_trait(?Send)]
 pub trait Api: Debug + 'static {
@@ -40,6 +36,9 @@ impl Ctx for Context {
 	fn api(&self) -> &Self::Api {
 		&self.api
 	}
+	fn api_mut(&mut self) -> &mut Self::Api {
+		&mut self.api
+	}
 	fn initial_state() -> Self::AppState {
 		structs::S {
 			context: PhantomData,
@@ -49,8 +48,9 @@ impl Ctx for Context {
 	}
 	type Api = ApiService;
 	type AppState = structs::S<Context>;
-	type GuiState = WebState;
 	type EventReceiver = structs::BroadcastReceiver<e::Event>;
+	type EventSender = structs::BroadcastSender<e::Event>;
+	type GuiState = WebState;
 }
 
 impl Host<Context> {
@@ -121,7 +121,7 @@ pub struct App<C: Ctx> {
 	pub workers: Vec<WorkHandle<C, tokio::task::JoinHandle<()>>>,
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct Context {
 	pub api: ApiService,
 }
@@ -155,11 +155,11 @@ impl Api for ApiClient {
 		todo!("ApiClient load_problems")
 	}
 
-	async fn sample_problem(&self, request: SampleProblemRequest) -> anyhow::Result<StoredProblem> {
+	async fn sample_problem(&self, _request: SampleProblemRequest) -> anyhow::Result<StoredProblem> {
 		todo!("ApiClient sample_problem")
 	}
 
-	async fn load_problem(&self, id: i64) -> anyhow::Result<StoredProblem> {
+	async fn load_problem(&self, _id: i64) -> anyhow::Result<StoredProblem> {
 		todo!("ApiClient load_problem")
 	}
 }

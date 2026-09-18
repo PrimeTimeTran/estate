@@ -6,7 +6,6 @@ use crate::{
 	},
 };
 
-use tokio::runtime::Runtime;
 
 #[async_trait::async_trait]
 pub trait Api: Debug + 'static {
@@ -50,7 +49,7 @@ impl Api for ApiClient {
 		Ok(problems)
 	}
 
-	async fn load_problem(&self, id: i64) -> anyhow::Result<StoredProblem> {
+	async fn load_problem(&self, _id: i64) -> anyhow::Result<StoredProblem> {
 		todo!("load_problem");
 		// StoredProblem::try_from(response)
 	}
@@ -311,16 +310,16 @@ where
 	}
 	fn device_event(
 		&mut self,
-		event_loop: &ActiveEventLoop,
-		device_id: winit::event::DeviceId,
-		event: winit::event::DeviceEvent,
+		_event_loop: &ActiveEventLoop,
+		_device_id: winit::event::DeviceId,
+		_event: winit::event::DeviceEvent,
 	) {
 		tracing::debug!("device_event");
 	}
-	fn exiting(&mut self, event_loop: &ActiveEventLoop) {
+	fn exiting(&mut self, _event_loop: &ActiveEventLoop) {
 		tracing::debug!("exiting")
 	}
-	fn memory_warning(&mut self, event_loop: &ActiveEventLoop) {
+	fn memory_warning(&mut self, _event_loop: &ActiveEventLoop) {
 		tracing::debug!("memory_warning")
 	}
 	fn new_events(&mut self, _event_loop: &ActiveEventLoop, _cause: winit::event::StartCause) {
@@ -332,7 +331,7 @@ where
 			self.open_window(event_loop, crate::START_WINDOW);
 		}
 	}
-	fn suspended(&mut self, event_loop: &ActiveEventLoop) {
+	fn suspended(&mut self, _event_loop: &ActiveEventLoop) {
 		tracing::info!("suspended")
 	}
 	fn user_event(&mut self, _event_loop: &ActiveEventLoop, event: AppEvent) {
@@ -344,7 +343,7 @@ where
 
 			AppEvent::RuntimeEvent => {
 				tracing::info!("user_event RuntimeEvent");
-				let mut ctx = self.app_context();
+				let _ctx = self.app_context();
 				Self::process_events(self);
 				self.sync_views();
 				// self.process_runtime_events();
@@ -355,10 +354,10 @@ where
 				tracing::debug!(">>> event_loop.exit() called");
 			}
 			AppEvent::ModifiersChanged {
-				alt,
-				command,
-				ctrl,
-				shift,
+				alt: _,
+				command: _,
+				ctrl: _,
+				shift: _,
 			} => {
 				tracing::info!("Modifiers Changed")
 			}
@@ -368,7 +367,7 @@ where
 
 	fn window_event(
 		&mut self,
-		event_loop: &ActiveEventLoop,
+		_event_loop: &ActiveEventLoop,
 		window_id: WindowId,
 		event: WindowEvent,
 	) {

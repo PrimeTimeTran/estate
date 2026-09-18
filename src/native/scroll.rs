@@ -72,7 +72,7 @@ impl GestureController {
 				input.pointer.hover_pos(),
 			)
 		});
-		let (delta, shift, ctrl, alt, command, mouse_pos) = current;
+		let (delta, shift, ctrl, alt, _command, _mouse_pos) = current;
 		if delta != egui::Vec2::ZERO {
 			self.state.last_delta = delta;
 			self.state.last_direction = Self::direction(delta);

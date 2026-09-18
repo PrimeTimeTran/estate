@@ -8,7 +8,7 @@ impl TaskManager {
 	pub fn from_path(path: impl Into<PathBuf>) -> Result<Self> {
 		let state_path = path.into();
 		let runtime = TaskManagerRuntime::new(&state_path)?;
-		let mut state = TaskManagerState {
+		let state = TaskManagerState {
 			state_path,
 			..Default::default()
 		};

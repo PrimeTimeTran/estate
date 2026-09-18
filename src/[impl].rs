@@ -65,7 +65,7 @@ impl<C> S<C>
 where
 	C: Ctx,
 {
-	pub fn window_count(&self, context: &C) -> usize {
+	pub fn window_count(&self, _context: &C) -> usize {
 		todo!("window_count")
 		// can't access `windows` here because Ctx doesn't guarantee it
 	}
@@ -111,7 +111,7 @@ where
 			event_tx,
 			context,
 			view: ViewType::MarkdownScreen,
-			#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+			// #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 			windows: vec![],
 		}
 	}

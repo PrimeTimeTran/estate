@@ -1,19 +1,10 @@
-#[cfg(all(feature = "native", not(target_arch = "wasm")))]
+#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 pub mod native;
 
-#[cfg(all(feature = "native", not(target_arch = "wasm")))]
+#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 pub use native::*;
 
-#[cfg(all(feature = "web", target_arch = "wasm32"))]
-pub mod web;
-#[cfg(all(feature = "web", target_arch = "wasm32"))]
-pub use web::*;
-
 use crate::prelude::*;
-
-#[path = "./runtime.app.rs"]
-pub mod app_runtime;
-pub use app_runtime::*;
 
 #[derive(Debug)]
 pub struct RuntimeState {

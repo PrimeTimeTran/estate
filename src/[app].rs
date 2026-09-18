@@ -17,9 +17,9 @@ where
 		self.init_api()?;
 
 		let handle = self.start_clock()?;
+		self.workers.push(handle);
 		#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 		{
-			self.workers.push(handle);
 			let handle = self.start_cargo_watcher()?;
 			self.workers.push(handle);
 			let handle = self.start_cursor_watcher_from_app()?;
@@ -57,11 +57,11 @@ where
 	}
 
 	pub fn start_clock_wasm(&mut self) {
-		let clock = self.host.clock();
+		let _clock = self.host.clock();
 		// clock.inherent_background_tick(String::from(
 		// 	"let clock = self.host.clock(); clock.inherent_background_tick",
 		// ));
-		let msg = String::from("start_clock_wasm clock.run_background(Duration::from_secs(1));");
+		let _msg = String::from("start_clock_wasm clock.run_background(Duration::from_secs(1));");
 		// clock.run_background(Duration::from_secs(1), msg.clone());
 		// clock.run_background::<C, ()>(Duration::from_secs(1), msg.clone())
 		// let handle = Clock::run_background(clock, Duration::from_secs(1), msg.clone());

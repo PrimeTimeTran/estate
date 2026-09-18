@@ -1,6 +1,6 @@
 use crate::{prelude::*, ui::*};
 
-use eframe::{self, Frame, WebOptions, WebRunner};
+use eframe::{self, WebOptions, WebRunner};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::{JsCast, JsValue, prelude::*};
 use web_sys::js_sys;
@@ -174,8 +174,8 @@ impl<C> eframe::App for App<C>
 where
 	C: Ctx,
 {
-	fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {}
-	fn logic(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {}
+	fn ui(&mut self, _ui: &mut egui::Ui, _frame: &mut eframe::Frame) {}
+	fn logic(&mut self, _ctx: &egui::Context, _frame: &mut eframe::Frame) {}
 }
 impl eframe::App for WebApp {
 	fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {

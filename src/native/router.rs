@@ -41,7 +41,7 @@
 /// estate fmt path/to/file.rs
 /// estate format path/to/file.rs
 /// ```
-use crate::{app::*, doc, native, native::daemon::projection::command, prelude::*};
+use crate::{doc, native::daemon::projection::command, prelude::*};
 
 pub async fn execute<R: Runtime>(
 	parsed_cli: Cli,

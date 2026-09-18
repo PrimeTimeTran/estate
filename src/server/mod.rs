@@ -19,7 +19,7 @@ pub mod submission;
 pub use crate::proto::{
 	problem_service_server::ProblemService, submission_service_server::SubmissionService,
 };
-pub use crate::server::{events::*, fs::*, problem::*, repo::*, submission::*};
+pub use crate::server::{events::*, fs::*, problem::*, repo::*};
 
 pub fn internal_error(error: anyhow::Error) -> Status {
 	tracing::error!("{error:#}");

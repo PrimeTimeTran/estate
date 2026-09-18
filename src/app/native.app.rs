@@ -1,7 +1,5 @@
-use crate::doc;
 
-use crate::native::router;
-use crate::{prelude::*, traits::Context};
+use crate::prelude::*;
 
 // // impl ApplicationHandler<AppEvent> for NativeApp {
 // // 	fn resumed(&mut self, event_loop: &ActiveEventLoop) {
@@ -1066,10 +1064,10 @@ impl Network for NativeNetwork {
 }
 
 impl Persistence for NativePersistence {
-	fn load(&self, key: &str) -> Result<Option<Vec<u8>>> {
+	fn load(&self, _key: &str) -> Result<Option<Vec<u8>>> {
 		todo!("")
 	}
-	fn save(&self, key: &str, value: &[u8]) -> Result<()> {
+	fn save(&self, _key: &str, _value: &[u8]) -> Result<()> {
 		todo!("")
 	}
 }

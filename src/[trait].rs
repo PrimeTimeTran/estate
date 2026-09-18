@@ -99,6 +99,7 @@ pub trait Clock: Clone {
 	#[cfg(not(target_arch = "wasm32"))]
 	fn run_foreground(&self, interval: Duration);
 
+	// #[cfg(not(target_arch = "wasm32"))]
 	fn run_background<C, J>(&self, interval: Duration, msg: String) -> Self::Handle<C, J>
 	where
 		C: Ctx,
@@ -278,14 +279,14 @@ pub trait Registry {
 ///
 /// A type implementing Runtime cannot contain non-'static borrowed references.
 ///
-pub trait Runtime: Clone + Sync + std::marker::Send + 'static {
+pub trait Runtime: Clone + Sync + Send + 'static {
 	#[cfg(not(target_arch = "wasm32"))]
 	fn sleep(&self, duration: Duration) -> impl Future<Output = ()> + Send;
 
-	/// [RPIT](https://doc.rust-lang.org/edition-guide/rust-2024/rpit-lifetime-capture.html)
-
 	#[cfg(target_arch = "wasm32")]
-	fn sleep(&self, duration: Duration) -> impl Future<Output = ()>;
+	fn sleep(&self, duration: Duration) -> impl Future<Output = ()> + Send;
+
+	/// [RPIT](https://doc.rust-lang.org/edition-guide/rust-2024/rpit-lifetime-capture.html)
 
 	fn session(&self) -> Session;
 	fn emit(&self, event: e::Event);
@@ -309,7 +310,6 @@ pub trait Runtime: Clone + Sync + std::marker::Send + 'static {
 	fn start_dispatcher(self: &Arc<Self>);
 	fn state(&self) -> &RuntimeState;
 	fn save(&self, state: &EstateState) -> Result<()>;
-
 	fn tasks(&self) -> &Arc<RwLock<TaskManager>>;
 	fn state_service(&self) -> &Arc<StateService>;
 	fn session_service(&self) -> &Arc<SessionService>;
@@ -421,7 +421,7 @@ pub trait StateStore: Send + Sync {
 	fn save(&self, state: &EstateState) -> Result<()>;
 }
 
-use crate::{e, prelude::*, ui::Layout};
+use crate::{e, ui::Layout};
 
 /// A screen-level coordinator.
 ///

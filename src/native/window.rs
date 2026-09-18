@@ -53,7 +53,7 @@ fn build_window(event_loop: &ActiveEventLoop) -> Result<Arc<winit::window::Windo
 		.or_else(|| event_loop.available_monitors().next())
 	{
 		let screen_size = monitor.size();
-		let scale_factor = monitor.scale_factor();
+		let _scale_factor = monitor.scale_factor();
 		// Optional: leave a small margin (e.g., 40 pixels) away from the edge/dock
 		// let margin_x = (40.0 * scale_factor) as i32;
 		// let margin_y = (60.0 * scale_factor) as i32;
@@ -391,7 +391,7 @@ where
 			.renderer
 			.render(&mut render_pass, primitives, screen_descriptor);
 	}
-	fn egui_view(&mut self, ctx: &egui::Context) {
+	fn egui_view(&mut self, _ctx: &egui::Context) {
 		doc!(
 			r#"
      	Estate UI Container
@@ -770,15 +770,15 @@ where
 	}
 }
 
-pub struct AppWindow<C, S>
-where
-	C: Ctx,
-{
-	// pub runtime: NativeRuntime,
-	pub kind: WindowType,
-	pub view: ViewType,
-	pub window: Window<C, S>,
-}
+// pub struct AppWindow<C, S>
+// where
+// 	C: Ctx,
+// {
+// 	// pub runtime: NativeRuntime,
+// 	pub kind: WindowType,
+// 	pub view: ViewType,
+// 	pub window: Window<C, S>,
+// }
 pub struct GlobalHotkeys {
 	hotkey_id: u32,
 	manager: GlobalHotKeyManager,
@@ -796,21 +796,21 @@ pub struct TrayMenu {
 	pub tasks: Submenu,
 	pub oracle: MenuItem,
 }
-pub struct Window<C, S>
-where
-	C: Ctx,
-{
-	pub screen: ui::ScreenInstance<C, S>,
-	// This Surface contains/borrows something that is guaranteed to be valid for the 'static lifetime.
-	pub surface: gui::wgpu::Surface<'static>,
-	pub config: gui::wgpu::SurfaceConfiguration,
-	pub device: wgpu::Device,
-	pub gui_ctx: gui::Context,
-	pub gui_state: egui_winit::State,
-	pub instance: Arc<winit::window::Window>,
-	pub kind: WindowType,
-	pub needs_resize: bool,
-	pub occluded: bool,
-	queue: wgpu::Queue,
-	renderer: egui_wgpu::Renderer,
-}
+// pub struct Window<C, S>
+// where
+// 	C: Ctx,
+// {
+// 	pub screen: ui::ScreenInstance<C, S>,
+// 	// This Surface contains/borrows something that is guaranteed to be valid for the 'static lifetime.
+// 	pub surface: gui::wgpu::Surface<'static>,
+// 	pub config: gui::wgpu::SurfaceConfiguration,
+// 	pub device: wgpu::Device,
+// 	pub gui_ctx: gui::Context,
+// 	pub gui_state: egui_winit::State,
+// 	pub instance: Arc<winit::window::Window>,
+// 	pub kind: WindowType,
+// 	pub needs_resize: bool,
+// 	pub occluded: bool,
+// 	queue: wgpu::Queue,
+// 	renderer: egui_wgpu::Renderer,
+// }

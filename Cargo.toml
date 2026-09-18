@@ -87,8 +87,8 @@ target = "wasm32-unknown-unknown"
 # cargo nextest run --bin settings --test-threads 1 --no-fail-fast
 [features]
 # default = []
-# default = ["web"]
-default = ["native"]
+default = ["web"]
+# default = ["native"]
 # This overwrites IDE config causing diagnostics to be wrong given the targetted platform.
 #
 # To get IDE diagnostics functioning correctly remove the hardcoded default when troubleshooting another build target.
@@ -126,7 +126,7 @@ native = [
   "dep:signal-hook",
   "dep:comfy-table",
   "dep:tray-icon",
-  "dep:egui-winit",
+
   "dep:macos-accessibility-client",
   # "dep:egui_commonmark",
   "dep:egui_extras",
@@ -143,12 +143,10 @@ revelation.workspace = true
 
 # External
 anyhow.workspace = true
+async-broadcast = "0.7.2"
 async-trait.workspace = true
 chrono.workspace = true
 dirs.workspace = true
-egui_plot.workspace = true
-egui-wgpu.workspace = true
-egui.workspace = true
 futures.workspace = true
 global-hotkey.workspace = true
 image.workspace = true
@@ -161,10 +159,11 @@ rand.workspace = true
 reqwest.workspace = true
 resvg.workspace = true
 schemars.workspace = true
-serde_json.workspace = true
-serde_yaml.workspace = true
 serde-wasm-bindgen.workspace = true
 serde.workspace = true
+serde_json.workspace = true
+serde_yaml.workspace = true
+strum = { version = "0.27", features = ["derive"] }
 toml.workspace = true
 tracing-subscriber.workspace = true
 tracing.workspace = true
@@ -173,19 +172,12 @@ uuid.workspace = true
 wasm-bindgen-futures.workspace = true
 wasm-bridge.workspace = true
 wgpu.workspace = true
-winit.workspace = true
-
-async-broadcast = "0.7.2"
-strum = { version = "0.27", features = ["derive"] }
-
 # Make all these optional so they can be toggled by the native feature
 cli = { workspace = true, optional = true }
 comfy-table = { workspace = true, optional = true }
 core-foundation = { workspace = true, optional = true }
 core-graphics = { workspace = true, optional = true }
 demand = { workspace = true, optional = true }
-eframe = { workspace = true, optional = true }
-egui-winit = { workspace = true, optional = true }
 egui_commonmark = { workspace = true }
 egui_extras = { workspace = true, optional = true }
 jsonc-parser = { workspace = true, optional = true }
@@ -197,6 +189,13 @@ tray-icon = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 web-sys = { workspace = true, optional = true }
 tokio-util = { workspace = true, optional = true }
+
+winit.workspace = true
+egui_plot.workspace = true
+egui-wgpu.workspace = true
+egui.workspace = true
+egui-winit.workspace = true
+eframe = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tokio = { workspace = true, features = ["rt", "macros", "time", "sync"] }
@@ -227,6 +226,5 @@ debug = "line-tables-only" #
 # Compile dependencies with high optimization so your dev binary runs fast,
 # while keeping your own application code unoptimized for fast rebuilds
 opt-level = 3 #
-
 
 [lints]

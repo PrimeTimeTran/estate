@@ -11,8 +11,6 @@
 //! When the identifier has stabilized and we're confident this
 //! is a meaningful difference then it's appropriate to move the definition to a domain specific dir.
 //!
-use tokio::sync::broadcast::error::TryRecvError;
-
 use crate::prelude::*;
 
 /// ## [AppState]
@@ -86,8 +84,6 @@ where
 	pub cancel: CancellationToken,
 	pub event_rx: C::EventReceiver,
 	pub event_tx: C::EventSender,
-
-	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 	pub windows: Vec<AppWindow<C, S>>,
 }
 /// ## [S]

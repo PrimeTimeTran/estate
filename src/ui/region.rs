@@ -189,7 +189,7 @@ where
 	C: Ctx,
 {
 	fn draw(&mut self, ui: &mut egui::Ui, _ctx: &mut AppContext<'_, C, S>) {
-		ui.vertical(|ui| {
+		ui.vertical(|_ui| {
 			// buttons
 		});
 	}
@@ -206,7 +206,7 @@ where
 	C: Ctx,
 {
 	fn draw(&mut self, ui: &mut egui::Ui, _ctx: &mut AppContext<'_, C, S>) {
-		ui.horizontal(|ui| {
+		ui.horizontal(|_ui| {
 			// buttons
 		});
 	}

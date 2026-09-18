@@ -11,9 +11,9 @@
 # trunk = "trunk build -q --release"
 # trunk-run = "trunk serve src/web/public/index.html --features web"
 
-# .cargo/config.toml
-
 [alias]
+fixall = "fix --bin web --no-default-features --features web --target wasm32-unknown-unknown --allow-dirty"
+fixallnative = "fix --bin native --no-default-features --features native --allow-dirty"
 
 # ─────────────────────────────────────────────
 # Builds

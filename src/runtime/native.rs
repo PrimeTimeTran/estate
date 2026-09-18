@@ -123,7 +123,7 @@ impl<C> Executor for NativeRuntime<C>
 where
 	C: Ctx,
 {
-	fn spawn(&self, future: impl Future<Output = ()> + Send + 'static) {
+	fn spawn(&self, _future: impl Future<Output = ()> + Send + 'static) {
 		println!("✅ NativeRuntime::spawn");
 	}
 	// This implementation chooses to use Tokio directly.
@@ -304,20 +304,9 @@ where
 	//     runtime.sleep(duration).await;
 	//
 	// without caring which platform it is running on.
-	//
-	// fn sleep(&self, duration: Duration) -> impl Future<Output = ()> + Send {
-	// 	tokio::time::sleep(duration)
-	// }
-	//
-
-	fn sleep(&self, duration: Duration) -> impl Future<Output = ()> + Send + 'static {
+	fn sleep(&self, duration: Duration) -> impl Future<Output = ()> + Send {
 		tokio::time::sleep(duration)
 	}
-	// fn sleep(duration: Duration) -> impl Future<Output = ()> + Send {
-	// 	async move {
-	// 		tokio::time::sleep(duration).await;
-	// 	}
-	// }
 
 	fn emit(&self, event: e::Event) {
 		tracing::debug!("NativeRuntime {:?}", event.kind.clone());
@@ -415,7 +404,7 @@ where
 /// generic trait abstraction.
 ///
 impl NativeExecutor {
-	pub fn spawn<F>(&self, future: F)
+	pub fn spawn<F>(&self, _future: F)
 	where
 		F: Future<Output = ()> + Send + 'static,
 	{

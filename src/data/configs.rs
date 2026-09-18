@@ -1,6 +1,6 @@
 use crate::{
 	prelude::*,
-	ui::{PanelState, *},
+	ui::PanelState,
 };
 
 macro_rules! grpc_endpoint {

@@ -24,7 +24,7 @@ where
 		// Put TaskManagerView into the appropriate region/panel.
 	}
 
-	fn update(&mut self, _layout: &mut Layout<C, S>, _ctx: &mut AppContext<'_, C, S>) {
+	fn update(&mut self, _layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {
 		// self.manager.poll_changes();
 		self.view.update(ctx);
 	}
@@ -224,7 +224,7 @@ impl<C, S> traits::View<C, S> for TaskManagerView
 where
 	C: Ctx,
 {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, C, S>) {
+	fn draw(&mut self, _ui: &mut egui::Ui, _ctx: &mut AppContext<'_, C, S>) {
 		// compose child views
 	}
 	fn update(&mut self, _ctx: &mut AppContext<'_, C, S>) {}
@@ -261,13 +261,13 @@ fn render_graphs(
 				},
 				// Chart
 				|ui| {
-					let max_value = state.tasks_created.max(1) as f64;
+					let _max_value = state.tasks_created.max(1) as f64;
 					let bars = vec![
 						Bar::new(0.0, state.tasks_created as f64).fill(palette::PRIMARY),
 						Bar::new(1.0, state.tasks_completed as f64).fill(palette::SUCCESS),
 					];
 					let chart = BarChart::new("task_counts", bars);
-					let max_y = state.tasks_created.max(1) as f64;
+					let _max_y = state.tasks_created.max(1) as f64;
 					Plot::new("task_counts_plot")
 						.height(190.0)
 						.show_axes([true, true])
@@ -316,7 +316,7 @@ fn render_graphs(
 					let created = state.tasks_created as f64;
 					let completed = state.tasks_completed as f64;
 					let remaining = (created - completed).max(0.0);
-					let percentage = if created > 0.0 {
+					let _percentage = if created > 0.0 {
 						(completed / created) * 100.0
 					} else {
 						0.0
@@ -375,7 +375,7 @@ fn render_graphs(
 				},
 				// Chart
 				|ui| {
-					let max_value = [
+					let _max_value = [
 						state.starts,
 						state.status_checks,
 						state.events_processed,

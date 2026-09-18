@@ -32,7 +32,7 @@ impl<C, S> Screen<C, S> for DashboardScreen
 where
 	C: Ctx,
 {
-	fn configure(&mut self, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {
+	fn configure(&mut self, _layout: &mut Layout<C, S>, _ctx: &mut AppContext<'_, C, S>) {
 		// Configure the regions this screen uses.
 	}
 
@@ -195,7 +195,7 @@ impl DashboardScreen {
 						// Check if the event is a modification or creation event
 						if matches!(event.kind, EventKind::Modify(_) | EventKind::Create(_)) {
 							tracing::info!("Detected change on chart file, reloading...");
-							if let Ok(mut locked) = oracle.lock() {
+							if let Ok(_locked) = oracle.lock() {
 								// locked.reload();
 							}
 						}
@@ -270,7 +270,7 @@ impl DashboardScreen {
 		// Bottom Status Bar
 		ui.horizontal(|ui| {
 			// Left side: Status or error indicator
-			if let Some(error) = &self.error {
+			if let Some(_error) = &self.error {
 				ui.colored_label(egui::Color32::RED, "Status: Error");
 			} else if self.dirty {
 				ui.colored_label(egui::Color32::YELLOW, "Status: Unsaved / Out of sync");

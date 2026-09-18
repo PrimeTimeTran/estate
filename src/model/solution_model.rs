@@ -1,4 +1,4 @@
-use crate::{model::*, prelude::*};
+use crate::model::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StoredSolution {

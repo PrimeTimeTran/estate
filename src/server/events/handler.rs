@@ -99,8 +99,8 @@ impl<R: Runtime> EventHandler<R> for AppHandler {
 			return;
 		}
 		match event.kind.clone() {
-			e::Klass::SessionStop { session } => match runtime.session_service().end().await {
-				Ok(session) => {
+			e::Klass::SessionStop { session: _ } => match runtime.session_service().end().await {
+				Ok(_session) => {
 					tracing::debug!("🛑 SessionStop");
 				}
 				Err(error) => {
@@ -141,7 +141,7 @@ impl<R: Runtime> EventHandler<R> for CommandHandler {
 				// }
 			}
 
-			e::Klass::CommandExecuted { command } => {
+			e::Klass::CommandExecuted { command: _ } => {
 				// handle actual commands here
 			}
 
@@ -217,7 +217,7 @@ impl<R: Runtime> EventHandler<R> for CommandHandler {
 #[async_trait::async_trait]
 impl<R: Runtime> EventHandler<R> for FileWatcherHandler {
 	async fn handle(&self, event: &e::Event, runtime: &R) {
-		if let e::Klass::FileModified { inode, path } = &event.kind {
+		if let e::Klass::FileModified { inode, path: _ } = &event.kind {
 			tracing::debug!("📡 FileWatcherHandler handle {:?} ({:?})", event, inode);
 			runtime.emit(Event::daemon(e::Klass::IndexUpdated { files_changed: 1 }));
 		}
@@ -411,7 +411,7 @@ impl TaskHandler {
 			task
 		};
 		{
-			let tasks = runtime.tasks().write().unwrap();
+			let _tasks = runtime.tasks().write().unwrap();
 		}
 		runtime.emit(Event::daemon(e::Klass::TaskStarted { task_id }));
 		let runtime = runtime.clone();

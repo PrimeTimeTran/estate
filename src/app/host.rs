@@ -1,7 +1,5 @@
 use crate::prelude::{t::Runtime, *};
 
-use tokio::runtime::Runtime as TokioRuntime;
-
 pub enum CargoFeature {
 	Native,
 	None,
@@ -16,7 +14,7 @@ pub enum TerminalHost {
 	Zed,
 }
 
-fn append_to_file(str: String) {}
+fn append_to_file(_str: String) {}
 fn terminal_host() -> TerminalHost {
 	let env = std::env::vars().collect::<std::collections::HashMap<_, _>>();
 	if env.contains_key("VSCODE_INJECTION")
@@ -41,7 +39,7 @@ fn terminal_host() -> TerminalHost {
 
 	TerminalHost::Unknown
 }
-fn sleep(str: String) {}
+fn sleep(_str: String) {}
 fn task() {
 	println!(
 		"The task asts the time that's used by the clock. {}",
@@ -136,13 +134,12 @@ impl Clock for HostClock {
 }
 
 impl<C: Ctx> Host<C> {
-	#[cfg(feature = "web")]
-	pub fn new(context: Arc<C>, api: ApiService) -> anyhow::Result<Self> {
+	#[cfg(all(feature = "web", target_arch = "wasm32"))]
+	pub fn new(context: Arc<C>, _api: ApiService) -> anyhow::Result<Self> {
 		let clock = HostClock {};
 
 		Ok(Self {
 			context,
-			api,
 			clock,
 			worker: HostWorker::new(),
 		})
