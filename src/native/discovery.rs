@@ -664,7 +664,7 @@ pub struct DiscoveryResult {
 	pub ignored: Vec<PathBuf>,
 }
 
-struct Package;
+pub struct Package;
 #[derive(Debug, Clone, Copy)]
 pub struct Probe {
 	pub id: &'static str,

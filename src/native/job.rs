@@ -35,7 +35,10 @@ impl TaskManagerRuntime {
 			watcher.watch(parent, RecursiveMode::NonRecursive)?;
 		}
 
-		Ok(Self { watcher, rx })
+		Ok(Self {
+			_watcher: watcher,
+			rx,
+		})
 	}
 }
 impl TaskResult {
@@ -92,7 +95,7 @@ pub struct TaskContext {
 }
 #[derive(Debug)]
 pub struct TaskManagerRuntime {
-	watcher: notify::RecommendedWatcher,
+	_watcher: notify::RecommendedWatcher,
 	pub rx: tokio::sync::mpsc::Receiver<()>,
 }
 #[derive(Debug, Clone)]

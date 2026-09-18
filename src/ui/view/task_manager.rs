@@ -24,21 +24,21 @@ where
 		// Put TaskManagerView into the appropriate region/panel.
 	}
 
-	fn update(&mut self, _layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {
-		// self.manager.poll_changes();
-		self.view.update(ctx);
-	}
+	// fn update(&mut self, _layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {
+	// 	// self.manager.poll_changes();
+	// 	self.view.update(ctx);
+	// }
 
-	fn event(
-		&mut self,
-		_event: &e::Event,
-		_layout: &mut Layout<C, S>,
-		_ctx: &mut AppContext<'_, C, S>,
-	) {
-		// Feature-level event handling.
-		//
-		// e.g. TaskCreated, TaskDeleted, etc.
-	}
+	// fn event(
+	// 	&mut self,
+	// 	_event: &e::Event,
+	// 	_layout: &mut Layout<C, S>,
+	// 	_ctx: &mut AppContext<'_, C, S>,
+	// ) {
+	// 	// Feature-level event handling.
+	// 	//
+	// 	// e.g. TaskCreated, TaskDeleted, etc.
+	// }
 }
 // impl<R: Runtime> TaskManagerScreen {
 // 	fn event(&mut self, event: &e::Event, _ctx: &mut AppContext<'_, C, S>) {

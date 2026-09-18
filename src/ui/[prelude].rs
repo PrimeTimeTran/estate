@@ -1,8 +1,3 @@
-// This looks like its an uncommented file, but it is actually a prelude file for the UI module.
-// It is used to bring all the necessary dependencies into scope for the UI module.
-// The prelude file is used to manage dependencies in a centralized manner,
-// allowing for easier maintenance and updates.
-//
 pub use egui::{
 	Align, ClippedPrimitive, Color32, Context, Direction, Frame, FullOutput, Id, Margin, ScrollArea,
 	TexturesDelta, Ui, UiBuilder, ViewportId, containers::Panel as EguiPanel,
@@ -27,9 +22,15 @@ pub use winit::{
 	window::WindowId,
 };
 
+// This looks like its an uncommented file, but it is actually a prelude file for the UI module.
+// It is used to bring all the necessary dependencies into scope for the UI module.
+// The prelude file is used to manage dependencies in a centralized manner,
+// allowing for easier maintenance and updates.
+
+pub use crate::prelude::*;
+
 pub use crate::{
 	model::common::{Difficulty, Language},
-	prelude::*,
 	proto::{types::*, *},
 	traits::Runtime,
 	ui::{
