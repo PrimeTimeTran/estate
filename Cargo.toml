@@ -82,9 +82,10 @@ target = "wasm32-unknown-unknown"
 
 # cargo nextest run --bin settings --test-threads 1 --no-fail-fast
 [features]
-# [Pick 1]
-default = []
-# default = ["web"]
+# The default here causes issues with VSCode's Problem Tab.
+# It picks up downloaded crates when analyzing
+# default = []
+default = ["web"]
 # default = ["native"]
 
 mobile = []

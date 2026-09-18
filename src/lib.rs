@@ -39,7 +39,8 @@ pub mod data;
 pub mod helpers;
 #[path = "./[impl].rs"]
 pub mod impls;
-pub mod r#macro;
+#[path = "./[macro].rs"]
+pub mod macros;
 pub mod model;
 pub mod prelude;
 pub mod proto;
@@ -56,7 +57,6 @@ pub mod util;
 
 pub use crate::{
 	app::{app_prelude, event as e},
-	r#macro as app_macros,
 	ui::*,
 };
 

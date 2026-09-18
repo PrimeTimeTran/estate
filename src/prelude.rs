@@ -31,13 +31,11 @@ pub use uuid::Uuid;
 /// [../script/git-precommit-hook.sh]
 ///
 pub use crate::{
-	// The app prefix prevents collision warnings from the ./src/app directory use/import of ./lib/mod.rs
-	app_macros,
 	app_prelude::*,
 	data::*,
 	e,
 	impls::{self, self as i},
-	r#macro::*,
+	macros::{self, *},
 	model::*,
 	runtime::*,
 	service::*,

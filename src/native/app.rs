@@ -6,7 +6,6 @@ use crate::{
 	},
 };
 
-
 #[async_trait::async_trait]
 pub trait Api: Debug + 'static {
 	async fn load_problems(&self, query: ProblemQuery) -> anyhow::Result<Vec<StoredProblem>>;
@@ -530,7 +529,7 @@ impl Host<Context> {
 		// awe!(Info, "Loaded {:#?} chars", chars);
 		// panic!("hi");
 		// awe!(Debug, "Runtime = {:?}", runtime);
-		// crate::app_macros::awe!(Trace, "Dispatching event: {:?}", event);
+		// crate::macros::awe!(Trace, "Dispatching event: {:?}", event);
 		// panic!(" Hi ");
 	}
 }

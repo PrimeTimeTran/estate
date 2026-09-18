@@ -16,7 +16,7 @@
 //
 // Each approach has tradeoffs worth understanding.
 
-pub use estate::{app_macros::section, helpers};
+pub use estate::{helpers, macros::section};
 
 pub fn ownership_borrows_sharing() {
 	section!("2. Ownership, Borrowing, Sharing");
