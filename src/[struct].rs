@@ -11,6 +11,8 @@
 //! When the identifier has stabilized and we're confident this
 //! is a meaningful difference then it's appropriate to move the definition to a domain specific dir.
 //!
+use tokio::sync::broadcast::error::TryRecvError;
+
 use crate::prelude::*;
 
 /// ## [AppState]
@@ -83,6 +85,7 @@ where
 	pub view: ViewType,
 	pub cancel: CancellationToken,
 	pub event_rx: C::EventReceiver,
+	pub event_tx: C::EventSender,
 
 	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 	pub windows: Vec<AppWindow<C, S>>,
@@ -110,13 +113,49 @@ pub struct State;
 
 pub struct Windows;
 
+pub static NEXT_RECEIVER_ID: AtomicU64 = AtomicU64::new(0);
+
 #[derive(Debug)]
 pub struct BroadcastReceiver<T> {
-	pub rx: tokio::sync::broadcast::Receiver<T>,
+	pub id: u64,
+	pub owner: &'static str,
+	pub rx: broadcast::Receiver<T>,
 }
 
 impl ReceivesEvents for BroadcastReceiver<e::Event> {
 	fn try_recv(&mut self) -> Option<e::Event> {
-		self.rx.try_recv().ok()
+		match self.rx.try_recv() {
+			Ok(event) => {
+				tracing::debug!(?event.kind, "ScreenInstance::event");
+				Some(event)
+			}
+
+			Err(TryRecvError::Empty) => {
+				tracing::debug!(id = self.id, "RECEIVER EMPTY");
+				None
+			}
+
+			Err(err) => {
+				tracing::error!(id = self.id, ?err, "RECEIVER ERROR");
+				None
+			}
+		}
+	}
+}
+
+#[derive(Debug, Clone)]
+pub struct BroadcastSender<T> {
+	pub tx: broadcast::Sender<T>,
+}
+
+impl BroadcastSender<e::Event> {
+	pub fn new(tx: broadcast::Sender<e::Event>) -> Self {
+		Self { tx }
+	}
+}
+
+impl SendsEvents for BroadcastSender<e::Event> {
+	fn send(&self, event: e::Event) {
+		let _ = self.tx.send(event);
 	}
 }

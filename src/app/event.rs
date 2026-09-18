@@ -106,10 +106,13 @@ pub enum EventKind {
 	FileModified { inode: Inode, path: String },
 	IndexUpdated { files_changed: u64 },
 	Navigate(ViewType),
+
 	ProblemLoaded(StoredProblem),
 	ProblemLoadFailed(String),
 	ProblemSampled(StoredProblem),
 	ProblemSampleFailed(String),
+
+	ProblemsRequested,
 	ProblemsLoaded(Vec<StoredProblem>),
 	ProblemsLoadFailed(String),
 	SampleProblemsError(String),
@@ -149,6 +152,9 @@ impl EventSink<AppEvent> for EventLoopProxy<AppEvent> {
 }
 
 impl Event {
+	pub fn app(kind: EventKind) -> Self {
+		Self::new(EventSource::App, kind)
+	}
 	fn new(source: EventSource, kind: EventKind) -> Self {
 		tracing::debug!("new Event {:?}", source);
 		// let trace = Tracer::new("event");
@@ -173,9 +179,7 @@ impl Event {
 	pub fn editor(kind: EventKind) -> Self {
 		Self::new(EventSource::Editor, kind)
 	}
-	pub fn app(kind: EventKind) -> Self {
-		Self::new(EventSource::App, kind)
-	}
+	
 }
 
 impl From<ProtoProblem> for ProblemLoaded {

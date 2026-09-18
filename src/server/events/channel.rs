@@ -71,8 +71,8 @@ pub struct EventReceiver<T> {
 }
 
 impl<T: Clone> BroadcastReceiver<T> {
-	pub fn new(rx: tokio::sync::broadcast::Receiver<T>) -> Self {
-		Self { rx }
+	pub fn new(id: u64, owner: &'static str, rx: tokio::sync::broadcast::Receiver<T>) -> Self {
+		Self { id, rx, owner }
 	}
 
 	pub fn poll(&mut self) -> Option<T> {

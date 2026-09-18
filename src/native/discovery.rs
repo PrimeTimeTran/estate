@@ -22,7 +22,7 @@ pub enum DiscoveryItem {
 }
 
 /// Async tasks triggered by events
-/// 
+///
 #[derive(Debug)]
 pub enum DiscoveryTask {
 	Index(PathBuf),
@@ -323,7 +323,8 @@ pub static PROBES_WORKSPACE: &[Probe] = &[
 impl DiscoverySink for EstateDiscovery {
 	async fn emit(&mut self, event: DiscoveryEvent) {
 		match event {
-			DiscoveryEvent::StartTask(raw) => {}
+			DiscoveryEvent::StartTask(_raw) => {}
+
 			DiscoveryEvent::Found(raw) => match raw.probe.id {
 				"cargo" => {
 					self.store.add_directory(FrameworkKind::Cargo, raw.path);

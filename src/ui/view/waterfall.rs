@@ -13,26 +13,31 @@ impl<C, S> Screen<C, S> for WaterfallScreen
 where
 	C: Ctx,
 {
-	fn configure(&mut self, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {
+	fn configure(&mut self, _layout: &mut Layout<C, S>, _ctx: &mut AppContext<'_, C, S>) {
 		// Configure the regions this screen uses.
 	}
 
-	fn update(&mut self, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {}
+	fn update(&mut self, _layout: &mut Layout<C, S>, _ctx: &mut AppContext<'_, C, S>) {}
 
-	fn event(&mut self, event: &e::Event, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {
+	fn event(
+		&mut self,
+		_event: &e::Event,
+		_layout: &mut Layout<C, S>,
+		_ctx: &mut AppContext<'_, C, S>,
+	) {
 	}
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct WaterfallChart {
-	jobs: Vec<&'static Job>,
+	_jobs: Vec<&'static Job>,
 }
-impl<C, S> ViewTrait<C, S> for WaterfallChart
+impl<C, S> traits::View<C, S> for WaterfallChart
 where
 	C: Ctx,
 {
-	fn update(&mut self, ctx: &mut AppContext<'_, C, S>) {}
-	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, C, S>) {}
+	fn update(&mut self, _ctx: &mut AppContext<'_, C, S>) {}
+	fn event(&mut self, _event: &e::Event, _ctx: &mut AppContext<'_, C, S>) {}
 	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, C, S>) {
 		if ctx.state_changed() {
 			ui.ctx().request_repaint();

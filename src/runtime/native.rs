@@ -119,7 +119,10 @@ impl Executor for NativeExecutor {
 //
 // These are two independent implementations of the same trait.
 //
-impl Executor for NativeRuntime {
+impl<C> Executor for NativeRuntime<C>
+where
+	C: Ctx,
+{
 	fn spawn(&self, future: impl Future<Output = ()> + Send + 'static) {
 		println!("✅ NativeRuntime::spawn");
 	}
@@ -135,34 +138,73 @@ impl Executor for NativeRuntime {
 	// architectural choice.
 }
 
-impl NativeRuntime {
-	pub async fn new(handle: tokio::runtime::Handle) -> anyhow::Result<Self> {
+impl<C> NativeRuntime<C>
+where
+	C: Ctx,
+{
+	pub fn new(
+		context: Arc<C>,
+		handle: tokio::runtime::Handle,
+		events: EventBus,
+	) -> anyhow::Result<Arc<Self>> {
 		let store = NativeStateStore::new()?;
+
 		let state_service = Arc::new(StateService::new(crate::STATE_PATH));
+
 		let session_service = Arc::new(SessionService::new(Arc::clone(&state_service)));
+
 		let state = store.load()?;
 		let runtime_state = RuntimeState::new(state);
-		let events = EventBus::new();
+
 		let event_rx = Arc::new(Mutex::new(events.subscribe()));
-		let services = NativeServices::connect().await?;
+
 		let executor = NativeExecutor {
 			handle: handle.clone(),
 		};
-		Ok(Self {
+
+		Ok(Arc::new(Self {
+			context,
 			event_rx,
 			events,
 			executor,
 			handle,
 			proxy: Arc::new(Mutex::new(None)),
-			services,
+			services: NativeServices::default(),
 			session_service,
 			session: Session::default(),
 			state_service,
 			state: Arc::new(runtime_state),
 			store,
 			tasks: Arc::new(RwLock::new(TaskManager::new())),
-		})
+		}))
 	}
+	// pub async fn new(handle: tokio::runtime::Handle) -> anyhow::Result<Self> {
+	// 	let store = NativeStateStore::new()?;
+	// 	let state_service = Arc::new(StateService::new(crate::STATE_PATH));
+	// 	let session_service = Arc::new(SessionService::new(Arc::clone(&state_service)));
+	// 	let state = store.load()?;
+	// 	let runtime_state = RuntimeState::new(state);
+	// 	let events = EventBus::new();
+	// 	let event_rx = Arc::new(Mutex::new(events.subscribe()));
+	// 	let services = NativeServices::connect().await?;
+	// 	let executor = NativeExecutor {
+	// 		handle: handle.clone(),
+	// 	};
+	// 	Ok(Self {
+	// 		event_rx,
+	// 		events,
+	// 		executor,
+	// 		handle,
+	// 		proxy: Arc::new(Mutex::new(None)),
+	// 		services,
+	// 		session_service,
+	// 		session: Session::default(),
+	// 		state_service,
+	// 		state: Arc::new(runtime_state),
+	// 		store,
+	// 		tasks: Arc::new(RwLock::new(TaskManager::new())),
+	// 	})
+	// }
 	pub fn attach_event_proxy(&self, proxy: EventLoopProxy<AppEvent>) {
 		*self.proxy.lock().unwrap() = Some(proxy);
 	}
@@ -205,7 +247,14 @@ impl NativeRuntime {
 //
 // It merely has the same method name.
 //
-impl Runtime for NativeRuntime {
+impl<C> Runtime for NativeRuntime<C>
+where
+	C: Ctx,
+{
+	type Context = C;
+	fn context(&self) -> &Self::Context {
+		&self.context
+	}
 	type EventReceiver = NativeEventReceiver;
 	fn subscribe(&self) -> Self::EventReceiver {
 		NativeEventReceiver {
@@ -216,8 +265,9 @@ impl Runtime for NativeRuntime {
 	fn services(&self) -> &Self::Services {
 		&self.services
 	}
-	fn spawn(&self, future: impl Future<Output = ()> + 'static) {
+	fn spawn(&self, future: impl Future<Output = ()> + Send + 'static) {
 		println!("✅ NativeRuntime::spawn");
+		self.handle.spawn(future);
 	}
 	// This is currently just a demonstration.
 	//
@@ -302,13 +352,15 @@ impl Runtime for NativeRuntime {
 		let runtime = Arc::clone(self);
 		let handle = runtime.handle.clone();
 		let mut receiver = runtime.events.subscribe();
-		let mut dispatcher = EventDispatcher::<NativeRuntime>::new();
+		let mut dispatcher = EventDispatcher::<NativeRuntime<C>>::new();
+
 		dispatcher.register(TaskHandler);
 		dispatcher.register(StateHandler);
 		dispatcher.register(CommandHandler);
 		dispatcher.register(FileWatcherHandler);
 		dispatcher.register(NavigationHandler);
 		dispatcher.register(AppHandler);
+		dispatcher.register(ProblemHandler);
 		handle.spawn(async move {
 			loop {
 				match receiver.recv().await {
@@ -456,19 +508,22 @@ pub struct NativeExecutor {
 /// tasks are implemented by the underlying infrastructure.
 ///
 #[derive(Clone, Debug)]
-pub struct NativeRuntime {
+pub struct NativeRuntime<C>
+where
+	C: Ctx,
+{
+	pub context: Arc<C>,
 	event_rx: Arc<Mutex<broadcast::Receiver<e::Event>>>,
-	pub handle: tokio::runtime::Handle,
 	proxy: Arc<Mutex<Option<EventLoopProxy<AppEvent>>>>,
 	pub events: EventBus,
+	pub executor: NativeExecutor,
+	pub handle: tokio::runtime::Handle,
+	pub session_service: Arc<SessionService>,
 	pub session: Session,
+	pub state_service: Arc<StateService>,
 	pub state: Arc<RuntimeState>,
 	pub store: NativeStateStore,
 	pub tasks: Arc<RwLock<TaskManager>>,
-	pub state_service: Arc<StateService>,
-	// pub api: Box<dyn Api>,
-	pub session_service: Arc<SessionService>,
-	pub executor: NativeExecutor,
 	services: NativeServices,
 }
 

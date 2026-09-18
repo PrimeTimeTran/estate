@@ -14,6 +14,8 @@ where
 
 	pub fn init_services(&mut self) -> Result<()> {
 		tracing::debug!("App init services");
+		self.init_api()?;
+
 		let handle = self.start_clock()?;
 		#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 		{
@@ -24,6 +26,20 @@ where
 			self.workers.push(handle);
 		}
 		tracing::debug!("App init services complete");
+		Ok(())
+	}
+	pub fn init_api(&mut self) -> Result<()> {
+		tracing::info!("Connecting API");
+
+		let context = self.host.context();
+		let api = context.api();
+
+		tracing::info!(
+			context = format_args!("{:p}", Arc::as_ptr(&context)),
+			api = format_args!("{:p}", api),
+			"API instance"
+		);
+
 		Ok(())
 	}
 

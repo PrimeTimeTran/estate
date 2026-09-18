@@ -2,7 +2,7 @@ use crate::{e, prelude::*};
 
 pub struct Panel<C, S> {
 	pub region: Region,
-	pub content: Box<dyn ViewTrait<C, S>>,
+	pub content: Box<dyn traits::View<C, S>>,
 	pub open: bool,
 	pub overlay: bool,
 	pub auto_hide: bool,
@@ -26,7 +26,7 @@ impl<C, S> Panel<C, S>
 where
 	C: Ctx,
 {
-	pub fn new(content: impl ViewTrait<C, S> + 'static, region: Region) -> Self {
+	pub fn new(content: impl traits::View<C, S> + 'static, region: Region) -> Self {
 		Self {
 			region,
 			content: Box::new(content),
@@ -36,7 +36,7 @@ where
 		}
 	}
 	pub fn from_config(
-		content: impl ViewTrait<C, S> + 'static,
+		content: impl traits::View<C, S> + 'static,
 		region: Region,
 		config: &PanelState,
 	) -> Self {
@@ -67,15 +67,15 @@ where
 		self.open
 	}
 }
-impl<C, S> ViewTrait<C, S> for Panel<C, S>
+impl<C, S> traits::View<C, S> for Panel<C, S>
 where
 	C: Ctx,
 {
 	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, C, S>) {
 		self.content.draw(ui, ctx);
 	}
-	fn update(&mut self, ctx: &mut AppContext<'_, C, S>) {}
-	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, C, S>) {}
+	fn update(&mut self, _ctx: &mut AppContext<'_, C, S>) {}
+	fn event(&mut self, _event: &e::Event, _ctx: &mut AppContext<'_, C, S>) {}
 }
 
 // A named, interactive view that occupies a region.
@@ -92,11 +92,11 @@ impl DebugPanel {
 		}
 	}
 }
-impl<C, S> ViewTrait<C, S> for DebugPanel
+impl<C, S> traits::View<C, S> for DebugPanel
 where
 	C: Ctx,
 {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, C, S>) {
+	fn draw(&mut self, ui: &mut egui::Ui, _ctx: &mut AppContext<'_, C, S>) {
 		ui.vertical_centered(|ui| {
 			ui.heading(&self.title);
 			ui.separator();
@@ -107,7 +107,7 @@ where
 			));
 		});
 	}
-	fn update(&mut self, ctx: &mut AppContext<'_, C, S>) {}
+	fn update(&mut self, _ctx: &mut AppContext<'_, C, S>) {}
 
-	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, C, S>) {}
+	fn event(&mut self, _event: &e::Event, _ctx: &mut AppContext<'_, C, S>) {}
 }

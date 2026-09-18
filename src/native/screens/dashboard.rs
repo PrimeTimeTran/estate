@@ -36,9 +36,14 @@ where
 		// Configure the regions this screen uses.
 	}
 
-	fn update(&mut self, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {}
+	fn update(&mut self, _layout: &mut Layout<C, S>, _ctx: &mut AppContext<'_, C, S>) {}
 
-	fn event(&mut self, event: &e::Event, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {
+	fn event(
+		&mut self,
+		_event: &e::Event,
+		_layout: &mut Layout<C, S>,
+		_ctx: &mut AppContext<'_, C, S>,
+	) {
 	}
 }
 impl DashboardScreen {
@@ -249,7 +254,7 @@ impl DashboardScreen {
 	}
 }
 impl DashboardScreen {
-	fn draw<C: Ctx, S>(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, C, S>) {
+	fn draw<C: Ctx, S>(&mut self, ui: &mut egui::Ui, _ctx: &mut AppContext<'_, C, S>) {
 		// 1. Poll the channel for file changes on every frame render tick
 		#[cfg(not(target_arch = "wasm32"))]
 		self.check_for_changes(ui.ctx());

@@ -95,21 +95,106 @@ where
 impl<C, S> structs::Renderer<C, S>
 where
 	C: Ctx,
+	S: 'static,
 {
 	pub fn new(
 		context: Arc<C>,
 		state: S,
 		cancel: CancellationToken,
 		event_rx: C::EventReceiver,
+		event_tx: C::EventSender,
 	) -> Self {
 		Self {
 			cancel,
 			state,
 			event_rx,
+			event_tx,
 			context,
 			view: ViewType::MarkdownScreen,
 			#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 			windows: vec![],
+		}
+	}
+	pub fn process_events(&mut self) {
+		tracing::info!("renderer process_events");
+		match self.event_rx.try_recv() {
+			Some(event) => {
+				let mut ctx = AppContext {
+					context: self.context.as_ref(),
+					state: &mut self.state,
+					event_tx: &mut self.event_tx,
+					// event_rx: &mut self.event_rx,
+					input: IOState::default(),
+					last_revision: 0,
+				};
+
+				tracing::info!("windows: {}", self.windows.len());
+
+				for window in &mut self.windows {
+					tracing::info!("dispatching event to screen");
+					window.window.screen.event(&event, &mut ctx);
+				}
+			}
+
+			None => {
+				tracing::info!("RENDERER GOT NO EVENT");
+			}
+		}
+	}
+	pub fn _process_events(&mut self) {
+		tracing::info!("renderer process_events");
+		// loop {
+		match self.event_rx.try_recv() {
+			Some(event) => {
+				tracing::info!(?event, "RENDERER GOT EVENT");
+
+				let mut ctx = AppContext {
+					context: self.context.as_ref(),
+					state: &mut self.state,
+					event_tx: &mut self.event_tx,
+					// event_rx: &mut self.event_rx,
+					input: IOState::default(),
+					last_revision: 0,
+				};
+
+				tracing::info!("windows: {}", self.windows.len());
+
+				for window in &mut self.windows {
+					tracing::info!("dispatching event to screen");
+					window.window.screen.event(&event, &mut ctx);
+				}
+			}
+
+			None => {
+				tracing::info!("RENDERER GOT NO EVENT");
+				// break;
+				// }
+			}
+		}
+	}
+	pub fn sync_views(&mut self) {
+		tracing::info!("sync_views");
+		#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+		for window in &mut self.windows {
+			window.view = self.view;
+			window.window.sync_view(window.view);
+			window.window.instance.set_title(self.view.name());
+			window.window.instance.request_redraw();
+		}
+	}
+	pub fn navigate_to(&mut self, view: ViewType) {
+		tracing::debug!("navigating from {:?} to {:?}", self.view, view,);
+		self.view = view;
+		self.sync_views();
+	}
+	pub fn app_context(&mut self) -> AppContext<'_, C, S> {
+		AppContext {
+			context: self.context.as_ref(),
+			state: &mut self.state,
+			// event_rx: &mut self.event_rx,
+			event_tx: &mut self.event_tx,
+			input: IOState::default(),
+			last_revision: 0,
 		}
 	}
 }

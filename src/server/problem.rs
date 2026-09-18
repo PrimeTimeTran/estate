@@ -133,6 +133,25 @@ pub struct ProblemQuery {
 	pub page_size: Option<i32>,
 	pub difficulty: Option<Difficulty>,
 }
+
+impl TryFrom<ProblemQuery> for crate::proto::types::ListProblemsRequest {
+	type Error = anyhow::Error;
+
+	fn try_from(query: ProblemQuery) -> Result<Self, Self::Error> {
+		let page = query.page.map(|page| crate::proto::types::PageRequest {
+			page,
+			page_size: query.page_size.unwrap_or(20),
+		});
+
+		Ok(Self {
+			page,
+			difficulty: query.difficulty.map(i32::from),
+			tags: Vec::new(),
+			search: String::new(),
+			published_only: Some(false),
+		})
+	}
+}
 #[derive(Default)]
 pub struct ProblemService<R> {
 	repository: R,

@@ -6,6 +6,7 @@ use crate::{
 };
 
 use egui::{ScrollArea, Ui};
+use egui_extras::syntax_highlighting::{CodeTheme, highlight};
 
 impl<C> ProblemScreen<C> {
 	pub fn new() -> Self {
@@ -21,15 +22,17 @@ impl<C> ProblemScreen<C> {
 		}
 	}
 }
-impl<C, S> ProblemView<C, S> {
+
+impl<C, S> Main<C, S> {
 	pub fn new() -> Self {
 		Self {
+			loading: false,
+			error: None,
+			problems: Vec::new(),
 			ticker: 0,
 			_marker: std::marker::PhantomData,
 		}
 	}
-}
-impl<C, S> ProblemView<C, S> {
 	fn draw_problem(&self, ui: &mut Ui, problem: &StoredProblem) {
 		egui::Frame::group(ui.style()).show(ui, |ui| {
 			ui.horizontal(|ui| {
@@ -41,11 +44,11 @@ impl<C, S> ProblemView<C, S> {
 		});
 	}
 }
-impl<C, S> ProblemView<C, S>
+impl<C, S> Main<C, S>
 where
 	C: Ctx,
 {
-	fn draw<E: Executor>(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, C, S>) {
+	fn draw<E: Executor>(&mut self, ui: &mut Ui, _ctx: &mut AppContext<'_, C, S>) {
 		ui.heading("Problem View");
 
 		ui.horizontal(|ui| {
@@ -110,14 +113,14 @@ where
 		});
 	}
 }
-impl<C> ProblemViewBottomPanel<C> {
+impl<C> BottomPanel<C> {
 	pub fn new() -> Self {
 		Self {
 			_marker: std::marker::PhantomData,
 		}
 	}
 }
-impl<C> ProblemViewSidebar<C> {
+impl<C> Sidebar<C> {
 	pub fn new() -> Self {
 		Self {
 			active_tab: Tab::Problem,
@@ -127,7 +130,7 @@ impl<C> ProblemViewSidebar<C> {
 		}
 	}
 }
-impl<C> ProblemViewSidebar<C> {
+impl<C> Sidebar<C> {
 	fn draw_solutions(&self, ui: &mut Ui) {
 		ui.heading("Solutions");
 		if self.solutions.is_empty() {
@@ -216,10 +219,8 @@ impl<C> ProblemViewSidebar<C> {
 										ui.label("→");
 									});
 								});
-
 								ui.horizontal_wrapped(|ui| {
 									ui.label(format!("{:?}", submission.language));
-
 									if let (Some(passed), Some(total)) =
 										(submission.tests_passed, submission.tests_total)
 									{
@@ -257,38 +258,79 @@ impl<C, S> Screen<C, S> for ProblemScreen<C>
 where
 	C: Ctx,
 {
-	fn configure(&mut self, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {
-		println!("Problem Screen configure")
+	fn configure(&mut self, layout: &mut Layout<C, S>, _ctx: &mut AppContext<'_, C, S>) {
+		tracing::info!("Problem Screen configure")
 		// Configure the regions this screen uses.
 	}
-	fn update(&mut self, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {
-		println!("Problem Screen update")
+	fn update(&mut self, layout: &mut Layout<C, S>, _ctx: &mut AppContext<'_, C, S>) {
+		tracing::info!("Problem Screen update")
 	}
-	fn event(&mut self, event: &e::Event, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {
-		println!("Problem Screen screen eventupdate")
+	fn event(
+		&mut self,
+		_event: &e::Event,
+		_layout: &mut Layout<C, S>,
+		_ctx: &mut AppContext<'_, C, S>,
+	) {
+		tracing::info!("Problem Screen screen event update")
 	}
 }
 
-impl<C, S> ViewTrait<C, S> for ProblemScreen<C>
+impl<C, S> t::View<C, S> for ProblemScreen<C>
 where
 	C: Ctx,
 {
-	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, C, S>) {
-		// println!("Problem Screen view draw")
+	fn draw(&mut self, ui: &mut Ui, _ctx: &mut AppContext<'_, C, S>) {
+		tracing::info!("Problem Screen view trait draw")
 	}
-	fn update(&mut self, ctx: &mut AppContext<'_, C, S>) {
-		println!("Problem Screen view update")
+	fn update(&mut self, _ctx: &mut AppContext<'_, C, S>) {
+		tracing::info!("Problem Screen view trait update")
 	}
-	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, C, S>) {
-		println!("Problem Screen view event")
+	fn event(&mut self, event: &e::Event, _ctx: &mut AppContext<'_, C, S>) {
+		tracing::info!("Problem Screen view trait event")
 	}
 }
-impl<C, S> ViewTrait<C, S> for ProblemView<C, S>
+impl<C, S> Main<C, S>
+where
+	C: Ctx,
+{
+	fn load_problems(&mut self, ctx: &mut AppContext<'_, C, S>) {
+		self.loading = true;
+		tracing::info!("load_problems");
+		ctx
+			.event_tx
+			.send(e::Event::app(e::Klass::ProblemsRequested));
+	}
+}
+
+impl<C, S> t::View<C, S> for Main<C, S>
 where
 	C: Ctx,
 {
 	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, C, S>) {
 		ui.vertical_centered(|ui| {
+			if self.loading {
+				ui.spinner();
+				ui.label("Loading problems...");
+			} else if self.problems.is_empty() {
+				ui.label("No problems loaded.");
+			} else {
+				ui.heading(format!("Problems ({})", self.problems.len()));
+				ui.add_space(8.0);
+				egui::ScrollArea::vertical()
+					.max_height(400.0)
+					.show(ui, |ui| {
+						for problem in &self.problems {
+							ui.group(|ui| {
+								ui.horizontal(|ui| {
+									ui.label(format!("#{}", problem.number));
+									ui.strong(&problem.title);
+								});
+							});
+
+							ui.add_space(4.0);
+						}
+					});
+			}
 			ui.add_space(16.0);
 
 			ui.heading("Problem View");
@@ -304,6 +346,9 @@ where
 			ui.add_space(12.0);
 
 			ui.horizontal(|ui| {
+				if ui.button("Load Problems").clicked() {
+					self.load_problems(ctx);
+				}
 				// Keep the whole control group centered.
 				ui.add_space((ui.available_width() - 420.0).max(0.0) / 2.0);
 
@@ -446,18 +491,38 @@ where
 			// let _ = api;
 		});
 	}
+	fn event(&mut self, event: &e::Event, _ctx: &mut AppContext<'_, C, S>) {
+		tracing::info!("Problem View view trait event");
+		match event.kind {
+			e::Klass::ProblemsRequested => {
+				self.loading = true;
+				// self.problems = problems.clone();
+			}
+			e::Klass::ProblemsLoaded(ref problems) => {
+				self.loading = false;
+				self.problems = problems.clone();
+				tracing::debug!("problem screen ProblemsLoaded")
+			}
+
+			e::Klass::ProblemsLoadFailed(ref error) => {
+				self.loading = false;
+				self.error = Some(error.clone());
+			}
+
+			_ => {}
+		}
+	}
 	fn update(&mut self, _ctx: &mut AppContext<'_, C, S>) {}
-	fn event(&mut self, _event: &e::Event, _ctx: &mut AppContext<'_, C, S>) {}
 }
-impl<C, S> ViewTrait<C, S> for ProblemViewBottomPanel<C>
+impl<C, S> t::View<C, S> for BottomPanel<C>
 where
 	C: Ctx,
 {
-	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, C, S>) {}
-	fn update(&mut self, ctx: &mut AppContext<'_, C, S>) {}
-	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, C, S>) {}
+	fn draw(&mut self, _ui: &mut Ui, _ctx: &mut AppContext<'_, C, S>) {}
+	fn update(&mut self, _ctx: &mut AppContext<'_, C, S>) {}
+	fn event(&mut self, _event: &e::Event, _ctx: &mut AppContext<'_, C, S>) {}
 }
-impl<C, S> ViewTrait<C, S> for ProblemViewSidebar<C>
+impl<C, S> t::View<C, S> for Sidebar<C>
 where
 	C: Ctx,
 {
@@ -471,121 +536,6 @@ where
 	fn event(&mut self, _event: &e::Event, _ctx: &mut AppContext<'_, C, S>) {}
 }
 
-// impl<C> ProblemView<C> {
-// 	// fn draw_problem(&self, ui: &mut egui::Ui, problem: &StoredProblem) {
-// 	// 	egui::Frame::group(ui.style()).show(ui, |ui| {
-// 	// 		ui.horizontal(|ui| {
-// 	// 			ui.strong(&problem.title);
-// 	// 			ui.separator();
-// 	// 			ui.monospace(&problem.slug);
-// 	// 		});
-// 	// 		ui.label(format!("ID: {}", problem.id));
-// 	// 	});
-// 	// }
-// 	// fn draw_solutions(&self, ui: &mut Ui, solutions: &[StoredSolution]) {
-// 	// 	ui.heading("Solutions");
-// 	// 	if solutions.is_empty() {
-// 	// 		ui.label("No solutions available.");
-// 	// 		return;
-// 	// 	}
-// 	// 	ScrollArea::vertical()
-// 	// 		.auto_shrink([false, false])
-// 	// 		.show(ui, |ui| {
-// 	// 			for solution in solutions {
-// 	// 				ui.group(|ui| {
-// 	// 					ui.horizontal(|ui| {
-// 	// 						ui.strong(&solution.title);
-// 	// 						ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-// 	// 							if ui.button("View").clicked() {
-// 	// 								// Navigate to solution detail.
-// 	// 							}
-// 	// 						});
-// 	// 					});
-// 	// 					ui.add_space(4.0);
-// 	// 					ui.horizontal_wrapped(|ui| {
-// 	// 						for code in &solution.code {
-// 	// 							let language = ProtoLanguage::try_from(code.language)
-// 	// 								.map(|language| format!("{language:?}"))
-// 	// 								.unwrap_or_else(|_| "Unknown".to_string());
-// 	// 							ui.label(language);
-// 	// 						}
-// 	// 					});
-// 	// 					ui.add_space(4.0);
-// 	// 					ui.horizontal_wrapped(|ui| {
-// 	// 						if !solution.approach.is_empty() {
-// 	// 							ui.label(format!("Approach: {}", solution.approach));
-// 	// 						}
-// 	// 						if !solution.time_complexity.is_empty() {
-// 	// 							ui.label(format!("Time: {}", solution.time_complexity));
-// 	// 						}
-// 	// 						if !solution.space_complexity.is_empty() {
-// 	// 							ui.label(format!("Space: {}", solution.space_complexity));
-// 	// 						}
-// 	// 					});
-// 	// 					ui.add_space(4.0);
-// 	// 					ui.horizontal(|ui| {
-// 	// 						ui.label(format!("👁 {}", solution.view_count));
-// 	// 						ui.label(format!("▲ {}", solution.vote_count));
-// 	// 						if let Some(created_at) = solution.created_at {
-// 	// 							ui.label(created_at.format("%Y-%m-%d").to_string());
-// 	// 						}
-// 	// 					});
-// 	// 				});
-// 	// 				ui.add_space(6.0);
-// 	// 			}
-// 	// 		});
-// 	// }
-// 	// fn draw_submissions(&self, ui: &mut Ui, submissions: &[StoredSubmission]) {
-// 	// 	ui.heading("Submissions");
-// 	// 	ui.add_space(4.0);
-// 	// 	if submissions.is_empty() {
-// 	// 		ui.label("No submissions yet.");
-// 	// 		return;
-// 	// 	}
-// 	// 	ScrollArea::vertical()
-// 	// 		.auto_shrink([false, false])
-// 	// 		.show(ui, |ui| {
-// 	// 			for submission in submissions {
-// 	// 				let clicked = ui
-// 	// 					.group(|ui| {
-// 	// 						ui.vertical(|ui| {
-// 	// 							ui.horizontal(|ui| {
-// 	// 								ui.strong(format!("{:?}", submission.status));
-// 	// 								ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-// 	// 									ui.label("→");
-// 	// 								});
-// 	// 							});
-// 	// 							ui.horizontal_wrapped(|ui| {
-// 	// 								ui.label(format!("{:?}", submission.language));
-// 	// 								if let (Some(passed), Some(total)) =
-// 	// 									(submission.tests_passed, submission.tests_total)
-// 	// 								{
-// 	// 									ui.label(format!("· {passed}/{total} tests"));
-// 	// 								}
-// 	// 								if let Some(runtime_ms) = submission.runtime_ms {
-// 	// 									ui.label(format!("· {runtime_ms} ms"));
-// 	// 								}
-// 	// 								if let Some(memory_bytes) = submission.memory_bytes {
-// 	// 									let memory_kb = memory_bytes as f64 / 1024.0;
-// 	// 									ui.label(format!("· {memory_kb:.1} KB"));
-// 	// 								}
-// 	// 							});
-// 	// 							if let Some(created_at) = submission.created_at {
-// 	// 								ui.small(created_at.format("%Y-%m-%d %H:%M:%S").to_string());
-// 	// 							}
-// 	// 						});
-// 	// 					})
-// 	// 					.response
-// 	// 					.clicked();
-// 	// 				if clicked {
-// 	// 					// Set selected submission / navigate to submission detail.
-// 	// 				}
-// 	// 				ui.add_space(4.0);
-// 	// 			}
-// 	// 		});
-// 	// }
-// }
-
 #[derive(Debug, Default)]
 pub struct ProblemScreen<C> {
 	idx: i32,
@@ -598,24 +548,24 @@ pub struct ProblemScreen<C> {
 	_marker: std::marker::PhantomData<C>,
 }
 #[derive(Debug, Default)]
-pub struct ProblemView<C, S> {
+pub struct Main<C, S> {
 	ticker: usize,
+	problems: Vec<StoredProblem>,
+	loading: bool,
+	error: Option<String>,
 	_marker: std::marker::PhantomData<(C, S)>,
 }
 #[derive(Debug, Default)]
-pub struct ProblemViewBottomPanel<C> {
+pub struct BottomPanel<C> {
 	_marker: std::marker::PhantomData<C>,
 }
 #[derive(Debug, Default)]
-pub struct ProblemViewSidebar<C> {
+pub struct Sidebar<C> {
 	active_tab: Tab,
 	solutions: Vec<StoredSolution>,
 	submissions: Vec<StoredSubmission>,
 	_marker: std::marker::PhantomData<C>,
 }
-
-use egui_extras::syntax_highlighting::{CodeTheme, highlight};
-
 fn code_block(ui: &mut egui::Ui, code: &str, language: &str) {
 	let theme = CodeTheme::from_style(ui.style());
 

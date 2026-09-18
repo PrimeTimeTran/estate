@@ -74,6 +74,16 @@ impl TryFrom<i32> for Difficulty {
 		}
 	}
 }
+impl From<Difficulty> for i32 {
+	fn from(value: Difficulty) -> Self {
+		match value {
+			Difficulty::Easy => 1,
+			Difficulty::Medium => 2,
+			Difficulty::Hard => 3,
+		}
+	}
+}
+
 impl TryFrom<i32> for Language {
 	type Error = anyhow::Error;
 

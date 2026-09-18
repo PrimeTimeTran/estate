@@ -410,7 +410,7 @@ impl TaskManager {
 // 		}
 // 	}
 // }
-// impl<C, S> ViewTrait<C, S> for TaskManagerView {
+// impl<C, S> traits::View<C, S> for TaskManagerView {
 // 	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, C, S>) {
 // 		// compose child views
 // 	}

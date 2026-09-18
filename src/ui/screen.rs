@@ -44,6 +44,15 @@ where
 		tracing::debug!("ScreenInstance::draw");
 		self.layout.draw(ui, ctx);
 	}
+	pub fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, C, S>) {
+		tracing::debug!("ScreenInstance::event");
+		self.layout.event(event, ctx);
+	}
+
+	pub fn update(&mut self, ctx: &mut AppContext<'_, C, S>) {
+		tracing::debug!("ScreenInstance::update");
+		self.layout.update(ctx);
+	}
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, IntoStaticStr)]

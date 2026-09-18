@@ -1,6 +1,6 @@
-use crate::prelude::*;
+use crate::prelude::{t::Runtime, *};
 
-use tokio::runtime::Runtime;
+use tokio::runtime::Runtime as TokioRuntime;
 
 pub enum CargoFeature {
 	Native,
@@ -137,27 +137,56 @@ impl Clock for HostClock {
 
 impl<C: Ctx> Host<C> {
 	#[cfg(feature = "web")]
-	pub fn new(context: Arc<C>) -> anyhow::Result<Self> {
+	pub fn new(context: Arc<C>, api: ApiService) -> anyhow::Result<Self> {
 		let clock = HostClock {};
+
 		Ok(Self {
-			clock,
 			context,
+			api,
+			clock,
 			worker: HostWorker::new(),
 		})
 	}
 
+	// #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+	// pub fn new(context: Arc<C>) -> anyhow::Result<Self> {
+	// 	let tokio = tokio::runtime::Runtime::new()?;
+	// 	let handle = tokio.handle().clone();
+	// 	let event_bus = EventBus::new();
+	// 	let runtime = NativeRuntime::new(Arc::clone(&context), handle.clone(), event_bus.clone())?;
+	// 	runtime.start_dispatcher();
+	// 	Ok(Self {
+	// 		context,
+	// 		runtime,
+	// 		event_bus,
+	// 		worker: HostWorker::new(),
+	// 		clock: HostClock::new(handle),
+	// 		tokio,
+	// 	})
+	// }
 	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-	pub fn new(context: Arc<C>) -> anyhow::Result<Self> {
-		let runtime = tokio::runtime::Runtime::new()?;
-		let handle = runtime.handle().clone();
+	pub fn new(context: Arc<C>, tokio: tokio::runtime::Runtime) -> anyhow::Result<Self> {
+		let handle = tokio.handle().clone();
 		let event_bus = EventBus::new();
+
+		let runtime = NativeRuntime::new(Arc::clone(&context), handle.clone(), event_bus.clone())?;
+
+		runtime.start_dispatcher();
+
 		Ok(Self {
 			context,
+			runtime,
 			event_bus,
 			worker: HostWorker::new(),
 			clock: HostClock::new(handle),
-			runtime,
+			tokio,
 		})
+	}
+	pub fn context_ref(&self) -> &C {
+		&self.context
+	}
+	pub fn api(&self) -> &C::Api {
+		self.context_ref().api()
 	}
 }
 
@@ -251,11 +280,14 @@ where
 	pub context: Arc<C>,
 	pub clock: HostClock,
 	pub worker: HostWorker<C>,
+
 	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 	pub event_bus: EventBus,
 
 	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-	pub runtime: tokio::runtime::Runtime,
+	pub runtime: Arc<NativeRuntime<C>>,
+	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+	pub tokio: tokio::runtime::Runtime,
 }
 
 pub struct HostRenderer;

@@ -11,7 +11,6 @@ pub trait Api: Debug + 'static {
 	async fn load_problem(&self, id: i64) -> anyhow::Result<StoredProblem>;
 	fn clone_box(&self) -> Box<dyn Api>;
 }
-
 impl<C> App<C>
 where
 	C: Ctx,
@@ -29,20 +28,18 @@ where
 	}
 }
 
-impl App<ContextWeb> {
+impl App<Context> {
 	pub fn run(&mut self) -> Result<()> {
 		tracing::debug!("App run");
 		self.init_services()?;
-		// self.run_gui()?;
 		Ok(())
 	}
 }
 
-impl Ctx for ContextWeb {
-	type AppState = structs::S<ContextWeb>;
-	type GuiState = WebState;
-	type EventReceiver = structs::BroadcastReceiver<e::Event>;
-
+impl Ctx for Context {
+	fn api(&self) -> &Self::Api {
+		&self.api
+	}
 	fn initial_state() -> Self::AppState {
 		structs::S {
 			context: PhantomData,
@@ -50,30 +47,27 @@ impl Ctx for ContextWeb {
 			view: ViewType::MarkdownScreen,
 		}
 	}
+	type Api = ApiService;
+	type AppState = structs::S<Context>;
+	type GuiState = WebState;
+	type EventReceiver = structs::BroadcastReceiver<e::Event>;
 }
 
-impl Host<ContextWeb> {
-	// pub fn new(context: Arc<C>) -> anyhow::Result<Self> {
-	// 	let clock = HostClock {};
-	// 	Ok(Self {
-	// 		clock,
-	// 		context,
-	// 		worker: HostWorker::new(),
-	// 	})
-	// }
+impl Host<Context> {
 	pub fn init() -> Result<Self> {
-		Self::new(Arc::new(ContextWeb::default()))
+		let api = ApiService::default();
+		Self::new(Arc::new(Context::default()), api)
 	}
 }
 
-impl<ContextWeb> Host<ContextWeb>
+impl<Context> Host<Context>
 where
-	ContextWeb: Ctx,
+	Context: Ctx,
 {
 	pub fn clock(&self) -> &HostClock {
 		&self.clock
 	}
-	pub fn context(&self) -> Arc<ContextWeb> {
+	pub fn context(&self) -> Arc<Context> {
 		self.context.clone()
 	}
 	pub fn wait_for_shutdown(&self) {
@@ -88,7 +82,7 @@ where
 			});
 		}
 	}
-	pub fn worker(&self) -> &HostWorker<ContextWeb> {
+	pub fn worker(&self) -> &HostWorker<Context> {
 		&self.worker
 	}
 }
@@ -128,7 +122,9 @@ pub struct App<C: Ctx> {
 }
 
 #[derive(Default)]
-pub struct ContextWeb;
+pub struct Context {
+	pub api: ApiService,
+}
 
 #[derive(Clone, Debug, Default)]
 pub struct WebState;
@@ -168,4 +164,4 @@ impl Api for ApiClient {
 	}
 }
 
-impl App<ContextWeb> {}
+impl App<Context> {}

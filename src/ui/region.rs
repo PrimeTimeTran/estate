@@ -184,34 +184,34 @@ impl ActivityBar {
 		Self { buttons: vec![] }
 	}
 }
-impl<C, S> ViewTrait<C, S> for ActivityBar
+impl<C, S> traits::View<C, S> for ActivityBar
 where
 	C: Ctx,
 {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, C, S>) {
+	fn draw(&mut self, ui: &mut egui::Ui, _ctx: &mut AppContext<'_, C, S>) {
 		ui.vertical(|ui| {
 			// buttons
 		});
 	}
-	fn update(&mut self, ctx: &mut AppContext<'_, C, S>) {}
+	fn update(&mut self, _ctx: &mut AppContext<'_, C, S>) {}
 
-	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, C, S>) {}
+	fn event(&mut self, _event: &e::Event, _ctx: &mut AppContext<'_, C, S>) {}
 }
 
 pub struct PrimaryBar {
 	buttons: Vec<&'static str>,
 }
-impl<C, S> ViewTrait<C, S> for PrimaryBar
+impl<C, S> traits::View<C, S> for PrimaryBar
 where
 	C: Ctx,
 {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, C, S>) {
+	fn draw(&mut self, ui: &mut egui::Ui, _ctx: &mut AppContext<'_, C, S>) {
 		ui.horizontal(|ui| {
 			// buttons
 		});
 	}
 
-	fn update(&mut self, ctx: &mut AppContext<'_, C, S>) {}
+	fn update(&mut self, _ctx: &mut AppContext<'_, C, S>) {}
 
-	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, C, S>) {}
+	fn event(&mut self, _event: &e::Event, _ctx: &mut AppContext<'_, C, S>) {}
 }

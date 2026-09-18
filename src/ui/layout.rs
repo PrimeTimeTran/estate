@@ -27,9 +27,9 @@ where
 	// may be safely destroyed, allowing memory to be reclaimed deterministically
 	// without a garbage collector.
 	pub fn new() -> Self {
-		let main = ProblemView::new();
-		let dock_left = ProblemViewSidebar::new();
-		let bottom_panel = ProblemViewBottomPanel::new();
+		let main = Main::new();
+		let dock_left = problem_screen::Sidebar::new();
+		let bottom_panel = BottomPanel::new();
 		Self {
 			main: Panel::from_config(main, Region::content(), &PanelState::new(true, 0.0)),
 			activity_bar: Panel::from_config(
@@ -75,7 +75,7 @@ where
 		}
 	}
 }
-impl<C, S> LayoutTrait<C, S> for Layout<C, S>
+impl<C, S> t::LayoutTrait<C, S> for Layout<C, S>
 where
 	C: Ctx,
 {
@@ -158,52 +158,62 @@ where
 			);
 		}
 	}
-	fn update(&mut self, _ctx: &mut AppContext<'_, C, S>) {}
-	fn event(&mut self, _event: &e::Event, _ctx: &mut AppContext<'_, C, S>) {}
+	fn update(&mut self, ctx: &mut AppContext<'_, C, S>) {
+		tracing::info!("LayoutTrait for Layout update {}", self.main.open);
+		if self.activity_bar.open {
+			self.activity_bar.content.update(ctx);
+		}
+		if self.dock_left.open {
+			self.dock_left.content.update(ctx);
+		}
+		if self.dock_right.open {
+			self.dock_right.content.update(ctx);
+		}
+		if self.primary_bar.open {
+			self.primary_bar.content.update(ctx);
+		}
+		if self.secondary_bar.open {
+			self.secondary_bar.content.update(ctx);
+		}
+		if self.bottom_panel.open {
+			self.bottom_panel.content.update(ctx);
+		}
+		self.main.update(ctx);
+	}
+
+	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, C, S>) {
+		tracing::info!("LayoutTrait for Layout event");
+		if self.activity_bar.open {
+			self.activity_bar.content.event(event, ctx);
+		}
+
+		if self.dock_left.open {
+			self.dock_left.content.event(event, ctx);
+		}
+
+		if self.dock_right.open {
+			self.dock_right.content.event(event, ctx);
+		}
+
+		if self.primary_bar.open {
+			self.primary_bar.content.event(event, ctx);
+		}
+
+		if self.secondary_bar.open {
+			self.secondary_bar.content.event(event, ctx);
+		}
+
+		if self.bottom_panel.open {
+			self.bottom_panel.content.event(event, ctx);
+		}
+
+		self.main.event(event, ctx);
+	}
 }
 impl<C, S> Layout<C, S>
 where
 	C: Ctx,
 {
-	fn draw_view(
-		ui: &mut egui::Ui,
-		rect: egui::Rect,
-		view: &mut dyn ViewTrait<C, S>,
-		ctx: &mut AppContext<'_, C, S>,
-	) {
-		while let Some(event) = ctx.next_event() {
-			view.event(&event, ctx);
-		}
-		let mut child = ui.new_child(
-			egui::UiBuilder::new()
-				.max_rect(rect)
-				.layout(egui::Layout::top_down(egui::Align::LEFT)),
-		);
-		view.draw(&mut child, ctx);
-	}
-	fn draw_panel(
-		ui: &mut egui::Ui,
-		ctx: &mut AppContext<'_, C, S>,
-		rect: egui::Rect,
-		panel: &mut Panel<C, S>,
-	) {
-		if !panel.open {
-			return;
-		}
-		// Outer panel appearance.
-		if let Some(fill) = panel.region.fill {
-			ui.painter().rect_filled(rect, 0.0, fill);
-		}
-		if panel.region.top_border {
-			ui.painter().line_segment(
-				[rect.left_top(), rect.right_top()],
-				egui::Stroke::new(1.0, palette::BORDER),
-			);
-		}
-		// Inner content area.
-		let content_rect = panel.region.content_rect(rect);
-		Self::draw_view(ui, content_rect, panel.content.as_mut(), ctx);
-	}
 	fn calculate_region_boundaries(&mut self, available: egui::Rect) -> VeLayout {
 		// =========================================================
 		// Fixed outer regions
@@ -337,6 +347,69 @@ where
 			status_bar,
 		}
 	}
+	pub fn cursor_target(&self, pos: Option<egui::Pos2>, layout: &VeLayout) -> CursorTarget {
+		let Some(pos) = pos else {
+			return CursorTarget::None;
+		};
+		if self.activity_bar.open && layout.activity_bar.contains(pos) {
+			CursorTarget::ActivityBar
+		} else if self.dock_left.open && layout.dock_left.contains(pos) {
+			CursorTarget::DockLeft
+		} else if layout.primary_bar.contains(pos) {
+			CursorTarget::PrimaryBar
+		} else if layout.secondary_bar.contains(pos) {
+			CursorTarget::SecondaryBar
+		} else if layout.main.contains(pos) {
+			CursorTarget::Main
+		} else if self.bottom_panel.open && layout.bottom_panel.contains(pos) {
+			CursorTarget::BottomPanel
+		} else if self.dock_right.open && layout.dock_right.contains(pos) {
+			CursorTarget::DockRight
+		} else if layout.status_bar.contains(pos) {
+			CursorTarget::StatusBar
+		} else {
+			CursorTarget::None
+		}
+	}
+	fn draw_view(
+		ui: &mut egui::Ui,
+		rect: egui::Rect,
+		view: &mut dyn traits::View<C, S>,
+		ctx: &mut AppContext<'_, C, S>,
+	) {
+		// while let Some(event) = ctx.next_event() {
+		// 	view.event(&event, ctx);
+		// }
+		let mut child = ui.new_child(
+			egui::UiBuilder::new()
+				.max_rect(rect)
+				.layout(egui::Layout::top_down(egui::Align::LEFT)),
+		);
+		view.draw(&mut child, ctx);
+	}
+	fn draw_panel(
+		ui: &mut egui::Ui,
+		ctx: &mut AppContext<'_, C, S>,
+		rect: egui::Rect,
+		panel: &mut Panel<C, S>,
+	) {
+		if !panel.open {
+			return;
+		}
+		// Outer panel appearance.
+		if let Some(fill) = panel.region.fill {
+			ui.painter().rect_filled(rect, 0.0, fill);
+		}
+		if panel.region.top_border {
+			ui.painter().line_segment(
+				[rect.left_top(), rect.right_top()],
+				egui::Stroke::new(1.0, palette::BORDER),
+			);
+		}
+		// Inner content area.
+		let content_rect = panel.region.content_rect(rect);
+		Self::draw_view(ui, content_rect, panel.content.as_mut(), ctx);
+	}
 	fn resize_handle(
 		ui: &mut egui::Ui,
 		id: &str,
@@ -368,37 +441,6 @@ where
 			let delta = match edge {
 				ResizeEdge::Left | ResizeEdge::Right => response.drag_motion().x,
 				ResizeEdge::Top | ResizeEdge::Bottom => response.drag_motion().y,
-			};
-			resize(delta);
-		}
-	}
-	fn resize_handle2(ui: &mut egui::Ui, id: &str, rect: egui::Rect, mut resize: impl FnMut(f32)) {
-		let cursor = if id == "bottom_panel_resize" {
-			egui::CursorIcon::ResizeVertical
-		} else {
-			egui::CursorIcon::ResizeHorizontal
-		};
-		let response = ui.interact(rect, egui::Id::new(id), egui::Sense::drag());
-		if response.hovered() || response.dragged() {
-			ui.ctx().set_cursor_icon(cursor);
-		}
-		// Visible resize divider.
-		let divider = match cursor {
-			egui::CursorIcon::ResizeVertical => {
-				egui::Rect::from_center_size(rect.center(), egui::vec2(2.0, rect.height()))
-			}
-			_ => egui::Rect::from_center_size(rect.center(), egui::vec2(rect.width(), 2.0)),
-		};
-		let color = if response.hovered() || response.dragged() {
-			palette::BORDER
-		} else {
-			palette::BORDER
-		};
-		ui.painter().rect_filled(divider, 0.0, color);
-		if response.dragged() {
-			let delta = match cursor {
-				egui::CursorIcon::ResizeVertical => response.drag_motion().y,
-				_ => response.drag_motion().x,
 			};
 			resize(delta);
 		}
@@ -436,30 +478,6 @@ where
 		Self::resize_handle(ui, id, handle, edge, |delta| {
 			region.size = (region.size + delta * direction).clamp(region.min_size, region.max_size);
 		});
-	}
-	pub fn cursor_target(&self, pos: Option<egui::Pos2>, layout: &VeLayout) -> CursorTarget {
-		let Some(pos) = pos else {
-			return CursorTarget::None;
-		};
-		if self.activity_bar.open && layout.activity_bar.contains(pos) {
-			CursorTarget::ActivityBar
-		} else if self.dock_left.open && layout.dock_left.contains(pos) {
-			CursorTarget::DockLeft
-		} else if layout.primary_bar.contains(pos) {
-			CursorTarget::PrimaryBar
-		} else if layout.secondary_bar.contains(pos) {
-			CursorTarget::SecondaryBar
-		} else if layout.main.contains(pos) {
-			CursorTarget::Main
-		} else if self.bottom_panel.open && layout.bottom_panel.contains(pos) {
-			CursorTarget::BottomPanel
-		} else if self.dock_right.open && layout.dock_right.contains(pos) {
-			CursorTarget::DockRight
-		} else if layout.status_bar.contains(pos) {
-			CursorTarget::StatusBar
-		} else {
-			CursorTarget::None
-		}
 	}
 }
 

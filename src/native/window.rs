@@ -234,7 +234,7 @@ where
 	}
 
 	pub fn draw(&mut self, ctx: &mut AppContext<'_, C, S>) -> Result<()> {
-		tracing::debug!("drawdrawdraw window before begin_egui");
+		tracing::debug!("Window draw before begin_egui");
 
 		let Some(surface_texture) = self.acquire_surface()? else {
 			tracing::debug!("NO SURFACE");
@@ -800,7 +800,7 @@ pub struct Window<C, S>
 where
 	C: Ctx,
 {
-	screen: ui::ScreenInstance<C, S>,
+	pub screen: ui::ScreenInstance<C, S>,
 	// This Surface contains/borrows something that is guaranteed to be valid for the 'static lifetime.
 	pub surface: gui::wgpu::Surface<'static>,
 	pub config: gui::wgpu::SurfaceConfiguration,
@@ -811,8 +811,6 @@ where
 	pub kind: WindowType,
 	pub needs_resize: bool,
 	pub occluded: bool,
-
-	// pending_textures: gui::TexturesDelta,
 	queue: wgpu::Queue,
 	renderer: egui_wgpu::Renderer,
 }

@@ -54,10 +54,11 @@ where
 	C: Ctx,
 {
 	pub context: &'a C,
-	pub state: &'a mut S,
-	pub event_rx: &'a mut C::EventReceiver,
+	// pub event_rx: &'a mut C::EventReceiver,
+	pub event_tx: &'a mut C::EventSender,
 	pub input: IOState,
 	pub last_revision: u64,
+	pub state: &'a mut S,
 }
 // ## 2. What the 'static constraint tells you
 // The + 'static on impl<'a, R: Runtime + 'static> AppContext<'a, R> tells
@@ -66,6 +67,15 @@ impl<'a, C, S> AppContext<'a, C, S>
 where
 	C: Ctx,
 {
+	pub fn api(&self) -> &C::Api {
+		self.context.api()
+	}
+	pub fn events(&self) -> &C::EventSender {
+		&self.event_tx
+	}
+	pub fn send_event(&self, event: e::Event) {
+		self.event_tx.send(event);
+	}
 	pub fn load_problems(&mut self) {
 		tracing::info!("load_problems");
 		// TODO: implement through Context/State
@@ -86,7 +96,7 @@ where
 		false
 	}
 
-	pub fn next_event(&mut self) -> Option<e::Event> {
-		self.event_rx.try_recv()
-	}
+	// pub fn next_event(&mut self) -> Option<e::Event> {
+	// 	self.event_rx.try_recv()
+	// }
 }

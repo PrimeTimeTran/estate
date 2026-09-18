@@ -1,6 +1,98 @@
 use crate::prelude::*;
 
 #[async_trait::async_trait]
+impl<R: Runtime> EventHandler<R> for ProblemHandler {
+	async fn handle(&self, event: &e::Event, runtime: &R) {
+		tracing::debug!(
+			event = ?event.kind,
+			"🧩 ProblemHandler received event"
+		);
+
+		match event.kind.clone() {
+			e::Klass::ProblemsRequested => {
+				tracing::debug!("📥 ProblemsRequested → spawning API request");
+
+				let runtime_copy = runtime.clone();
+
+				runtime.spawn(async move {
+					tracing::debug!("🚀 problem API task started");
+
+					tracing::debug!("🌐 calling api.load_problems()");
+					let query = ProblemQuery {
+						page: Some(0),
+						page_size: Some(20),
+						difficulty: None,
+					};
+
+					let result = runtime_copy.context().api().load_problems(query).await;
+
+					tracing::debug!("🌐 api.load_problems() returned");
+
+					match result {
+						Ok(problems) => {
+							tracing::debug!(count = problems.len(), "✅ problems loaded");
+
+							for (index, problem) in problems.iter().enumerate() {
+								tracing::debug!(
+									index,
+									problem = ?problem,
+									"📦 loaded problem"
+								);
+							}
+
+							tracing::debug!("📤 emitting ProblemsLoaded");
+
+							runtime_copy.emit(e::Event::app(e::Klass::ProblemsLoaded(problems)));
+
+							tracing::debug!("📤 ProblemsLoaded emitted");
+						}
+
+						Err(error) => {
+							tracing::error!(
+								error = %error,
+								"❌ failed to load problems"
+							);
+
+							tracing::debug!("📤 emitting ProblemsLoadFailed");
+
+							runtime_copy.emit(e::Event::app(e::Klass::ProblemsLoadFailed(
+								error.to_string(),
+							)));
+
+							tracing::debug!("📤 ProblemsLoadFailed emitted");
+						}
+					}
+				});
+			}
+
+			e::Klass::ProblemsLoaded(problems) => {
+				tracing::debug!(
+					count = problems.len(),
+					"🎉 ProblemHandler received ProblemsLoaded"
+				);
+
+				for (index, problem) in problems.iter().enumerate() {
+					tracing::debug!(
+						index,
+						problem = ?problem,
+						"📦 ProblemsLoaded problem"
+					);
+				}
+			}
+
+			e::Klass::ProblemsLoadFailed(error) => {
+				tracing::error!(
+					error = %error,
+					"💥 ProblemHandler received ProblemsLoadFailed"
+				);
+			}
+
+			_ => {}
+		}
+	}
+}
+
+#[async_trait::async_trait]
 impl<R: Runtime> EventHandler<R> for AppHandler {
 	async fn handle(&self, event: &e::Event, runtime: &R) {
 		if !matches!(event.kind, e::Klass::SessionStart) {
@@ -9,7 +101,7 @@ impl<R: Runtime> EventHandler<R> for AppHandler {
 		match event.kind.clone() {
 			e::Klass::SessionStop { session } => match runtime.session_service().end().await {
 				Ok(session) => {
-					tracing::info!("🛑 SessionStop");
+					tracing::debug!("🛑 SessionStop");
 				}
 				Err(error) => {
 					tracing::error!(%error, "failed to create session");
@@ -17,7 +109,7 @@ impl<R: Runtime> EventHandler<R> for AppHandler {
 			},
 			e::Klass::SessionStart => match runtime.session_service().create().await {
 				Ok(session) => {
-					tracing::info!(?session, "session created");
+					tracing::debug!(?session, "session created");
 				}
 				Err(error) => {
 					tracing::error!(%error, "failed to create session");
@@ -32,7 +124,7 @@ impl<R: Runtime> EventHandler<R> for AppHandler {
 
 #[async_trait::async_trait]
 impl<R: Runtime> EventHandler<R> for CommandHandler {
-	async fn handle(&self, event: &e::Event, runtime: &R) {
+	async fn handle(&self, event: &e::Event, _runtime: &R) {
 		tracing::debug!("CommandHandler handler {:?}", event);
 
 		match &event.kind {
@@ -57,7 +149,7 @@ impl<R: Runtime> EventHandler<R> for CommandHandler {
 		}
 	}
 	// 			"task_create" => {
-	// 				tracing::info!("CommandHandler task_create {:?}", event);
+	// 				tracing::debug!("CommandHandler task_create {:?}", event);
 	// 				runtime.emit(Event::app(event::Klass::TaskRequested {
 	// 					request: TaskRequest::Create(TaskKind::SyncBookmarks),
 	// 				}));
@@ -94,7 +186,7 @@ impl<R: Runtime> EventHandler<R> for CommandHandler {
 	// 				}
 	// 				runtime.emit(Event::daemon(event::EventKind::TasksCleared));
 	// 			}
-	// 			"dev_info" => {
+	// 			"dev_debug" => {
 	// 				runtime.emit(Event::daemon(event::EventKind::TaskRequested {
 	// 					request: TaskRequest::Create(TaskKind::BuildEstatePrototype),
 	// 				}));
@@ -319,7 +411,7 @@ impl TaskHandler {
 			task
 		};
 		{
-			let mut tasks = runtime.tasks().write().unwrap();
+			let tasks = runtime.tasks().write().unwrap();
 		}
 		runtime.emit(Event::daemon(e::Klass::TaskStarted { task_id }));
 		let runtime = runtime.clone();
@@ -347,10 +439,10 @@ impl TaskHandler {
 
 impl TaskRunner {
 	pub async fn execute<R: Runtime>(runtime: &R, task: Task) -> Result<()> {
-		tracing::info!("TaskRunner execute {:?}", task);
+		tracing::debug!("TaskRunner execute {:?}", task);
 		match task.kind {
 			TaskKind::SessionStart => {
-				tracing::info!("Session Start in Task Runner Execute");
+				tracing::debug!("Session Start in Task Runner Execute");
 				tracing::debug!("SessionStart");
 				tracing::debug!("✅ LoadMaster complete");
 			}
@@ -365,7 +457,7 @@ impl TaskRunner {
 			}
 			TaskKind::IndexWorkspace => {
 				let started = Instant::now();
-				tracing::info!("Index Timer Start 🏁 {:?}ms", started);
+				tracing::debug!("Index Timer Start 🏁 {:?}ms", started);
 
 				let mut discovery = tokio::task::spawn_blocking(EstateDiscovery::init)
 					.await
@@ -379,32 +471,32 @@ impl TaskRunner {
 					duration: duration as u64,
 				}));
 
-				tracing::info!("Index Time End ⏰ {}ms", duration);
-				tracing::info!("Files: {}", discovery.files.len());
-				tracing::info!("Types: {}", discovery.types().len());
+				tracing::debug!("Index Time End ⏰ {}ms", duration);
+				tracing::debug!("Files: {}", discovery.files.len());
+				tracing::debug!("Types: {}", discovery.types().len());
 			}
 			TaskKind::RebuildIndex => {
-				tracing::info!("🔨 rebuilding index");
+				tracing::debug!("🔨 rebuilding index");
 				tokio::time::sleep(Duration::from_secs(2)).await;
-				tracing::info!("✅ index rebuild complete");
+				tracing::debug!("✅ index rebuild complete");
 			}
 			TaskKind::GenerateView(name) => {
-				tracing::info!("👁️ generating view: {name}");
+				tracing::debug!("👁️ generating view: {name}");
 				tokio::time::sleep(Duration::from_secs(2)).await;
-				tracing::info!("✅ view generated: {name}");
+				tracing::debug!("✅ view generated: {name}");
 			}
 			TaskKind::SyncBookmarks => {
-				tracing::info!("🔖 TaskKind::SyncBookmarks {:?}", task);
+				tracing::debug!("🔖 TaskKind::SyncBookmarks {:?}", task);
 				tokio::time::sleep(Duration::from_secs(2)).await;
-				tracing::info!("✅ bookmark sync complete {:?}", task.id);
+				tracing::debug!("✅ bookmark sync complete {:?}", task.id);
 			}
 			TaskKind::BuildEstatePrototype => {
-				tracing::info!("🚧 starting BuildEstatePrototype");
+				tracing::debug!("🚧 starting BuildEstatePrototype");
 				for i in 1..=10 {
 					tokio::time::sleep(Duration::from_secs(1)).await;
-					tracing::info!("🚧 prototype task: {i}/10");
+					tracing::debug!("🚧 prototype task: {i}/10");
 				}
-				tracing::info!("✅ BuildEstatePrototype complete");
+				tracing::debug!("✅ BuildEstatePrototype complete");
 			}
 		}
 		Ok(())
@@ -417,6 +509,9 @@ pub struct CommandHandler;
 pub struct FileWatcherHandler;
 pub struct Master;
 pub struct NavigationHandler;
+
+#[derive(Debug, Clone)]
+pub struct ProblemHandler;
 pub struct LogHandler;
 pub struct StateHandler;
 /// ## TaskHandler

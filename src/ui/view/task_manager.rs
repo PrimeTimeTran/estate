@@ -20,16 +20,21 @@ impl<C, S> Screen<C, S> for TaskManagerScreen
 where
 	C: Ctx,
 {
-	fn configure(&mut self, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {
+	fn configure(&mut self, _layout: &mut Layout<C, S>, _ctx: &mut AppContext<'_, C, S>) {
 		// Put TaskManagerView into the appropriate region/panel.
 	}
 
-	fn update(&mut self, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {
+	fn update(&mut self, _layout: &mut Layout<C, S>, _ctx: &mut AppContext<'_, C, S>) {
 		// self.manager.poll_changes();
 		self.view.update(ctx);
 	}
 
-	fn event(&mut self, event: &e::Event, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {
+	fn event(
+		&mut self,
+		_event: &e::Event,
+		_layout: &mut Layout<C, S>,
+		_ctx: &mut AppContext<'_, C, S>,
+	) {
 		// Feature-level event handling.
 		//
 		// e.g. TaskCreated, TaskDeleted, etc.
@@ -215,16 +220,16 @@ impl TaskManagerView {
 		}
 	}
 }
-impl<C, S> ViewTrait<C, S> for TaskManagerView
+impl<C, S> traits::View<C, S> for TaskManagerView
 where
 	C: Ctx,
 {
 	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, C, S>) {
 		// compose child views
 	}
-	fn update(&mut self, ctx: &mut AppContext<'_, C, S>) {}
+	fn update(&mut self, _ctx: &mut AppContext<'_, C, S>) {}
 
-	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, C, S>) {}
+	fn event(&mut self, _event: &e::Event, _ctx: &mut AppContext<'_, C, S>) {}
 }
 
 fn render_graphs(

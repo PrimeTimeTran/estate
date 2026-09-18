@@ -18,29 +18,34 @@ impl<C, S> Screen<C, S> for EguiVeable
 where
 	C: Ctx,
 {
-	fn configure(&mut self, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {
+	fn configure(&mut self, layout: &mut Layout<C, S>, _ctx: &mut AppContext<'_, C, S>) {
 		todo!("")
 	}
 
-	fn update(&mut self, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {
+	fn update(&mut self, layout: &mut Layout<C, S>, _ctx: &mut AppContext<'_, C, S>) {
 		todo!("")
 	}
 
-	fn event(&mut self, event: &e::Event, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {
+	fn event(
+		&mut self,
+		event: &e::Event,
+		layout: &mut Layout<C, S>,
+		_ctx: &mut AppContext<'_, C, S>,
+	) {
 		todo!("")
 	}
 }
-impl<C, S> ViewTrait<C, S> for EguiVeable
+impl<C, S> traits::View<C, S> for EguiVeable
 where
 	C: Ctx,
 {
-	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, C, S>) {
+	fn draw(&mut self, ui: &mut egui::Ui, _ctx: &mut AppContext<'_, C, S>) {
 		self.draw_ui(ui);
 	}
 
-	fn update(&mut self, ctx: &mut AppContext<'_, C, S>) {}
+	fn update(&mut self, _ctx: &mut AppContext<'_, C, S>) {}
 
-	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, C, S>) {}
+	fn event(&mut self, _event: &e::Event, _ctx: &mut AppContext<'_, C, S>) {}
 }
 impl EguiVeable {
 	pub fn new() -> Self {
@@ -324,12 +329,17 @@ impl<C, S> Screen<C, S> for Sidebar
 where
 	C: Ctx,
 {
-	fn configure(&mut self, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {
+	fn configure(&mut self, layout: &mut Layout<C, S>, _ctx: &mut AppContext<'_, C, S>) {
 		// Configure the regions this screen uses.
 	}
 
-	fn update(&mut self, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {}
+	fn update(&mut self, _layout: &mut Layout<C, S>, _ctx: &mut AppContext<'_, C, S>) {}
 
-	fn event(&mut self, event: &e::Event, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {
+	fn event(
+		&mut self,
+		_event: &e::Event,
+		_layout: &mut Layout<C, S>,
+		_ctx: &mut AppContext<'_, C, S>,
+	) {
 	}
 }

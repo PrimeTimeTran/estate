@@ -438,10 +438,16 @@ pub enum DaemonCommand {
 	// Disable,
 	// Status,
 }
-pub struct DaemonHandle {
-	runtime: NativeRuntime,
+pub struct DaemonHandle<C>
+where
+	C: Ctx,
+{
+	runtime: NativeRuntime<C>,
 }
-impl DaemonHandle {
+impl<C> DaemonHandle<C>
+where
+	C: Ctx,
+{
 	pub fn emit(&self, event: e::Event) {
 		self.runtime.emit(event);
 	}

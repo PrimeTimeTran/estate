@@ -1,10 +1,4 @@
-use crate::{
-	// app::context::AppContext,
-	model::problem_model::StoredProblem,
-	prelude::*,
-	ui::ui_trait::Screen,
-	*,
-};
+use crate::{model::problem_model::StoredProblem, prelude::*, *};
 
 #[derive(Debug, Default)]
 pub struct ProblemsScreen;
@@ -24,14 +18,20 @@ impl ProblemsScreen {
 	}
 }
 
-impl<C, S> Screen<C, S> for ProblemsScreen where
+impl<C, S> Screen<C, S> for ProblemsScreen
+where
 	C: Ctx,
 {
-	fn configure(&mut self, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {
+	fn configure(&mut self, _layout: &mut Layout<C, S>, _ctx: &mut AppContext<'_, C, S>) {
 		// Configure the regions this screen uses.
 	}
-	fn update(&mut self, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {}
-	fn event(&mut self, event: &e::Event, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {
+	fn update(&mut self, _layout: &mut Layout<C, S>, _ctx: &mut AppContext<'_, C, S>) {}
+	fn event(
+		&mut self,
+		_event: &e::Event,
+		_layout: &mut Layout<C, S>,
+		_ctx: &mut AppContext<'_, C, S>,
+	) {
 	}
 }
 

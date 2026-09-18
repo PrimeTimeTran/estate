@@ -21,8 +21,13 @@ impl<C, S> Screen<C, S> for MarkdownScreen
 where
 	C: Ctx,
 {
-	fn configure(&mut self, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {}
-	fn update(&mut self, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {}
-	fn event(&mut self, event: &e::Event, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {
+	fn configure(&mut self, layout: &mut Layout<C, S>, _ctx: &mut AppContext<'_, C, S>) {}
+	fn update(&mut self, layout: &mut Layout<C, S>, _ctx: &mut AppContext<'_, C, S>) {}
+	fn event(
+		&mut self,
+		_event: &e::Event,
+		_layout: &mut Layout<C, S>,
+		_ctx: &mut AppContext<'_, C, S>,
+	) {
 	}
 }

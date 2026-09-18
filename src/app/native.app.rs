@@ -1139,7 +1139,7 @@ pub struct NativePersistence;
 #[derive(Debug, Default, Clone)]
 pub struct NativeStorage;
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, Default)]
 pub struct NativeServices {
 	persistence: NativePersistence,
 	network: NativeNetwork,

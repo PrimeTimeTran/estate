@@ -10,7 +10,7 @@ use tokio::runtime::Runtime;
 
 #[async_trait::async_trait]
 pub trait Api: Debug + 'static {
-	async fn load_problems(&self) -> anyhow::Result<Vec<StoredProblem>>;
+	async fn load_problems(&self, query: ProblemQuery) -> anyhow::Result<Vec<StoredProblem>>;
 	async fn sample_problem(&self, request: SampleProblemRequest) -> anyhow::Result<StoredProblem>;
 	async fn load_problem(&self, id: i64) -> anyhow::Result<StoredProblem>;
 	fn clone_box(&self) -> Box<dyn Api>;
@@ -21,14 +21,41 @@ impl Api for ApiClient {
 	fn clone_box(&self) -> Box<dyn Api> {
 		Box::new(self.clone())
 	}
-	async fn load_problems(&self) -> anyhow::Result<Vec<StoredProblem>> {
-		todo!("ApiClient load_problems")
+	async fn load_problems(&self, query: ProblemQuery) -> anyhow::Result<Vec<StoredProblem>> {
+		let request: crate::proto::types::ListProblemsRequest = query.try_into()?;
+
+		tracing::info!(?request, "Sending ListProblemsRequest");
+
+		let response = self
+			.problems
+			.clone()
+			.list_problems(request)
+			.await?
+			.into_inner();
+
+		tracing::info!(
+			returned = response.problems.len(),
+			?response,
+			"Received ListProblemsResponse"
+		);
+
+		let problems = response
+			.problems
+			.into_iter()
+			.map(StoredProblem::try_from)
+			.collect::<Result<Vec<_>, _>>()?;
+
+		tracing::info!(count = problems.len(), "Decoded problems");
+
+		Ok(problems)
 	}
+
 	async fn load_problem(&self, id: i64) -> anyhow::Result<StoredProblem> {
-		todo!("ApiClient load_problem")
+		todo!("load_problem");
+		// StoredProblem::try_from(response)
 	}
+
 	async fn sample_problem(&self, request: SampleProblemRequest) -> anyhow::Result<StoredProblem> {
-		// println!("Native API Client sample_problem");
 		let request: crate::proto::types::SampleProblemRequest = request.into();
 		let response = self
 			.problems
@@ -37,6 +64,37 @@ impl Api for ApiClient {
 			.await?
 			.into_inner();
 		StoredProblem::try_from(response)
+	}
+}
+
+impl ApiClient {
+	pub async fn connect() -> anyhow::Result<Self> {
+		let endpoint = crate::GRPC_SOCKET_CLIENT;
+
+		tracing::info!(endpoint, "Connecting to gRPC server");
+
+		let chan = Channel::from_static(endpoint)
+			.connect()
+			.await
+			.map_err(|error| {
+				anyhow::anyhow!("failed to connect to gRPC endpoint {endpoint}: {error:#}")
+			})?;
+
+		tracing::info!("gRPC channel connected");
+
+		Ok(Self {
+			problems: ProblemServiceClient::new(chan.clone()),
+			submissions: SubmissionServiceClient::new(chan),
+		})
+	}
+	pub fn new(
+		problems: ProblemServiceClient<Channel>,
+		submissions: SubmissionServiceClient<Channel>,
+	) -> Self {
+		Self {
+			problems,
+			submissions,
+		}
 	}
 }
 
@@ -59,6 +117,9 @@ where
 }
 
 impl App<Context> {
+	pub fn api(&self) -> &ApiService {
+		self.host.api()
+	}
 	pub fn run(&mut self) -> Result<()> {
 		tracing::debug!("App run");
 		self.init_services()?;
@@ -67,22 +128,29 @@ impl App<Context> {
 	}
 	pub fn run_gui(&mut self) -> Result<()> {
 		let cancel = CancellationToken::new();
+
 		let event_loop = EventLoop::<AppEvent>::with_user_event()
 			.build()
 			.expect("failed to build GUI event loop");
 		let proxy = event_loop.create_proxy();
 		let handle = self.start_app_events(proxy.clone())?;
 		self.workers.push(handle);
-		let event_rx = self.host.event_bus.subscribe_broadcast();
+
+		let event_rx = self.host.event_bus.subscribe_broadcast("app");
+		let event_tx = self.host.event_bus.sender();
+		self.host.runtime.attach_event_proxy(proxy);
 		let mut renderer = Renderer::<Context, <Context as Ctx>::AppState>::new(
 			self.host.context(),
 			self.state.clone(),
 			cancel,
 			event_rx,
+			event_tx,
 		);
+
 		event_loop
 			.run_app(&mut renderer)
 			.map_err(|err| anyhow::anyhow!("GUI event loop failed: {err}"))?;
+
 		Ok(())
 	}
 }
@@ -255,7 +323,7 @@ where
 	fn memory_warning(&mut self, event_loop: &ActiveEventLoop) {
 		tracing::debug!("memory_warning")
 	}
-	fn new_events(&mut self, event_loop: &ActiveEventLoop, cause: winit::event::StartCause) {
+	fn new_events(&mut self, _event_loop: &ActiveEventLoop, _cause: winit::event::StartCause) {
 		tracing::debug!("new_events")
 	}
 	fn resumed(&mut self, event_loop: &ActiveEventLoop) {
@@ -267,7 +335,7 @@ where
 	fn suspended(&mut self, event_loop: &ActiveEventLoop) {
 		tracing::info!("suspended")
 	}
-	fn user_event(&mut self, event_loop: &ActiveEventLoop, event: AppEvent) {
+	fn user_event(&mut self, _event_loop: &ActiveEventLoop, event: AppEvent) {
 		tracing::debug!("user_event");
 		match event {
 			AppEvent::Navigate(view) => {
@@ -276,7 +344,11 @@ where
 
 			AppEvent::RuntimeEvent => {
 				tracing::info!("user_event RuntimeEvent");
+				let mut ctx = self.app_context();
+				Self::process_events(self);
 				self.sync_views();
+				// self.process_runtime_events();
+				// self.window.request_redraw();
 			}
 			AppEvent::Shutdown => {
 				tracing::debug!(">>> shutdown event received");
@@ -333,7 +405,7 @@ where
 				let mut ctx = AppContext {
 					context: self.context.as_ref(),
 					state: &mut self.state,
-					event_rx: &mut self.event_rx,
+					event_tx: &mut self.event_tx,
 					input: IOState::default(),
 					last_revision: 0,
 				};
@@ -348,7 +420,24 @@ where
 	}
 }
 
+impl Context {
+	fn new(state: NativeState, api: ApiService) -> Self {
+		Self { state, api }
+	}
+}
+impl Default for Context {
+	fn default() -> Self {
+		Self::new(NativeState::default(), ApiService::default())
+	}
+}
+
 impl Ctx for Context {
+	fn api(&self) -> &Self::Api {
+		&self.api
+	}
+	fn api_mut(&mut self) -> &mut Self::Api {
+		&mut self.api
+	}
 	fn initial_state() -> Self::AppState {
 		structs::S {
 			context: PhantomData,
@@ -356,9 +445,11 @@ impl Ctx for Context {
 			view: ViewType::MarkdownScreen,
 		}
 	}
+	type Api = ApiService;
 	type AppState = structs::S<Context>;
-	type GuiState = NativeGuiState;
 	type EventReceiver = structs::BroadcastReceiver<e::Event>;
+	type EventSender = structs::BroadcastSender<e::Event>;
+	type GuiState = NativeGuiState;
 }
 
 impl<Context> Host<Context>
@@ -374,11 +465,11 @@ where
 	}
 
 	pub fn handle(&self) -> tokio::runtime::Handle {
-		self.runtime.handle().clone()
+		self.tokio.handle().clone()
 	}
 
 	pub fn shutdown(self) {
-		self.runtime.shutdown_background();
+		self.tokio.shutdown_background();
 	}
 
 	pub fn wait_for_shutdown(&self) {
@@ -394,22 +485,33 @@ where
 		&self.worker
 	}
 	pub fn subscribe(&self) -> structs::BroadcastReceiver<e::Event> {
-		self.event_bus.subscribe_broadcast()
+		self.event_bus.subscribe_broadcast("host")
 	}
 }
 
 impl Host<Context> {
-	// pub fn new(context: Arc<C>) -> anyhow::Result<Self> {
-	// 	let runtime = tokio::runtime::Runtime::new()?;
-	// 	let handle = runtime.handle().clone();
-	// 	Ok(Self {
-	// 		context,
-	// 		worker: HostWorker::new(),
-	// 		clock: HostClock::new(handle),
-	// 		runtime,
-	// 	})
-	// }
-	pub fn init() -> Result<Self> {
+	pub fn init() -> anyhow::Result<Self> {
+		let parsed = cli::context::parse();
+
+		let mut config = LogConfig::load()?;
+		config.apply_cli(&parsed);
+		logger::init_logging(&config)?;
+
+		// Create the one runtime.
+		let tokio = tokio::runtime::Runtime::new()?;
+
+		// Context is still uniquely owned here.
+		let mut context = Context::default();
+
+		// Connect using the same runtime that Host will retain.
+		tokio.block_on(context.api_mut().connect())?;
+
+		// Only share Context after initialization.
+		let context = Arc::new(context);
+
+		Self::new(context, tokio)
+	}
+	fn logging() {
 		// let count = 1;
 		// let host = "12";
 		// let error = EventKind::DaemonStarted;o
@@ -431,12 +533,6 @@ impl Host<Context> {
 		// awe!(Debug, "Runtime = {:?}", runtime);
 		// crate::app_macros::awe!(Trace, "Dispatching event: {:?}", event);
 		// panic!(" Hi ");
-		let parsed = cli::context::parse();
-		let mut config = LogConfig::load()?;
-		config.apply_cli(&parsed);
-		logger::init_logging(&config)?;
-		let context = Context::default();
-		Self::new(Arc::new(context))
 	}
 }
 
@@ -475,7 +571,7 @@ where
 			}
 		}
 	}
-	fn handle_event(&mut self, event: MenuEvent, event_loop: &ActiveEventLoop) {
+	fn handle_event(&mut self, _event: MenuEvent, _event_loop: &ActiveEventLoop) {
 		tracing::info!("handle_event");
 
 		// match event {
@@ -493,41 +589,19 @@ where
 	NativeCtx: Ctx + 'static,
 	S: 'static,
 {
-	fn sync_views(&mut self) {
-		for window in &mut self.windows {
-			window.view = self.view;
-			window.window.sync_view(window.view);
-			window.window.instance.set_title(self.view.name());
-			window.window.instance.request_redraw();
-		}
-	}
-	fn navigate_to(&mut self, view: ViewType) {
-		tracing::debug!("navigating from {:?} to {:?}", self.view, view,);
-		self.view = view;
-		self.sync_views();
-	}
-}
-
-impl ApiClient {
-	pub async fn connect() -> anyhow::Result<Self> {
-		let chan = Channel::from_static(crate::GRPC_SOCKET_CLIENT)
-			.connect()
-			.await?;
-
-		Ok(Self {
-			problems: ProblemServiceClient::new(chan.clone()),
-			submissions: SubmissionServiceClient::new(chan),
-		})
-	}
-	pub fn new(
-		problems: ProblemServiceClient<Channel>,
-		submissions: SubmissionServiceClient<Channel>,
-	) -> Self {
-		Self {
-			problems,
-			submissions,
-		}
-	}
+	// fn sync_views(&mut self) {
+	// 	for window in &mut self.windows {
+	// 		window.view = self.view;
+	// 		window.window.sync_view(window.view);
+	// 		window.window.instance.set_title(self.view.name());
+	// 		window.window.instance.request_redraw();
+	// 	}
+	// }
+	// fn navigate_to(&mut self, view: ViewType) {
+	// 	tracing::debug!("navigating from {:?} to {:?}", self.view, view,);
+	// 	self.view = view;
+	// 	self.sync_views();
+	// }
 }
 
 impl<C> Worker<C> for HostWorker<C>
@@ -618,12 +692,13 @@ pub struct App<C: Ctx> {
 	pub workers: Vec<WorkHandle<C, tokio::task::JoinHandle<()>>>,
 }
 
-#[derive(Default)]
+#[derive(Clone)]
 pub struct Context {
 	pub state: NativeState,
-	pub menu_bar: Option<MenuBar>,
-	pub tray_clock: Option<MenuBar>,
-	pub tray_cursor: Option<TrayIcon>,
+	pub api: ApiService,
+	// pub menu_bar: Option<MenuBar>,
+	// pub tray_clock: Option<MenuBar>,
+	// pub tray_cursor: Option<TrayIcon>,
 }
 
 #[derive(Debug, Clone)]
@@ -641,8 +716,6 @@ pub struct CursorPosition {
 pub struct NativeState {
 	pub menu_bar: Option<MenuBar>,
 	pub tray_clock: Option<MenuBar>,
-	// pub tray_cursor: Arc<Option<TrayIcon>>,
-	// pub windows: Vec<AppWindow>,
 }
 #[derive(Clone, Debug, Default)]
 pub struct NativeGuiState {

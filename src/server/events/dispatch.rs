@@ -14,24 +14,47 @@ impl<R: Runtime> Default for EventDispatcher<R> {
 
 impl EventBus {
 	pub fn new() -> Self {
-		let (sender, _) = broadcast::channel(256);
-		Self { sender }
+		let (tx, _) = broadcast::channel(256);
+		tracing::info!("EventBus CREATED");
+
+		Self { tx }
 	}
+
 	pub fn emit(&self, event: e::Event) {
-		match self.sender.send(event.clone()) {
+		match self.tx.send(event.clone()) {
 			Ok(count) => {
-				tracing::debug!("📡 Event emitted: {:?} → {} receiver(s)", event.kind, count);
+				tracing::info!("📡 Event emitted: {:?} → {} receiver(s)", event.kind, count);
 			}
 			Err(_) => {
-				tracing::debug!("⚠️ Event emitted with NO receivers: {:?}", event.kind);
+				tracing::info!("⚠️ Event emitted with NO receivers: {:?}", event.kind);
 			}
 		}
 	}
+
+	/// Raw Tokio broadcast receiver.
 	pub fn subscribe(&self) -> broadcast::Receiver<e::Event> {
-		self.sender.subscribe()
+		tracing::info!("EventBus subscribe RAW");
+		self.tx.subscribe()
 	}
-	pub fn subscribe_broadcast(&self) -> structs::BroadcastReceiver<e::Event> {
-		structs::BroadcastReceiver::new(self.sender.subscribe())
+
+	/// Application-level event receiver.
+	pub fn subscribe_broadcast(&self, owner: &'static str) -> BroadcastReceiver<e::Event> {
+		let id = NEXT_RECEIVER_ID.fetch_add(1, Ordering::Relaxed);
+
+		tracing::info!(id, owner, "EventBus creating broadcast receiver");
+
+		BroadcastReceiver {
+			id,
+			owner,
+			rx: self.tx.subscribe(),
+		}
+	}
+
+	/// Application-level event sender.
+	pub fn sender(&self) -> BroadcastSender<e::Event> {
+		BroadcastSender {
+			tx: self.tx.clone(),
+		}
 	}
 }
 
@@ -93,18 +116,51 @@ impl<R: Runtime> EventDispatcher<R> {
 
 impl std::hash::Hash for EventBus {
 	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-		self.sender.same_channel(&self.sender).hash(state);
+		self.tx.same_channel(&self.tx).hash(state);
 	}
 }
 
-/// [EventBus]
+/// ## [EventBus]
 ///
-/// Enables disparate modules to talk to
-/// each other by sending and receiving messages called events.
+/// Enables disparate modules to talk to each other by sending and receiving
+/// messages called events.
 ///
+/// <details>
+/// <summary>Diagram</summary>
+///
+/// ```mermaid
+/// flowchart TD
+///     EB["EventBus"]
+///     EB --> RX["subscribe() → BroadcastReceiver"]
+///     EB --> TX["sender() → BroadcastSender"]
+///
+///     RX --> R["Renderer"]
+///     TX --> R
+///
+///     R --> AC["AppContext"]
+///     AC --> PV["ProblemView::draw()"]
+///
+///     PV -->|send| PR["ProblemsRequested"]
+///     PR --> EB
+///
+///     EB --> RT["AppRuntime"]
+///     RT --> API["async API request"]
+///
+///     API -->|success| PL["ProblemsLoaded"]
+///     API -->|failure| PF["ProblemsLoadFailed"]
+///
+///     PL --> EB
+///     PF --> EB
+///
+///     RT --> S["Update application state"]
+/// ```
+/// </details>
+///
+/// The issue is it's not big enough. Doesn't scroll?
 #[derive(Debug, Clone)]
 pub struct EventBus {
-	sender: broadcast::Sender<e::Event>,
+	tx: broadcast::Sender<e::Event>,
+	// id: usize,
 }
 
 /// ## [EventDispatcher]

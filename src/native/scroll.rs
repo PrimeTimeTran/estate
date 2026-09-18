@@ -1,8 +1,10 @@
+use crate::prelude::*;
 
-use crate::{
-	native::{CursorDaemon, CursorPosition},
-	prelude::*,
-};
+#[derive(Debug, Clone, Copy)]
+pub enum CursorEvent {
+	CursorPosition { x: f64, y: f64 },
+	ModifiersChanged(Modifiers),
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScrollDirection {
@@ -23,7 +25,12 @@ pub fn scroll_state() -> &'static Mutex<ScrollRedirectState> {
 		})
 	})
 }
-
+pub fn spawn_global_cursor_daemon_new<S>(sink: S, cancel: CancellationToken) -> anyhow::Result<()>
+where
+	S: CursorEventSink,
+{
+	CursorDaemon::new(sink, cancel).run()
+}
 pub fn target_position(bounds: CGRect, target: ScreenPosition, y: f64) -> CGPoint {
 	let inset = CURSOR_INSET;
 	let inset = inset.clamp(0.0, 0.5);
@@ -36,15 +43,6 @@ pub fn target_position(bounds: CGRect, target: ScreenPosition, y: f64) -> CGPoin
 }
 
 pub static SCROLL_STATE: OnceLock<Mutex<ScrollRedirectState>> = OnceLock::new();
-
-#[derive(Debug)]
-pub struct GestureState {
-	pub active_focus: FocusedPane,
-	pub side_panel_width: f32,
-	pub secondary_scroll_offset: f32,
-	pub last_delta: egui::Vec2,
-	pub last_direction: ScrollDirection,
-}
 impl Default for GestureState {
 	fn default() -> Self {
 		Self {
@@ -55,10 +53,6 @@ impl Default for GestureState {
 			last_direction: ScrollDirection::None,
 		}
 	}
-}
-#[derive(Debug)]
-pub struct GestureController {
-	pub state: GestureState,
 }
 impl GestureController {
 	pub(crate) fn new() -> Self {
@@ -136,27 +130,6 @@ impl GestureController {
 		}
 	}
 }
-
-#[derive(Debug, Clone, Copy)]
-pub struct ScrollRedirectState {
-	pub active: bool,
-	pub redirected: bool,
-	pub original_position: CGPoint,
-	pub target_position: CGPoint,
-}
-#[derive(Debug, Clone, Copy)]
-pub struct TrackpadState {
-	pub delta: egui::Vec2,
-	pub direction: ScrollDirection,
-	pub shift_held: bool,
-	pub ctrl_held: bool,
-	pub alt_held: bool,
-	pub command_held: bool,
-	pub mouse_pos: Option<egui::Pos2>,
-	pub hovered: CursorTarget,
-	pub clicked: Option<CursorTarget>,
-	pub focus: FocusedPane,
-}
 impl TrackpadState {
 	pub(crate) fn primary_axis(&self) -> &'static str {
 		if self.delta.x.abs() > self.delta.y.abs() {
@@ -171,17 +144,6 @@ impl TrackpadState {
 		self.hovered.name()
 	}
 }
-
-#[derive(Debug, Clone, Copy)]
-pub enum CursorEvent {
-	CursorPosition { x: f64, y: f64 },
-	ModifiersChanged(Modifiers),
-}
-
-pub struct AppCursorSink {
-	pub tx: std::sync::mpsc::Sender<CursorEvent>,
-}
-
 impl CursorEventSink for AppCursorSink {
 	fn cursor_moved(&self, position: CursorPosition) {
 		let _ = self.tx.send(CursorEvent::CursorPosition {
@@ -194,7 +156,6 @@ impl CursorEventSink for AppCursorSink {
 		let _ = self.tx.send(CursorEvent::ModifiersChanged(modifiers));
 	}
 }
-
 impl<S> CursorDaemon<S>
 where
 	S: CursorEventSink,
@@ -450,9 +411,38 @@ where
 	}
 }
 
-pub fn spawn_global_cursor_daemon_new<S>(sink: S, cancel: CancellationToken) -> anyhow::Result<()>
-where
-	S: CursorEventSink,
-{
-	CursorDaemon::new(sink, cancel).run()
+pub struct AppCursorSink {
+	pub tx: std::sync::mpsc::Sender<CursorEvent>,
+}
+#[derive(Debug)]
+pub struct GestureController {
+	pub state: GestureState,
+}
+#[derive(Debug)]
+pub struct GestureState {
+	pub active_focus: FocusedPane,
+	pub side_panel_width: f32,
+	pub secondary_scroll_offset: f32,
+	pub last_delta: egui::Vec2,
+	pub last_direction: ScrollDirection,
+}
+#[derive(Debug, Clone, Copy)]
+pub struct ScrollRedirectState {
+	pub active: bool,
+	pub redirected: bool,
+	pub original_position: CGPoint,
+	pub target_position: CGPoint,
+}
+#[derive(Debug, Clone, Copy)]
+pub struct TrackpadState {
+	pub delta: egui::Vec2,
+	pub direction: ScrollDirection,
+	pub shift_held: bool,
+	pub ctrl_held: bool,
+	pub alt_held: bool,
+	pub command_held: bool,
+	pub mouse_pos: Option<egui::Pos2>,
+	pub hovered: CursorTarget,
+	pub clicked: Option<CursorTarget>,
+	pub focus: FocusedPane,
 }
