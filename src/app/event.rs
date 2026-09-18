@@ -22,7 +22,7 @@
 //! - sync
 //! - thread
 //!
-pub use crate::prelude::*;
+use crate::prelude::*;
 
 /// # Create Events
 ///
@@ -179,7 +179,6 @@ impl Event {
 	pub fn editor(kind: EventKind) -> Self {
 		Self::new(EventSource::Editor, kind)
 	}
-	
 }
 
 impl From<ProtoProblem> for ProblemLoaded {

@@ -1,11 +1,12 @@
 //! ## Protobuf Type defs
-//! 
+//!
 //! Three different platforms must use these type defs
-//! 
+//!
 //! Native, Wasm (Web), Server
-//! 
+//!
 //! So the build system is kinda complicated.
-//! 
+//!
+
 pub mod types {
 	include!(concat!(env!("OUT_DIR"), "/types.rs"));
 }

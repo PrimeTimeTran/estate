@@ -20,7 +20,7 @@ pub mod ui;
 pub mod util;
 pub mod window;
 
-use crate::ui::*;
+pub use prelude_native::*;
 
 #[cfg(target_os = "linux")]
 pub mod linux;

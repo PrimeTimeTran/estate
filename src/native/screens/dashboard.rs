@@ -1,9 +1,4 @@
-use crate::{
-	e,
-	native::{OracleScreen, monitor::StateMonitor},
-	prelude::*,
-	ui::chart::*,
-};
+use crate::{e, native::monitor::StateMonitor, prelude::*, ui::chart::*};
 
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 

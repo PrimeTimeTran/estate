@@ -27,11 +27,14 @@ pub use winit::{
 // The prelude file is used to manage dependencies in a centralized manner,
 // allowing for easier maintenance and updates.
 
-pub use crate::prelude::*;
+// This needs to expose the crates prelude
+// pub use crate::prelude::*;
+
+pub use crate::proto::types::*;
 
 pub use crate::{
 	model::common::{Difficulty, Language},
-	proto::{types::*, *},
+	proto::*,
 	traits::Runtime,
 	ui::{
 		layout::*,

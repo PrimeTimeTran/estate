@@ -1,7 +1,7 @@
 use crate::{
-	ProblemService as ProblemServiceTrait,
 	model::{ProtoProblem, common::Difficulty},
 	prelude::*,
+	server::ProblemService as ProblemServiceTrait,
 	server::*,
 };
 

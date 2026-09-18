@@ -30,12 +30,14 @@ pub use uuid::Uuid;
 ///
 /// [../script/git-precommit-hook.sh]
 ///
+pub use crate::data::{configs::*, default::*};
+
 pub use crate::{
 	app_prelude::*,
-	data::*,
 	e,
 	impls::{self, self as i},
 	macros::{self, *},
+	// Verbosely use/export because of name collisions with external crates.
 	model::common::{Difficulty, Language},
 	model::*,
 	runtime::*,
@@ -44,7 +46,7 @@ pub use crate::{
 	structs::{self, self as s, *},
 	// Verbosely use/export intrinsic traits because of name collisions with external crates.
 	traits::{self, self as t, Context, EventReceiver, *},
-	ui::{config::*, prelude_ui::*, theme::*, *},
+	ui::{config::*, theme::*, *},
 	util::{time::*, *},
 };
 
@@ -53,7 +55,6 @@ pub use crate::{
 	app::{app_native::*, context::*, *},
 	native::{
 		job,
-		prelude_native::*,
 		runtime::*,
 		state::*,
 		util::{logger::*, *},
