@@ -12,8 +12,8 @@
 # trunk-run = "trunk serve src/web/public/index.html --features web"
 
 [alias]
-fixall = "fix --bin web --no-default-features --features web --target wasm32-unknown-unknown --allow-dirty"
-fixallnative = "fix --bin native --no-default-features --features native --allow-dirty"
+fix-all-web = "fix --bin web --no-default-features --features web --target wasm32-unknown-unknown --allow-dirty"
+fix-all-native = "fix --bin native --no-default-features --features native --allow-dirty"
 
 # ─────────────────────────────────────────────
 # Builds

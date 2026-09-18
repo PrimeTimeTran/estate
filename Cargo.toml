@@ -48,10 +48,6 @@ path = "src/bin/macros.rs"
 name = "native"
 path = "src/bin/native.rs"
 required-features = ["native"]
-# feature = "native"
-# target = "aarch64-apple-darwin"
-# 1. Run as native
-# cargo run --bin native --features=native
 
 # https://doc.rust-lang.org/cargo/reference/cargo-targets.html#configuring-a-target
 [[bin]]
@@ -86,21 +82,11 @@ target = "wasm32-unknown-unknown"
 
 # cargo nextest run --bin settings --test-threads 1 --no-fail-fast
 [features]
-# default = []
-default = ["web"]
+# [Pick 1]
+default = []
+# default = ["web"]
 # default = ["native"]
-# This overwrites IDE config causing diagnostics to be wrong given the targetted platform.
-#
-# To get IDE diagnostics functioning correctly remove the hardcoded default when troubleshooting another build target.
-#
-# cargo build --bin web --no-default-features --features="web" --target wasm32-unknown-unknown
-# cargo build --bin web --no-default-features --features="web" --target wasm32-unknown-unknown
 
-# default = []
-# [CHOOSE 1]
-
-# [DEFAULT to this]
-# default = []
 mobile = []
 web = [
   "dep:wasm-bindgen",
@@ -190,6 +176,7 @@ wasm-bindgen = { workspace = true, optional = true }
 web-sys = { workspace = true, optional = true }
 tokio-util = { workspace = true, optional = true }
 
+# EGUI Family Deps
 winit.workspace = true
 egui_plot.workspace = true
 egui-wgpu.workspace = true
