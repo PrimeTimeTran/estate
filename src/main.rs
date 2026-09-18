@@ -1,25 +1,29 @@
 fn main() {
-	let a = String::from("hello");
-	println!("a {}", a);
-	let b = a;
-	println!("b {}", b);
-	println!("a {}", a);
-	
 	main_intro()
 }
 fn main_intro() {
-	trait FooTrait {
+	trait Trait {}
+	trait Bar {}
+	trait Foo {
 		type GenericAssociatedType<'a>;
 	}
-	impl FooTrait for u32 {
+	impl Foo for u32 {
 		type GenericAssociatedType<'a> = &'a u32;
 	}
-	trait Trait {}
+	/// For every T that implements Foo, the particular type
+	///
+	/// (T, for<'a> fn(T::GenericAssociatedType<'a>))
+	///
+	/// implements Trait.
+	///
+	/// - You're implementing it for a constructed type involving T.
+	///
+	impl<T: Foo> Trait for (T, for<'a> fn(<T as Foo>::GenericAssociatedType<'a>)) {}
+	// -> If I can prove T: Foo, then I can prove that this derived type implements Trait.
 
-	impl<T: FooTrait> Trait for (T, for<'a> fn(<T as FooTrait>::GenericAssociatedType<'a>)) {}
+	// impls input type must satisfy `Trait`
 
 	fn impls<T: Trait>() {}
-
 	impls::<(u32, for<'a> fn(&'a u32))>();
 }
 
@@ -108,4 +112,9 @@ fn main_documented() {
 	fn impls<T: Trait>() {}
 
 	impls::<(u32, for<'a> fn(&'a u32))>();
+
+	// Constructed Type
+	// -> A type formed by applying type constructors to other types.
+	//
+	// (T, for<'a> fn(<T as Foo>::GenericAssociatedType<'a>))
 }

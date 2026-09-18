@@ -1,15 +1,15 @@
 //! ## [Struct]
 //!
-//! Defining everything in a single file looks
-//! messy but helps us quickly identify conflicting abstractions which are competing.
+//! All structs in a file looks
+//! messy but helps us quickly spot competing abstractions early.
 //!
 //! What's the different between state, app state, native state, web state for example?
 //!
-//! The difference may noe be apparent to both the reader & the author. But having these structures next to each other
-//! enables us to see where they can be squashed and where they meaningfully diverge.
+//! The difference may not be apparent to either reader or author... So having structs default
+//! next to each other helps us to see where they align, diverge, and can be squashed or merged.
 //!
-//! When the identifier has stabilized and we're confident this is a meaningful difference,
-//! then it's appropriate to move the definition to a domain specific dir.
+//! When the identifier has stabilized and we're confident this
+//! is a meaningful difference then it's appropriate to move the definition to a domain specific dir.
 //!
 use crate::prelude::*;
 

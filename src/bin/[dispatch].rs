@@ -1,5 +1,5 @@
 #![allow(warnings)]
-#![feature(type_changing_struct_update)]
+// #![feature(type_changing_struct_update)]
 // https://www.youtube.com/watch?v=3biW5NkNnrk
 
 use std::{

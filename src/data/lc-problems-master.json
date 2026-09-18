@@ -1,5 +1,71 @@
 [
   {
+    "number": 1520,
+    "normalized-name": "maximum-number-of-non-overlapping-substrings",
+    "title": "Maximum Number of Non-Overlapping Substrings",
+    "difficulty": "hard",
+    "description": "Given a string s of lowercase letters, you need to find the maximum number of non-empty substrings of s that meet the following conditions:\n\nFind the maximum number of substrings that meet the above conditions. If there are multiple solutions with the same number of substrings, return the one with minimum total length. It can be shown that there exists a unique solution of minimum total length.",
+    "url": "https://leetcode.com/problems/maximum-number-of-non-overlapping-substrings/",
+    "filename": "1520-maximum-number-of-non-overlapping-substrings.py",
+    "description-raw": "<p>Given a string <code>s</code> of lowercase letters, you need to find the maximum number of <strong>non-empty</strong> substrings of <code>s</code> that meet the following conditions:</p>\n<p>Find <em>the maximum number of substrings that meet the above conditions</em>. If there are multiple solutions with the same number of substrings, <em>return the one with minimum total length. </em>It can be shown that there exists a unique solution of minimum total length.</p>",
+    "test-cases": [
+      {
+        "index": 0,
+        "input": "s = \"adefaddaccc\"",
+        "output": "[\"e\",\"f\",\"ccc\"]\nExplanation: The following are all the possible substrings that meet the conditions:\n[\n  \"adefaddaccc\"\n  \"adefadda\",\n  \"ef\",\n  \"e\",\n  \"f\",\n  \"ccc\",\n]\nIf we choose the first string, we cannot choose anything else and we'd get only 1. If we choose \"adefadda\", we are left with \"ccc\" which is the only one that doesn't overlap, thus obtaining 2 substrings. Notice also, that it's not optimal to choose \"ef\" since it can be split into two. Therefore, the optimal way is to choose [\"e\",\"f\",\"ccc\"] which gives us 3 substrings. No other solution of the same number of substrings exist.",
+        "explanation": null
+      },
+      {
+        "index": 1,
+        "input": "s = \"abbaccd\"",
+        "output": "[\"d\",\"bb\",\"cc\"]\nExplanation: Notice that while the set of substrings [\"d\",\"abba\",\"cc\"] also has length 3, it's considered incorrect since it has larger total length.",
+        "explanation": null
+      },
+      {
+        "index": 2,
+        "input": null,
+        "output": null,
+        "explanation": null
+      },
+      {
+        "index": 3,
+        "input": null,
+        "output": null,
+        "explanation": null
+      }
+    ]
+  },
+  {
+    "number": 1477,
+    "normalized-name": "find-two-non-overlapping-sub-arrays-each-with-target-sum",
+    "title": "Find Two Non-overlapping Sub-arrays Each With Target Sum",
+    "difficulty": "medium",
+    "description": "You are given an array of integers arr and an integer target.\n\nYou have to find two non-overlapping sub-arrays of arr each with a sum equal target. There can be multiple answers so you have to find an answer where the sum of the lengths of the two sub-arrays is minimum.",
+    "url": "https://leetcode.com/problems/find-two-non-overlapping-sub-arrays-each-with-target-sum/",
+    "filename": "1477-find-two-non-overlapping-sub-arrays-each-with-target-sum.py",
+    "description-raw": "<p>You are given an array of integers <code>arr</code> and an integer <code>target</code>.</p>\n<p>You have to find <strong>two non-overlapping sub-arrays</strong> of <code>arr</code> each with a sum equal <code>target</code>. There can be multiple answers so you have to find an answer where the sum of the lengths of the two sub-arrays is <strong>minimum</strong>.</p>",
+    "test-cases": [
+      {
+        "index": 0,
+        "input": "arr = [3,2,2,4,3], target = 3",
+        "output": "2",
+        "explanation": "Only two sub-arrays have sum = 3 ([3] and [3]). The sum of their lengths is 2."
+      },
+      {
+        "index": 1,
+        "input": "arr = [7,3,4,7], target = 7",
+        "output": "2",
+        "explanation": "Although we have three non-overlapping sub-arrays of sum = 7 ([7], [3,4] and [7]), but we will choose the first and third sub-arrays as the sum of their lengths is 2."
+      },
+      {
+        "index": 2,
+        "input": "arr = [4,3,2,6,2,3,4], target = 6",
+        "output": "-1",
+        "explanation": "We have only one sub-array of sum = 6."
+      }
+    ]
+  },
+  {
     "number": 1621,
     "normalized-name": "number-of-sets-of-k-non-overlapping-line-segments",
     "title": "Number of Sets of K Non-Overlapping Line Segments",
