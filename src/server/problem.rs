@@ -1,22 +1,9 @@
-use crate::services::*;
-
 use crate::{
+	ProblemService as ProblemServiceTrait,
 	model::{ProtoProblem, common::Difficulty},
 	prelude::*,
 	server::*,
-	services::*,
 };
-
-#[async_trait]
-pub trait ProblemRepository: Send + Sync {
-	async fn create(&self, problem: CreateProblem) -> Result<ProtoProblem>;
-	async fn delete(&self, id: i64) -> Result<()>;
-	async fn get_by_slug(&self, slug: &str) -> Result<ProtoProblem>;
-	async fn get(&self, id: i64) -> Result<ProtoProblem>;
-	async fn list(&self, query: ProblemQuery) -> Result<Page<ProtoProblem>>;
-	async fn sample_problem(&self, query: ProblemQuery) -> Result<ProtoProblem>;
-	async fn update(&self, id: i64, problem: UpdateProblem) -> Result<ProtoProblem>;
-}
 
 fn problem_id(id: &str) -> Result<i64, Status> {
 	id.parse()
@@ -24,7 +11,7 @@ fn problem_id(id: &str) -> Result<i64, Status> {
 }
 
 #[tonic::async_trait]
-impl<R> ProblemService for ProblemServiceImpl<R>
+impl<R> ProblemServiceTrait for ProblemService<R>
 where
 	R: ProblemRepository + 'static,
 {
@@ -131,7 +118,7 @@ where
 	}
 }
 
-impl<R> ProblemServiceImpl<R> {
+impl<R> ProblemService<R> {
 	pub fn new(repository: R) -> Self {
 		Self { repository }
 	}
@@ -147,7 +134,7 @@ pub struct ProblemQuery {
 	pub difficulty: Option<Difficulty>,
 }
 #[derive(Default)]
-pub struct ProblemServiceImpl<R> {
+pub struct ProblemService<R> {
 	repository: R,
 }
 pub struct UpdateProblem {

@@ -1,19 +1,7 @@
-use crate::{
-	model::common::Language, prelude::*, proto::types::Submission, server::*,
-	services::SubmissionService,
-};
-
-#[async_trait]
-pub trait SubmissionRepository {
-	async fn create(&self, submission: CreateSubmission) -> anyhow::Result<Submission>;
-	async fn delete(&self, id: &str) -> anyhow::Result<()>;
-	async fn get(&self, id: &str) -> anyhow::Result<Submission>;
-	async fn list(&self, query: SubmissionQuery) -> anyhow::Result<Page<Submission>>;
-	async fn update(&self, id: &str, submission: UpdateSubmission) -> anyhow::Result<Submission>;
-}
+use crate::prelude::{SubmissionService as SubmissionServiceTrait, *};
 
 #[tonic::async_trait]
-impl<R> SubmissionService for SubmissionServiceImpl<R>
+impl<R> SubmissionServiceTrait for SubmissionService<R>
 where
 	R: SubmissionRepository + Send + Sync + 'static,
 {
@@ -120,13 +108,14 @@ where
 		Err(Status::unimplemented("run_submission is not implemented"))
 	}
 }
-impl<R> SubmissionServiceImpl<R> {
+
+impl<R> SubmissionService<R> {
 	pub fn new(repository: R) -> Self {
 		Self { repository }
 	}
 }
 
 #[derive(Default)]
-pub struct SubmissionServiceImpl<R> {
+pub struct SubmissionService<R> {
 	repository: R,
 }

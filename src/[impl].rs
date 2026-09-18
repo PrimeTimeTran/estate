@@ -15,6 +15,12 @@ pub async fn sleep(duration: Duration) {
 	gloo_timers::future::TimeoutFuture::new(duration.as_millis() as u32).await;
 }
 
+impl Clone for Box<dyn Api> {
+	fn clone(&self) -> Self {
+		self.clone_box()
+	}
+}
+
 impl<C> Clone for S<C> {
 	fn clone(&self) -> Self {
 		Self {

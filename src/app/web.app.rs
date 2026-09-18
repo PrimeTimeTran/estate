@@ -142,7 +142,7 @@ impl Runtime for WebRuntime {
 impl Services for WebServices {
 	type Network = WebNetwork;
 	type Persistence = WebStorage;
-	type Client = WebApiClient;
+	type Client = ApiClient;
 
 	fn api(&self) -> &Option<Self::Client> {
 		&self.api
@@ -157,7 +157,7 @@ impl Services for WebServices {
 }
 impl WebServices {
 	pub fn new() -> anyhow::Result<Self> {
-		let api = WebApiClient::new(String::from(""));
+		let api = ApiClient::new(String::from(""));
 		Ok(Self { api: Some(api) })
 	}
 }
@@ -214,7 +214,7 @@ pub struct WebApp {
 
 #[derive(Debug, Clone)]
 pub struct WebServices {
-	api: Option<WebApiClient>,
+	api: Option<ApiClient>,
 }
 #[derive(Default)]
 pub struct WebHost {

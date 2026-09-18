@@ -1,0 +1,88 @@
+use crate::prelude::*;
+
+impl<T> JsonFile<T>
+where
+	T: Serialize + DeserializeOwned,
+{
+	pub fn new(path: impl Into<PathBuf>) -> Self {
+		Self {
+			path: path.into(),
+			_marker: PhantomData,
+		}
+	}
+
+	pub fn path(&self) -> &Path {
+		&self.path
+	}
+
+	pub async fn read(&self) -> Result<T> {
+		let json = tokio::fs::read_to_string(&self.path).await?;
+		Ok(serde_json::from_str(&json)?)
+	}
+
+	pub async fn write(&self, value: &T) -> Result<()> {
+		let json = serde_json::to_string_pretty(value)?;
+		tokio::fs::write(&self.path, json).await?;
+		Ok(())
+	}
+
+	pub async fn update<F>(&self, update: F) -> Result<T>
+	where
+		F: FnOnce(&mut T),
+	{
+		let mut value = self.read().await?;
+		update(&mut value);
+		self.write(&value).await?;
+		Ok(value)
+	}
+
+	pub async fn delete(&self) -> Result<()> {
+		tokio::fs::remove_file(&self.path).await?;
+		Ok(())
+	}
+}
+
+impl<T> JsonRepo<T>
+where
+	T: Serialize + DeserializeOwned,
+{
+	pub fn new(path: impl Into<PathBuf>) -> Self {
+		Self {
+			path: path.into(),
+			_marker: std::marker::PhantomData,
+		}
+	}
+	pub fn path(&self) -> &Path {
+		&self.path
+	}
+	pub async fn read(&self) -> Result<T> {
+		let json = tokio::fs::read_to_string(&self.path).await?;
+		Ok(serde_json::from_str(&json)?)
+	}
+	pub async fn write(&self, value: &T) -> Result<()> {
+		let json = serde_json::to_string_pretty(value)?;
+		tokio::fs::write(&self.path, json).await?;
+		Ok(())
+	}
+	pub async fn update<F>(&self, update: F) -> Result<T>
+	where
+		F: FnOnce(&mut T),
+	{
+		let mut value = self.read().await?;
+
+		update(&mut value);
+
+		self.write(&value).await?;
+
+		Ok(value)
+	}
+	pub async fn delete(&self) -> Result<()> {
+		tokio::fs::remove_file(&self.path).await?;
+		Ok(())
+	}
+}
+
+pub struct JsonFile<T> {
+	path: PathBuf,
+	_marker: PhantomData<T>,
+}

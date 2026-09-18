@@ -1,3 +1,5 @@
+#![allow(warnings)]
+
 fn main() {
 	main_intro()
 }
@@ -26,8 +28,7 @@ fn main_intro() {
 	fn impls<T: Trait>() {}
 	impls::<(u32, for<'a> fn(&'a u32))>();
 }
-
-fn main_documented() {
+fn _main_documented() {
 	/// ## Generic Associated Types (GATs)
 	///
 	/// A GAT is an associated type that is itself parameterized:

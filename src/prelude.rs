@@ -23,41 +23,40 @@ pub use uuid::Uuid;
 
 /// ## Warning
 ///
-/// Disabling lint suppressions in lib.rs makes this blow up with warnings.
+/// Enabling warnings by removing the suppression macro in lib.rs makes this blow up with warnings.
 ///
-/// Don't touch this unless all 3 platforms have build & run using the smoke testing script below
+/// Don't touch this unless all 3 platforms build & run using the smoke testing script below
 ///
 /// [../script/git-precommit-hook.sh]
 ///
 pub use crate::{
-	api::*,
 	// The app prefix prevents collision warnings from the ./src/app directory use/import of ./lib/mod.rs
 	app_entry::*,
 	app_macros,
 	app_prelude::*,
 	data::*,
 	e,
-	impls,
+	impls::{self, self as i},
 	r#macro::*,
 	model::*,
 	runtime::*,
-	services::*,
+	service::*,
 	share::{share_prelude::*, *},
-	structs::{self, *},
+	structs::{self, self as s, *},
 	tool::{time::*, *},
-	// Verbosely use/export intrinsic traits when their name collides with external ones.
-	traits::{self, Context, EventReceiver, *},
-	ui::{config::*, theme::*, ui_prelude::*, ui_trait::*, *},
+	// Verbosely use/export intrinsic traits because of name collisions with external crates.
+	traits::{self, self as t, Context, EventReceiver, *},
+	ui::{config::*, prelude::*, theme::*, ui_trait::*, *},
 };
 
-#[cfg(all(feature = "web", target_arch = "wasm32"))]
-pub use crate::web::*;
-
+// This gate auto imports native when appropriate saving multiple use statements.
 #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 pub use crate::{
 	app::{app_native::*, context::*, *},
-	logger::*,
-	native::{native_prelude::*, *},
-	native_state::*,
-	server::{self, events::*},
+	native::{prelude::*, state::*, *},
+	server::{self, events::*, fs::*},
+	tool::logger::*,
 };
+
+#[cfg(all(feature = "web", target_arch = "wasm32"))]
+pub use crate::web::{app::*, bridge::*, *};

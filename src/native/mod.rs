@@ -1,14 +1,14 @@
-
-
+pub mod app;
 pub mod agent;
 pub mod backend;
 pub mod daemon;
 pub mod discovery;
 pub mod lint;
 pub mod monitor;
-pub mod native_job;
-pub mod native_prelude;
+pub mod job;
 pub mod poc;
+#[path = "[prelude].rs"]
+pub mod prelude;
 pub mod resolver;
 pub mod router;
 pub mod screens;

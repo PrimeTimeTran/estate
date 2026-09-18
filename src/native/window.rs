@@ -1,4 +1,9 @@
-use crate::{doc, prelude::anyhow::anyhow, prelude::*, ui, ui_prelude as gui};
+use crate::{
+	doc,
+	prelude::anyhow::anyhow,
+	prelude::*,
+	ui::{self, prelude as gui},
+};
 
 use objc2_app_kit::{NSApplication, NSApplicationActivationPolicy};
 use objc2_foundation::MainThreadMarker;
@@ -229,10 +234,10 @@ where
 	}
 
 	pub fn draw(&mut self, ctx: &mut AppContext<'_, C, S>) -> Result<()> {
-		tracing::info!("drawdrawdraw window before begin_egui");
+		tracing::debug!("drawdrawdraw window before begin_egui");
 
 		let Some(surface_texture) = self.acquire_surface()? else {
-			tracing::warn!("NO SURFACE");
+			tracing::debug!("NO SURFACE");
 			return Ok(());
 		};
 
@@ -253,7 +258,7 @@ where
 		);
 
 		gui::Frame::NONE.show(&mut ui, |ui| {
-			tracing::info!("Window → ScreenInstance::draw");
+			tracing::debug!("Window → ScreenInstance::draw");
 			self.screen.draw(ui, ctx);
 		});
 

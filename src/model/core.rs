@@ -14,40 +14,6 @@
 
 use crate::prelude::*;
 
-/// ## [Estate]
-///
-/// Represents an estate instance and its complete project state.
-///
-/// An [Estate] is the root entity for a project. It owns the project's
-/// identity, scope, nodes, resources, relations, and bindings.
-///
-/// Each Estate has a globally unique [Uuid] and may optionally have a
-/// parent Estate, allowing Estates to be organized hierarchically.
-///
-/// ### Resources
-///
-/// Resources represent files or other external assets associated with the
-/// Estate. They can be created, looked up, mutably accessed, and removed
-/// through the resource methods on this type.
-///
-/// ### Examples
-///
-/// ```ignore
-/// let estate = Estate::new("my-project".into(), Scope::default());
-/// assert_eq!(estate.resources.len(), 0);
-/// ```
-#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
-pub struct Estate {
-	pub bindings: Vec<Binding>,
-	pub id: Uuid,
-	pub name: String,
-	pub nodes: Vec<Node>,
-	pub parent: Option<Uuid>,
-	pub relations: Vec<Relation>,
-	pub resources: Vec<Resource>,
-	pub scope: Scope,
-}
-
 /// Estate Constructors
 ///
 /// Constructors of Estate Entities
@@ -102,6 +68,40 @@ impl Estate {
 		let index = self.resources.iter().position(|r| r.id == id)?;
 		Some(self.resources.remove(index))
 	}
+}
+
+/// ## [Estate]
+///
+/// Represents an estate instance and its complete project state.
+///
+/// An [Estate] is the root entity for a project. It owns the project's
+/// identity, scope, nodes, resources, relations, and bindings.
+///
+/// Each Estate has a globally unique [Uuid] and may optionally have a
+/// parent Estate, allowing Estates to be organized hierarchically.
+///
+/// ### Resources
+///
+/// Resources represent files or other external assets associated with the
+/// Estate. They can be created, looked up, mutably accessed, and removed
+/// through the resource methods on this type.
+///
+/// ### Examples
+///
+/// ```ignore
+/// let estate = Estate::new("my-project".into(), Scope::default());
+/// assert_eq!(estate.resources.len(), 0);
+/// ```
+#[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
+pub struct Estate {
+	pub bindings: Vec<Binding>,
+	pub id: Uuid,
+	pub name: String,
+	pub nodes: Vec<Node>,
+	pub parent: Option<Uuid>,
+	pub relations: Vec<Relation>,
+	pub resources: Vec<Resource>,
+	pub scope: Scope,
 }
 
 #[derive(Clone, Default, Debug, PartialEq, Eq)]

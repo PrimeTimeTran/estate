@@ -1,4 +1,4 @@
-use crate::{model::ProtoProblem, native::*, prelude::*, server::*, services::*};
+use crate::{model::ProtoProblem, native::*, prelude::*, server::*};
 
 use anyhow::Context;
 
@@ -95,7 +95,7 @@ impl JsonProblemRepository {
 }
 
 impl JsonProblemRepository {
-	async fn load_matching(&self, query: &ProblemQuery) -> Result<Vec<ProtoProblem>> {
+	pub async fn load_matching(&self, query: &ProblemQuery) -> Result<Vec<ProtoProblem>> {
 		let mut problems = Vec::new();
 
 		let mut entries = tokio::fs::read_dir(&self.path)
@@ -128,7 +128,7 @@ impl JsonProblemRepository {
 
 		Ok(problems)
 	}
-	async fn list(&self, query: ProblemQuery) -> Result<Page<ProtoProblem>> {
+	pub async fn list(&self, query: ProblemQuery) -> Result<Page<ProtoProblem>> {
 		let page = query.page.unwrap_or(0).max(0) as u32;
 		let page_size = query.page_size.unwrap_or(20).max(1) as u32;
 
@@ -148,7 +148,7 @@ impl JsonProblemRepository {
 			total,
 		})
 	}
-	async fn sample_problem(&self, query: ProblemQuery) -> Result<ProtoProblem> {
+	pub async fn sample_problem(&self, query: ProblemQuery) -> Result<ProtoProblem> {
 		use rand::seq::IndexedRandom;
 
 		let problems = self.load_matching(&query).await?;
@@ -280,5 +280,5 @@ impl ProblemRepository for JsonProblemRepository {
 }
 
 pub struct JsonProblemRepository {
-	path: PathBuf,
+	pub path: PathBuf,
 }

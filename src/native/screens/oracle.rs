@@ -1,4 +1,4 @@
-use crate::{e, native_prelude::*, prelude::*, ui::Layout};
+use crate::{e, prelude::*, ui::Layout};
 
 pub struct OracleScreen {
 	active_focus: FocusedPane,
@@ -41,7 +41,7 @@ impl OracleScreen {
 	// -------------------------------------------------------------------------
 	// INPUT
 	// -------------------------------------------------------------------------
-	fn inspect_trackpad<C:Ctx, S>(
+	fn inspect_trackpad<C: Ctx, S>(
 		&mut self,
 		ui: &mut egui::Ui,
 		ctx: &AppContext<'_, C, S>,
@@ -51,7 +51,7 @@ impl OracleScreen {
 	// -------------------------------------------------------------------------
 	// UI
 	// -------------------------------------------------------------------------
-	fn draw_ui<C:Ctx, S>(&mut self, ui: &mut egui::Ui, ctx: &AppContext<'_, C, S>) {
+	fn draw_ui<C: Ctx, S>(&mut self, ui: &mut egui::Ui, ctx: &AppContext<'_, C, S>) {
 		self.draw_header(ui);
 
 		let trackpad = self.inspect_trackpad(ui, ctx);

@@ -238,10 +238,7 @@ where
 
 #[derive(Debug, Clone)]
 pub struct Connected {
-	#[cfg(all(feature = "native"))]
-	pub api: NativeApiClient,
-	#[cfg(all(feature = "web"))]
-	pub api: WebApiClient,
+	pub api: ApiClient,
 }
 
 #[derive(Debug, Clone, Copy, Default)]

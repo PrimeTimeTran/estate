@@ -48,7 +48,7 @@ pub use winit::platform::macos::{ActivationPolicy, EventLoopBuilderExtMacOS};
 /// cause compilation errors or runtime issues in the native platform targets.
 pub use crate::{
 	native::{
-		daemon::*, monitor::*, native_job::*, screens::*, scroll::*, state as native_state, ui::*,
+		app::*, daemon::*, job::*, monitor::*, screens::*, scroll::*, state, ui::*,
 		window::*,
 	},
 	server::*,

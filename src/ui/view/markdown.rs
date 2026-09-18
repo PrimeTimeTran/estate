@@ -17,7 +17,8 @@ impl MarkdownScreen {
 		CommonMarkViewer::new().show(ui, &mut self.cache, &mut self.markdown);
 	}
 }
-impl<C, S> Screen<C, S> for MarkdownScreen where
+impl<C, S> Screen<C, S> for MarkdownScreen
+where
 	C: Ctx,
 {
 	fn configure(&mut self, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {}

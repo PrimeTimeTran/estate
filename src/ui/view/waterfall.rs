@@ -1,4 +1,4 @@
-use crate::{e, prelude::*, theme::palette, ui::Layout};
+use crate::{e, prelude::*, ui::Layout};
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct WaterfallScreen;
@@ -9,7 +9,8 @@ impl WaterfallScreen {
 	}
 }
 
-impl<C, S> Screen<C, S> for WaterfallScreen where
+impl<C, S> Screen<C, S> for WaterfallScreen
+where
 	C: Ctx,
 {
 	fn configure(&mut self, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {
@@ -26,7 +27,8 @@ impl<C, S> Screen<C, S> for WaterfallScreen where
 pub struct WaterfallChart {
 	jobs: Vec<&'static Job>,
 }
-impl<C, S> ViewTrait<C, S> for WaterfallChart where
+impl<C, S> ViewTrait<C, S> for WaterfallChart
+where
 	C: Ctx,
 {
 	fn update(&mut self, ctx: &mut AppContext<'_, C, S>) {}

@@ -7,17 +7,6 @@ use crate::{
 
 use egui::{ScrollArea, Ui};
 
-#[derive(Debug, Default)]
-pub struct ProblemScreen<C> {
-	idx: i32,
-	source: String,
-	submission_status: Option<SubmissionStatus>,
-	solutions: Vec<StoredSolution>,
-	submissions: Vec<StoredSubmission>,
-	ticker: usize,
-
-	_marker: std::marker::PhantomData<C>,
-}
 impl<C> ProblemScreen<C> {
 	pub fn new() -> Self {
 		tracing::debug!("ProblemScreen new");
@@ -32,43 +21,101 @@ impl<C> ProblemScreen<C> {
 		}
 	}
 }
-
-impl<C, S> ViewTrait<C, S> for ProblemScreen<C>
+impl<C, S> ProblemView<C, S> {
+	pub fn new() -> Self {
+		Self {
+			ticker: 0,
+			_marker: std::marker::PhantomData,
+		}
+	}
+}
+impl<C, S> ProblemView<C, S> {
+	fn draw_problem(&self, ui: &mut Ui, problem: &StoredProblem) {
+		egui::Frame::group(ui.style()).show(ui, |ui| {
+			ui.horizontal(|ui| {
+				ui.strong(&problem.title);
+				ui.separator();
+				ui.monospace(&problem.slug);
+			});
+			ui.label(format!("ID: {}", problem.id));
+		});
+	}
+}
+impl<C, S> ProblemView<C, S>
 where
 	C: Ctx,
 {
-	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, C, S>) {
-		// println!("Problem Screen view draw")
-	}
-	fn update(&mut self, ctx: &mut AppContext<'_, C, S>) {
-		println!("Problem Screen view update")
-	}
-	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, C, S>) {
-		println!("Problem Screen view event")
-	}
-}
-impl<C, S> Screen<C, S> for ProblemScreen<C>
-where
-	C: Ctx,
-{
-	fn configure(&mut self, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {
-		println!("Problem Screen configure")
-		// Configure the regions this screen uses.
-	}
-	fn update(&mut self, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {
-		println!("Problem Screen update")
-	}
-	fn event(&mut self, event: &e::Event, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {
-		println!("Problem Screen screen eventupdate")
-	}
-}
+	fn draw<E: Executor>(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, C, S>) {
+		ui.heading("Problem View");
 
-#[derive(Debug, Default)]
-pub struct ProblemViewSidebar<C> {
-	active_tab: Tab,
-	solutions: Vec<StoredSolution>,
-	submissions: Vec<StoredSubmission>,
-	_marker: std::marker::PhantomData<C>,
+		ui.horizontal(|ui| {
+			ui.label(format!("Ticker: {}", self.ticker));
+
+			if ui.button("−").clicked() {
+				self.ticker = self.ticker.saturating_sub(1);
+			}
+
+			if ui.button("Reset").clicked() {
+				self.ticker = 0;
+			}
+
+			if ui.button("+").clicked() {
+				self.ticker = (self.ticker + 1).min(5);
+			}
+		});
+
+		ui.add_space(10.0);
+
+		ui.horizontal(|ui| {
+			for i in 0..=5 {
+				if i > 0 {
+					ui.label("──");
+				}
+
+				let label = if i == self.ticker {
+					format!("● {}", i)
+				} else {
+					format!("○ {}", i)
+				};
+
+				if ui.button(label).clicked() {
+					self.ticker = i;
+				}
+			}
+		});
+
+		ui.label(format!("Position: {} / 5", self.ticker));
+
+		ui.separator();
+
+		// Direct service access, as you intended.
+		// let api = ctx.app.runtime().services().api();
+
+		ui.horizontal_wrapped(|ui| {
+			if ui.button("load_problems").clicked() {
+				tracing::info!("UI → api.load_problems");
+				// ctx.app.executor.spawn();
+				// api.load_problems(...)
+			}
+
+			if ui.button("load_problem").clicked() {
+				tracing::info!("UI → api.load_problem");
+				// api.load_problem(...)
+			}
+
+			if ui.button("sample_problem").clicked() {
+				tracing::info!("UI → api.sample_problem");
+				// api.sample_problem(...)
+			}
+		});
+	}
+}
+impl<C> ProblemViewBottomPanel<C> {
+	pub fn new() -> Self {
+		Self {
+			_marker: std::marker::PhantomData,
+		}
+	}
 }
 impl<C> ProblemViewSidebar<C> {
 	pub fn new() -> Self {
@@ -79,19 +126,6 @@ impl<C> ProblemViewSidebar<C> {
 			_marker: std::marker::PhantomData,
 		}
 	}
-}
-impl<C, S> ViewTrait<C, S> for ProblemViewSidebar<C>
-where
-	C: Ctx,
-{
-	fn draw(&mut self, ui: &mut Ui, _ctx: &mut AppContext<'_, C, S>) {
-		ui.heading("Problem");
-		ui.separator();
-		self.draw_solutions(ui);
-		self.draw_submissions(ui);
-	}
-	fn update(&mut self, _ctx: &mut AppContext<'_, C, S>) {}
-	fn event(&mut self, _event: &e::Event, _ctx: &mut AppContext<'_, C, S>) {}
 }
 impl<C> ProblemViewSidebar<C> {
 	fn draw_solutions(&self, ui: &mut Ui) {
@@ -219,36 +253,34 @@ impl<C> ProblemViewSidebar<C> {
 			});
 	}
 }
-#[derive(Debug, Default)]
-pub struct ProblemViewBottomPanel<C> {
-	_marker: std::marker::PhantomData<C>,
-}
-impl<C> ProblemViewBottomPanel<C> {
-	pub fn new() -> Self {
-		Self {
-			_marker: std::marker::PhantomData,
-		}
-	}
-}
-impl<C, S> ViewTrait<C, S> for ProblemViewBottomPanel<C>
+impl<C, S> Screen<C, S> for ProblemScreen<C>
 where
 	C: Ctx,
 {
-	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, C, S>) {}
-	fn update(&mut self, ctx: &mut AppContext<'_, C, S>) {}
-	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, C, S>) {}
+	fn configure(&mut self, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {
+		println!("Problem Screen configure")
+		// Configure the regions this screen uses.
+	}
+	fn update(&mut self, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {
+		println!("Problem Screen update")
+	}
+	fn event(&mut self, event: &e::Event, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {
+		println!("Problem Screen screen eventupdate")
+	}
 }
-#[derive(Debug, Default)]
-pub struct ProblemView<C, S> {
-	ticker: usize,
-	_marker: std::marker::PhantomData<(C, S)>,
-}
-impl<C, S> ProblemView<C, S> {
-	pub fn new() -> Self {
-		Self {
-			ticker: 0,
-			_marker: std::marker::PhantomData,
-		}
+
+impl<C, S> ViewTrait<C, S> for ProblemScreen<C>
+where
+	C: Ctx,
+{
+	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, C, S>) {
+		// println!("Problem Screen view draw")
+	}
+	fn update(&mut self, ctx: &mut AppContext<'_, C, S>) {
+		println!("Problem Screen view update")
+	}
+	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, C, S>) {
+		println!("Problem Screen view event")
 	}
 }
 impl<C, S> ViewTrait<C, S> for ProblemView<C, S>
@@ -353,16 +385,22 @@ where
 				ui.set_min_height(300.0);
 				ui.set_min_width(ui.available_width());
 
-				ui.vertical(|ui| {
-					ui.label(
-						egui::RichText::new(format!(
-							"// Step {}\n\nfn solution() {{\n    // code goes here\n}}",
-							self.ticker
-						))
-						.monospace()
-						.size(16.0),
-					);
-				});
+				code_block(
+					ui,
+					"// Step {}\n\nfn solution() {{\n    // code goes here\n}}",
+					"rust",
+				);
+				// MarkdownScreen::new("// Step {}\n\nfn solution() {{\n    // code goes here\n}}");
+				// ui.vertical(|ui| {
+				// 	ui.label(
+				// 		egui::RichText::new(format!(
+				// 			"// Step {}\n\nfn solution() {{\n    // code goes here\n}}",
+				// 			self.ticker
+				// 		))
+				// 		.monospace()
+				// 		.size(16.0),
+				// 	);
+				// });
 			});
 
 			ui.add_space(20.0);
@@ -411,88 +449,28 @@ where
 	fn update(&mut self, _ctx: &mut AppContext<'_, C, S>) {}
 	fn event(&mut self, _event: &e::Event, _ctx: &mut AppContext<'_, C, S>) {}
 }
-
-impl<C, S> ProblemView<C, S> {
-	fn draw_problem(&self, ui: &mut Ui, problem: &StoredProblem) {
-		egui::Frame::group(ui.style()).show(ui, |ui| {
-			ui.horizontal(|ui| {
-				ui.strong(&problem.title);
-				ui.separator();
-				ui.monospace(&problem.slug);
-			});
-			ui.label(format!("ID: {}", problem.id));
-		});
-	}
-}
-impl<C, S> ProblemView<C, S>
+impl<C, S> ViewTrait<C, S> for ProblemViewBottomPanel<C>
 where
 	C: Ctx,
 {
-	fn draw<E: Executor>(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, C, S>) {
-		ui.heading("Problem View");
-
-		ui.horizontal(|ui| {
-			ui.label(format!("Ticker: {}", self.ticker));
-
-			if ui.button("−").clicked() {
-				self.ticker = self.ticker.saturating_sub(1);
-			}
-
-			if ui.button("Reset").clicked() {
-				self.ticker = 0;
-			}
-
-			if ui.button("+").clicked() {
-				self.ticker = (self.ticker + 1).min(5);
-			}
-		});
-
-		ui.add_space(10.0);
-
-		ui.horizontal(|ui| {
-			for i in 0..=5 {
-				if i > 0 {
-					ui.label("──");
-				}
-
-				let label = if i == self.ticker {
-					format!("● {}", i)
-				} else {
-					format!("○ {}", i)
-				};
-
-				if ui.button(label).clicked() {
-					self.ticker = i;
-				}
-			}
-		});
-
-		ui.label(format!("Position: {} / 5", self.ticker));
-
-		ui.separator();
-
-		// Direct service access, as you intended.
-		// let api = ctx.app.runtime().services().api();
-
-		ui.horizontal_wrapped(|ui| {
-			if ui.button("load_problems").clicked() {
-				tracing::info!("UI → api.load_problems");
-				// ctx.app.executor.spawn();
-				// api.load_problems(...)
-			}
-
-			if ui.button("load_problem").clicked() {
-				tracing::info!("UI → api.load_problem");
-				// api.load_problem(...)
-			}
-
-			if ui.button("sample_problem").clicked() {
-				tracing::info!("UI → api.sample_problem");
-				// api.sample_problem(...)
-			}
-		});
-	}
+	fn draw(&mut self, ui: &mut Ui, ctx: &mut AppContext<'_, C, S>) {}
+	fn update(&mut self, ctx: &mut AppContext<'_, C, S>) {}
+	fn event(&mut self, event: &e::Event, ctx: &mut AppContext<'_, C, S>) {}
 }
+impl<C, S> ViewTrait<C, S> for ProblemViewSidebar<C>
+where
+	C: Ctx,
+{
+	fn draw(&mut self, ui: &mut Ui, _ctx: &mut AppContext<'_, C, S>) {
+		ui.heading("Problem");
+		ui.separator();
+		self.draw_solutions(ui);
+		self.draw_submissions(ui);
+	}
+	fn update(&mut self, _ctx: &mut AppContext<'_, C, S>) {}
+	fn event(&mut self, _event: &e::Event, _ctx: &mut AppContext<'_, C, S>) {}
+}
+
 // impl<C> ProblemView<C> {
 // 	// fn draw_problem(&self, ui: &mut egui::Ui, problem: &StoredProblem) {
 // 	// 	egui::Frame::group(ui.style()).show(ui, |ui| {
@@ -607,3 +585,56 @@ where
 // 	// 		});
 // 	// }
 // }
+
+#[derive(Debug, Default)]
+pub struct ProblemScreen<C> {
+	idx: i32,
+	source: String,
+	submission_status: Option<SubmissionStatus>,
+	solutions: Vec<StoredSolution>,
+	submissions: Vec<StoredSubmission>,
+	ticker: usize,
+
+	_marker: std::marker::PhantomData<C>,
+}
+#[derive(Debug, Default)]
+pub struct ProblemView<C, S> {
+	ticker: usize,
+	_marker: std::marker::PhantomData<(C, S)>,
+}
+#[derive(Debug, Default)]
+pub struct ProblemViewBottomPanel<C> {
+	_marker: std::marker::PhantomData<C>,
+}
+#[derive(Debug, Default)]
+pub struct ProblemViewSidebar<C> {
+	active_tab: Tab,
+	solutions: Vec<StoredSolution>,
+	submissions: Vec<StoredSubmission>,
+	_marker: std::marker::PhantomData<C>,
+}
+
+use egui_extras::syntax_highlighting::{CodeTheme, highlight};
+
+fn code_block(ui: &mut egui::Ui, code: &str, language: &str) {
+	let theme = CodeTheme::from_style(ui.style());
+
+	let mut layouter = |ui: &egui::Ui, text: &dyn egui::TextBuffer, wrap_width: f32| {
+		let mut job = highlight(ui.ctx(), ui.style(), &theme, text.as_str(), language);
+
+		job.wrap.max_width = wrap_width;
+
+		ui.fonts_mut(|fonts| fonts.layout_job(job))
+	};
+
+	let mut code = code;
+
+	ui.add(
+		egui::TextEdit::multiline(&mut code)
+			.font(egui::TextStyle::Monospace)
+			.desired_width(f32::INFINITY)
+			.desired_rows(10)
+			// .interactive(false) // Selectable
+			.layouter(&mut layouter),
+	);
+}

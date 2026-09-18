@@ -126,6 +126,7 @@ impl VeConfig {
 }
 
 pub const LAYOUT: VeConfig = VeConfig::default();
+
 pub static FILE_EXTENSIONS: &[&str] = &[
 	"rs", "loi", "estate", "html", "htm", "css", "js", "jsx", "ts", "tsx", "json", "jsonc", "md",
 	"mdx", "txt", "toml", "yaml", "yml", "ini", "conf", "sh", "bash", "zsh", "c", "h", "cpp", "hpp",

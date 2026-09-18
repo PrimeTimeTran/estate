@@ -1,7 +1,7 @@
 use crate::prelude::*;
 
 #[cfg(feature = "native")]
-use crate::native::native_job::*;
+use crate::native::job::*;
 
 #[derive(Debug, Clone, Eq, Deserialize, PartialEq, Serialize)]
 pub struct Task {

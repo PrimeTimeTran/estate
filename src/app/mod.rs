@@ -4,13 +4,8 @@
 //! Platform implementations for native, mobile, web should exist in their own respective namespaces
 //!
 //! - [App]:
-//! - [NativeApp]:
 //! - [Clock]:
 //! - [Provide]:
-//!
-//! - ./src/native
-//! - ./src/web
-//! - ./src/mobile
 //!
 /// Generic traits defined in ./src/trait module
 /// Platform implementations for native, mobile, web should exist in their own respective namespaces
@@ -24,14 +19,6 @@ pub mod host;
 pub mod job;
 pub mod task;
 pub mod worker;
-
-#[cfg(feature = "native")]
-#[path = "./[native].rs"]
-pub mod native_ctx;
-
-#[cfg(feature = "web")]
-#[path = "./[web].rs"]
-pub mod web_ctx;
 
 #[path = "./[prelude].rs"]
 pub mod app_prelude;

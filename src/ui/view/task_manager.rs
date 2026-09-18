@@ -1,4 +1,4 @@
-use crate::{e, prelude::*, theme::palette, ui::Layout, ui_prelude::*};
+use crate::{e, prelude::*, ui::Layout};
 
 use Duration;
 
@@ -16,7 +16,8 @@ impl TaskManagerScreen {
 	}
 }
 
-impl<C, S> Screen<C, S> for TaskManagerScreen where
+impl<C, S> Screen<C, S> for TaskManagerScreen
+where
 	C: Ctx,
 {
 	fn configure(&mut self, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>) {
@@ -214,7 +215,8 @@ impl TaskManagerView {
 		}
 	}
 }
-impl<C, S> ViewTrait<C, S> for TaskManagerView where
+impl<C, S> ViewTrait<C, S> for TaskManagerView
+where
 	C: Ctx,
 {
 	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, C, S>) {

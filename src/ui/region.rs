@@ -1,8 +1,5 @@
 use crate::{e, prelude::*};
 
-#[cfg(feature = "native")]
-use crate::native::native_prelude::*;
-
 // View
 //   │
 //   │ selects which screen is active
@@ -187,7 +184,8 @@ impl ActivityBar {
 		Self { buttons: vec![] }
 	}
 }
-impl<C, S> ViewTrait<C, S> for ActivityBar where
+impl<C, S> ViewTrait<C, S> for ActivityBar
+where
 	C: Ctx,
 {
 	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, C, S>) {
@@ -203,7 +201,8 @@ impl<C, S> ViewTrait<C, S> for ActivityBar where
 pub struct PrimaryBar {
 	buttons: Vec<&'static str>,
 }
-impl<C, S> ViewTrait<C, S> for PrimaryBar where
+impl<C, S> ViewTrait<C, S> for PrimaryBar
+where
 	C: Ctx,
 {
 	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, C, S>) {

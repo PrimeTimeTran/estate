@@ -1,4 +1,8 @@
-use crate::{doc, prelude::*, ui, ui_prelude as gui};
+use crate::{
+	doc,
+	prelude::*,
+	ui::{self, prelude as gui},
+};
 
 #[async_trait::async_trait(?Send)]
 pub trait Api: Debug + 'static {
@@ -133,11 +137,11 @@ pub struct WebState;
 ///
 /// Native Build needs client too.
 #[derive(Debug, Clone)]
-pub struct WebApiClient {
+pub struct ApiClient {
 	base_url: String,
 }
 
-impl WebApiClient {
+impl ApiClient {
 	pub fn new(base_url: impl Into<String>) -> Self {
 		Self {
 			base_url: base_url.into(),
@@ -146,21 +150,21 @@ impl WebApiClient {
 }
 
 #[async_trait::async_trait(?Send)]
-impl Api for WebApiClient {
+impl Api for ApiClient {
 	fn clone_box(&self) -> Box<dyn Api> {
 		Box::new(self.clone())
 	}
 
 	async fn load_problems(&self) -> anyhow::Result<Vec<StoredProblem>> {
-		todo!("WebApiClient load_problems")
+		todo!("ApiClient load_problems")
 	}
 
 	async fn sample_problem(&self, request: SampleProblemRequest) -> anyhow::Result<StoredProblem> {
-		todo!("WebApiClient sample_problem")
+		todo!("ApiClient sample_problem")
 	}
 
 	async fn load_problem(&self, id: i64) -> anyhow::Result<StoredProblem> {
-		todo!("WebApiClient load_problem")
+		todo!("ApiClient load_problem")
 	}
 }
 

@@ -250,7 +250,7 @@ use crate::{prelude::*, traits::Context};
 // 		// EstateEngineRuntime
 // 		self.runtime().start_services();
 // 		let daemon_rx = self.daemon_rx.take().expect("daemon already started");
-// 		let (ready_tx, ready_rx) = std::sync::mpsc::sync_channel::<Result<Arc<NativeApiClient>>>(1);
+// 		let (ready_tx, ready_rx) = std::sync::mpsc::sync_channel::<Result<Arc<ApiClient>>>(1);
 // 		self.spawn_daemon(daemon_rx, ready_tx);
 // 		self.spawn_global_hotkey_daemon()?;
 // 		let event_loop = EventLoop::<AppEvent>::with_user_event()
@@ -822,7 +822,7 @@ use crate::{prelude::*, traits::Context};
 // 	fn spawn_daemon(
 // 		&mut self,
 // 		mut rx: mpsc::Receiver<DaemonCommand>,
-// 		ready_tx: std::sync::mpsc::SyncSender<Result<Arc<NativeApiClient>>>,
+// 		ready_tx: std::sync::mpsc::SyncSender<Result<Arc<ApiClient>>>,
 // 	) {
 // 		let runtime = self.runtime_old();
 // 		self.handle().spawn(async move {
@@ -1050,7 +1050,7 @@ impl NativeHost {
 
 impl NativeServices {
 	pub async fn connect() -> anyhow::Result<Self> {
-		let api = NativeApiClient::connect().await?;
+		let api = ApiClient::connect().await?;
 		Ok(Self {
 			persistence: NativePersistence::default(),
 			network: NativeNetwork::default(),
@@ -1077,7 +1077,7 @@ impl Persistence for NativePersistence {
 impl Services for NativeServices {
 	type Persistence = NativePersistence;
 	type Network = NativeNetwork;
-	type Client = NativeApiClient;
+	type Client = ApiClient;
 	fn persistence(&self) -> &Self::Persistence {
 		todo!("");
 	}
@@ -1143,7 +1143,7 @@ pub struct NativeStorage;
 pub struct NativeServices {
 	persistence: NativePersistence,
 	network: NativeNetwork,
-	api: Option<NativeApiClient>,
+	api: Option<ApiClient>,
 }
 
 #[derive(Debug, Default, Clone)]

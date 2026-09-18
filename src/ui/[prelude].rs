@@ -27,11 +27,17 @@ pub use winit::{
 };
 
 pub use crate::{
-	panel::*,
 	prelude::*,
 	proto::{types::*, *},
 	traits::Runtime,
-	ui::{layout::*, primitive::*, region::*, screen::*, theme::palette::*, view::*, *},
+	ui::{
+		layout::*,
+		panel::*,
+		primitive::*,
+		region::*,
+		screen::*,
+		theme::{palette, *},
+		view::*,
+		*,
+	},
 };
-
-

@@ -41,7 +41,7 @@ where
 	}
 
 	pub fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, C, S>) {
-		tracing::info!("ScreenInstance::draw");
+		tracing::debug!("ScreenInstance::draw");
 		self.layout.draw(ui, ctx);
 	}
 }

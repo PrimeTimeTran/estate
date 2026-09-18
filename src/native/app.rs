@@ -17,15 +17,15 @@ pub trait Api: Debug + 'static {
 }
 
 #[async_trait::async_trait]
-impl Api for NativeApiClient {
+impl Api for ApiClient {
 	fn clone_box(&self) -> Box<dyn Api> {
 		Box::new(self.clone())
 	}
 	async fn load_problems(&self) -> anyhow::Result<Vec<StoredProblem>> {
-		todo!("NativeApiClient load_problems")
+		todo!("ApiClient load_problems")
 	}
 	async fn load_problem(&self, id: i64) -> anyhow::Result<StoredProblem> {
-		todo!("NativeApiClient load_problem")
+		todo!("ApiClient load_problem")
 	}
 	async fn sample_problem(&self, request: SampleProblemRequest) -> anyhow::Result<StoredProblem> {
 		// println!("Native API Client sample_problem");
@@ -58,7 +58,7 @@ where
 	}
 }
 
-impl App<ContextNative> {
+impl App<Context> {
 	pub fn run(&mut self) -> Result<()> {
 		tracing::debug!("App run");
 		self.init_services()?;
@@ -74,7 +74,7 @@ impl App<ContextNative> {
 		let handle = self.start_app_events(proxy.clone())?;
 		self.workers.push(handle);
 		let event_rx = self.host.event_bus.subscribe_broadcast();
-		let mut renderer = Renderer::<ContextNative, <ContextNative as Ctx>::AppState>::new(
+		let mut renderer = Renderer::<Context, <Context as Ctx>::AppState>::new(
 			self.host.context(),
 			self.state.clone(),
 			cancel,
@@ -115,14 +115,14 @@ where
 
 							let view = TICK_ITEMS[view_idx];
 
-							tracing::info!(
+							tracing::debug!(
 								"🔥 APP EVENTS NAVIGATING TO {:?}",
 								view,
 							);
 
 							match proxy.send_event(AppEvent::Navigate(view)) {
 								Ok(()) => {
-									tracing::info!("🔥 Navigate SENT");
+									tracing::debug!("🔥 Navigate SENT");
 								}
 
 								Err(err) => {
@@ -348,7 +348,7 @@ where
 	}
 }
 
-impl Ctx for ContextNative {
+impl Ctx for Context {
 	fn initial_state() -> Self::AppState {
 		structs::S {
 			context: PhantomData,
@@ -356,20 +356,20 @@ impl Ctx for ContextNative {
 			view: ViewType::MarkdownScreen,
 		}
 	}
-	type AppState = structs::S<ContextNative>;
+	type AppState = structs::S<Context>;
 	type GuiState = NativeGuiState;
 	type EventReceiver = structs::BroadcastReceiver<e::Event>;
 }
 
-impl<ContextNative> Host<ContextNative>
+impl<Context> Host<Context>
 where
-	ContextNative: Ctx,
+	Context: Ctx,
 {
 	pub fn clock(&self) -> &HostClock {
 		&self.clock
 	}
 
-	pub fn context(&self) -> Arc<ContextNative> {
+	pub fn context(&self) -> Arc<Context> {
 		self.context.clone()
 	}
 
@@ -390,7 +390,7 @@ where
 		});
 	}
 
-	pub fn worker(&self) -> &HostWorker<ContextNative> {
+	pub fn worker(&self) -> &HostWorker<Context> {
 		&self.worker
 	}
 	pub fn subscribe(&self) -> structs::BroadcastReceiver<e::Event> {
@@ -398,7 +398,7 @@ where
 	}
 }
 
-impl Host<ContextNative> {
+impl Host<Context> {
 	// pub fn new(context: Arc<C>) -> anyhow::Result<Self> {
 	// 	let runtime = tokio::runtime::Runtime::new()?;
 	// 	let handle = runtime.handle().clone();
@@ -435,7 +435,7 @@ impl Host<ContextNative> {
 		let mut config = LogConfig::load()?;
 		config.apply_cli(&parsed);
 		logger::init_logging(&config)?;
-		let context = ContextNative::default();
+		let context = Context::default();
 		Self::new(Arc::new(context))
 	}
 }
@@ -502,13 +502,13 @@ where
 		}
 	}
 	fn navigate_to(&mut self, view: ViewType) {
-		tracing::info!("navigating from {:?} to {:?}", self.view, view,);
+		tracing::debug!("navigating from {:?} to {:?}", self.view, view,);
 		self.view = view;
 		self.sync_views();
 	}
 }
 
-impl NativeApiClient {
+impl ApiClient {
 	pub async fn connect() -> anyhow::Result<Self> {
 		let chan = Channel::from_static(crate::GRPC_SOCKET_CLIENT)
 			.connect()
@@ -619,7 +619,7 @@ pub struct App<C: Ctx> {
 }
 
 #[derive(Default)]
-pub struct ContextNative {
+pub struct Context {
 	pub state: NativeState,
 	pub menu_bar: Option<MenuBar>,
 	pub tray_clock: Option<MenuBar>,
@@ -651,7 +651,7 @@ pub struct NativeGuiState {
 }
 
 #[derive(Debug, Clone)]
-pub struct NativeApiClient {
+pub struct ApiClient {
 	pub problems: ProblemServiceClient<Channel>,
 	pub submissions: SubmissionServiceClient<Channel>,
 }

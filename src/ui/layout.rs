@@ -1,17 +1,23 @@
 use crate::prelude::*;
 
-use crate::LAYOUT as config;
+use crate::data::LAYOUT as config;
 
-pub struct Layout<C, S> {
-	pub activity_bar: Panel<C, S>,
-	pub dock_left: Panel<C, S>,
-	pub main: Panel<C, S>,
-	pub primary_bar: Panel<C, S>,
-	pub secondary_bar: Panel<C, S>,
-	pub bottom_panel: Panel<C, S>,
-	pub status_bar: Panel<C, S>,
-	pub dock_right: Panel<C, S>,
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub enum FocusedPane {
+	#[default]
+	MainEditor,
+	SidePanel,
+	CenterGrid,
+	Unknown,
 }
+#[derive(Debug, Default, Clone, PartialEq)]
+pub enum Tab {
+	#[default]
+	Problem,
+	Solutions,
+	Submissions,
+}
+
 impl<C, S> Layout<C, S>
 where
 	C: Ctx + 'static,
@@ -21,7 +27,6 @@ where
 	// may be safely destroyed, allowing memory to be reclaimed deterministically
 	// without a garbage collector.
 	pub fn new() -> Self {
-		tracing::info!("Layout Omg plz");
 		let main = ProblemView::new();
 		let dock_left = ProblemViewSidebar::new();
 		let bottom_panel = ProblemViewBottomPanel::new();
@@ -75,7 +80,7 @@ where
 	C: Ctx,
 {
 	fn draw(&mut self, ui: &mut egui::Ui, ctx: &mut AppContext<'_, C, S>) {
-		tracing::info!("🎨 Layout::draw");
+		tracing::debug!("🎨 Layout::draw");
 		let rect = ui.max_rect();
 		ui.painter()
 			.rect_filled(rect, 0.0, egui::Color32::from_rgb(30, 30, 30));
@@ -122,9 +127,6 @@ where
 			Self::draw_panel(ui, ctx, layout.dock_right, &mut self.dock_right);
 		}
 		Self::draw_panel(ui, ctx, layout.status_bar, &mut self.status_bar);
-		// ---------------------------------------------------------
-		// Draw resize handles LAST
-		// ---------------------------------------------------------
 		if self.dock_left.open {
 			Self::resize_region(
 				ui,
@@ -461,18 +463,13 @@ where
 	}
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub enum FocusedPane {
-	#[default]
-	MainEditor,
-	SidePanel,
-	CenterGrid,
-	Unknown,
-}
-#[derive(Debug, Default, Clone, PartialEq)]
-pub enum Tab {
-	#[default]
-	Problem,
-	Solutions,
-	Submissions,
+pub struct Layout<C, S> {
+	pub activity_bar: Panel<C, S>,
+	pub dock_left: Panel<C, S>,
+	pub main: Panel<C, S>,
+	pub primary_bar: Panel<C, S>,
+	pub secondary_bar: Panel<C, S>,
+	pub bottom_panel: Panel<C, S>,
+	pub status_bar: Panel<C, S>,
+	pub dock_right: Panel<C, S>,
 }
