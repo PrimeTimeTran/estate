@@ -30,27 +30,26 @@ pub use uuid::Uuid;
 ///
 /// [../script/git-precommit-hook.sh]
 ///
-pub use crate::data::{configs::*, default::*};
-
 pub use crate::{
 	app_prelude::*,
+	data::{configs::*, default::*},
 	e,
 	impls::{self, self as i},
 	macros::{self, *},
-	// Verbosely use/export because of name collisions with external crates.
+	// Verbose use/export to resolve name collisions with GRPC models.
 	model::common::{Difficulty, Language},
 	model::*,
 	runtime::*,
 	service::*,
 	share::{share_prelude::*, *},
 	structs::{self, self as s, *},
-	// Verbosely use/export intrinsic traits because of name collisions with external crates.
+	// Verbose use/export to resolve name collisions with external crates.
 	traits::{self, self as t, Context, EventReceiver, *},
 	ui::{config::*, theme::*, *},
 	util::{time::*, *},
 };
 
-#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+#[cfg(not(target_arch = "wasm32"))]
 pub use crate::{
 	app::{app_native::*, context::*, *},
 	native::{
@@ -60,7 +59,7 @@ pub use crate::{
 		util::{logger::*, *},
 		*,
 	},
-	server::{self, channel, events::*, fs::*},
+	server::{self, channel, events::*, fs_deps::*},
 };
 
 #[cfg(all(feature = "web", target_arch = "wasm32"))]

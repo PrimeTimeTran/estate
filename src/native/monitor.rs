@@ -90,14 +90,14 @@ impl Monitor for StateMonitor {
 }
 #[derive(Debug)]
 pub struct NativeMonitor {
-	watcher: RecommendedWatcher,
+	_watcher: RecommendedWatcher,
 	rx: mpsc::Receiver<()>,
 }
 
 impl NativeMonitor {
 	pub fn new() -> Result<Self> {
 		let (tx, rx) = mpsc::channel(1);
-		let watcher = RecommendedWatcher::new(
+		let _watcher = RecommendedWatcher::new(
 			move |result: Result<Event, notify::Error>| {
 				let Ok(event) = result else {
 					return;
@@ -109,7 +109,7 @@ impl NativeMonitor {
 			Config::default(),
 		)?;
 
-		Ok(Self { watcher, rx })
+		Ok(Self { _watcher, rx })
 	}
 }
 
@@ -123,7 +123,7 @@ impl Monitor for NativeMonitor {
 
 #[derive(Debug)]
 pub struct StateMonitor {
-	watcher: RecommendedWatcher,
+	_watcher: RecommendedWatcher,
 	rx: mpsc::Receiver<()>,
 }
 
@@ -131,7 +131,7 @@ impl Default for StateMonitor {
 	fn default() -> Self {
 		let (tx, rx) = mpsc::channel(100);
 
-		let watcher = RecommendedWatcher::new(
+		let _watcher = RecommendedWatcher::new(
 			move |_| {
 				let _ = tx.try_send(());
 			},
@@ -139,7 +139,7 @@ impl Default for StateMonitor {
 		)
 		.expect("failed to create state watcher");
 
-		Self { watcher, rx }
+		Self { _watcher, rx }
 	}
 }
 
@@ -147,7 +147,7 @@ impl StateMonitor {
 	pub fn new(path: &Path) -> notify::Result<Self> {
 		let (tx, rx) = mpsc::channel(16);
 
-		let mut watcher = RecommendedWatcher::new(
+		let mut _watcher = RecommendedWatcher::new(
 			move |result: notify::Result<Event>| {
 				if result.is_ok() {
 					let _ = tx.try_send(());
@@ -157,10 +157,10 @@ impl StateMonitor {
 		)?;
 
 		if let Some(parent) = path.parent() {
-			watcher.watch(parent, RecursiveMode::NonRecursive)?;
+			_watcher.watch(parent, RecursiveMode::NonRecursive)?;
 		}
 
-		Ok(Self { watcher, rx })
+		Ok(Self { _watcher, rx })
 	}
 
 	pub fn try_changed(&mut self) -> bool {

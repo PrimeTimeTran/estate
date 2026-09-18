@@ -66,25 +66,25 @@ impl<R: Runtime> EstateEngine<R> {
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-pub(crate) struct EstateRegistry;
+pub struct EstateRegistry;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-pub(crate) struct EstateIndex;
+pub struct EstateIndex;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-pub(crate) struct EstateResolver;
+pub struct EstateResolver;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-pub(crate) struct EstateGraph;
+pub struct EstateGraph;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-pub(crate) struct EstateVfs;
+pub struct EstateVfs;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-pub(crate) struct AnchorService {
+pub struct AnchorService {
 	registry: EstateRegistry,
 	index: EstateIndex,
 	resolver: EstateResolver,
 }
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-pub(crate) struct SearchService;
+pub struct SearchService;
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
-pub(crate) struct AnalysisService;
+pub struct AnalysisService;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Deserialize, Serialize)]
 pub enum ReferenceKind {

@@ -15,9 +15,9 @@ pub struct DashboardScreen {
 	#[cfg(not(target_arch = "wasm32"))]
 	monitor: StateMonitor,
 
-	scroll_x: f32,
-	scroll_y: f32,
-	last_direction: String,
+	_scroll_x: f32,
+	_scroll_y: f32,
+	_last_direction: String,
 
 	pub side_panel_width: f32,
 	pub active_focus: FocusedPane,
@@ -103,9 +103,9 @@ impl DashboardScreen {
 			dirty: false,
 			error: None,
 			last_loaded: None,
-			scroll_x: 0.0,
-			scroll_y: 0.0,
-			last_direction: String::new(),
+			_scroll_x: 0.0,
+			_scroll_y: 0.0,
+			_last_direction: String::new(),
 			side_panel_width: 0.0,
 			active_focus: FocusedPane::MainEditor,
 			secondary_scroll_offset: 0.0,

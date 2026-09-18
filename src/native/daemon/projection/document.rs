@@ -16,7 +16,7 @@ fn explain_json_path() -> Result<PathBuf> {
 	Ok(engine_data_dir()?.join("explain.json"))
 }
 
-fn manifest_json_path() -> Result<PathBuf> {
+fn _manifest_json_path() -> Result<PathBuf> {
 	Ok(engine_data_dir()?.join("manifest.json"))
 }
 
@@ -24,7 +24,7 @@ fn symbols_json_path() -> Result<PathBuf> {
 	Ok(engine_data_dir()?.join("symbols.json"))
 }
 
-fn read_symbols() -> serde_json::Value {
+fn _read_symbols() -> serde_json::Value {
 	let path = match symbols_json_path() {
 		Ok(p) => p,
 		Err(_) => {

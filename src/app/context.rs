@@ -54,7 +54,6 @@ where
 	C: Ctx,
 {
 	pub context: &'a C,
-	// pub event_rx: &'a mut C::EventReceiver,
 	pub event_tx: &'a mut C::EventSender,
 	pub input: IOState,
 	pub last_revision: u64,
@@ -95,8 +94,4 @@ where
 		// TODO: determine the revision from the new State abstraction.
 		false
 	}
-
-	// pub fn next_event(&mut self) -> Option<e::Event> {
-	// 	self.event_rx.try_recv()
-	// }
 }

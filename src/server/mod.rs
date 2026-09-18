@@ -9,7 +9,8 @@ use crate::prelude::*;
 /// # Server modules exposed for use in native/wasm bins.
 ///
 pub mod events;
-pub mod fs;
+#[path = "./fs/mod.rs"]
+pub mod fs_deps;
 pub mod json;
 pub mod problem;
 pub mod repo;

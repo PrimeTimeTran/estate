@@ -66,5 +66,5 @@ pub mod native;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod server;
 
-#[cfg(all(feature = "web", target_arch = "wasm32"))]
+#[cfg(target_arch = "wasm32")]
 pub mod web;

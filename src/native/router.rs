@@ -63,7 +63,7 @@ pub async fn execute<R: Runtime>(
 			// App::start_app(engine)?;
 		}
 		Command::Format(args) => {
-			engine.format(&args).await;
+			let _ = engine.format(&args).await;
 		}
 		Command::Metrics(args) => {
 			let workspace = AnalyzeDaemon.run(&ctx, &args).await?;

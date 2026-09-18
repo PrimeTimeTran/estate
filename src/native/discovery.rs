@@ -576,7 +576,7 @@ impl EstateDiscovery {
 			"npm" => Some(DiscoveryItem::Project(raw.path)),
 			"Cargo.toml" => Some(DiscoveryItem::CargoProject(raw.path)),
 			"package.json" => Some(DiscoveryItem::Project(raw.path)),
-			"zed" => Some(DiscoveryItem::PackageManager(raw.path)),
+			// "zed" => Some(DiscoveryItem::PackageManager(raw.path)),
 			"estate-settings" => Some(DiscoveryItem::Settings(raw.path)),
 			"estate-keymap" => Some(DiscoveryItem::KeyMap(raw.path)),
 			_ => None,
@@ -632,8 +632,8 @@ impl FsWalker {
 }
 
 #[derive(Clone, Debug)]
-struct Connected {
-	task_tx: mpsc::Sender<DiscoveryTask>,
+pub struct Connected {
+	pub task_tx: mpsc::Sender<DiscoveryTask>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
