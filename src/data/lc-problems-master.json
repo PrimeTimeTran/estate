@@ -1,5 +1,35 @@
 [
   {
+    "number": 1401,
+    "normalized-name": "circle-and-rectangle-overlapping",
+    "title": "Circle and Rectangle Overlapping",
+    "difficulty": "medium",
+    "description": "You are given a circle represented as (radius, xCenter, yCenter) and an axis-aligned rectangle represented as (x1, y1, x2, y2), where (x1, y1) are the coordinates of the bottom-left corner, and (x2, y2) are the coordinates of the top-right corner of the rectangle.\n\nReturn true if the circle and rectangle are overlapped otherwise return false. In other words, check if there is any point (xi, yi) that belongs to the circle and the rectangle at the same time.",
+    "url": "https://leetcode.com/problems/circle-and-rectangle-overlapping/",
+    "filename": "1401-circle-and-rectangle-overlapping.py",
+    "description-raw": "<p>You are given a circle represented as <code>(radius, xCenter, yCenter)</code> and an axis-aligned rectangle represented as <code>(x1, y1, x2, y2)</code>, where <code>(x1, y1)</code> are the coordinates of the bottom-left corner, and <code>(x2, y2)</code> are the coordinates of the top-right corner of the rectangle.</p>\n<p>Return <code>true</code><em> if the circle and rectangle are overlapped otherwise return </em><code>false</code>. In other words, check if there is <strong>any</strong> point <code>(x<sub>i</sub>, y<sub>i</sub>)</code> that belongs to the circle and the rectangle at the same time.</p>",
+    "test-cases": [
+      {
+        "index": 0,
+        "input": "radius = 1, xCenter = 0, yCenter = 0, x1 = 1, y1 = -1, x2 = 3, y2 = 1",
+        "output": "true",
+        "explanation": "Circle and rectangle share the point (1,0)."
+      },
+      {
+        "index": 1,
+        "input": "radius = 1, xCenter = 1, yCenter = 1, x1 = 1, y1 = -3, x2 = 2, y2 = -1",
+        "output": "false",
+        "explanation": null
+      },
+      {
+        "index": 2,
+        "input": "radius = 1, xCenter = 0, yCenter = 0, x1 = -1, y1 = 0, x2 = 0, y2 = 1",
+        "output": "true",
+        "explanation": null
+      }
+    ]
+  },
+  {
     "number": 1520,
     "normalized-name": "maximum-number-of-non-overlapping-substrings",
     "title": "Maximum Number of Non-Overlapping Substrings",

@@ -29,6 +29,10 @@ name = "dispatch"
 path = "src/bin/[dispatch].rs"
 
 [[bin]]
+name = "mpl"
+path = "src/bin/[tmp].rs"
+
+[[bin]]
 name = "type-state"
 path = "src/bin/[type-state].rs"
 

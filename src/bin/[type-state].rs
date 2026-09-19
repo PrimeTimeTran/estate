@@ -297,6 +297,9 @@ mod impls {
 			person: s::Person<s::Context, s::State>,
 			callsign: String,
 		) -> Self {
+			if person.name == "Tom" {
+				
+			}
 			let person = s::Person {
 				context: s::CtxWork::default(),
 				state: s::StateWork::default(),
