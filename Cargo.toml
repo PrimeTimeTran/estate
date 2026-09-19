@@ -88,9 +88,9 @@ target = "wasm32-unknown-unknown"
 [features]
 # The default here causes issues with VSCode's Problem Tab.
 # It picks up downloaded crates when analyzing
-default = []
+# default = []
 # default = ["web"]
-# default = ["native"]
+default = ["native"]
 
 mobile = []
 web = [
