@@ -36,7 +36,7 @@ pub mod app;
 #[path = "./[app].rs"]
 pub mod app_entry;
 pub mod data;
-pub mod helpers;
+pub mod helper;
 #[path = "./[impl].rs"]
 pub mod impls;
 #[path = "./[macro].rs"]
@@ -44,7 +44,6 @@ pub mod macros;
 pub mod model;
 pub mod prelude;
 pub mod proto;
-pub mod runtime;
 pub mod service;
 pub mod share;
 #[path = "./[struct].rs"]

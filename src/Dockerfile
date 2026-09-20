@@ -11,12 +11,12 @@ RUN apt-get update \
 RUN useradd --uid 1000 --create-home runner
 
 # Main dispatcher.
-COPY src/runner.sh /usr/local/bin/runner
+COPY src/tool/runner.sh /usr/local/bin/runner
 
 # Language-specific runners.
-COPY src/runner/rust/runner.sh /usr/local/bin/runner.rust.sh
-COPY src/runner/python/runner.sh /usr/local/bin/runner.python.sh
-COPY src/runner/javascript/runner.sh /usr/local/bin/runner.javascript.sh
+COPY src/tool/runner/rust/runner.sh /usr/local/bin/runner.rust.sh
+COPY src/tool/runner/python/runner.sh /usr/local/bin/runner.python.sh
+COPY src/tool/runner/javascript/runner.sh /usr/local/bin/runner.javascript.sh
 
 RUN chmod +x \
     /usr/local/bin/runner \
