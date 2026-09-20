@@ -16,18 +16,12 @@ pub mod app_task;
 /// ./src/web
 /// ./src/mobile
 pub mod context;
-pub mod event;
 pub mod host;
 pub mod job;
 pub mod worker;
 
 #[path = "./[prelude].rs"]
 pub mod app_prelude;
-
-/// Platform Gates
-#[cfg(feature = "native")]
-#[path = "./native.app.rs"]
-pub mod app_native;
 
 #[cfg(not(all(feature = "web", target_arch = "wasm32")))]
 #[path = "./web.app.stub.rs"]

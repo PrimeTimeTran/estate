@@ -1,32 +1,52 @@
 #![allow(warnings)]
-
+// foo, bar, baz, qux, quux, corge, grault, garply, waldo, fred, plugh, xyzzy, and thud
+// spam, ham, eggs, salt, bacon, toast, cheese, sausage
 fn main() {
-	main_intro()
+	struct Foo<C, S> {
+		state: S,
+		context: C,
+	}
+
+	impl<C, S> Foo<C, S> {}
+	struct Context;
+	struct State;
+	impl<C> Foo<C, State> {}
+
+	gat()
 }
-fn main_intro() {
-	trait Trait {}
-	trait Bar {}
+fn gat() {
+	trait Trait {
+		fn spam();
+	}
 	trait Foo {
 		type GenericAssociatedType<'a>;
 	}
 	impl Foo for u32 {
 		type GenericAssociatedType<'a> = &'a u32;
 	}
-	/// For every T that implements Foo, the particular type
+
+	/// For every T that implements Foo, this particular type
 	///
 	/// (T, for<'a> fn(T::GenericAssociatedType<'a>))
 	///
 	/// implements Trait.
 	///
-	/// - You're implementing it for a constructed type involving T.
+	/// > You're implementing it for a constructed type involving T.
 	///
-	impl<T: Foo> Trait for (T, for<'a> fn(<T as Foo>::GenericAssociatedType<'a>)) {}
-	// -> If I can prove T: Foo, then I can prove that this derived type implements Trait.
+	impl<T: Foo> Trait for (T, for<'a> fn(<T as Foo>::GenericAssociatedType<'a>)) {
+		fn spam() {
+			println!("Trait spam")
+		}
+	}
+	/// -> If I can prove T: Foo, then I can prove that this derived type implements Trait.
+	/// impls input type must satisfy `Trait`
+	fn impls<T: Trait>(baz: &str) {
+		println!("impls method {}", baz)
+	}
 
-	// impls input type must satisfy `Trait`
-
-	fn impls<T: Trait>() {}
-	impls::<(u32, for<'a> fn(&'a u32))>();
+	type bar = (u32, for<'a> fn(&'a u32));
+	impls::<bar>("eggs");
+	bar::spam()
 }
 fn _main_documented() {
 	/// ## Generic Associated Types (GATs)

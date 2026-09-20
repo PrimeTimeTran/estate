@@ -69,6 +69,7 @@ pub trait Ctx: Clone + Send + Sync + 'static {
 	type EventSender: SendsEvents;
 	type GuiState;
 }
+
 pub trait ReceivesEvents {
 	fn try_recv(&mut self) -> Option<e::Event>;
 }

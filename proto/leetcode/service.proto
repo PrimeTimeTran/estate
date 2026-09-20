@@ -6,6 +6,12 @@ package leetcode;
 
 import "leetcode/type.proto";
 
+
+service EventService {
+  rpc Subscribe(leetcode.types.SubscribeRequest) returns (stream leetcode.types.Event);
+}
+
+
 service ProblemService {
   rpc CreateProblem(leetcode.types.CreateProblemRequest) returns (leetcode.types.Problem);
   rpc GetProblem(leetcode.types.GetProblemRequest) returns (leetcode.types.Problem);

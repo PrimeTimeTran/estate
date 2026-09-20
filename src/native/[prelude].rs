@@ -30,7 +30,7 @@ pub use tokio::{
 	},
 };
 pub use tokio_util::sync::CancellationToken;
-pub use tonic::transport::Channel;
+pub use tonic::{Request, Response, Status, transport::Channel};
 pub use tray_icon::{
 	Icon, TrayIcon, TrayIconBuilder,
 	menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu},
@@ -47,10 +47,7 @@ pub use winit::platform::macos::{ActivationPolicy, EventLoopBuilderExtMacOS};
 /// The items here are necessary to bring dependencies into scope for the native platform targets. Removing items may
 /// cause compilation errors or runtime issues in the native platform targets.
 pub use crate::{
-	native::{
-		app::*, daemon::*, job::*, monitor::*, screens::*, scroll::*, state, ui::*,
-		window::*,
-	},
+	native::{app::*, daemon::*, job::*, monitor::*, screens::*, scroll::*, state, ui::*, window::*},
 	server::*,
 };
 

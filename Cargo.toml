@@ -189,6 +189,8 @@ egui.workspace = true
 egui-winit.workspace = true
 eframe = { workspace = true, optional = true }
 
+tokio-stream = { version = "0.1.19", features = ["sync"] }
+
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tokio = { workspace = true, features = ["rt", "macros", "time", "sync"] }
 objc2 = { workspace = true, optional = true }

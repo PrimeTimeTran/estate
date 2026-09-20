@@ -1,6 +1,18 @@
-#![allow(warnings)]
-// #![feature(type_changing_struct_update)]
 // https://www.youtube.com/watch?v=3biW5NkNnrk
+// JetBrains
+// - shift+shift
+// 	- All, types, files, symbols, actions, text
+// - cmd+e: Recent Files
+// 	-
+// 	-
+// - cmd+e: Recent Files
+// - left opt + f1: select in
+// - ctrl+tab: the switcher
+// - ctrl+ctrl: run anything
+// - cmd+f12: code structure popup
+// - cmd+cmd (zen mode): shows side rails
+//
+#![allow(warnings)]
 
 use std::{
 	any::Any,
@@ -10,8 +22,137 @@ use std::{
 	rc::{Rc, Weak},
 };
 
+use self::traits::*;
+use self::{enums as e, structs as s};
+
+fn main() {
+	// Global context
+	let context = s::Context::default();
+	let state = s::State::default();
+
+	// ## Type Param Techniques
+	{
+		use crate::structs::Foo;
+		let foo1 = Foo::new(context, state);
+		let foo2 = Foo::new_with_type::<s::Context, s::State>(context, state);
+		let foo3 = Foo::<s::Context, s::State>::new_where(context, state);
+		let foo_from_converted = Foo::<s::Context, s::State>::convert_from::<s::C, s::S>(s::C, s::S);
+		let foo_from_identity =
+			Foo::<s::Context, s::State>::convert_from::<s::Context, s::State>(context, state);
+	}
+
+	// Person's Lifetime
+	{
+		let mut tom = s::Person::new(context, state, String::from("Tom"), e::Gender::Male);
+		let mut ava = s::Person::new(context, state, String::from("Ava"), e::Gender::Female);
+
+		println!("{}'s state {:?}", tom.name, tom.state());
+		println!("{}'s is_single {}", tom.name, tom.is_single());
+		println!("{}'s state {:?}", ava.name, ava.state());
+		println!("{}'s is_single {}", ava.name, ava.is_single());
+
+		// Work Context
+		{
+			let work_tom = s::Work::new(s::CtxWork::default(), s::StateWork::default(), tom.clone());
+			println!("Work Tom's name: {:?}", work_tom.name);
+			println!(
+				"Work Tom's birth/legal/person name: {:?}",
+				work_tom.person.name
+			);
+		}
+
+		// Family/Dating/Legacy Context
+		{
+			let mut p1 = s::Person::new(
+				s::Context::default(),
+				s::Single,
+				String::from("Tom"),
+				e::Gender::Male,
+			);
+			let mut p2 = s::Person::new(
+				s::Context::default(),
+				s::Single,
+				String::from("Ava"),
+				e::Gender::Female,
+			);
+			println!("{} is_single {}", p1.name, p1.is_single());
+			println!("{} is_single {}", p2.name, p2.is_single());
+
+			// ## [3] methods available:
+			// - p1.date_of_where(&mut p2);
+			// - p1.date_of_single(&mut p2);
+			// - p1.date_of_runtime(&mut p2);
+			//
+			{
+				// p1.date_of_where(&mut p2);
+				// println!("post date_of_where");
+				// println!("{} is_single  {}", p1.name, p1.is_single());
+				// println!("{} is_single {}", p2.name, p2.is_single());
+
+				// p1.date_of_single(&mut p2);
+				// println!("post date_of_single");
+				// println!("{} is_single {}", p1.name, p1.is_single());
+				// println!("{} is_single {}", p2.name, p2.is_single());
+
+				p1.date_of_runtime(&mut p2);
+				println!("post date_of_runtime");
+				println!("{} is_single  {}", p1.name, p1.is_single());
+				println!("{} is_single {}", p2.name, p2.is_single());
+			}
+
+			if let Some(tom) = tom.as_single() {
+				// Only this is available
+				// tom.date_of_lifetimed_singleref();
+				tom.date_of_lifetimed_singleref(&mut ava);
+			}
+			tom.date_of_runtime(&mut ava);
+			println!("{} is {:?}", tom.name(), tom.martial_status);
+			println!("{} is {:?}", ava.name(), ava.martial_status);
+
+			// Marriage Context
+			{
+				let (tom, ava, family) = tom.marry(ava);
+
+				// And they can discuss with spouse, but must borrow themselves as they're married (part of family)
+				tom.borrow().discuss_with_spouse("Where should we live?");
+				ava.borrow().discuss_with_spouse("Should we have children?");
+				println!(
+					"{} is {:?}",
+					tom.borrow().name(),
+					tom.borrow().martial_status
+				);
+				println!(
+					"{} is {:?}",
+					ava.borrow().name(),
+					ava.borrow().martial_status
+				);
+
+				// ─────────────────────────────────────────
+				// They have a child
+				// ─────────────────────────────────────────
+
+				let child = family.borrow_mut().have_child("Alice", e::Gender::Female);
+
+				println!(
+					"{} is a parent {:?}",
+					tom.borrow().name(),
+					tom.borrow().martial_status
+				);
+				println!(
+					"{} is a parent {:?}",
+					ava.borrow().name(),
+					ava.borrow().martial_status
+				);
+				println!("{} is a child {:?}", child.name(), child.martial_status);
+				// tom.consider_request("Can I stay up late?");
+				// tom.discipline_child("Alice", "She stayed up too late");
+				// println!("{}'s children: {:?}", tom.name(), tom.children());
+			}
+		}
+	}
+}
+
 mod enums {
-	use super::{i, s, t, *};
 	#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 	pub enum Gender {
 		#[default]
@@ -29,12 +170,12 @@ mod enums {
 		Single,
 		Dating,
 		Married,
-		Divorced,
+		// Divorced,
 	}
 }
 
 mod impls {
-	use super::{e, s, t, *};
+	use super::{e, s, *};
 
 	impl<C, S> Deref for s::Child<C, S> {
 		type Target = s::Person<s::CtxPerson, s::StatePerson>;
@@ -43,13 +184,12 @@ mod impls {
 		}
 	}
 
-	impl t::RelationshipState for s::Single {
+	impl RelationshipState for s::Single {
 		fn status() -> e::RelationshipStatus {
 			e::RelationshipStatus::Single
 		}
 	}
-
-	impl t::RelationshipState for s::Dating {
+	impl RelationshipState for s::Dating {
 		fn status() -> e::RelationshipStatus {
 			e::RelationshipStatus::Dating
 		}
@@ -57,7 +197,7 @@ mod impls {
 
 	impl<C, S> s::Person<C, S>
 	where
-		S: t::RelationshipState,
+		S: RelationshipState,
 	{
 		pub fn foobar(&self) {
 			println!("Instance Function")
@@ -74,38 +214,32 @@ mod impls {
 		}
 	}
 
-	// impl<'a, C, S> s::PersonView<'a, C, S, s::Single> {
-	// 	pub fn date(self, other: &mut s::Person<C, S>) {
-	// 		self.person.martial_status = e::RelationshipStatus::Dating;
-	// 		other.martial_status = e::RelationshipStatus::Dating;
-	// 	}
-	// }
-
-	impl<C, S: t::RelationshipState> s::Person<C, S> {
+	impl<C, S: RelationshipState> s::Person<C, S> {
 		pub fn relationship_status(&self) -> e::RelationshipStatus {
 			S::status()
 		}
 	}
 
 	/// Compile-time capability:
-	/// `date_in_where` is available whenever `S: CanDate`.
+	/// `date_of_where` is available whenever `S: CanDate`.
 	/// Flexible across any state that grants the capability, but does not verify
 	/// that the person's current runtime state actually matches that capability.
-	impl t::CanDate for s::Single {}
-	impl t::CanMarry for s::Dating {}
-	impl t::CanDivorce for s::Married {}
+	///
+	impl CanDate for s::Single {}
+	impl CanMarry for s::Dating {}
+	impl CanDivorce for s::Married {}
 
 	impl<C, S> s::Person<C, S>
 	where
 		S: CanDate,
 	{
-		pub fn date_in_where(&mut self, other: &mut s::Person<C, S>) {
-			println!("date_in_where");
+		pub fn date_of_where(&mut self, other: &mut s::Person<C, S>) {
+			println!("date_of_where");
 		}
 	}
 	impl<C> s::Person<C, s::Single> {
-		pub fn date_in_single(&mut self, other: &mut s::Person<C, s::Single>) {
-			println!("date_in_single");
+		pub fn date_of_single(&mut self, other: &mut s::Person<C, s::Single>) {
+			println!("date_of_single");
 			if self.martial_status == e::RelationshipStatus::Single
 				&& other.martial_status == e::RelationshipStatus::Single
 			{
@@ -164,7 +298,7 @@ mod impls {
 		) -> s::Child<s::Context, s::State> {
 			let context = s::CtxPerson::default();
 			let state = s::StatePerson::default();
-			let mut person = s::Person::new(context.clone(), state.clone(), name.into(), gender);
+			let person = s::Person::new(context.clone(), state.clone(), name.into(), gender);
 			let context = s::Context::default();
 			let state = s::State::default();
 			let child = s::Child::new(context, state, person);
@@ -188,16 +322,8 @@ mod impls {
 		}
 	}
 
-	impl<C: Clone> s::Person<C, s::Dating> {
-		fn breakup() {}
-		fn propose() {}
-		fn accept_proposal() {}
-		fn engage() {}
-		fn marry2() {}
-	}
-	impl<C: Clone> s::Person<C, s::Married> {
-		fn divorce() {}
-	}
+	impl<C: Clone> s::Person<C, s::Dating> {}
+	impl<C: Clone> s::Person<C, s::Married> {}
 
 	/// =======================================================
 	/// impl<C, S> s::Person<C, S> {}
@@ -247,14 +373,17 @@ mod impls {
 
 	impl<C, S> s::Person<C, S>
 	where
-		S: t::Dating,
+		S: Dating,
 	{
-		pub fn is_dating(self) {}
+		pub fn dating(self) {}
 	}
 	/// Runtime capability:
 	/// `date_of_runtime` is available on every Person and decides at runtime whether
 	/// dating is allowed. Most flexible and naturally imperative, but the compiler
 	/// cannot restrict access based on the person's current runtime state.
+	///
+	/// In other words the method is always available and the business logic handles whether "date"
+	/// does affect a change in a person.
 	impl<C, S> s::Person<C, S> {
 		pub fn date_of_runtime(&mut self, other: &mut s::Person<C, S>) {
 			println!("date_of_runtime");
@@ -282,7 +411,7 @@ mod impls {
 			// ~2. Unstable Nightly
 			// #![feature(type_changing_struct_update)]
 			// https://github.com/rust-lang/rust/issues/86555
-			// s::Person { context, ..self }
+			// s::Person { context, ...self }
 		}
 		pub fn in_state<NS>(self, state: NS) -> s::Person<C, NS> {
 			s::Person {
@@ -304,9 +433,9 @@ mod impls {
 		}
 	}
 
-	impl t::Parent for s::Parent<s::Context, s::State> {
+	impl Parent for s::Parent<s::Context, s::State> {
 		fn children<C, S>(&self) -> &[s::Child<C, S>] {
-			// There are two items in my completion panel when i type
+			// There are two items in my completion panel when I type
 			// self.children.
 			//
 			// What would u say the difference between these two are?
@@ -335,15 +464,15 @@ mod impls {
 	/// "For every possible C and S, s::Person<C, S> implements Person."
 	///
 	/// "A Person that participates in my dynamic-dispatch/Any system must own
-	/// its state and context, or otherwise contain only 'static data."
+	/// its state and context, or otherwise contain only static data."
 	///
 	/// Fixes:
-	/// impl<C, S> t::Person for s::Person<C, S> {
+	/// impl<C, S> t::Person for s::Person<C, S>
 	///
 	/// Errored:
 	/// "the parameter type `C` may not live long enough"
 	///
-	impl<C: 'static, S: 'static> t::Person for s::Parent<C, S> {
+	impl<C: 'static, S: 'static> Person for s::Parent<C, S> {
 		/// trait method
 		fn name(&self) -> &str {
 			// Self::name(&self);
@@ -360,18 +489,21 @@ mod impls {
 		}
 	}
 
-	impl<C: 'static, S: 'static> t::Person for s::Person<C, S> {
+	impl<C: 'static, S: 'static> Person for s::Person<C, S> {
 		fn name(&self) -> &str {
 			&self.name
-		}
-		fn as_any(&self) -> &dyn Any {
-			self
 		}
 		fn state(&self) -> &dyn Any {
 			&self.state
 		}
+		fn as_any(&self) -> &dyn Any {
+			self
+		}
 	}
-	impl<C: 'static, S: 'static> t::Spouse for s::Person<C, S> {
+	impl<C: 'static, S: 'static> Spouse for s::Person<C, S> {
+		fn name(&self) -> &str {
+			"Dearest"
+		}
 		fn spouse(&self) -> Option<String> {
 			let member = self.families.first()?.upgrade()?;
 			let member = member.borrow();
@@ -387,36 +519,31 @@ mod impls {
 				}
 			})
 		}
-
 		fn discuss_with_spouse(&self, topic: &str) {
 			let me = self.name.clone();
 			let spouse = self.spouse().expect("Married person should have a spouse");
 			println!("{me} discussing with {spouse}: {topic}");
 		}
-		fn name(&self) -> &str {
-			"Dearest"
-		}
 	}
 
-	impl t::Single for s::Single {
-		fn accept_date(&self) {
-			todo!("accept_date")
-		}
+	impl Single for s::Single {
 		fn date(&self) {
 			todo!("date")
+		}
+		fn accept_date(&self) {
+			todo!("accept_date")
 		}
 		fn get_to_know(&self) {
 			todo!("get_to_know")
 		}
 	}
-
 	/// Scoped capability:
-	/// `date_in_lifetimed_singleref` is only available after a runtime check creates
+	/// `date_of_lifetimed_singleref` is only available after a runtime check creates
 	/// a `SingleRef`. It preserves the same Person while temporarily narrowing the
 	/// available API: maximum state-awareness without converting the underlying value.
 	impl<'a, C, S> s::SingleRef<'a, C, S> {
-		pub fn date_in_lifetimed_singleref(self, other: &mut s::Person<C, S>) {
-			println!("date_in_lifetimed_singleref");
+		pub fn date_of_lifetimed_singleref(self, other: &mut s::Person<C, S>) {
+			println!("date_of_lifetimed_singleref");
 			self.person.martial_status = e::RelationshipStatus::Dating;
 			other.martial_status = e::RelationshipStatus::Dating;
 		}
@@ -453,9 +580,9 @@ mod impls {
 		}
 	}
 
-	/// =======================================================
+	// =======================================================
 	// "exact type" vs "family of types"
-	/// =======================================================
+	// =======================================================
 	impl<C, S> s::Foo<C, S> {
 		pub fn new(context: C, state: S) -> Self {
 			Self {
@@ -506,14 +633,14 @@ mod impls {
 	/// Person<C, S> for any type S that implements the Single trait.
 	impl<C, S> s::Foo<C, S>
 	where
-		S: t::Single,
+		S: Single,
 	{
 		pub fn single_traits_implemented() {}
 	}
 }
 
 mod structs {
-	use super::{e, i, t, *};
+	use super::{e, *};
 
 	impl From<C> for Context {
 		fn from(_: C) -> Self {
@@ -531,7 +658,7 @@ mod structs {
 
 	/// ## [C]: Context filler
 	///
-	/// Non trivial apps eventually end up modeling context & state..
+	/// Non-trivial apps eventually end up modeling context & state.
 	///
 	/// With that in mind from the beginning with the goal of
 	/// building robust abstractions & implementations we use generic context [C] and [S]
@@ -547,10 +674,10 @@ mod structs {
 
 	/// ## [Context]: Typestate placeholder
 	///
-	/// Type safety is a global property of a programming
-	/// language or code that prevents invalid operations on data types,
-	/// whereas typestate is a specific design pattern that encodes an object's
-	/// current lifecycle state into its type to restrict operations at compile time.
+	/// Type safety is a global property of a programming language
+	/// or code that prevents invalid operations on data types, whereas
+	/// typestate is a specific design pattern that encodes an object's current
+	/// lifecycle state into its type to restrict operations at compile time.
 	///
 	/// When a context stabilizes swap the generic [C] for
 	/// a concrete implementation of Context in order to reap typestate safety benefits.
@@ -643,11 +770,7 @@ mod structs {
 		pub families: Vec<Weak<RefCell<FamilyMember<Context, State>>>>,
 		pub children: Vec<Rc<RefCell<Child<Context, State>>>>,
 	}
-	// pub struct PersonView<'a, C, S, V> {
-	// 	pub person: &'a mut Person<C, S>,
-	// 	pub _view: PhantomData<V>,
-	// }
-	impl<C, S> s::Person<C, S> {
+	impl<C, S> Person<C, S> {
 		/// Both ava.name & ava.name() work
 		/// But the representation of an object should not necessarily be part of its public API.
 		///
@@ -737,7 +860,8 @@ mod structs {
 }
 
 mod traits {
-	use super::{e, i, s, *};
+	use super::{e, s, *};
+
 	pub trait Child {}
 	pub trait Family {
 		type Context;
@@ -775,16 +899,10 @@ mod traits {
 	pub trait Single {
 		fn date(&self);
 		fn accept_date(&self);
-		// fn dodge(&self);
 		fn get_to_know(&self);
-		// fn ghost(&self);
-		// fn is_interested(&self);
-		// fn is_interesting(&self);
-		// fn plan_date(&self);
-		// fn can_settle(&self);
 	}
 	pub trait Dating {
-		fn is_dating(&self) {}
+		fn dating(&self) {}
 	}
 	pub trait Spouse: Person {
 		fn name(&self) -> &str;
@@ -798,207 +916,329 @@ mod traits {
 	}
 }
 
-use crate::structs::Foo;
-
-use self::traits::*;
-use self::{enums as e, impls as i, structs as s, traits as t};
-
-fn main() {
-	use t::*;
-	let context = s::Context::default();
-	let state = s::State::default();
-
-	let foo1 = Foo::new(context, state);
-	let foo2 = Foo::new_with_type::<s::Context, s::State>(context, state);
-	let foo3 = Foo::<s::Context, s::State>::new_where(context, state);
-
-	let foo_from_converted = Foo::<s::Context, s::State>::convert_from::<s::C, s::S>(s::C, s::S);
-	let foo_from_identity =
-		Foo::<s::Context, s::State>::convert_from::<s::Context, s::State>(context, state);
-
-	let mut tom = s::Person::new(
-		context.clone(),
-		state.clone(),
-		String::from("Tom"),
-		e::Gender::Male,
-	);
-
-	println!("{} is {:?}", tom.name, tom.martial_status);
-
-	// ─────────────────────────────────────────
-	// Work Context
-	// ─────────────────────────────────────────
-
-	let work_tom = s::Work::new(s::CtxWork::default(), s::StateWork::default(), tom.clone());
-	println!("Work Tom's name: {:?}", work_tom.name);
-	println!(
-		"Work Tom's birth/legal/person name: {:?}",
-		work_tom.person.name
-	);
-
-	let mut ava = s::Person::new(context, state, String::from("Ava"), e::Gender::Female);
-
-	println!("{}'s state {:?}", tom.name, tom.state());
-	println!("{}'s is_single {}", tom.name, tom.is_single());
-	println!("{}'s state {:?}", ava.name, ava.state());
-	println!("{}'s is_single {}", ava.name, ava.is_single());
-
-	// Error as unmarried.
-	// tom.discuss_with_spouse("Where should we live?");
-	// ava.discuss_with_spouse("Where should we live?");
-
-	// ─────────────────────────────────────────
-	// They Date
-	// ─────────────────────────────────────────
-	let mut p1 = s::Person::new(
-		s::Context::default(),
-		s::Single,
-		String::from("Tom"),
-		e::Gender::Male,
-	);
-	let mut p2 = s::Person::new(
-		s::Context::default(),
-		s::Single,
-		String::from("Ava"),
-		e::Gender::Female,
-	);
-	println!("{} is_single {}", p1.name, p1.is_single());
-	println!("{} is_single {}", p2.name, p2.is_single());
-
-	/// ## [3] methods available:
-	/// - p1.date_in_where(&mut p2);
-	/// - p1.date_in_single(&mut p2);
-	/// - p1.date_of_runtime(&mut p2);
-	///
-	p1.date_in_where(&mut p2);
-	println!("post date_in_where");
-	println!("{} is_single  {}", p1.name, p1.is_single());
-	println!("{} is_single {}", p2.name, p2.is_single());
-	// p1.date_in_single(&mut p2);
-	// println!("post date_in_single");
-	// println!("{} is_single  {}", p1.name, p1.is_single());
-	// println!("{} is_single {}", p2.name, p2.is_single());
-	// p1.date_of_runtime(&mut p2);
-	// println!("post date_of_runtime");
-	// println!("{} is_single  {}", p1.name, p1.is_single());
-	// println!("{} is_single {}", p2.name, p2.is_single());
-	if let Some(tom) = tom.as_single() {
-		// Only this is available
-		// tom.date_in_lifetimed_singleref();
-		tom.date_in_lifetimed_singleref(&mut ava);
-	}
-	// tom only has this method now.
-	tom.date_of_runtime(&mut ava);
-	println!("{} is {:?}", tom.name(), tom.martial_status);
-	println!("{} is {:?}", ava.name(), ava.martial_status);
-
-	// ─────────────────────────────────────────
-	// They Marry
-	// Now they belong to Family
-	// ─────────────────────────────────────────
-	let (tom, ava, family) = tom.marry(ava);
-
-	// And they can discuss with spouse, but must borrow themselves as they're married (part of family)
-	tom.borrow().discuss_with_spouse("Where should we live?");
-	ava.borrow().discuss_with_spouse("Should we have children?");
-	println!(
-		"{} is {:?}",
-		tom.borrow().name(),
-		tom.borrow().martial_status
-	);
-	println!(
-		"{} is {:?}",
-		ava.borrow().name(),
-		ava.borrow().martial_status
-	);
-
-	// ─────────────────────────────────────────
-	// They have a child
-	// ─────────────────────────────────────────
-
-	let child = family.borrow_mut().have_child("Alice", e::Gender::Female);
-
-	println!(
-		"{} is a parent {:?}",
-		tom.borrow().name(),
-		tom.borrow().martial_status
-	);
-	println!(
-		"{} is a parent {:?}",
-		ava.borrow().name(),
-		ava.borrow().martial_status
-	);
-	println!("{} is a child {:?}", child.name(), child.martial_status);
-
-	// tom.consider_request("Can I stay up late?");
-	// tom.discipline_child("Alice", "She stayed up too late");
-
-	// println!("{}'s children: {:?}", tom.name(), tom.children());
-}
-
-fn main2() {
-	// 	let tom = s::Person {
-	// 		name: String::from("Ann"),
-	// 	};
-	// 	println!("tom {}", tom.name);
-	// 	let person: &dyn t::Person = &tom;
-	// 	// let parent: &dyn t::Parent = &tom;
-	// 	// let spouse: &dyn t::Spouse = &tom;
-
-	// 	// ## Static Dispatch
-	// 	// - Hover Children: Go to C & P
-	// 	// tom.children;
-
-	// 	// ## Dynamic Dispatch
-	// 	// let ava: &(dyn Parent + 'static)
-	// 	let ava: &dyn t::Person = &tom;
-	// 	// - Hover Children: Self = dyn Parent + 'static
-	// 	ava.children();
-
-	// 	// ## Dynamic Dispatch
-	// 	// Owning the trait object
-	// 	// - Type Erased interface
-	// 	let p3: Box<dyn t::Parent> = Box::new(s::Parent {
-	// 		name: String::from("tom"),
-	// 		children: vec![],
-	// 	});
-	// 	// - Hover Children: Self = dyn Parent + 'static
-	// 	p3.children();
-	// 	p3.children();
-	// 	p3.consider_request("Can I go?");
-	// 	// let c3 = C {
-	// 	// 	name: String::from("child"),
-	// 	// 	parents: vec![p3],
-	// 	// };
-	// 	// p3.discipline_child(&c3, "You broke the rules");
-}
-
 fn type_conversion() {
-	// i32
-	// ↓
-	// Into<i64>
-	// ↓
-	// i64
-	let n: i32 = 10;
-	let x: i64 = n.into();
+	/// ============================================================
+	/// 1. INFERENCE + COERCION
+	/// ============================================================
+	///
+	/// Not every "conversion" you see in Rust is actually a
+	/// conversion. Sometimes the compiler simply:
+	///
+	///   • infers the type of value from surrounding constraints
+	///   • performs a language-defined coercion
+	///
+	/// Integer literals are initially type-flexible:
+	///
+	///     let n = 10;
+	///
+	/// If nothing else constrains `n`, Rust defaults it to i32.
+	///
+	/// But here:
+	///
+	///     let x: i64 = n;
+	///
+	/// the expected type of `x` constrains `n`, so the compiler
+	/// infers the original literal as i64:
+	///
+	///     let n: i64 = 10;
+	///     let x: i64 = n;
+	///
+	/// NO i32 -> i64 conversion happened.
+	///
+	/// Coercion is different: Rust can implicitly change certain
+	/// related types in specific situations.
+	///
+	/// For example, &[T; N] can coerce to &[T], and &String can
+	/// deref-coerce to &str.
+	fn inference_and_coercion() {
+		// Integer inference:
+		let n = 10;
+		let x: i64 = n;
 
-	// trait Into<T> {
-	//   fn into(self) -> T;
-	// }
-	// impl From<A> for B {
-	//   fn from(a: A) -> B {
-	//       ...
-	//   }
-	// }
-	// let b: B = a.into();
+		// `n` was inferred as i64 because of `x`.
+		println!("n = {n}, x = {x}");
+
+		// Borrowing:
+		//
+		// `&s` borrows `s`.
+		//
+		// With no expected type, Rust simply infers:
+		//
+		//     let slice = &s;
+		//     // slice: &String
+
+		let s = String::from("hello");
+		let slice = &s;
+		println!("slice = {slice}");
+
+		// Deref coercion:
+		//
+		// When the expected type is &str, Rust can use
+		// String's Deref<Target = str> implementation:
+		//
+		//     &String → &str
+
+		let s = String::from("hello");
+		let slice: &str = &s;
+		println!("slice = {slice}");
+
+		// Deref coercion isn't something that automatically happens whenever
+		// you take a reference to a String. It happens when type checking
+		// requires a compatible target type.
+
+		// Unsizing coercion:
+		let array = [1, 2, 3];
+
+		// &[i32; 3] -> &[i32]
+		let slice: &[i32] = &array;
+
+		println!("slice = {slice:?}");
+	}
+
+	// ============================================================
+	// 2. `as` CASTING
+	// ============================================================
+	//
+	// `as` performs an explicit cast.
+	//
+	// Unlike the previous example, the source type is already
+	// established:
+	//
+	//     let n: i32 = 10;
+	//
+	// Therefore:
+	//
+	//     n as i64
+	//
+	// really is an i32 -> i64 cast.
+	//
+	// `as` is commonly used for primitive numeric conversions
+	// and certain pointer casts.
+	//
+	// It is NOT the same mechanism as From/Into.
+	fn as_casts() {
+		let n: i32 = 10;
+
+		// Explicit numeric cast:
+		let x: i64 = n as i64;
+
+		println!("n = {n}, x = {x}");
+
+		// `as` can also perform conversions where information may
+		// be lost. For example:
+		let large: i32 = 300;
+		let small: u8 = large as u8;
+
+		println!("300 as u8 = {small}");
+
+		// This is fundamentally different from:
+		//
+		//     let small: u8 = large.into();
+		//
+		// because Into/From expresses a trait-based conversion,
+		// while `as` is the language's explicit casting syntax.
+	}
+
+	// ============================================================
+	// 3. From / Into / TryFrom / TryInto
+	// ============================================================
+	//
+	// From represents an infallible conversion:
+	//
+	//     From<A> for B
+	//
+	// means:
+	//
+	//     A -> B
+	//
+	// and Rust automatically gives A:
+	//
+	//     Into<B>
+	//
+	// Therefore:
+	//
+	//     B::from(a)
+	//
+	// and:
+	//
+	//     a.into()
+	//
+	// represent the same conversion.
+	//
+	// TryFrom is the fallible counterpart:
+	//
+	//     A -> Result<B, Error>
+	//
+	// and therefore:
+	//
+	//     TryInto<B>
+	//
+	// is also available.
+
+	fn trait_conversions() {
+		// --------------------------------------------------------
+		// From / Into
+		// --------------------------------------------------------
+
+		let n: i32 = 10;
+
+		// Explicit destination type:
+		let x = i64::from(n);
+
+		println!("x = {x}");
+
+		// Into relies on the destination type to determine T:
+		let n: i32 = 10;
+		let x: i64 = n.into();
+
+		println!("x = {x}");
+
+		// Conceptually:
+		//
+		//     impl From<i32> for i64
+		//                 │
+		//                 └── gives i32::into() -> i64
+		//
+		// You normally implement From rather than implementing
+		// Into directly.
+
+		// --------------------------------------------------------
+		// TryFrom / TryInto
+		// --------------------------------------------------------
+
+		let n: i64 = 100;
+
+		// i64 -> u8 can fail because u8 only holds 0..=255.
+		let x: u8 = u8::try_from(n).unwrap();
+
+		println!("x = {x}");
+
+		// Same operation through TryInto:
+		let n: i64 = 100;
+
+		let x: u8 = n.try_into().unwrap();
+
+		println!("x = {x}");
+
+		// Unlike From:
+		//
+		//     From<i64> for u8
+		//
+		// would imply that every i64 can become a u8 without failure.
+		//
+		// Instead:
+		//
+		//     TryFrom<i64> for u8
+		//
+		// returns:
+		//
+		//     Result<u8, Error>
+		//
+		// because some values cannot be represented.
+	}
+
+	// ============================================================
+	// 4. BORROWING / VIEW CONVERSIONS
+	// ============================================================
+	//
+	// AsRef and AsMut are different from From/Into.
+	//
+	// They don't generally consume one type and create another.
+	// They provide a borrowed view:
+	//
+	//     AsRef<T>
+	//         A -> &T
+	//
+	//     AsMut<T>
+	//         A -> &mut T
+	//
+	// This is extremely useful for generic APIs.
+	//
+	// `Deref` is closely related because deref coercion lets Rust
+	// automatically turn things such as:
+	//
+	//     &String
+	//
+	// into:
+	//
+	//     &str
+	//
+	// when the expected type requires it.
+
+	fn borrowing_conversions() {
+		// --------------------------------------------------------
+		// AsRef
+		// --------------------------------------------------------
+
+		fn print_text<T: AsRef<str>>(value: T) {
+			println!("{}", value.as_ref());
+		}
+
+		let owned = String::from("hello");
+
+		// String can be viewed as &str:
+		print_text(owned);
+
+		// &str also works:
+		print_text("hello");
+
+		// The important idea is that AsRef isn't saying:
+		//
+		//     String -> str
+		//
+		// as an owned conversion.
+		//
+		// It says:
+		//
+		//     String -> &str
+		//
+		// as a borrowed view.
+
+		// --------------------------------------------------------
+		// AsMut
+		// --------------------------------------------------------
+
+		fn modify_text<T: AsMut<str>>(value: &mut T) {
+			let text: &mut str = value.as_mut();
+
+			text.make_ascii_uppercase();
+		}
+
+		let mut text = String::from("hello");
+
+		modify_text(&mut text);
+
+		println!("{text}"); // HELLO
+
+		println!("{text}");
+
+		// --------------------------------------------------------
+		// Deref coercion
+		// --------------------------------------------------------
+
+		let text = String::from("hello");
+
+		// Rust automatically deref-coerces:
+		//
+		//     &String
+		//        ↓
+		//     &str
+		//
+		fn takes_str(value: &str) {
+			println!("{value}");
+		}
+
+		takes_str(&text);
+	}
+
+	// Run the four demonstrations.
+	inference_and_coercion();
+	as_casts();
+	trait_conversions();
+	borrowing_conversions();
 }
 
-fn deref() {
-	// What Box does have is Deref
-	// Rust's dereferencing/coercion machinery allows the method call to work through the Box.
-}
-
-mod example {
+mod state_context_paradigm {
 	/// "Foo is parameterized by the conditions under which Foo exists and behaves."
 	///
 	/// state: The raw, current data values of an object or application.
@@ -1006,7 +1246,7 @@ mod example {
 	/// - Highly mutable; changes constantly based on user actions or logic.
 	/// - Internal: What the specific module or object knows about itself.
 	///
-	/// context: The surrounding environment, configurations, or metavata.
+	/// context: The surrounding environment, configurations, or metadata.
 	/// - To explain where, why, or how something is operating.
 	/// - Relatively stable; acts as a wrapper or container for operations.
 	/// - External / Pervasive: The broader system constraints impacting the object.
@@ -1014,16 +1254,10 @@ mod example {
 	/// A field's type tells Rust what type of thing the relationship
 	/// contains. A where clause tells Rust what properties that type must have.
 	///
-	struct Foo<S, C> {
+	struct Foo<C, S> {
 		state: S,
 		context: C,
 	}
-	// You hit the nail on the head: it absolutely depends, and it is a continuous loop.
-	// It is the software engineering equivalent of "nature vs. nurture."
-	// Instead of one driving the other permanently, think of them as an interactive cycle:
-	// Context dictates what states are possible or valid, while State transitions eventually change the Context.
-	// Here is the breakdown of how they drive each other depending on the lens you look through.
-	// ------------------------------
 	// ## 1. When Context Drives State (The Rules & Environment)
 	// From a design and initialization perspective, context always drives state. Context defines the sandbox.
 	// It dictates how state is allowed to behave, what values are legal, and what state should be initialized.
@@ -1039,7 +1273,7 @@ mod example {
 	// From a runtime and behavioral perspective, accumulated state changes eventually shift the context. When individual data points hit a certain threshold, the entire environment morphs.
 
 	// * The Threshold Shift: A user's account state variable failed_login_attempts increments from 4 to 5. This state change instantly flips the application context from Standard Login Screen to Secured Captcha Lockout.
-	// * The Business Logic Evolution: An e-commerce order state moves from Items Assembled to Shipped. The context of that order now shifts from an "Inventory Management" context to a "Logistics & Delivery Tracking" context.
+	// * The Business Logic Evolution: An e-commerce order state moves from Items Assembled to Ship. The context of that order now shifts from an "Inventory Management" context to a "Logistics & Delivery Tracking" context.
 	// * The Physical World: In a video game, when the player's coordinate states cross a specific boundary, the game engine unloads the "Forest" context and loads the "Dungeon" context.
 
 	// Summary: State acts as the evolutionary data. When state changes drastically enough, it forces a context switch.
@@ -1092,7 +1326,7 @@ mod example {
 	// Person state == Family state == Membership state
 
 	// This means there are multiple state dimensions.
-	// Each model has it's own state.
+	// Each model has its own state.
 	// Person<C,S₁>
 	// Family<C,S₂>
 	// FamilyMember<C,?>

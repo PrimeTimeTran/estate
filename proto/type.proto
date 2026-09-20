@@ -4,6 +4,16 @@ package types;
 
 import "google/protobuf/timestamp.proto";
 
+message SubscribeRequest {}
+
+message Event {
+  uint64 id = 1;
+  string kind = 2;
+  string payload = 3;
+  string source = 4;
+  uint64 timestamp = 5;
+}
+
 message Empty {}
 
 // -----------------------------------------------------------------------------
@@ -452,3 +462,5 @@ message ListRepliesRequest {
 
   string parent_id = 2;
 }
+
+

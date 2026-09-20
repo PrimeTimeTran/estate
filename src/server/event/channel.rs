@@ -1,7 +1,6 @@
-use tokio::sync::mpsc::error::TryRecvError;
 use tokio::sync::mpsc::{
 	Receiver as TokioReceiver, Sender as TokioSender, channel as tokio_channel,
-	error::{SendError, TrySendError},
+	error::{SendError, TryRecvError, TrySendError},
 };
 
 use crate::prelude::*;
@@ -60,14 +59,13 @@ impl<T> EventSender<T> {
 }
 
 #[derive(Debug)]
-pub struct EventSender<T> {
-	tx: TokioSender<T>,
+pub struct EventReceiver<T> {
+	rx: TokioReceiver<T>,
 }
 
 #[derive(Debug)]
-pub struct EventReceiver<T> {
-	rx: TokioReceiver<T>,
-	// rx: tokio::sync::broadcast::Receiver<T>,
+pub struct EventSender<T> {
+	tx: TokioSender<T>,
 }
 
 impl<T: Clone> BroadcastReceiver<T> {

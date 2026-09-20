@@ -54,11 +54,7 @@ pub mod traits;
 pub mod ui;
 pub mod util;
 
-pub use crate::{
-	app::{app_prelude, event as e},
-	data::*,
-	ui::*,
-};
+pub use crate::{app::app_prelude, data::*, service::event as e, ui::*};
 
 #[cfg(not(target_arch = "wasm32"))]
 pub mod native;

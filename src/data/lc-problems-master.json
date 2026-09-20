@@ -1,5 +1,29 @@
 [
   {
+    "number": 3498,
+    "normalized-name": "reverse-degree-of-a-string",
+    "title": "Reverse Degree of a String",
+    "difficulty": "easy",
+    "description": "Given a string s, calculate its reverse degree.\n\nThe reverse degree is calculated as follows:",
+    "url": "https://leetcode.com/problems/reverse-degree-of-a-string/",
+    "filename": "3498-reverse-degree-of-a-string.py",
+    "description-raw": "<p>Given a string <code>s</code>, calculate its <strong>reverse degree</strong>.</p>\n<p>The <strong>reverse degree</strong> is calculated as follows:</p>",
+    "test-cases": [
+      {
+        "index": 0,
+        "input": "s = \"abc\"",
+        "output": "148",
+        "explanation": "The reversed degree is 26 + 50 + 72 = 148.\n\n"
+      },
+      {
+        "index": 1,
+        "input": "s = \"zaza\"",
+        "output": "160",
+        "explanation": "The reverse degree is 1 + 52 + 3 + 104 = 160.\n\n"
+      }
+    ]
+  },
+  {
     "number": 1401,
     "normalized-name": "circle-and-rectangle-overlapping",
     "title": "Circle and Rectangle Overlapping",

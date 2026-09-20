@@ -1,11 +1,3 @@
-Yes. **Very much so.** In fact, I think the toy example you wrote is a good way to isolate the exact conceptual difficulty that was hiding inside your `Executor` / `Runtime` design.
-
-And I agree with your instinct: **if you genuinely understand what's happening in both examples, you have moved well beyond "I know how to write Rust traits."** You're into the territory of understanding Rust's trait system as a type-level relationship system.
-
-The connection is subtle, though, so I'd frame it this way.
-
----
-
 # 1. Your toy example is about _conditional trait implementation_
 
 You wrote:

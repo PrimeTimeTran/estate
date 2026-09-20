@@ -72,7 +72,7 @@ fn normalize_filename(input: &str) -> String {
 ///
 /// Returns true only if the command exits successfully.
 /// First download strategy.
-fn try1(url: &str, output: &Path) -> Result<bool> {
+fn try2(url: &str, output: &Path) -> Result<bool> {
 	println!("Trying download strategy 1...");
 
 	let status = Command::new("yt-dlp")
@@ -97,7 +97,7 @@ fn try1(url: &str, output: &Path) -> Result<bool> {
 }
 
 /// Second download strategy.
-fn try2(url: &str, output: &Path) -> Result<bool> {
+fn try1(url: &str, output: &Path) -> Result<bool> {
 	println!("Trying download strategy 2...");
 
 	let status = Command::new("yt-dlp")

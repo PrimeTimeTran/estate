@@ -1,5 +1,6 @@
 //! ## [Impl]
 //!
+//!
 //! Kitchen draw placement for impls until API stabilizes.
 //!
 use crate::{
@@ -14,6 +15,7 @@ pub async fn sleep(duration: Duration) {
 	#[cfg(target_arch = "wasm32")]
 	gloo_timers::future::TimeoutFuture::new(duration.as_millis() as u32).await;
 }
+
 
 impl Clone for Box<dyn Api> {
 	fn clone(&self) -> Self {

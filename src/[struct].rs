@@ -57,7 +57,6 @@ pub struct HostClock {
 
 #[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub struct Inode;
-
 pub struct Linux;
 pub struct MacOS;
 
