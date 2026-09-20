@@ -19,7 +19,7 @@
 //! For example, `package.json` may simultaneously be understood in several
 //! different contexts:
 //!
-//! ```mermaid
+//! `mermaid
 //! graph TD
 //!     Package["package.json"]
 //!
@@ -35,7 +35,7 @@
 //!     Build -->|examines as| Config
 //!     Ecosystem -->|groups with| PackageFiles
 //!     Package -->|belongs to| Project
-//! ```
+//! `
 //!
 //! These are not necessarily different files or different entities. They are
 //! different relationships and contexts through which the same entity can be
@@ -49,7 +49,7 @@
 //!
 //! A single node may participate in many independent relationships.
 //!
-//! ```mermaid
+//! `mermaid
 //! graph TD
 //!     Package["package.json"]
 //!
@@ -69,7 +69,7 @@
 //!
 //!     Package -->|member of| MemberOf
 //!     MemberOf --> PackageFiles
-//! ```
+//! `
 //!
 //! None of these relationships needs to replace the others. A projection can
 //! select the relationships relevant to a particular question and present
@@ -82,7 +82,7 @@
 //!
 //! An anchor on a resource may act as the beginning of a pipeline:
 //!
-//! ```mermaid
+//! `mermaid
 //! graph LR
 //!     Package["package.json"]
 //!     Init["npm init -y"]
@@ -94,7 +94,7 @@
 //!     Init --> Project
 //!     Project --> Build
 //!     Build --> Guide
-//! ```
+//! `
 //!
 //! In this model, a relationship is not restricted to "A belongs to B".
 //! Relationships can describe provenance, generation, dependency,
@@ -109,7 +109,7 @@
 //!
 //! This allows a graph to connect semantic entities to concrete evidence:
 //!
-//! ```mermaid
+//! `mermaid
 //! graph TD
 //!     Blog["Blog post"]
 //!     Paragraph["Paragraph / code block"]
@@ -122,7 +122,7 @@
 //!
 //!     Source -->|anchor| Struct
 //!     Struct -->|implements| VFS
-//! ```
+//! `
 //!
 //! The same semantic entity can therefore be reached through many resources
 //! and many locations.
@@ -135,7 +135,7 @@
 //!
 //! For example, a projection might answer:
 //!
-//! ```mermaid
+//! `mermaid
 //! graph TD
 //!     Concept["Concept"]
 //!     Rust["Rust source"]
@@ -145,11 +145,11 @@
 //!     Concept -->|implements| Rust
 //!     Concept -->|implements| Python
 //!     Concept -->|implements| Example
-//! ```
+//! `
 //!
 //! Another projection of the same graph might answer:
 //!
-//! ```mermaid
+//! `mermaid
 //! graph TD
 //!     Artifact["Artifact"]
 //!     Command["Command"]
@@ -157,11 +157,11 @@
 //!
 //!     Artifact -->|generated from| Command
 //!     Command --> Init
-//! ```
+//! `
 //!
 //! Another might answer:
 //!
-//! ```mermaid
+//! `mermaid
 //! graph TD
 //!     Concept["Concept"]
 //!     Blog["Blog post"]
@@ -171,7 +171,7 @@
 //!     Concept -->|explained by| Blog
 //!     Concept -->|explained by| Guide
 //!     Concept -->|explained by| Comments
-//! ```
+//! `
 //!
 //! These views do not require the underlying entities to be duplicated.
 //! They are different interpretations of the same graph.
@@ -212,7 +212,7 @@
 //! interpreted differently without requiring separate copies of that entity
 //! for every interpretation.
 //!
-//! ```mermaid
+//! `mermaid
 //! graph TD
 //!     Entity["Entity"]
 //!
@@ -231,7 +231,7 @@
 //!     ContextA --> ProjectionA
 //!     ContextB --> ProjectionB
 //!     ContextC --> ProjectionC
-//! ```
+//! `
 //!
 //! The graph is therefore the relationship layer between the entities Estate
 //! knows about and the many contextual views that can be derived from them.
@@ -249,13 +249,13 @@ use crate::prelude::*;
 // /// example, several implementations, examples, or discussions of the same
 // /// idea may all be associated with one node:
 // ///
-// /// ```text
+// /// `text
 // /// Node: "climbingStairs"
 // /// ├── python implementation
 // /// ├── rust implementation
 // /// ├── blog post explaining the algorithm
 // /// └── notes comparing recursive and dynamic-programming solutions
-// /// ```
+// /// `
 // ///
 // /// Nodes form the semantic layer of an Estate. [`Relation`]s connect nodes
 // /// to describe how those entities relate to one another.
@@ -265,15 +265,15 @@ use crate::prelude::*;
 // /// Relations can express relationships that exist independently of the
 // /// physical organization of files. For example:
 // ///
-// /// ```text
+// /// `text
 // /// VFS
 // /// ├── Implements ──→ Inode-based filesystem
 // /// ├── ExplainedBy ──→ compiler architecture article
 // /// ├── UsedBy ──────→ WASM IDE
 // /// └── RelatedTo ───→ client-side sandbox
-// /// ```
+// /// `
 // ///
-// /// A source file or code block therefore does not necessarily *define* the
+// /// A source file or code block therefore does not necessarily _define_ the
 // /// semantic entity it contains. Instead, it can provide a representation of,
 // /// implementation of, explanation of, or reference to a node.
 // ///
@@ -305,8 +305,7 @@ use crate::prelude::*;
 // /// A node representing a conceptual implementation can exist independently
 // /// of the files containing its implementations:
 // ///
-// /// ```
-// /// # use estate::prelude::*;
+// /// `// /// # use estate::prelude::*;
 // ///
 // /// let climbing_stairs = Node::new(
 // ///     "climbingStairs".into(),
@@ -315,122 +314,123 @@ use crate::prelude::*;
 // ///     Scope::default(),
 // ///     None,
 // /// );
-// /// ```
+// ///`
 // ///
 // /// Individual implementations or explanations can then be represented by
 // /// other nodes and connected with [`Relation`]s such as [`RelationKind::Implements`],
 // /// [`RelationKind::Explains`], or [`RelationKind::References`].
 #[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct Node {
-	/// The stable identity of this semantic entity.
-	pub id: Uuid,
+/// The stable identity of this semantic entity.
+pub id: Uuid,
 
-	/// The semantic category of the node.
-	pub kind: NodeKind,
+    /// The semantic category of the node.
+    pub kind: NodeKind,
 
-	/// The human-readable name of the entity.
-	pub name: String,
+    /// The human-readable name of the entity.
+    pub name: String,
 
-	/// An optional description of what the entity represents.
-	pub description: Option<String>,
+    /// An optional description of what the entity represents.
+    pub description: Option<String>,
 
-	/// The scope in which this entity is meaningful.
-	pub scope: Scope,
+    /// The scope in which this entity is meaningful.
+    pub scope: Scope,
 
-	/// Optional semantic tags associated with the entity.
-	pub tags: Option<Vec<Tag>>,
+    /// Optional semantic tags associated with the entity.
+    pub tags: Option<Vec<Tag>>,
 
-	/// When this node was created.
-	pub created_at: DateTime<Utc>,
+    /// When this node was created.
+    pub created_at: DateTime<Utc>,
 
-	/// When this node was last modified.
-	pub updated_at: DateTime<Utc>,
+    /// When this node was last modified.
+    pub updated_at: DateTime<Utc>,
+
 }
 
 // impl Node {
-// 	/// Creates a new semantic node.
-// 	///
-// 	/// The node receives a new time-sortable [`Uuid`] and uses the current
-// 	/// time for both [`Node::created_at`] and [`Node::updated_at`].
-// 	pub fn new(
-// 		name: String,
-// 		kind: NodeKind,
-// 		description: Option<String>,
-// 		scope: Scope,
-// 		tags: Option<Vec<Tag>>,
-// 	) -> Self {
-// 		let now = Utc::now();
+// /// Creates a new semantic node.
+// ///
+// /// The node receives a new time-sortable [`Uuid`] and uses the current
+// /// time for both [`Node::created_at`] and [`Node::updated_at`].
+// pub fn new(
+// name: String,
+// kind: NodeKind,
+// description: Option<String>,
+// scope: Scope,
+// tags: Option<Vec<Tag>>,
+// ) -> Self {
+// let now = Utc::now();
 
-// 		Self {
-// 			id: Uuid::new_v4(),
-// 			kind,
-// 			name,
-// 			description,
-// 			scope,
-// 			tags,
-// 			created_at: now,
-// 			updated_at: now,
-// 		}
-// 	}
+// Self {
+// id: Uuid::new_v4(),
+// kind,
+// name,
+// description,
+// scope,
+// tags,
+// created_at: now,
+// updated_at: now,
+// }
+// }
 // }
 
 // /// Graph
-// ///     "What is A connected to?"
+// /// "What is A connected to?"
 // /// - I created an estate .md file which wikilinks to 5 other estate files. Do I do a full table scan of the registry every time? No, the resolver should take in an estate id and context and give me back what it is I'm looking for. If I've opened the IDE from a repo/workspace then the link will look differently to resolve.
 // pub trait Graph {
-// 	fn children(&self, id: Uuid) -> Vec<Uuid>;
-// 	fn parents(&self, id: Uuid) -> Vec<Uuid>;
-// 	fn dependencies(&self, id: Uuid) -> Vec<Uuid>;
+// fn children(&self, id: Uuid) -> Vec<Uuid>;
+// fn parents(&self, id: Uuid) -> Vec<Uuid>;
+// fn dependencies(&self, id: Uuid) -> Vec<Uuid>;
 // }
 
 // // #[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 // // pub enum NodeKind {
-// // 	#[default]
-// // 	Generic,
-// // 	Concept,
-// // 	Workspace,
-// // 	Bookmark,
-// // 	Artifact,
-// // 	View,
-// // 	Asset,
-// // 	Config,
-// // 	Directory,
-// // 	Document,
-// // 	File,
-// // 	Source,
+// // #[default]
+// // Generic,
+// // Concept,
+// // Workspace,
+// // Bookmark,
+// // Artifact,
+// // View,
+// // Asset,
+// // Config,
+// // Directory,
+// // Document,
+// // File,
+// // Source,
 // // }
 
 // // // "What named thing exists?"
 // // #[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 // // pub struct Relation {
-// // 	pub from: Uuid,
-// // 	pub to: Uuid,
-// // 	pub kind: RelationKind,
+// // pub from: Uuid,
+// // pub to: Uuid,
+// // pub kind: RelationKind,
 // // }
 // // impl Relation {
-// // 	pub fn new(from: Uuid, to: Uuid, kind: RelationKind) -> Self {
-// // 		Self { from, to, kind }
-// // 	}
+// // pub fn new(from: Uuid, to: Uuid, kind: RelationKind) -> Self {
+// // Self { from, to, kind }
+// // }
 // // }
 // // #[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 // // pub enum RelationKind {
-// // 	#[default]
-// // 	Null,
-// // 	Represents,
-// // 	Contains,
-// // 	PartOf,
-// // 	DependsOn,
-// // 	Implements,
-// // 	Uses,
-// // 	Documents,
-// // 	Explains,
-// // 	Visualizes,
-// // 	DerivedFrom,
-// // 	GeneratedFrom,
-// // 	RelatedTo,
-// // 	References,
-// // 	Imports,
-// // 	Calls,
+// // #[default]
+// // Null,
+// // Represents,
+// // Contains,
+// // PartOf,
+// // DependsOn,
+// // Implements,
+// // Uses,
+// // Documents,
+// // Explains,
+// // Visualizes,
+// // DerivedFrom,
+// // GeneratedFrom,
+// // RelatedTo,
+// // References,
+// // Imports,
+// // Calls,
 // // }
 
 /// ---------------------
@@ -442,99 +442,101 @@ pub struct Node {
 /// location or representation.
 #[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum RelationKind {
-	/// A relationship with no more specific semantic meaning.
-	#[default]
-	Null,
+/// A relationship with no more specific semantic meaning.
+#[default]
+Null,
 
-	/// The source entity represents the target entity.
-	Represents,
+    /// The source entity represents the target entity.
+    Represents,
 
-	/// The source entity contains the target entity.
-	Contains,
+    /// The source entity contains the target entity.
+    Contains,
 
-	/// The source entity is a part of the target entity.
-	PartOf,
+    /// The source entity is a part of the target entity.
+    PartOf,
 
-	/// The source entity depends on the target entity.
-	DependsOn,
+    /// The source entity depends on the target entity.
+    DependsOn,
 
-	/// The source entity provides an implementation of the target entity.
-	Implements,
+    /// The source entity provides an implementation of the target entity.
+    Implements,
 
-	/// The source entity uses the target entity.
-	Uses,
+    /// The source entity uses the target entity.
+    Uses,
 
-	/// The source entity documents the target entity.
-	Documents,
+    /// The source entity documents the target entity.
+    Documents,
 
-	/// The source entity explains the target entity.
-	Explains,
+    /// The source entity explains the target entity.
+    Explains,
 
-	/// The source entity provides a visualization of the target entity.
-	Visualizes,
+    /// The source entity provides a visualization of the target entity.
+    Visualizes,
 
-	/// The source entity was derived from the target entity.
-	DerivedFrom,
+    /// The source entity was derived from the target entity.
+    DerivedFrom,
 
-	/// The source entity was generated from the target entity.
-	GeneratedFrom,
+    /// The source entity was generated from the target entity.
+    GeneratedFrom,
 
-	/// The source entity is generally related to the target entity.
-	RelatedTo,
+    /// The source entity is generally related to the target entity.
+    RelatedTo,
 
-	/// The source entity references the target entity.
-	References,
+    /// The source entity references the target entity.
+    References,
 
-	/// The source entity imports the target entity.
-	Imports,
+    /// The source entity imports the target entity.
+    Imports,
 
-	/// The source entity invokes or calls the target entity.
-	Calls,
+    /// The source entity invokes or calls the target entity.
+    Calls,
+
 }
 
 /// The semantic category of a [`Node`].
 ///
-/// `NodeKind` describes what a node *represents*, rather than where it is
+/// `NodeKind` describes what a node _represents_, rather than where it is
 /// stored. A single semantic concept may therefore have many resources or
 /// representations associated with it.
 #[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum NodeKind {
-	/// A node without a more specific semantic classification.
-	#[default]
-	Generic,
+/// A node without a more specific semantic classification.
+#[default]
+Generic,
 
-	/// An abstract idea or concept.
-	Concept,
+    /// An abstract idea or concept.
+    Concept,
 
-	/// A workspace or project-level entity.
-	Workspace,
+    /// A workspace or project-level entity.
+    Workspace,
 
-	/// A saved point of interest.
-	Bookmark,
+    /// A saved point of interest.
+    Bookmark,
 
-	/// A produced or constructed artifact.
-	Artifact,
+    /// A produced or constructed artifact.
+    Artifact,
 
-	/// A derived presentation or view of other entities.
-	View,
+    /// A derived presentation or view of other entities.
+    View,
 
-	/// An external or supporting asset.
-	Asset,
+    /// An external or supporting asset.
+    Asset,
 
-	/// Configuration or configuration-related data.
-	Config,
+    /// Configuration or configuration-related data.
+    Config,
 
-	/// A directory or hierarchical container.
-	Directory,
+    /// A directory or hierarchical container.
+    Directory,
 
-	/// A document containing information or explanation.
-	Document,
+    /// A document containing information or explanation.
+    Document,
 
-	/// A file-level semantic entity.
-	File,
+    /// A file-level semantic entity.
+    File,
 
-	/// A source-code entity or source representation.
-	Source,
+    /// A source-code entity or source representation.
+    Source,
+
 }
 
 // "What named thing exists?"
@@ -552,37 +554,38 @@ pub enum NodeKind {
 ///
 /// A concrete implementation can be related to a conceptual entity:
 ///
-/// ```text
+/// `text
 /// Rust VFS implementation
 ///        │
 ///        └── Implements ──→ Virtual File System
-/// ```
+/// `
 ///
 /// Multiple implementations can therefore point to the same semantic node:
 ///
-/// ```text
+/// `text
 /// Rust implementation ──┐
 /// Python implementation ├── Implements ──→ Climbing Stairs
 /// Blog explanation ─────┘
-/// ```
+/// `
 ///
 /// The graph can consequently represent relationships that cannot be
 /// expressed naturally by a filesystem hierarchy.
 #[derive(Clone, Debug, Default, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct Relation {
-	/// The source node of the relationship.
-	pub from: Uuid,
+/// The source node of the relationship.
+pub from: Uuid,
 
-	/// The target node of the relationship.
-	pub to: Uuid,
+    /// The target node of the relationship.
+    pub to: Uuid,
 
-	/// The semantic meaning of the relationship.
-	pub kind: RelationKind,
+    /// The semantic meaning of the relationship.
+    pub kind: RelationKind,
+
 }
 
 impl Relation {
-	/// Creates a directed semantic relationship between two nodes.
-	pub fn new(from: Uuid, to: Uuid, kind: RelationKind) -> Self {
-		Self { from, to, kind }
-	}
+/// Creates a directed semantic relationship between two nodes.
+pub fn new(from: Uuid, to: Uuid, kind: RelationKind) -> Self {
+Self { from, to, kind }
+}
 }

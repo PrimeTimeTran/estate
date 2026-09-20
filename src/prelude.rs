@@ -18,14 +18,12 @@ pub use std::{
 	},
 	time::{Duration, Instant, SystemTime},
 };
-
 pub use tokio::{
 	sync::broadcast::{self, error::TryRecvError},
 	task::JoinHandle,
 };
 pub use tokio_stream::{Stream, StreamExt, wrappers::BroadcastStream};
 pub use tokio_util::sync::CancellationToken;
-
 pub use uuid::Uuid;
 
 /// ## Warning
@@ -58,7 +56,7 @@ pub use crate::{
 #[cfg(not(target_arch = "wasm32"))]
 pub use crate::{
 	app::{context::*, *},
-	native::{
+	modules::native::{
 		job,
 		runtime::*,
 		state::*,

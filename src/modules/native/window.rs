@@ -34,7 +34,7 @@ fn build_egui(event_loop: &ActiveEventLoop) -> (gui::Context, egui_winit::State)
 fn build_window(event_loop: &ActiveEventLoop) -> Result<Arc<winit::window::Window>> {
 	let width = 1920;
 	let height = 1280;
-	let icon_file = include_bytes!("../../assets/icon.png");
+	let icon_file = include_bytes!("../../../assets/icon.png");
 	let icon = {
 		let image = image::load_from_memory(icon_file)
 			.expect("failed to load icon")

@@ -42,6 +42,7 @@ pub mod impls;
 #[path = "./[macro].rs"]
 pub mod macros;
 pub mod model;
+pub mod modules;
 pub mod prelude;
 pub mod proto;
 pub mod service;
@@ -53,10 +54,7 @@ pub mod traits;
 pub mod ui;
 pub mod util;
 
-pub use crate::{app::app_prelude, data::*, service::event as e, ui::*};
-
-#[cfg(not(target_arch = "wasm32"))]
-pub mod native;
+pub use crate::{app::app_prelude, data::*, modules::*, service::event as e, ui::*};
 
 #[cfg(not(target_arch = "wasm32"))]
 pub mod server;

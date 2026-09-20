@@ -1,5 +1,5 @@
 // [Modules]
-// This should encapsulate logic that isn't "app" specific but 
+// This should encapsulate logic that isn't "app" specific but
 // also encapsulates larger systems that are bigger than a single
 // target. Event is a leading contender right now
 // Whats a mod? Something bigger than a mod, model, behavior.
@@ -10,3 +10,9 @@
 //
 // pub(crate) mod runtime;
 // pub use runtime::*;
+
+#[cfg(not(target_arch = "wasm32"))]
+pub mod native;
+
+#[cfg(not(target_arch = "wasm32"))]
+pub use crate::modules::native::*;
