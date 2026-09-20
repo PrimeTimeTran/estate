@@ -67,4 +67,4 @@ pub use crate::{
 };
 
 #[cfg(all(feature = "web", target_arch = "wasm32"))]
-pub use crate::web::{app::*, bridge::*, *};
+pub use crate::modules::web::{app::*, bridge::*, *};

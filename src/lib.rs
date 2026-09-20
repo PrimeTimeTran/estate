@@ -58,6 +58,3 @@ pub use crate::{app::app_prelude, data::*, modules::*, service::event as e, ui::
 
 #[cfg(not(target_arch = "wasm32"))]
 pub mod server;
-
-#[cfg(target_arch = "wasm32")]
-pub mod web;

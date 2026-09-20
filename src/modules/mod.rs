@@ -14,5 +14,5 @@
 #[cfg(not(target_arch = "wasm32"))]
 pub mod native;
 
-#[cfg(not(target_arch = "wasm32"))]
-pub use crate::modules::native::*;
+#[cfg(target_arch = "wasm32")]
+pub mod web;
