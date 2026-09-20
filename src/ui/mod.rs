@@ -10,7 +10,6 @@ pub mod primitive;
 pub mod region;
 pub mod screen;
 pub mod theme;
-pub mod ui_trait;
 pub mod view;
 
 pub use crate::ui::prelude::*;

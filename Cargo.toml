@@ -1,5 +1,11 @@
-# https://doc.rust-lang.org/cargo/reference/manifest.html
+# Manifest file
+## https://doc.rust-lang.org/cargo/reference/manifest.html
+
+# Configuration of Cargo build targets
+## https://doc.rust-lang.org/cargo/reference/cargo-targets.html#configuring-a-target
+
 # https://github.com/dandavison/delta
+
 [package]
 name = "estate"
 version = "0.1.0"
@@ -16,52 +22,68 @@ short_description = "Estate development environment"
 long_description = "Estate development environment"
 icon = ["assets/icon.icns"]
 
-# [[bin]]
-# name = "daemon"
-# path = "src/bin/daemon.rs"
-
+# Internal bins for document/testing/observing
+# abstractions like nightly rust should be prefixed with _ in the bin dir.
+# 
+# These might become seperate crates one day but until we're certain they support estate or aren't rust/prototype examples
+# then leave them here so we can easily run & use soruce from the repo.
+# 
 [[bin]]
 name = "base"
-path = "src/bin/[base].rs"
+path = "src/bin/_base.rs"
+
+# [[bin]]
+# name = "daemon"
+# path = "src/bin/_daemon.rs"
 
 [[bin]]
 name = "dispatch"
-path = "src/bin/[dispatch].rs"
+path = "src/bin/_dispatch.rs"
+
+[[bin]]
+name = "macros"
+path = "src/bin/_macro.rs"
+
+[[bin]]
+name = "threads"
+path = "src/bin/_threads.rs"
 
 [[bin]]
 name = "mpl"
-path = "src/bin/[tmp].rs"
+path = "src/bin/_tmp.rs"
 
 [[bin]]
 name = "type-state"
-path = "src/bin/[type-state].rs"
+path = "src/bin/_type-state.rs"
 
 [[bin]]
 name = "type-state1"
-path = "src/bin/[type-state1].rs"
+path = "src/bin/_type-state1.rs"
 
 [[bin]]
 name = "lifetime"
 path = "src/bin/lifetime/main.rs"
 
-[[bin]]
-name = "macros"
-path = "src/bin/macros.rs"
-
+# Bins of Estate or high likelyhood for seperate crate/project 
+# should be wrapped with [] to identify them clearly. It means we do have some
+# concrete idea of how we must have this in the src long term.
+# 
+# Each bin is not only entry point but should be the start of 
+# documentation of APIs, cli commands, etc.
+# 
 [[bin]]
 name = "native"
-path = "src/bin/native.rs"
-required-features = ["native"]
-
-# https://doc.rust-lang.org/cargo/reference/cargo-targets.html#configuring-a-target
-[[bin]]
-name = "runner1"
-path = "src/bin/runner1.rs"
+path = "src/bin/[native].rs"
 required-features = ["native"]
 
 [[bin]]
 name = "runner"
-path = "src/bin/runner.rs"
+path = "src/bin/[runner].rs"
+required-features = ["native"]
+
+[[bin]]
+name = "runner1"
+path = "src/bin/runner1.rs"
 required-features = ["native"]
 
 [[bin]]
@@ -71,23 +93,24 @@ required-features = ["native"]
 
 [[bin]]
 name = "server"
-path = "src/bin/server.rs"
+path = "src/bin/[server].rs"
 required-features = ["native"]
 
 [[bin]]
-name = "threads"
-path = "src/bin/threads.rs"
-
-[[bin]]
 name = "web"
-path = "src/bin/web.rs"
+path = "src/bin/[web].rs"
 required-features = ["web"]
 target = "wasm32-unknown-unknown"
 
-# cargo nextest run --bin settings --test-threads 1 --no-fail-fast
+# Cargo Features
+## https://doc.rust-lang.org/cargo/reference/features.html
 [features]
+# cargo nextest run --bin settings --test-threads 1 --no-fail-fast
+
 # The default here causes issues with VSCode's Problem Tab.
 # It picks up downloaded crates when analyzing
+
+# [PICK 1]
 # default = []
 # default = ["web"]
 default = ["native"]
@@ -117,9 +140,7 @@ native = [
   "dep:signal-hook",
   "dep:comfy-table",
   "dep:tray-icon",
-
   "dep:macos-accessibility-client",
-  # "dep:egui_commonmark",
   "dep:egui_extras",
   "dep:jsonc-parser",
 ]

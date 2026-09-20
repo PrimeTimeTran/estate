@@ -1,14 +1,14 @@
 use estate::{
 	e::{EventBus, EventService},
+	modules::server::{
+		json::{problem::JsonProblemRepository, submission::JsonSubmissionRepository},
+		problem::{ProblemQuery, ProblemService},
+		submission::SubmissionService,
+	},
 	prelude::*,
 	proto::{
 		event_service_server::EventServiceServer, problem_service_server::ProblemServiceServer,
 		submission_service_server::SubmissionServiceServer,
-	},
-	server::{
-		json::{problem::JsonProblemRepository, submission::JsonSubmissionRepository},
-		problem::{ProblemQuery, ProblemService},
-		submission::SubmissionService,
 	},
 };
 
