@@ -1,0 +1,27 @@
+# Intent: [Short Title of the Idea or Problem]
+
+## Author
+
+[Name, Role / Team (email@company.com)]
+[Timestamp / Date]
+
+## Problem
+
+[Describe what cannot be done today, the current pain point, or the event/alert that triggered this. Use plain, natural language without technical solution framing.]
+
+## Proposed Outcome
+
+[Describe what "better" looks like, who is affected, and the observable change or value delivered once solved.]
+
+## Constraints & Boundaries
+
+- [Hard constraint 1, e.g., must not change underlying third-party API]
+- [Hard constraint 2, e.g., performance or timeline bounds]
+
+## Out of Scope
+
+- [What explicitly will NOT be addressed in this iteration]
+
+## Open Questions
+
+- [Unresolved question or risk area marked for investigation by the agent/reviewer]

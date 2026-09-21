@@ -1,7 +1,4 @@
-use crate::{
-	prelude::*,
-	ui::PanelState,
-};
+use crate::{prelude::*, ui::PanelState};
 
 macro_rules! grpc_endpoint {
 	($host:literal, $port:literal) => {

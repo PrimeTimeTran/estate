@@ -12,6 +12,8 @@ version = "0.1.0"
 edition = "2024"
 description = "Estate"
 
+autobins = false
+
 [package.metadata.bundle.bin.estate]
 name = "Estate"
 identifier = "tran.primetimetran.loi"
@@ -41,6 +43,10 @@ name = "dispatch"
 path = "src/bin/_dispatch.rs"
 
 [[bin]]
+name = "inquire"
+path = "src/bin/_inquire.rs"
+
+[[bin]]
 name = "macros"
 path = "src/bin/_macro.rs"
 
@@ -53,6 +59,10 @@ name = "mpl"
 path = "src/bin/_tmp.rs"
 
 [[bin]]
+name = "run"
+path = "src/bin/_run.rs"
+
+[[bin]]
 name = "type-state"
 path = "src/bin/_type-state.rs"
 
@@ -63,6 +73,10 @@ path = "src/bin/_type-state1.rs"
 [[bin]]
 name = "lifetime"
 path = "src/bin/lifetime/main.rs"
+
+[[bin]]
+name = "sdlc"
+path = "src/bin/_sdlc.rs"
 
 # Bins of Estate or high likelyhood for seperate crate/project 
 # should be wrapped with [] to identify them clearly. It means we do have some
@@ -77,13 +91,8 @@ path = "src/bin/[native].rs"
 required-features = ["native"]
 
 [[bin]]
-name = "runner"
+name = "runner-main"
 path = "src/bin/[runner].rs"
-required-features = ["native"]
-
-[[bin]]
-name = "runner1"
-path = "src/bin/runner1.rs"
 required-features = ["native"]
 
 [[bin]]
@@ -211,6 +220,9 @@ egui-winit.workspace = true
 eframe = { workspace = true, optional = true }
 
 tokio-stream = { version = "0.1.19", features = ["sync"] }
+jev-sdk = "0.1.0"
+dotenvy = "0.15.7"
+inquire = "0.9"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tokio = { workspace = true, features = ["rt", "macros", "time", "sync"] }

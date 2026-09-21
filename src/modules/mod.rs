@@ -11,6 +11,8 @@
 // pub(crate) mod runtime;
 // pub use runtime::*;
 
+pub mod sdlc;
+
 #[cfg(not(target_arch = "wasm32"))]
 pub mod native;
 
