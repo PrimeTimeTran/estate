@@ -2,6 +2,8 @@ use demand::{Confirm, DemandOption, Dialog, DialogButton, Input, MultiSelect, Se
 
 use anyhow::Result;
 
+use estate::modules::wizard;
+
 pub fn main() -> Result<()> {
 	println!();
 	println!("Estate CLI playground");
@@ -9,12 +11,13 @@ pub fn main() -> Result<()> {
 
 	// ─────────────────────────────────────────────
 	// 1. INPUT
+	// - Plain text input
+	// - Can have suggestions
 	// ─────────────────────────────────────────────
 
 	let name = Input::new("What's your name?")
 		.description("We'll use this to personalize your experience.")
 		.placeholder("Enter your name")
-		.prompt("Name: ")
 		.suggestions(&[
 			"Adam Grant",
 			"Danielle Steel",
@@ -37,14 +40,14 @@ pub fn main() -> Result<()> {
 		.run()
 		.expect("input failed");
 
-	println!("Hello, {name}!");
+	// println!("Hello, {name}!");
 
 	// ─────────────────────────────────────────────
 	// 2. SELECT
 	// ─────────────────────────────────────────────
 
 	let project_type = Select::new("What are you building?")
-		.description("Choose the primary type of project.")
+		.description("[Select] Choose the primary type of project.")
 		.filterable(true)
 		.option(DemandOption::new("Rust Application").description("A native Rust application"))
 		.option(DemandOption::new("CLI").description("A command-line application"))
@@ -61,7 +64,7 @@ pub fn main() -> Result<()> {
 	// ─────────────────────────────────────────────
 
 	let features = MultiSelect::new("Which features do you want?")
-		.description("You can select multiple features.")
+		.description("[Multi Select] You can select multiple features.")
 		.filterable(true)
 		.option(DemandOption::new("CLI").selected(true))
 		.option(DemandOption::new("LSP"))
