@@ -1,5 +1,3 @@
-// https://www.youtube.com/watch?v=3biW5NkNnrk
-//
 #![allow(warnings)]
 
 use std::{

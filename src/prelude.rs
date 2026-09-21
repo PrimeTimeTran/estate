@@ -59,6 +59,13 @@ pub use crate::{
 	traits::{self, self as t, Context, EventReceiver, *},
 };
 
+/// A non wasm32 target is non browser code, server, native, desktop
+/// so this logic is safe for native/server/etc.
+///
+/// These conditionals will change to use all() & feature if we ever get around to mobile builds.
+///
+/// #[cfg(all(feature="native", not(target_arch = "wasm32")))]
+///
 #[cfg(not(target_arch = "wasm32"))]
 pub use crate::{
 	app::{context::*, *},
@@ -74,5 +81,8 @@ pub use crate::{
 	},
 };
 
-#[cfg(all(feature = "web", target_arch = "wasm32"))]
+/// A Wasm32 build target
+/// is code that runs client side (in browser) so we want this mod.
+///
+#[cfg(target_arch = "wasm32")]
 pub use crate::modules::web::{app::*, bridge::*, *};

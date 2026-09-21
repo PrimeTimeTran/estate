@@ -44,7 +44,6 @@ pub mod macros;
 pub mod model;
 pub mod modules;
 pub mod prelude;
-pub mod proto;
 pub mod service;
 pub mod share;
 #[path = "./[struct].rs"]
@@ -54,4 +53,4 @@ pub mod traits;
 pub mod ui;
 pub mod util;
 
-pub use crate::{app::app_prelude, data::*, modules::*, service::event as e, ui::*};
+pub use crate::{app::app_prelude, data::*, modules::*, service::event as e, share::proto, ui::*};

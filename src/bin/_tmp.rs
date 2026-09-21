@@ -33,7 +33,7 @@ fn main() -> Result<()> {
 	let url = args.next().ok_or("usage: mpl <name> <url>")?;
 
 	let filename = normalize_filename(&input_name);
-	let output = PathBuf::from(format!("/Users/future/consultants/tmp/{filename}.mp4"));
+	let output = PathBuf::from(format!("/Users/future/consultants/[tmp]/{filename}.mp4"));
 	println!("filename: {filename}");
 	println!("url: {url}");
 	println!("output: {}", output.display());
