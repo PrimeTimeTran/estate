@@ -1,19 +1,11 @@
 use estate::prelude::*;
 
-fn main_daemon() -> Result<()> {
-	let host = Host::init()?;
+/// ## [Native Entry]
+///
+#[cfg(feature = "native")]
+fn main() -> Result<()> {
+	let host = Host::init().expect("Host should start successfully.");
 	let mut app = App::new(host)?;
-	let result = app.run();
-
-	std::process::exit(match result {
-		Ok(()) => 0,
-		Err(error) => {
-			eprintln!("{error:#}");
-			1
-		}
-	});
-}
-
-fn main() {
-	let _result = main_daemon();
+	app.run()?;
+	Ok(())
 }

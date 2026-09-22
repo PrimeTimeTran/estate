@@ -49,10 +49,10 @@ echo "🌐 Checking web..."
 cargo web
 echo "✅ [Web] build passed"
 
-start_process "Server" cargo server-run
+start_process "Server" cargo run-server
 SERVER_PID=$LAST_PID
 
-start_process "Native" cargo native-run
+start_process "Native" cargo run-native
 NATIVE_PID=$LAST_PID
 
 
@@ -60,11 +60,11 @@ NATIVE_PID=$LAST_PID
 # --------------------------------------------------
 
 # e.g.
-# cargo native-run -- start
-# cargo native-run -- tray
-# cargo native-run -- window
-# cargo native-run -- status
-# cargo native-run -- doctor
+# cargo run-native -- start
+# cargo run-native -- tray
+# cargo run-native -- window
+# cargo run-native -- status
+# cargo run-native -- doctor
 
 # --------------------------------------------------
 

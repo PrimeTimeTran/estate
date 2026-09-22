@@ -10,7 +10,7 @@
 //  bootstrap-1 -m estate/1-estate-diagram.md -f 2
 use estate::prelude::*;
 use lazy_static::lazy_static;
-
+json-presentation-editing-for-all
 lazy_static! {
 		static ref PATHS: HashMap<&'static str, &'static str> = {
 				let mut m = HashMap::new();

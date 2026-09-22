@@ -35,20 +35,8 @@ name = "base"
 path = "src/bin/_base.rs"
 
 [[bin]]
-name = "threads"
-path = "src/bin/_threads.rs"
-
-[[bin]]
 name = "mpl"
 path = "src/bin/_tmp.rs"
-
-[[bin]]
-name = "type-state"
-path = "src/bin/_type-state.rs"
-
-[[bin]]
-name = "lifetime"
-path = "src/bin/lifetime/main.rs"
 
 # Bins of Estate or high likelyhood for seperate crate/project 
 # should be wrapped with [] to identify them clearly. It means we do have some
@@ -57,8 +45,10 @@ path = "src/bin/lifetime/main.rs"
 # Each bin is not only entry point but should be the start of 
 # documentation of APIs, cli commands, etc.
 [[bin]]
+# cargo run --bin native --no-default-features --features "native,daemon"
 name = "daemon"
 path = "src/bin/[daemon].rs"
+required-features = ["daemon"]
 
 [[bin]]
 name = "native"
@@ -109,6 +99,7 @@ target = "wasm32-unknown-unknown"
 default = ["native"]
 
 mobile = []
+daemon = []
 web = [
   "dep:wasm-bindgen",
   "dep:web-sys",
@@ -205,6 +196,8 @@ egui.workspace = true
 egui-winit.workspace = true
 eframe = { workspace = true, optional = true }
 tokio-stream = { version = "0.1.19", features = ["sync"] }
+axuielement = "0.9.1"
+libc.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 jev-sdk = { version = "0.1.0", default-features = false }

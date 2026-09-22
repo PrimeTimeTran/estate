@@ -5,6 +5,24 @@ use crate::{
 		submission_service_client::SubmissionServiceClient,
 	},
 };
+use std::cmp::PartialEq;
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum AppMode {
+	Gui,
+	Tray,
+	Daemon,
+}
+
+pub fn get_app_mode() -> AppMode {
+	#[cfg(feature = "native")]
+	let mode = AppMode::Daemon;
+	#[cfg(feature = "web")]
+	let mode = AppMode::Daemon;
+	#[cfg(feature = "daemon")]
+	let mode = AppMode::Daemon;
+	mode
+}
 
 #[async_trait::async_trait]
 pub trait Api: Debug + 'static {
@@ -104,15 +122,25 @@ where
 		tracing::debug!("New App Native Context");
 		let state = C::initial_state();
 		let (cursor_event_tx, cursor_events) = std::sync::mpsc::channel();
+		let cancel = CancellationToken::new();
+
 		return Ok(Self {
+			cancel,
 			cursor_event_tx,
 			cursor_events,
 			host,
 			state,
 			workers: vec![],
+			mode: get_app_mode(),
 		});
 	}
 }
+//
+// impl PartialEq for AppMode {
+// 	fn eq(&self, other: &Self) -> bool {
+// 		todo!()
+// 	}
+// }
 
 impl App<Context> {
 	pub fn api(&self) -> &ApiService {
@@ -122,6 +150,9 @@ impl App<Context> {
 		tracing::debug!("App run");
 		self.init_services()?;
 		self.run_gui()?;
+		if self.mode == AppMode::Daemon {
+			self.init_daemon();
+		}
 		Ok(())
 	}
 	pub fn run_gui(&mut self) -> Result<()> {
@@ -136,17 +167,20 @@ impl App<Context> {
 		let event_rx = self.host.event_bus.subscribe_broadcast("app");
 		let event_tx = self.host.event_bus.sender();
 		self.host.runtime.attach_event_proxy(proxy);
-		let mut renderer = structs::Renderer::<Context, <Context as Ctx>::AppState>::new(
-			self.host.context(),
-			self.state.clone(),
-			cancel,
-			event_rx,
-			event_tx,
-		);
 
-		event_loop
-			.run_app(&mut renderer)
-			.map_err(|err| anyhow::anyhow!("GUI event loop failed: {err}"))?;
+		#[cfg(not(feature = "daemon"))]
+		{
+			let mut renderer = structs::Renderer::<Context, <Context as Ctx>::AppState>::new(
+				self.host.context(),
+				self.state.clone(),
+				cancel,
+				event_rx,
+				event_tx,
+			);
+			event_loop
+				.run_app(&mut renderer)
+				.map_err(|err| anyhow::anyhow!("GUI event loop failed: {err}"))?;
+		}
 
 		Ok(())
 	}
@@ -180,20 +214,20 @@ where
 
 							let view = TICK_ITEMS[view_idx];
 
-							tracing::debug!(
-								"🔥 APP EVENTS NAVIGATING TO {:?}",
+							tracing::info!(
+								"🔥 APP EVENTS TICK {:?}",
 								view,
 							);
 
-							match proxy.send_event(AppEvent::Navigate(view)) {
-								Ok(()) => {
-									tracing::debug!("🔥 Navigate SENT");
-								}
+							// match proxy.send_event(AppEvent::Navigate(view)) {
+							// 	Ok(()) => {
+							// 		tracing::debug!("🔥 Navigate SENT");
+							// 	}
 
-								Err(err) => {
-									tracing::error!(?err, "🔥 Navigate FAILED");
-								}
-							}
+							// 	Err(err) => {
+							// 		tracing::error!(?err, "🔥 Navigate FAILED");
+							// 	}
+							// }
 						} else {
 							current_time -= 1;
 
@@ -500,8 +534,12 @@ impl Host<Context> {
 		// Context is still uniquely owned here.
 		let mut context = Context::default();
 
-		// Connect using the same runtime that Host will retain.
-		tokio.block_on(context.api_mut().connect())?;
+		// Daemon doesn't need this yet.
+		#[cfg(not(feature = "daemon"))]
+		{
+			// Connect using the same runtime that Host will retain.
+			tokio.block_on(context.api_mut().connect())?;
+		}
 
 		// Only share Context after initialization.
 		let context = Arc::new(context);
@@ -687,6 +725,8 @@ pub struct App<C: Ctx> {
 	pub host: Host<C>,
 	pub state: C::AppState,
 	pub workers: Vec<WorkHandle<C, tokio::task::JoinHandle<()>>>,
+	mode: AppMode,
+	pub cancel: CancellationToken,
 }
 
 #[derive(Clone)]

@@ -21,14 +21,18 @@ pub enum SessionFile {
 #[derive(Debug, Clone, Copy)]
 pub enum SpecialFile {
 	AiTemplateDir,
+	EstateManifest,
+	HostContext,
 	LogDir,
-	TmpDir,
 	SdlcCurrent,
 	SessionsDir,
 	SessionsIndex,
-	EstateManifest,
+	TmpDir,
 }
 
+pub fn crate_root() -> PathBuf {
+	PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+}
 pub fn ws_path() -> Result<PathBuf> {
 	let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 
@@ -155,6 +159,7 @@ impl FS {
 
 		Ok(())
 	}
+
 	pub fn delete(path: impl AsRef<Path>) -> Result<()> {
 		let path = path.as_ref();
 
@@ -253,6 +258,7 @@ impl SpecialFile {
 			Self::SessionsDir => root.join("log/session"),
 			Self::SessionsIndex => root.join("log/sdlc.session.index.json"),
 			Self::EstateManifest => root.join("estate.toml"),
+			Self::HostContext => crate_root().join("host.env.context.json"),
 		})
 	}
 }

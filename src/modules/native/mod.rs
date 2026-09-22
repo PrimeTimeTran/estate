@@ -5,8 +5,10 @@ pub mod app;
 pub mod backend;
 pub mod daemon;
 pub mod discovery;
+pub mod host_env_provider;
 pub mod job;
 pub mod monitor;
+pub mod observer;
 pub mod poc;
 #[path = "[prelude].rs"]
 pub mod prelude_native;

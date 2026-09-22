@@ -61,3 +61,15 @@ This data shows you have all three IDEs running concurrently. To make this a fla
 2.  Rerun Your Command: Run your ps query again during that heavy workload. You will likely watch VS Code's helper processes balloons past 2.5 GB as rust-analyzer fires up, while RustRover will stay stably locked to its pre-allocated JVM size.
 
 Would you like a specialized Zsh shell alias you can drop into your .zshrc file so you can type a quick shortcut (like ide-ram) to print this aggregated chart anytime?
+
+
+
+### Ideas
+
+Outline panel should support multiple ways of searching
+- filename (string literal)
+- vim nav
+- 'category nav'. Imagine moving jumping focusing between enums, structs, impls, functions or files/folders inside of tree view
+  - "next file down", "next folder up"
+- Also there should be ways of hiding 'all of type' or 'showing all of type' in a file
+- also a 'secondary config menu'
