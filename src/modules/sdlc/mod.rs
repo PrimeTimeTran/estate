@@ -64,22 +64,18 @@ trait TextModel {
 #[async_trait]
 impl ArtifactGenerator for LocalGenerator {
 	async fn generate(&self, prompt: &str) -> Result<String> {
-		println!("=== GENERATOR START ===");
-		println!("{prompt}");
-
+		// println!("=== GENERATOR START ===");
+		// println!("{prompt}");
 		let task = AgentTask::new(prompt.to_string());
 		let (event_tx, _) = tokio::sync::mpsc::unbounded_channel();
-
 		let result = self.agent.run_agent_loop(task, event_tx).await?;
-
-		println!("=== AGENT RESULT ===");
-		println!("status: {:?}", result.status);
-		println!("chat: {:?}", result.chat);
-		println!("summary: {:?}", result.summary);
-		println!("artifacts: {:?}", result.artifacts);
-		println!("logs: {:?}", result.logs);
-		println!("=====================");
-
+		// println!("=== AGENT RESULT ===");
+		// println!("status: {:?}", result.status);
+		// println!("chat: {:?}", result.chat);
+		// println!("summary: {:?}", result.summary);
+		// println!("artifacts: {:?}", result.artifacts);
+		// println!("logs: {:?}", result.logs);
+		// println!("=====================");
 		Err(anyhow::anyhow!(
 			"debug: Agent completed but no generation result was extracted"
 		))
@@ -1092,7 +1088,6 @@ impl Sdlc {
 							self.commit()?;
 							self.transition(Stage::Complete)?;
 						}
-
 						_ => {
 							self.transition(Stage::Build)?;
 						}
@@ -1124,17 +1119,6 @@ impl Sdlc {
 	// ─────────────────────────────────────────────────────────────────────
 	// Verification
 	// ─────────────────────────────────────────────────────────────────────
-
-	/// Run deterministic verification.
-	///
-	/// Examples:
-	///
-	///     cargo test
-	///     npm test
-	///     cargo check
-	///     npm run build
-	///     lint
-	///     typecheck
 	async fn run_checks(&self) -> Result<Vec<CheckResult>> {
 		let checks = [
 			("cargo check", vec!["cargo", "check"]),
@@ -1179,17 +1163,6 @@ impl Sdlc {
 
 		Ok(results)
 	}
-
-	/// Run semantic verification through JEV.
-	///
-	/// JEV evaluates the relationship between:
-	///
-	///     intent.md
-	///     spec.md
-	///     implementation
-	///     deterministic evidence
-	///
-	/// It does not mutate the lifecycle itself.
 	async fn evaluate(&self, checks: &[CheckResult]) -> Result<Vec<EvaluationResult>> {
 		let session = self
 			.session
@@ -1200,13 +1173,6 @@ impl Sdlc {
 		let spec = self.read("spec.md");
 		let plan = self.read("plan.md");
 		let progress = self.read("progress.md");
-
-		// Eventually:
-		//
-		// let diff = git.diff()?;
-		//
-		// let result = jev.evaluate()?;
-		//
 		Ok(vec![])
 	}
 
@@ -1232,48 +1198,6 @@ impl SdlcSession {
 	fn create_readable(&self) -> String {
 		let current = Utc::now();
 		current.format("%B %-d, %Y at %-I:%M:%S %p UTC").to_string()
-	}
-	fn diagram() {
-		//           SdlcAgent / Runner
-		//                  │
-		//                  │ owns lifecycle
-		//                  ▼
-		//                Sdlc
-		//                  │
-		//     ┌────────────┼────────────┐
-		//     ▼            ▼            ▼
-		//  Intent         Spec         Plan
-		//     │            │            │
-		//     └────────────┼────────────┘
-		//                  │
-		//                  ▼
-		//             AgentContext
-		//                  │
-		//                  ▼
-		//                Agent
-		//                  │
-		//     ┌────────────┼─────────────┐
-		//     ▼            ▼             ▼
-		// read_file     write_file    run_command
-		//     │            │             │
-		//     └────────────┼─────────────┘
-		//                  ▼
-		//                Verify
-		//                  │
-		//           ┌──────┴──────┐
-		//           ▼             ▼
-		//        checks          JEV
-		//           │             │
-		//           └──────┬──────┘
-		//                  ▼
-		//           pass / failure
-		//             │         │
-		//           pass       fail
-		//             │         │
-		//             ▼         ▼
-		//           commit     Agent
-		//                         │
-		//                         └──→ fix
 	}
 }
 
@@ -1370,8 +1294,6 @@ pub struct StageEvaluation {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Verification {
 	pub passed: bool,
-	/// Results from deterministic tooling.
 	pub checks: Vec<CheckResult>,
-	/// Results produced by JEV.
 	pub evaluations: Vec<EvaluationResult>,
 }
