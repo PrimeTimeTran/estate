@@ -1,5 +1,5 @@
 use crate::prelude::*;
-
+use anyhow::Result;
 use tracing_subscriber::{
 	EnvFilter, Layer, filter::LevelFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt,
 };
@@ -30,7 +30,7 @@ pub fn init() -> Result<()> {
 		.init();
 	Ok(())
 }
-pub fn init_logging(config: &LogConfig) -> Result<()> {
+pub fn init_logging(config: &LogConfig) -> anyhow::Result<()> {
 	let terminal_filter = config.terminal_filter()?;
 	let terminal = fmt::layer()
 		.without_time()

@@ -1,8 +1,8 @@
 use crate::{native::resolver::*, prelude::*};
 
+use anyhow::Result;
 use std::{
 	fs,
-	io::Result,
 	path::{Path, PathBuf},
 };
 
@@ -98,7 +98,7 @@ fn render_symbols(json: &serde_json::Value) -> String {
 	out
 }
 
-pub fn generate_explain_doc() -> Result<()> {
+pub fn generate_explain_doc() -> anyhow::Result<()> {
 	let workspace = workspace_root()?;
 
 	EstateState::save_workspace(&workspace);

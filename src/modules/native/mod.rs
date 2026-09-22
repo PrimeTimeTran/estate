@@ -34,8 +34,6 @@ pub mod windows;
 #[cfg(target_os = "macos")]
 pub mod macos;
 
-use crate::prelude::*;
-
 impl NativeHost {
 	fn new() -> Self {
 		Self::default()

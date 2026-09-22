@@ -1,4 +1,5 @@
-use crate::{native::resolver, prelude::*};
+use crate::{model::resolver::engine_data_dir, native::resolver, prelude::*};
+use anyhow::Result;
 
 impl NativeStateStore {
 	pub fn new() -> Result<Self> {
@@ -25,7 +26,7 @@ impl StateStore for NativeStateStore {
 		Ok(serde_json::from_str(&raw)?)
 	}
 	fn save(&self, state: &EstateState) -> Result<()> {
-		let path = crate::native::resolver::engine_data_dir()?.join("state.json");
+		let path = engine_data_dir()?.join("state.json");
 
 		let json = serde_json::to_string_pretty(state)?;
 		fs::write(path, json)?;
@@ -39,8 +40,8 @@ impl EstateState {
 		let contents = fs::read_to_string(path)?;
 		Ok(serde_json::from_str(&contents)?)
 	}
-	pub fn path() -> std::io::Result<PathBuf> {
-		Ok(crate::native::resolver::engine_data_dir()?.join("state.json"))
+	pub fn path() -> Result<PathBuf> {
+		Ok(engine_data_dir()?.join("state.json"))
 	}
 	pub fn load_from_disk() -> Result<Self> {
 		let path = Self::path()?;

@@ -2,7 +2,7 @@ use crate::{
 	model::{
 		AgentTask,
 		agent::{Agent, AgentContext},
-		resolver::{workspace_cargo_path, ws_path},
+		resolver::{SpecialFiles, workspace_cargo_path, ws_path},
 		task::TaskResult,
 	},
 	prelude::*,
@@ -506,15 +506,14 @@ impl Evaluator {
 	}
 	async fn evaluate_verification(&self, session: &Path) -> Result<StageEvaluation> {
 		let started_at = Utc::now();
-
-		let intent = std::fs::read_to_string(session.join("intent.md"))?;
-		let spec = std::fs::read_to_string(session.join("spec.md"))?;
-		let tests = std::fs::read_to_string(session.join("tests.md"))?;
+		let intent = SpecialFiles::read_intent(&session)?;
+		let spec = SpecialFiles::read_spec(&session)?;
+		let tests = SpecialFiles::read_tests(&session)?;
 
 		// This should eventually come from the actual deterministic verifier.
 		// For now, `verification.md` can contain the commands that were run and
 		// their results.
-		let evidence = match std::fs::read_to_string(session.join("verification.md")) {
+		let evidence = match SpecialFiles::read_verification(&session) {
 			Ok(evidence) => evidence,
 			Err(_) => String::from("No verification evidence was recorded."),
 		};
@@ -580,10 +579,10 @@ impl Evaluator {
 impl Sdlc {
 	/// Load the current lifecycle, if one exists.
 	pub fn load(jev: TypeSafeClient) -> Result<Option<Self>> {
-		let state_path = ws_path().join("log").join("tmp").join("sdlc.current.json");
-
+		let state_path = SpecialFiles::ws_sdlc_current_file()?;
 		let evaluator = Evaluator { jev };
 		let (event_tx, _) = broadcast::channel(256);
+
 		if !state_path.exists() {
 			return Ok(Some(Self {
 				evaluator,
@@ -939,14 +938,7 @@ impl Sdlc {
 	/// This file is only the recovery cursor for the currently active session.
 	/// The actual lifecycle artifacts live in the session directory.
 	fn persist(&self) -> Result<()> {
-		let parent = self
-			.state_path
-			.parent()
-			.ok_or_else(|| anyhow::anyhow!("invalid SDLC state path"))?;
-		std::fs::create_dir_all(parent)?;
-		let contents = serde_json::to_string_pretty(&self.session)?;
-		std::fs::write(&self.state_path, contents)?;
-
+		SpecialFiles::write_json(&self.state_path, &self.session);
 		Ok(())
 	}
 
@@ -954,10 +946,7 @@ impl Sdlc {
 	///
 	/// Called after the lifecycle reaches a terminal state.
 	pub fn clear_current(&self) -> Result<()> {
-		if self.state_path.exists() {
-			std::fs::remove_file(&self.state_path)?;
-		}
-
+		SpecialFiles::remove_file_if_exists(&self.state_path);
 		Ok(())
 	}
 
@@ -1067,29 +1056,23 @@ impl Sdlc {
 	///
 	///     crates/estate/ai/template/
 	pub fn create_dir(&self, title: &str) -> Result<PathBuf> {
-		let root = ws_path().join("log").join("session");
-		std::fs::create_dir_all(&root)?;
+		let sessions_dir = SpecialFiles::ensure_dir(SpecialFiles::ws_sessions_dir()?)?;
 		let date = Local::now().format("%Y-%m-%d");
-		let dir = root.join(format!("{date}.{title}"));
-		std::fs::create_dir_all(&dir)?;
+		let dir = sessions_dir.join(format!("{date}.{title}"));
+		SpecialFiles::ensure_dir(&dir)?;
 		Ok(dir)
 	}
 
 	/// Materialize the template files for a new session.
 	fn initialize_templates(&self, dir: &Path) -> Result<()> {
-		let template_dir = ws_path().join("ai").join("template");
-
 		for name in ["intent.md", "spec.md", "plan.md", "progress.md"] {
-			let source = template_dir.join(name);
 			let destination = dir.join(name);
-			if source.exists() {
-				std::fs::copy(source, destination)?;
-			} else {
-				Self::write(destination, format!("# {}\n\n", name));
 
-				// std::fs::write(destination, format!("# {}\n\n", name))?;
-			}
+			let contents = SpecialFiles::read_template(name)?.unwrap_or_else(|| format!("# {name}\n\n"));
+
+			SpecialFiles::write(destination, contents)?;
 		}
+
 		Ok(())
 	}
 
@@ -1104,19 +1087,10 @@ impl Sdlc {
 			.as_ref()
 			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
 
-		let path = session.dir.join("progress.md");
+		let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S");
 
-		let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
-
-		let entry = format!("\n## {}\n\n{}\n", timestamp, message,);
-
-		let mut file = std::fs::OpenOptions::new()
-			.create(true)
-			.append(true)
-			.open(path)?;
-
-		file.write_all(entry.as_bytes())?;
-
+		let entry = format!("\n## {timestamp}\n\n{message}\n");
+		SpecialFiles::append_text(SpecialFiles::session_progress(&session.dir), entry);
 		Ok(())
 	}
 
@@ -1134,26 +1108,22 @@ impl Sdlc {
 			.session
 			.as_ref()
 			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
-		let log_dir = ws_path().join("log");
-		std::fs::create_dir_all(&log_dir)?;
-		let index_path = log_dir.join("sessions.json");
-		let mut sessions: Vec<SdlcSession> = if index_path.exists() {
-			let contents = std::fs::read_to_string(&index_path)?;
 
-			if contents.trim().is_empty() {
-				Vec::new()
-			} else {
-				serde_json::from_str(&contents)?
-			}
+		let index_path = SpecialFiles::ws_sessions_index()?;
+
+		let mut sessions: Vec<SdlcSession> = if index_path.exists() {
+			SpecialFiles::read_json(&index_path)?
 		} else {
 			Vec::new()
 		};
-		// Replace an existing entry for this session rather than
-		// creating duplicate index entries.
+
+		// Replace an existing entry for this session rather
+		// than creating duplicate index entries.
 		sessions.retain(|existing| existing.id != session.id);
+
 		sessions.push(session.clone());
-		let contents = serde_json::to_string_pretty(&sessions)?;
-		Self::write(index_path, contents);
+
+		SpecialFiles::write_json(index_path, &sessions);
 		Ok(())
 	}
 	pub async fn run_simulated(
