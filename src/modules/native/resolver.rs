@@ -10,6 +10,9 @@ pub fn home_dir() -> Result<PathBuf> {
 pub fn workspace_cargo_path() -> PathBuf {
 	PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }
+pub fn ws_path() -> PathBuf {
+	PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+}
 
 /// User global estate.
 /// Example:

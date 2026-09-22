@@ -1,12 +1,13 @@
 use std::time::Duration;
 
 use crossterm::{
-	event::{self, Event, KeyCode},
+	event::{self, Event, KeyCode, KeyEventKind},
 	execute,
 	terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 
-use estate::sdlc::{Sdlc, SdlcEvent, SdlcView, Stage, prompt_for_intent};
+// use estate::sdlc::{Sdlc, SdlcEvent, SdlcInput, SdlcView, Stage, prompt_for_intent, *};
+use estate::sdlc::*;
 use jev_sdk::TypeSafeClient;
 use ratatui::{Terminal, backend::CrosstermBackend};
 
@@ -15,6 +16,14 @@ use std::io::{self, stdout};
 #[tokio::main]
 pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	dotenvy::dotenv()?;
+
+	/// 1. Normal run
+	/// cargo run --bin sdlc
+	///
+	/// 2. Dry run (no ai invocation)
+	/// ESTATE_SDLC_DEMO=1 cargo run --bin sdlc
+	///
+	let demo = std::env::var_os("ESTATE_SDLC_DEMO").is_some();
 
 	let client = TypeSafeClient::from_env()?;
 	let mut sdlc = Sdlc::load(client)?.expect("SDLC state should always exist");
@@ -39,29 +48,30 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 	let backend = CrosstermBackend::new(stdout);
 	let mut terminal = Terminal::new(backend)?;
+	terminal.clear()?;
+	terminal.hide_cursor()?;
 
 	// ------------------------------------------------------------
 	// SDLC task
 	// ------------------------------------------------------------
+	let (input_tx, input_rx) = tokio::sync::mpsc::unbounded_channel::<SdlcInput>();
+	let run = async {
+		if demo {
+			sdlc.run_simulated(input_rx).await
+		} else {
+			sdlc.run(input_rx).await
+		}
+	};
 
-	let run = sdlc.run();
 	tokio::pin!(run);
 
 	let mut ticker = tokio::time::interval(Duration::from_millis(100));
 
 	let result = loop {
 		tokio::select! {
-			// ----------------------------------------------------
-			// SDLC finished
-			// ----------------------------------------------------
-
 			result = &mut run => {
 				break result;
 			}
-
-			// ----------------------------------------------------
-			// SDLC event
-			// ----------------------------------------------------
 
 			event = events.recv() => {
 				match event {
@@ -84,33 +94,44 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 				}
 			}
 
-			// ----------------------------------------------------
-			// redraw
-			// ----------------------------------------------------
-
 			_ = ticker.tick() => {
+				if event::poll(Duration::from_millis(0))? {
+					if let Event::Key(key) = event::read()? {
+						if key.kind == KeyEventKind::Press {
+							match key.code {
+								KeyCode::Char('q') => {
+									break Ok(());
+								}
+
+								KeyCode::Char('p') => {
+									view.toggle_pause();
+								}
+
+								KeyCode::Char('l') => {
+									view.toggle_logs();
+								}
+
+								KeyCode::Char('r') => {
+									let _ = input_tx.send(
+										SdlcInput::Retry
+									);
+								}
+
+								KeyCode::Char('v') => {
+									let _ = input_tx.send(
+										SdlcInput::Reviewed
+									);
+								}
+
+								_ => {}
+							}
+						}
+					}
+				}
 
 				terminal.draw(|frame| {
 					SdlcView::render(frame, &view);
 				})?;
-			}
-
-			// ----------------------------------------------------
-			// keyboard
-			// ----------------------------------------------------
-
-			_ = tokio::task::yield_now() => {
-				if event::poll(Duration::from_millis(0))? {
-					if let Event::Key(key) = event::read()? {
-						match key.code {
-							KeyCode::Char('q') => {
-								break Ok(());
-							}
-
-							_ => {}
-						}
-					}
-				}
 			}
 		}
 	};
