@@ -1,10 +1,10 @@
 [
   {
-    "id": "19a0460d-7f75-4806-9f21-22e448820f29",
+    "id": "3aad2b9e-c816-4b26-9238-fe8f3ece8745",
     "title": "finish-sdlc-module-which-creates-a-loop-for",
-    "stage": "Plan",
-    "session_dir": "/Users/future/kb/project/crates/estate/log/session/2026-09-21.finish-sdlc-module-which-creates-a-loop-for",
-    "created_at": "2026-09-22T00:54:58.121084+00:00",
-    "updated_at": "2026-09-22T00:56:42.212683+00:00"
+    "stage": "Verify",
+    "dir": "/Users/future/kb/project/crates/estate/log/session/2026-09-21.finish-sdlc-module-which-creates-a-loop-for",
+    "created_at": "2026-09-22T01:48:32.171214Z",
+    "updated_at": "2026-09-22T02:03:10.568862Z"
   }
 ]

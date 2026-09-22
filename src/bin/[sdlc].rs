@@ -474,10 +474,16 @@
 //                                    ▼
 //                                 INTENT
 use estate::modules::sdlc::*;
+use jev_sdk::{Choice, Noul, Question, Score, TypeSafeClient};
+use std::env;
 
 #[tokio::main]
 pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
-	let mut sdlc = Sdlc::load()?.expect("SDLC state should always exist");
+	dotenvy::dotenv()?;
+	// let key = std::env::var("TYPESAFE_API_KEY")?;
+	// println!("key {}", key);
+	let client = TypeSafeClient::from_env()?;
+	let mut sdlc = Sdlc::load(client)?.expect("SDLC state should always exist");
 	match sdlc.stage() {
 		None => {
 			// No active session.

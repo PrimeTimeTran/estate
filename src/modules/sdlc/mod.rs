@@ -1,9 +1,16 @@
+use crate::model::{
+	AgentTask,
+	agent::{Agent, AgentContext},
+};
 use anyhow::{Ok, Result};
+use chrono::{DateTime, Local, Utc};
+use jev_sdk::{Choice, Noul, Question, Score, TypeSafeClient};
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
-
-use crate::model::agent::AgentContext;
-use crate::model::{AgentTask, agent::Agent};
+use std::{
+	io::Write,
+	path::{Path, PathBuf},
+	process::Command,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Stage {
@@ -22,28 +29,39 @@ pub fn prompt_for_intent() -> Result<String> {
 		"Finish SDLC Module which creates a loop for my SDLC. ",
 	))
 }
+fn output_status(_output: &str) -> std::process::ExitStatus {
+	// placeholder
+	unimplemented!()
+}
 
 impl Sdlc {
 	/// Path to the globally active SDLC session.
 	///
+	/// During development this lives inside the project's log directory
+	/// so the current lifecycle state is easy to inspect.
+	///
 	/// Example:
 	///
-	/// ~/tmp/sdlc.current.json
-	pub fn current_path() -> PathBuf {
-		dirs::home_dir()
-			.expect("home directory must exist")
+	/// crates/estate/log/tmp/sdlc.current.json
+	///
+	fn current_path() -> PathBuf {
+		Self::root()
+			.join("log")
 			.join("tmp")
 			.join("sdlc.current.json")
 	}
 
 	/// Load the current lifecycle, if one exists.
-	pub fn load() -> Result<Option<Self>> {
+	pub fn load(jev: TypeSafeClient) -> Result<Option<Self>> {
 		let state_path = Self::current_path();
+
+		let evaluator = Evaluator { jev };
 
 		if !state_path.exists() {
 			return Ok(Some(Self {
 				state_path,
 				session: None,
+				evaluator,
 			}));
 		}
 
@@ -53,6 +71,7 @@ impl Sdlc {
 		Ok(Some(Self {
 			state_path,
 			session: Some(session),
+			evaluator,
 		}))
 	}
 
@@ -71,15 +90,16 @@ impl Sdlc {
 			.join("-")
 			.to_lowercase();
 
-		let session_dir = self.create_session_dir(&title)?;
+		let dir = self.create_dir(&title)?;
+		let now = Utc::now();
 
 		let session = SdlcSession {
 			id,
 			title,
 			stage: Stage::Intent,
-			session_dir,
-			created_at: chrono::Utc::now().to_rfc3339(),
-			updated_at: chrono::Utc::now().to_rfc3339(),
+			dir,
+			created_at: now,
+			updated_at: now,
 		};
 
 		self.session = Some(session);
@@ -88,7 +108,7 @@ impl Sdlc {
 			self
 				.session()?
 				.ok_or_else(|| anyhow::anyhow!("failed to create session"))?
-				.session_dir
+				.dir
 				.as_path(),
 		)?;
 
@@ -96,7 +116,7 @@ impl Sdlc {
 		let intent_path = self
 			.session()?
 			.ok_or_else(|| anyhow::anyhow!("no active session"))?
-			.session_dir
+			.dir
 			.join("intent.md");
 
 		std::fs::write(intent_path, format!("# Intent\n\n{}\n", intent))?;
@@ -111,7 +131,7 @@ impl Sdlc {
 	///
 	/// State is already loaded from `sdlc.current.json`, so there is
 	/// intentionally little to do here for now.
-	pub async fn resume(&mut self) -> Result<()> {
+	async fn resume(&mut self) -> Result<()> {
 		if self.session.is_none() {
 			return Err(anyhow::anyhow!("no active SDLC session to resume"));
 		}
@@ -124,7 +144,7 @@ impl Sdlc {
 
 	/// Return the current lifecycle stage.
 	pub fn stage(&self) -> Option<Stage> {
-		self.session.as_ref().map(|session| session.stage.clone())
+		self.session.as_ref().map(|s| s.stage.clone())
 	}
 
 	/// Return the active session.
@@ -133,14 +153,8 @@ impl Sdlc {
 	}
 
 	// ─────────────────────────────────────────────────────────────────────
-	// Lifecycle stages
+	// Stages
 	// ─────────────────────────────────────────────────────────────────────
-
-	// ─────────────────────────────────────────────────────────────────────
-	// Lifecycle stages
-	// ─────────────────────────────────────────────────────────────────────
-
-	/// Execute the Intent stage.
 	pub async fn intent(&mut self) -> Result<()> {
 		let session = self
 			.session
@@ -161,7 +175,6 @@ impl Sdlc {
 		Ok(())
 	}
 
-	/// Execute the Spec stage.
 	pub async fn spec(&mut self) -> Result<()> {
 		let session = self
 			.session
@@ -175,7 +188,7 @@ impl Sdlc {
 			));
 		}
 
-		let intent = std::fs::read_to_string(session.session_dir.join("intent.md"))?;
+		let intent = std::fs::read_to_string(session.dir.join("intent.md"))?;
 
 		let spec = format!(
 			"# Specification\n\n\
@@ -188,7 +201,7 @@ impl Sdlc {
 			intent.trim()
 		);
 
-		std::fs::write(session.session_dir.join("spec.md"), spec)?;
+		std::fs::write(session.dir.join("spec.md"), spec)?;
 
 		self.update_progress("Spec stage completed")?;
 		self.transition(Stage::Plan)?;
@@ -196,22 +209,18 @@ impl Sdlc {
 		Ok(())
 	}
 
-	/// Execute the Plan stage.
 	pub async fn plan(&mut self) -> Result<()> {
 		let session = self
 			.session
 			.as_ref()
 			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
-
 		if session.stage != Stage::Plan {
 			return Err(anyhow::anyhow!(
 				"cannot execute Plan stage while at {:?}",
 				session.stage
 			));
 		}
-
-		let spec = std::fs::read_to_string(session.session_dir.join("spec.md"))?;
-
+		let spec = std::fs::read_to_string(session.dir.join("spec.md"))?;
 		let plan = format!(
 			"# Implementation Plan\n\n\
 			 ## Specification\n\n\
@@ -225,14 +234,12 @@ impl Sdlc {
 			 6. Verify the resulting implementation.\n",
 			spec.trim()
 		);
-
-		std::fs::write(session.session_dir.join("plan.md"), plan)?;
-
+		std::fs::write(session.dir.join("plan.md"), plan)?;
 		self.update_progress("Plan stage completed")?;
 		self.transition(Stage::Build)?;
-
 		Ok(())
 	}
+
 	/// Execute the Build stage.
 	///
 	/// Produces:
@@ -242,85 +249,44 @@ impl Sdlc {
 	///     documentation
 	///
 	/// The agent performs implementation work here.
-	// pub async fn build(&mut self) -> Result<()> {
-	// 	// give the agent the authoritative context, allow it to
-	// 	// modify the repository, observe what happened, and repeat until it has
-	// 	// produced a candidate implementation.
-	// 	let session = self.session()?;
-
-	// 	let context = AgentContext::from_session(session)?;
-
-	// 	self.update_progress("Build started")?;
-
-	// 	let task = AgentTask {
-	// 		id: uuid::Uuid::new_v4(),
-	// 		prompt: build_task_prompt(&context),
-	// 		// ...
-	// 	};
-
-	// 	let agent = Agent::new();
-
-	// 	// let result = agent.run_agent_loop(task).await?;
-
-	// 	// self.update_progress(&format!("Agent completed: {}", result.summary()))?;
-
-	// 	self.transition(Stage::Verify)?;
-
-	// 	Ok(())
-	// }
 	pub async fn build(&mut self) -> Result<()> {
 		let session = self
 			.session()?
 			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
-
 		let context = AgentContext::from_session(session)?;
-
 		self.update_progress("Build started")?;
-
 		let task = context.task.clone();
-
 		let agent = Agent::new();
-
-		// let result = agent.run_agent_loop(task, event_tx).await?;
-
+		// let result = agent.run_agent_loop(task).await?;
+		// self.update_progress(&format!("Agent completed: {}", result.summary()))?;
 		self.transition(Stage::Verify)?;
 
 		Ok(())
 	}
+
 	/// Execute the Verify stage.
 	///
 	/// Runs deterministic checks and JEV evaluations.
 	///
 	/// Failure returns the lifecycle to Build.
-	// pub async fn verify(&mut self) -> Result<Verification> {
-	// 	let checks = self.run_checks().await?;
-
-	// 	let evaluations = self.evaluate(&checks).await?;
-
-	// 	let verification = Verification {
-	// 		passed: true,
-	// 		// passed: ...,
-	// 		checks,
-	// 		evaluations,
-	// 	};
-
-	// 	// Persist evidence.
-
-	// 	Ok(verification)
-	// }
 	pub async fn verify(&mut self) -> Result<Verification> {
+		self.update_progress("Verification started")?;
 		let checks = self.run_checks().await?;
-
 		let evaluations = self.evaluate(&checks).await?;
-
 		let verification = Verification {
-			passed: true,
+			passed: self.verification_passed(&checks, &evaluations),
 			checks,
 			evaluations,
 		};
+		// Persist the evidence somewhere.
+		self.update_progress(&format!(
+			"Verification completed: passed={}",
+			verification.passed
+		))?;
 
 		Ok(verification)
 	}
+
 	/// Execute the Deploy stage.
 	///
 	/// Only allowed after successful verification.
@@ -349,31 +315,26 @@ impl Sdlc {
 			.as_mut()
 			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
 
-		let current = &session.stage;
-
 		let valid = matches!(
-			(current, &next),
+			(&session.stage, &next),
 			(Stage::Intent, Stage::Spec)
 				| (Stage::Spec, Stage::Plan)
 				| (Stage::Plan, Stage::Build)
 				| (Stage::Build, Stage::Verify)
 				| (Stage::Verify, Stage::Build)
 				| (Stage::Verify, Stage::Complete)
-				| (Stage::Complete, Stage::Complete)
-				| (Stage::Deploy, Stage::Maintain)
-				| (Stage::Maintain, Stage::Complete)
 		);
 
 		if !valid {
 			return Err(anyhow::anyhow!(
 				"invalid SDLC transition: {:?} -> {:?}",
-				current,
+				session.stage,
 				next
 			));
 		}
 
 		session.stage = next;
-		session.updated_at = chrono::Utc::now().to_rfc3339();
+		session.updated_at = Utc::now();
 
 		self.persist()?;
 		self.record_session()?;
@@ -381,7 +342,7 @@ impl Sdlc {
 		Ok(())
 	}
 
-	pub fn commit(&mut self) -> Result<()> {
+	fn commit(&mut self) -> Result<()> {
 		Ok(())
 	}
 
@@ -389,20 +350,17 @@ impl Sdlc {
 	///
 	/// Writes:
 	///
-	///     ~/tmp/sdlc.current.json
+	///     ./log/tmp/sdlc.current.json
 	///
 	/// This file is only the recovery cursor for the currently active session.
 	/// The actual lifecycle artifacts live in the session directory.
-	pub fn persist(&self) -> Result<()> {
+	fn persist(&self) -> Result<()> {
 		let parent = self
 			.state_path
 			.parent()
 			.ok_or_else(|| anyhow::anyhow!("invalid SDLC state path"))?;
-
 		std::fs::create_dir_all(parent)?;
-
 		let contents = serde_json::to_string_pretty(&self.session)?;
-
 		std::fs::write(&self.state_path, contents)?;
 
 		Ok(())
@@ -423,12 +381,16 @@ impl Sdlc {
 	// Artifacts
 	// ─────────────────────────────────────────────────────────────────────
 
+	fn root() -> PathBuf {
+		PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+	}
+
 	/// Return the directory containing the current session's artifacts.
-	pub fn session_dir(&self) -> Result<&Path> {
+	pub fn dir(&self) -> Result<&Path> {
 		self
 			.session
 			.as_ref()
-			.map(|session| session.session_dir.as_path())
+			.map(|session| session.dir.as_path())
 			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))
 	}
 
@@ -441,39 +403,28 @@ impl Sdlc {
 	/// Templates live under:
 	///
 	///     crates/estate/ai/template/
-	pub fn create_session_dir(&self, title: &str) -> Result<PathBuf> {
-		let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-			.join("log")
-			.join("session");
-
+	pub fn create_dir(&self, title: &str) -> Result<PathBuf> {
+		let root = Self::root().join("log").join("session");
 		std::fs::create_dir_all(&root)?;
-
-		let date = chrono::Local::now().format("%Y-%m-%d");
-
-		let session_dir = root.join(format!("{date}.{title}"));
-
-		std::fs::create_dir_all(&session_dir)?;
-
-		Ok(session_dir)
+		let date = Local::now().format("%Y-%m-%d");
+		let dir = root.join(format!("{date}.{title}"));
+		std::fs::create_dir_all(&dir)?;
+		Ok(dir)
 	}
 
 	/// Materialize the template files for a new session.
-	pub fn initialize_templates(&self, session_dir: &Path) -> Result<()> {
-		let template_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-			.join("ai")
-			.join("template");
+	fn initialize_templates(&self, dir: &Path) -> Result<()> {
+		let template_dir = Self::root().join("ai").join("template");
 
 		for name in ["intent.md", "spec.md", "plan.md", "progress.md"] {
 			let source = template_dir.join(name);
-			let destination = session_dir.join(name);
-
+			let destination = dir.join(name);
 			if source.exists() {
 				std::fs::copy(source, destination)?;
 			} else {
 				std::fs::write(destination, format!("# {}\n\n", name))?;
 			}
 		}
-
 		Ok(())
 	}
 
@@ -482,19 +433,17 @@ impl Sdlc {
 	/// The progress journal lives inside the active session directory:
 	///
 	///     crates/estate/log/session/<session>/progress.md
-	pub fn update_progress(&self, message: &str) -> Result<()> {
+	fn update_progress(&self, message: &str) -> Result<()> {
 		let session = self
 			.session
 			.as_ref()
 			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
 
-		let path = session.session_dir.join("progress.md");
+		let path = session.dir.join("progress.md");
 
-		let timestamp = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+		let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
 		let entry = format!("\n## {}\n\n{}\n", timestamp, message,);
-
-		use std::io::Write;
 
 		let mut file = std::fs::OpenOptions::new()
 			.create(true)
@@ -515,18 +464,14 @@ impl Sdlc {
 	/// This file is only an index:
 	///
 	///     crates/estate/log/sessions.json
-	pub fn record_session(&self) -> Result<()> {
+	fn record_session(&self) -> Result<()> {
 		let session = self
 			.session
 			.as_ref()
 			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
-
-		let log_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("log");
-
+		let log_dir = Self::root().join("log");
 		std::fs::create_dir_all(&log_dir)?;
-
 		let index_path = log_dir.join("sessions.json");
-
 		let mut sessions: Vec<SdlcSession> = if index_path.exists() {
 			let contents = std::fs::read_to_string(&index_path)?;
 
@@ -538,19 +483,15 @@ impl Sdlc {
 		} else {
 			Vec::new()
 		};
-
 		// Replace an existing entry for this session rather than
 		// creating duplicate index entries.
 		sessions.retain(|existing| existing.id != session.id);
-
 		sessions.push(session.clone());
-
 		let contents = serde_json::to_string_pretty(&sessions)?;
-
 		std::fs::write(index_path, contents)?;
-
 		Ok(())
 	}
+
 	pub async fn run(&mut self) -> Result<()> {
 		loop {
 			match self.stage() {
@@ -594,6 +535,7 @@ impl Sdlc {
 			}
 		}
 	}
+
 	// ─────────────────────────────────────────────────────────────────────
 	// Verification
 	// ─────────────────────────────────────────────────────────────────────
@@ -608,8 +550,49 @@ impl Sdlc {
 	///     npm run build
 	///     lint
 	///     typecheck
-	pub async fn run_checks(&self) -> Result<Vec<CheckResult>> {
-		todo!()
+	async fn run_checks(&self) -> Result<Vec<CheckResult>> {
+		let checks = [
+			("cargo check", vec!["cargo", "check"]),
+			("cargo test", vec!["cargo", "test"]),
+			(
+				"cargo clippy",
+				vec!["cargo", "clippy", "--", "-D", "warnings"],
+			),
+			("cargo fmt", vec!["cargo", "fmt", "--", "--check"]),
+		];
+
+		let mut results = Vec::with_capacity(checks.len());
+
+		for (name, command) in checks {
+			let result = Command::new(command[0])
+				.args(&command[1..])
+				.current_dir(env!("CARGO_MANIFEST_DIR"))
+				.output()
+				.map_err(|error| anyhow::anyhow!("failed to run verification check `{name}`: {error}"))?;
+
+			let stdout = String::from_utf8_lossy(&result.stdout);
+			let stderr = String::from_utf8_lossy(&result.stderr);
+
+			let output = if stderr.is_empty() {
+				stdout.into_owned()
+			} else if stdout.is_empty() {
+				stderr.into_owned()
+			} else {
+				format!("{stdout}\n{stderr}")
+			};
+
+			results.push(CheckResult {
+				name: name.to_string(),
+				passed: result.status.success(),
+				output: Some(output),
+			});
+
+			if !result.status.success() {
+				break;
+			}
+		}
+
+		Ok(results)
 	}
 
 	/// Run semantic verification through JEV.
@@ -622,17 +605,49 @@ impl Sdlc {
 	///     deterministic evidence
 	///
 	/// It does not mutate the lifecycle itself.
-	pub async fn evaluate(&self, verification: &[CheckResult]) -> Result<Vec<EvaluationResult>> {
-		todo!()
+	async fn evaluate(&self, checks: &[CheckResult]) -> Result<Vec<EvaluationResult>> {
+		let session = self
+			.session
+			.as_ref()
+			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
+		let intent = std::fs::read_to_string(session.dir.join("intent.md"))?;
+		let spec = std::fs::read_to_string(session.dir.join("spec.md"))?;
+		let plan = std::fs::read_to_string(session.dir.join("plan.md"))?;
+		let progress = std::fs::read_to_string(session.dir.join("progress.md"))?;
+
+		// Eventually:
+		//
+		// let diff = git.diff()?;
+		//
+		// let result = jev.evaluate()?;
+		//
+		Ok(vec![])
 	}
 
 	/// Determine whether all verification gates have passed.
-	fn verification_passed(&self, verification: &Verification) -> bool {
-		todo!("verification_passed")
+	fn verification_passed(&self, checks: &[CheckResult], evaluations: &[EvaluationResult]) -> bool {
+		checks.iter().all(|check| check.passed)
+			&& evaluations.iter().all(|evaluation| evaluation.passed)
 	}
 }
 
-impl Sdlc {
+impl SdlcSession {
+	fn created_at_readable(&self) -> String {
+		self
+			.created_at
+			.format("%B %-d, %Y at %-I:%M:%S %p UTC")
+			.to_string()
+	}
+	fn updated_at_readable(&self) -> String {
+		self
+			.updated_at
+			.format("%B %-d, %Y at %-I:%M:%S %p UTC")
+			.to_string()
+	}
+	fn create_readable(&self) -> String {
+		let current = Utc::now();
+		current.format("%B %-d, %Y at %-I:%M:%S %p UTC").to_string()
+	}
 	fn diagram() {
 		//           SdlcAgent / Runner
 		//                  │
@@ -677,19 +692,30 @@ impl Sdlc {
 	}
 }
 
-impl SdlcSession {}
-
+pub struct Check {
+	pub name: String,
+	pub command: String,
+}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CheckResult {
 	pub name: String,
 	pub passed: bool,
 	pub output: Option<String>,
 }
+struct CommandResult {
+	status: std::process::ExitStatus,
+	output: String,
+}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvaluationResult {
 	pub name: String,
-	pub value: f64,
+	pub passed: bool,
+	pub score: f64,
 	pub confidence: f64,
+	pub explanation: String,
+}
+pub struct Evaluator {
+	jev: TypeSafeClient,
 }
 /// Persistent state for the lifecycle runner.
 ///
@@ -698,6 +724,8 @@ pub struct EvaluationResult {
 pub struct Sdlc {
 	state_path: PathBuf,
 	session: Option<SdlcSession>,
+	// jev: TypeSafeClient,
+	evaluator: Evaluator,
 }
 /// The persistent state of an active SDLC session.
 ///
@@ -708,9 +736,9 @@ pub struct SdlcSession {
 	pub id: String,
 	pub title: String,
 	pub stage: Stage,
-	pub session_dir: PathBuf,
-	pub created_at: String,
-	pub updated_at: String,
+	pub dir: PathBuf,
+	pub created_at: DateTime<Utc>,
+	pub updated_at: DateTime<Utc>,
 }
 /// Result of verification.
 ///

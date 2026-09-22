@@ -1,39 +1,26 @@
-# Implementation Plan: [Feature or Change Name]
+# Implementation Plan
 
-## Overview
+## Specification
 
-Briefly describe what this plan accomplishes and its direct tie to `spec.md`.
+# Specification
 
-## Context & References
+## Intent
 
-- **Intent Reference**: `intent/[slug].md`
-- **Specification Reference**: `spec/[slug].md`
-- **Target Repository State**: [Branch name / Commit hash baseline]
+# Intent
 
-## Proposed Changes
+Finish SDLC Module which creates a loop for my SDLC.
 
-List the precise files to create, modify, or delete.
+## Requirements
 
-### [COMPONENT / MODULE NAME]
+- The implementation must satisfy the intent above.
+- The implementation must be testable.
+- Verification must provide deterministic evidence.
 
-- **File Path**: `path/to/file.ext`
-- **Action**: [Create | Modify | Delete]
-- **Description of changes**:
-  - Detailed bullet points of structural, logic, or API updates inside this file.
+## Steps
 
-## Verification & Testing Strategy
-
-- **Unit Tests**:
-  - [ ] Add/update test cases in `path/to/test.ext`
-- **Integration / End-to-End Checks**:
-  - [ ] Describe verification mechanism or manual test commands.
-- **Expected Constraints/Risks**:
-  - Note potential regressions or flagged policy boundaries.
-
-## Execution Work Order
-
-Ordered steps for agent or human execution:
-
-1. Step 1: Initialize/modify file A and verify unit tests.
-2. Step 2: Implement core logic in file B.
-3. Step 3: Run final regression suite.
+1. Inspect the existing implementation.
+2. Implement the required functionality.
+3. Add or update tests.
+4. Run deterministic checks.
+5. Fix any failures.
+6. Verify the resulting implementation.

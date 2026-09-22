@@ -213,10 +213,10 @@ impl AgentContext {
 	}
 
 	pub fn from_session(session: &SdlcSession) -> Result<Self> {
-		let intent = std::fs::read_to_string(session.session_dir.join("intent.md"))?;
-		let spec = std::fs::read_to_string(session.session_dir.join("spec.md"))?;
-		let plan = std::fs::read_to_string(session.session_dir.join("plan.md"))?;
-		let progress = std::fs::read_to_string(session.session_dir.join("progress.md"))?;
+		let intent = std::fs::read_to_string(session.dir.join("intent.md"))?;
+		let spec = std::fs::read_to_string(session.dir.join("spec.md"))?;
+		let plan = std::fs::read_to_string(session.dir.join("plan.md"))?;
+		let progress = std::fs::read_to_string(session.dir.join("progress.md"))?;
 
 		let prompt = format!(
 			"Execute the current SDLC plan.\n\n\
