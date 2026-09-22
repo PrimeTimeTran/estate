@@ -16,7 +16,76 @@ pub enum GenerationProvider {
 	Local,
 	Api,
 }
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
+pub enum SdlcEvent {
+	RunStarted,
+
+	StageStarted {
+		stage: Stage,
+		attempt: u32,
+	},
+
+	PhaseChanged {
+		phase: SdlcPhase,
+	},
+
+	ExecutionComplete {
+		stage: Stage,
+	},
+
+	ExecutionFailed {
+		stage: Stage,
+		attempt: u32,
+		error: String,
+	},
+
+	EvaluationStarted {
+		stage: Stage,
+	},
+
+	Evaluated {
+		stage: Stage,
+		score: f32,
+		confidence: f32,
+		passed: bool,
+	},
+
+	EvaluationFailed {
+		stage: Stage,
+		error: String,
+	},
+
+	StageRetrying {
+		stage: Stage,
+		attempt: u32,
+	},
+
+	StageTransitioned {
+		from: Stage,
+		to: Stage,
+	},
+
+	Completed,
+
+	Exited {
+		reason: String,
+	},
+
+	Failed {
+		stage: Option<Stage>,
+		error: String,
+	},
+}
+#[derive(Debug, Clone, Copy)]
+pub enum SdlcPhase {
+	Starting,
+	Executing,
+	Evaluating,
+	Retrying,
+	Completed,
+	Failed,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Stage {
 	Intent,
 	Spec,
@@ -532,10 +601,11 @@ impl Sdlc {
 		let state_path = Self::current_path();
 
 		let evaluator = Evaluator { jev };
-
+		let (event_tx, _) = broadcast::channel(256);
 		if !state_path.exists() {
 			return Ok(Some(Self {
 				evaluator,
+				event_tx,
 				generator: Box::new(LocalGenerator {
 					agent: Agent::new(),
 				}),
@@ -550,7 +620,7 @@ impl Sdlc {
 
 		Ok(Some(Self {
 			evaluator,
-
+			event_tx,
 			generator: Box::new(LocalGenerator {
 				agent: Agent::new(),
 			}),
@@ -558,6 +628,13 @@ impl Sdlc {
 			state_path,
 			session: Some(session),
 		}))
+	}
+	pub fn subscribe(&self) -> broadcast::Receiver<SdlcEvent> {
+		self.event_tx.subscribe()
+	}
+
+	fn emit(&self, event: SdlcEvent) {
+		let _ = self.event_tx.send(event);
 	}
 
 	/// Start a new lifecycle session from user-provided intent.
@@ -1106,138 +1183,162 @@ impl Sdlc {
 		let mut last_stage = None;
 		let mut attempt = 0u32;
 
-		println!("┌──────────────────────────────────────────────");
-		println!("│ SDLC RUN START");
-		println!("└──────────────────────────────────────────────");
+		self.emit(SdlcEvent::RunStarted);
 
 		loop {
 			let stage = match self.stage() {
 				Some(stage) => stage,
 
 				None => {
-					println!("SDLC EXIT: no current stage");
-					println!("total elapsed: {}", format_elapsed(run_started.elapsed()));
+					self.emit(SdlcEvent::Exited {
+						reason: "no current stage".into(),
+					});
+
 					return Ok(());
 				}
 			};
 
-			if last_stage == Some(stage.clone()) {
+			if last_stage == Some(stage) {
 				attempt += 1;
 			} else {
 				attempt = 1;
-				last_stage = Some(stage.clone());
+				last_stage = Some(stage);
 			}
-			println!();
-			println!("══════════════════════════════════════════════");
-			println!("SDLC {stage:?} | attempt #{attempt}/{MAX_STAGE_ATTEMPTS}");
-			println!("elapsed: {}", format_elapsed(run_started.elapsed()));
-			println!("══════════════════════════════════════════════");
 
-			let next = stage
-				.clone()
-				.next()
-				.ok_or_else(|| anyhow!("Stage {stage:?} has no next stage"))?;
+			self.emit(SdlcEvent::StageStarted { stage, attempt });
 
-			let execution_result = match stage.clone() {
-				Stage::Intent => {
-					monitor(
-						stage.clone(),
-						attempt,
-						run_started,
-						"execute",
-						self.stage_intent(),
-					)
-					.await
-				}
+			self.emit(SdlcEvent::PhaseChanged {
+				phase: SdlcPhase::Executing,
+			});
 
-				Stage::Spec => {
-					monitor(
-						stage.clone(),
-						attempt,
-						run_started,
-						"execute",
-						self.stage_spec(),
-					)
-					.await
-				}
+			// ------------------------------------------------------------
+			// EXECUTION
+			// ------------------------------------------------------------
 
-				Stage::Plan => {
-					monitor(
-						stage.clone(),
-						attempt,
-						run_started,
-						"execute",
-						self.stage_plan(),
-					)
-					.await
-				}
+			let execution_result = match stage {
+				Stage::Intent => self.stage_intent().await,
 
-				Stage::Build => {
-					monitor(
-						stage.clone(),
-						attempt,
-						run_started,
-						"execute",
-						self.stage_build(),
-					)
-					.await
-				}
+				Stage::Spec => self.stage_spec().await,
+
+				Stage::Plan => self.stage_plan().await,
+
+				Stage::Build => self.stage_build().await,
 
 				Stage::Verify => self.verify().await.map(|_| ()),
 
 				Stage::Complete => {
-					println!("→ Entering Complete");
+					self.emit(SdlcEvent::PhaseChanged {
+						phase: SdlcPhase::Completed,
+					});
+
 					self.clear_current()?;
 
-					println!();
-					println!("┌──────────────────────────────────────────────");
-					println!("│ SDLC RUN COMPLETE");
-					println!("│ total elapsed: {}", format_elapsed(run_started.elapsed()));
-					println!("└──────────────────────────────────────────────");
+					self.emit(SdlcEvent::Completed);
 
 					return Ok(());
 				}
 
 				Stage::Deploy | Stage::Maintain => {
-					return Err(anyhow!("stage {stage:?} not implemented"));
+					let error = anyhow!("stage {stage:?} not implemented");
+
+					self.emit(SdlcEvent::Failed {
+						stage: Some(stage),
+						error: error.to_string(),
+					});
+
+					return Err(error);
 				}
 			};
 
-			println!("✓ Stage execution complete");
+			// ------------------------------------------------------------
+			// EXECUTION FAILURE
+			// ------------------------------------------------------------
 
-			let decision = match self.evaluate_stage(stage.clone()).await {
-				Ok(decision) => decision,
+			if let Err(error) = execution_result {
+				self.emit(SdlcEvent::ExecutionFailed {
+					stage,
+					attempt,
+					error: error.to_string(),
+				});
+
+				if attempt >= MAX_STAGE_ATTEMPTS {
+					self.emit(SdlcEvent::Failed {
+						stage: Some(stage),
+						error: error.to_string(),
+					});
+
+					return Err(error);
+				}
+
+				self.emit(SdlcEvent::StageRetrying {
+					stage,
+					attempt: attempt + 1,
+				});
+
+				self.emit(SdlcEvent::PhaseChanged {
+					phase: SdlcPhase::Retrying,
+				});
+
+				self.retry(stage)?;
+
+				continue;
+			}
+
+			self.emit(SdlcEvent::ExecutionComplete { stage });
+
+			// ------------------------------------------------------------
+			// JEV EVALUATION
+			// ------------------------------------------------------------
+
+			self.emit(SdlcEvent::PhaseChanged {
+				phase: SdlcPhase::Evaluating,
+			});
+
+			self.emit(SdlcEvent::EvaluationStarted { stage });
+
+			let evaluation = match self.evaluate_stage(stage).await {
+				Ok(evaluation) => evaluation,
 
 				Err(error) => {
-					println!("✗ JEV EVALUATION FAILED");
-					println!("  stage: {stage:?}");
-					println!("  error: {error}");
+					self.emit(SdlcEvent::EvaluationFailed {
+						stage,
+						error: error.to_string(),
+					});
 
 					if attempt >= MAX_STAGE_ATTEMPTS {
+						self.emit(SdlcEvent::Failed {
+							stage: Some(stage),
+							error: error.to_string(),
+						});
+
 						return Err(error);
 					}
 
-					println!("↻ retrying stage because evaluation failed");
+					self.emit(SdlcEvent::StageRetrying {
+						stage,
+						attempt: attempt + 1,
+					});
+
+					self.emit(SdlcEvent::PhaseChanged {
+						phase: SdlcPhase::Retrying,
+					});
+
 					continue;
 				}
 			};
 
-			println!();
-			println!("┌─ JEV ───────────────────────────────────────");
-			println!("│ stage:      {stage:?}");
-			println!("│ attempt:    #{attempt}");
-			println!("│ score:      {:.2}", decision.score);
-			println!("│ confidence: {:.2}", decision.confidence);
-			println!("│ passed:     {}", decision.passed);
-			println!("└──────────────────────────────────────────────");
+			self.emit(SdlcEvent::Evaluated {
+				stage,
+				score: evaluation.score as f32,
+				confidence: evaluation.confidence as f32,
+				passed: evaluation.passed,
+			});
 
-			let action = if decision.passed {
-				StageAction::Continue
-			} else if attempt < MAX_STAGE_ATTEMPTS {
-				StageAction::Retry
-			} else {
-				StageAction::Abort
-			};
+			// ------------------------------------------------------------
+			// ORCHESTRATION
+			// ------------------------------------------------------------
+
+			let action = stage_action(&evaluation, attempt, MAX_STAGE_ATTEMPTS);
 
 			match action {
 				StageAction::Continue => {
@@ -1245,25 +1346,36 @@ impl Sdlc {
 						.next()
 						.ok_or_else(|| anyhow!("Stage {stage:?} has no next stage"))?;
 
-					println!("→ JEV says stage passed");
-					println!("→ transition: {stage:?} → {next:?}");
-
 					self.transition(next)?;
+
+					self.emit(SdlcEvent::StageTransitioned {
+						from: stage,
+						to: next,
+					});
 				}
 
 				StageAction::Retry => {
-					println!("↻ RETRY: {stage:?} | next attempt #{}", attempt + 1);
+					self.emit(SdlcEvent::StageRetrying {
+						stage,
+						attempt: attempt + 1,
+					});
+
+					self.emit(SdlcEvent::PhaseChanged {
+						phase: SdlcPhase::Retrying,
+					});
 
 					self.retry(stage)?;
 				}
 
 				StageAction::Abort => {
-					println!("✗ ABORT: {stage:?}");
-					println!("  exhausted {} attempts", MAX_STAGE_ATTEMPTS);
+					let error = anyhow!("SDLC aborted at {stage:?} after {attempt} attempts");
 
-					return Err(anyhow!(
-						"SDLC aborted at {stage:?} after {attempt} attempts"
-					));
+					self.emit(SdlcEvent::Failed {
+						stage: Some(stage),
+						error: error.to_string(),
+					});
+
+					return Err(error);
 				}
 			}
 		}
@@ -1334,6 +1446,15 @@ impl Sdlc {
 			&& evaluations.iter().all(|evaluation| evaluation.passed)
 	}
 }
+impl Sdlc {
+	pub fn retry(&mut self, stage: Stage) -> Result<()> {
+		self.stage_attempt += 1;
+
+		println!("↻ RETRY {stage:?} | attempt #{}", self.stage_attempt);
+
+		Ok(())
+	}
+}
 impl SdlcSession {
 	fn created_at_readable(&self) -> String {
 		self
@@ -1352,6 +1473,136 @@ impl SdlcSession {
 		current.format("%B %-d, %Y at %-I:%M:%S %p UTC").to_string()
 	}
 }
+impl SdlcView {
+	pub fn new(stage: Stage) -> Self {
+		Self {
+			runtime: SdlcRuntime {
+				stage,
+				attempt: 0,
+				started_at: Instant::now(),
+				stage_started_at: Instant::now(),
+				phase: SdlcPhase::Starting,
+				score: None,
+				confidence: None,
+				passed: None,
+				message: None,
+				history: Vec::new(),
+				total_tokens: 0,
+				total_agent_calls: 0,
+			},
+		}
+	}
+	pub fn apply(&mut self, event: SdlcEvent) {
+		self.runtime.history.push(event.clone());
+
+		match event {
+			SdlcEvent::RunStarted => {
+				self.runtime.started_at = Instant::now();
+				self.runtime.phase = SdlcPhase::Starting;
+			}
+
+			SdlcEvent::StageStarted { stage, attempt } => {
+				self.runtime.stage = stage;
+				self.runtime.attempt = attempt;
+				self.runtime.stage_started_at = Instant::now();
+
+				self.runtime.phase = SdlcPhase::Starting;
+				self.runtime.score = None;
+				self.runtime.confidence = None;
+				self.runtime.passed = None;
+				self.runtime.message = None;
+			}
+
+			SdlcEvent::PhaseChanged { phase } => {
+				self.runtime.phase = phase;
+			}
+
+			SdlcEvent::ExecutionComplete { stage } => {
+				self.runtime.stage = stage;
+				self.runtime.phase = SdlcPhase::Evaluating;
+			}
+
+			SdlcEvent::ExecutionFailed { stage, error, .. } => {
+				self.runtime.stage = stage;
+				self.runtime.phase = SdlcPhase::Failed;
+				self.runtime.message = Some(error);
+			}
+
+			SdlcEvent::EvaluationStarted { stage } => {
+				self.runtime.stage = stage;
+				self.runtime.phase = SdlcPhase::Evaluating;
+			}
+
+			SdlcEvent::Evaluated {
+				stage,
+				score,
+				confidence,
+				passed,
+			} => {
+				self.runtime.stage = stage;
+				self.runtime.score = Some(score);
+				self.runtime.confidence = Some(confidence);
+				self.runtime.passed = Some(passed);
+			}
+
+			SdlcEvent::EvaluationFailed { stage, error } => {
+				self.runtime.stage = stage;
+				self.runtime.phase = SdlcPhase::Failed;
+				self.runtime.message = Some(error);
+			}
+
+			SdlcEvent::StageRetrying { stage, attempt } => {
+				self.runtime.stage = stage;
+				self.runtime.attempt = attempt;
+				self.runtime.phase = SdlcPhase::Retrying;
+			}
+
+			SdlcEvent::StageTransitioned { to, .. } => {
+				self.runtime.stage = to;
+			}
+
+			SdlcEvent::Completed => {
+				self.runtime.phase = SdlcPhase::Completed;
+			}
+
+			SdlcEvent::Exited { reason } => {
+				self.runtime.message = Some(reason);
+			}
+
+			SdlcEvent::Failed { error, .. } => {
+				self.runtime.phase = SdlcPhase::Failed;
+				self.runtime.message = Some(error);
+			}
+			SdlcEvent::RunStarted {} => {} // SdlcEvent::Started => {}
+			                               // SdlcEvent::StageExecuted {} => {}
+			                               // SdlcEvent::AgentWorking { message } => {}
+		}
+	}
+	pub fn render(frame: &mut Frame, view: &SdlcView) {
+		let chunks: std::rc::Rc<[Rect]> = Layout::default()
+			.direction(Direction::Vertical)
+			.constraints([
+				Constraint::Length(2), // header
+				Constraint::Length(3), // stepper
+				Constraint::Min(8),    // body
+				Constraint::Length(1), // footer
+			])
+			.split(frame.area());
+
+		render_header(frame, view, chunks[0]);
+		render_stepper(frame, view, chunks[1]);
+
+		let body = Layout::default()
+			.direction(Direction::Horizontal)
+			.constraints([Constraint::Percentage(55), Constraint::Percentage(45)])
+			.split(chunks[2]);
+
+		render_current_stage(frame, view, body[0]);
+		render_activity(frame, view, body[1]);
+
+		render_footer(frame, view, chunks[3]);
+	}
+}
 impl Stage {
 	pub fn next(&self) -> Option<Self> {
 		match self {
@@ -1366,15 +1617,23 @@ impl Stage {
 		}
 	}
 }
-impl Sdlc {
-	pub fn retry(&mut self, stage: Stage) -> Result<()> {
-		self.stage_attempt += 1;
+impl Stage {
+	pub fn is_before(self, other: Stage) -> bool {
+		let rank = |stage: Stage| match stage {
+			Stage::Intent => 0,
+			Stage::Spec => 1,
+			Stage::Plan => 2,
+			Stage::Build => 3,
+			Stage::Verify => 4,
+			Stage::Deploy => 5,
+			Stage::Maintain => 6,
+			Stage::Complete => 7,
+		};
 
-		println!("↻ RETRY {stage:?} | attempt #{}", self.stage_attempt);
-
-		Ok(())
+		rank(self) < rank(other)
 	}
 }
+
 pub struct ApiGenerator {
 	// whatever API client you decide to use
 }
@@ -1423,6 +1682,28 @@ pub struct Sdlc {
 	evaluator: Evaluator,
 	stage_attempt: u32,
 	generator: Box<dyn ArtifactGenerator>,
+	event_tx: broadcast::Sender<SdlcEvent>,
+}
+#[derive(Debug, Clone)]
+pub struct SdlcRuntime {
+	pub stage: Stage,
+	pub attempt: u32,
+
+	pub started_at: Instant,
+	pub stage_started_at: Instant,
+
+	pub phase: SdlcPhase,
+
+	pub score: Option<f32>,
+	pub confidence: Option<f32>,
+	pub passed: Option<bool>,
+
+	pub message: Option<String>,
+
+	pub total_tokens: u64,
+	pub total_agent_calls: u32,
+
+	pub history: Vec<SdlcEvent>,
 }
 /// The persistent state of an active SDLC session.
 ///
@@ -1437,6 +1718,9 @@ pub struct SdlcSession {
 	pub dir: PathBuf,
 	pub created_at: DateTime<Utc>,
 	pub updated_at: DateTime<Utc>,
+}
+pub struct SdlcView {
+	pub runtime: SdlcRuntime,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StageRecord {
@@ -1534,4 +1818,386 @@ fn structure_prompt_for_generate_tests(intent: &str, spec: &str, plan: &str) -> 
 			Return only the contents of `tests.md`.
 		"#,
 	)
+}
+
+use ratatui::{
+	Frame,
+	layout::{Constraint, Direction, Layout, Rect},
+	style::{Color, Modifier, Style},
+	text::{Line, Span},
+	widgets::{Block, BorderType, Borders, List, ListItem, Paragraph},
+};
+
+fn render_header(frame: &mut Frame, view: &SdlcView, area: Rect) {
+	let elapsed = format_elapsed(view.runtime.started_at.elapsed());
+
+	let line = Line::from(vec![
+		Span::styled(
+			format!("{:?}", view.runtime.stage),
+			Style::default().add_modifier(Modifier::BOLD),
+		),
+		Span::raw(format!(
+			" · attempt #{}/3   {}",
+			view.runtime.attempt, elapsed
+		)),
+		Span::raw("    [q] quit  [p] pause  [l] logs"),
+	]);
+
+	frame.render_widget(Paragraph::new(line), area);
+}
+fn render_stepper(frame: &mut Frame, view: &SdlcView, area: Rect) {
+	let stages = [
+		Stage::Intent,
+		Stage::Spec,
+		Stage::Plan,
+		Stage::Build,
+		Stage::Verify,
+		Stage::Complete,
+	];
+
+	let current = view.runtime.stage;
+	let mut spans = Vec::new();
+
+	for (index, stage) in stages.iter().copied().enumerate() {
+		let style = stage_style(stage, current);
+
+		let symbol = if stage == current {
+			"● "
+		} else if stage.is_before(current) {
+			"✓ "
+		} else {
+			"○ "
+		};
+
+		spans.push(Span::styled(symbol, style));
+		spans.push(Span::styled(format!("{stage:?}"), style));
+
+		if index + 1 < stages.len() {
+			spans.push(Span::styled("  →  ", Style::default().fg(Color::DarkGray)));
+		}
+	}
+
+	frame.render_widget(Paragraph::new(Line::from(spans)), area);
+}
+fn render_current_stage(frame: &mut Frame, view: &SdlcView, area: Rect) {
+	let runtime = &view.runtime;
+
+	let phase_style = phase_style(runtime.phase);
+
+	let score = runtime
+		.score
+		.map(|value| format!("{value:.2}"))
+		.unwrap_or_else(|| "—".into());
+
+	let confidence = runtime
+		.confidence
+		.map(|value| format!("{value:.2}"))
+		.unwrap_or_else(|| "—".into());
+
+	let passed = match runtime.passed {
+		Some(true) => Span::styled(
+			"yes",
+			Style::default()
+				.fg(Color::Green)
+				.add_modifier(Modifier::BOLD),
+		),
+
+		Some(false) => Span::styled(
+			"no",
+			Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+		),
+
+		None => Span::styled("—", Style::default().fg(Color::DarkGray)),
+	};
+
+	let lines = vec![
+		Line::from(vec![
+			Span::styled(
+				format!("{:?}", runtime.stage),
+				Style::default()
+					.fg(Color::White)
+					.add_modifier(Modifier::BOLD),
+			),
+			Span::styled(
+				format!("   attempt {}/3", runtime.attempt),
+				Style::default().fg(Color::Gray),
+			),
+		]),
+		Line::from(""),
+		Line::from(vec![
+			Span::styled("phase       ", Style::default().fg(Color::DarkGray)),
+			Span::styled(format!("{:?}", runtime.phase), phase_style),
+		]),
+		Line::from(vec![
+			Span::styled("stage time  ", Style::default().fg(Color::DarkGray)),
+			Span::styled(
+				format_elapsed(runtime.stage_started_at.elapsed()),
+				Style::default().fg(Color::White),
+			),
+		]),
+		Line::from(vec![
+			Span::styled("JEV score   ", Style::default().fg(Color::DarkGray)),
+			Span::styled(score, Style::default().fg(Color::Cyan)),
+		]),
+		Line::from(vec![
+			Span::styled("confidence  ", Style::default().fg(Color::DarkGray)),
+			Span::styled(confidence, Style::default().fg(Color::Cyan)),
+		]),
+		Line::from(vec![
+			Span::styled("passed      ", Style::default().fg(Color::DarkGray)),
+			passed,
+		]),
+	];
+
+	frame.render_widget(
+		Paragraph::new(lines).block(
+			Block::default()
+				.borders(Borders::ALL)
+				.border_type(BorderType::Rounded)
+				.border_style(Style::default().fg(Color::White))
+				.title(Span::styled(
+					" Current Stage ",
+					Style::default()
+						.fg(Color::White)
+						.add_modifier(Modifier::BOLD),
+				)),
+		),
+		area,
+	);
+}
+fn render_activity(frame: &mut Frame, view: &SdlcView, area: Rect) {
+	let items = view
+		.runtime
+		.history
+		.iter()
+		.rev()
+		.take(10)
+		.map(|event| ListItem::new(event_line(event)))
+		.collect::<Vec<_>>();
+	frame.render_widget(
+		List::new(items).block(
+			Block::default()
+				.borders(Borders::ALL)
+				.border_type(BorderType::Plain)
+				.border_style(Style::default().fg(Color::DarkGray))
+				.title(Span::styled(" Activity ", Style::default().fg(Color::Gray))),
+		),
+		area,
+	);
+}
+fn render_footer(frame: &mut Frame, view: &SdlcView, area: Rect) {
+	let phase = view.runtime.phase;
+
+	let line = Line::from(vec![
+		Span::styled(format!("{:?}", phase), phase_style(phase)),
+		Span::styled(
+			format!(" · attempt #{} / 3", view.runtime.attempt),
+			Style::default().fg(Color::Gray),
+		),
+		Span::styled(
+			format!(" · {}", format_elapsed(view.runtime.started_at.elapsed())),
+			Style::default().fg(Color::DarkGray),
+		),
+		Span::raw("    "),
+		Span::styled(
+			"[q]",
+			Style::default()
+				.fg(Color::White)
+				.add_modifier(Modifier::BOLD),
+		),
+		Span::raw(" quit  "),
+		Span::styled(
+			"[p]",
+			Style::default()
+				.fg(Color::White)
+				.add_modifier(Modifier::BOLD),
+		),
+		Span::raw(" pause  "),
+		Span::styled(
+			"[l]",
+			Style::default()
+				.fg(Color::White)
+				.add_modifier(Modifier::BOLD),
+		),
+		Span::raw(" logs"),
+	]);
+
+	frame.render_widget(Paragraph::new(line), area);
+}
+
+fn event_line(event: &SdlcEvent) -> Line<'static> {
+	match event {
+		SdlcEvent::RunStarted => Line::from(Span::styled(
+			"SDLC started",
+			Style::default().fg(Color::Gray),
+		)),
+
+		SdlcEvent::StageStarted { stage, attempt } => Line::from(vec![
+			Span::styled("● ", Style::default().fg(Color::White)),
+			Span::styled(
+				format!("{stage:?}"),
+				Style::default()
+					.fg(Color::White)
+					.add_modifier(Modifier::BOLD),
+			),
+			Span::styled(
+				format!(" · attempt #{attempt}"),
+				Style::default().fg(Color::Gray),
+			),
+		]),
+
+		SdlcEvent::PhaseChanged { phase } => Line::from(vec![
+			Span::styled("  phase ", Style::default().fg(Color::DarkGray)),
+			Span::styled(format!("→ {phase:?}"), phase_style(*phase)),
+		]),
+
+		SdlcEvent::ExecutionComplete { stage } => Line::from(vec![
+			Span::styled("✓ ", Style::default().fg(Color::Green)),
+			Span::styled(
+				format!("{stage:?} execution complete"),
+				Style::default().fg(Color::Green),
+			),
+		]),
+
+		SdlcEvent::ExecutionFailed {
+			stage,
+			attempt,
+			error,
+		} => Line::from(vec![
+			Span::styled("✗ ", Style::default().fg(Color::Red)),
+			Span::styled(
+				format!("{stage:?} attempt #{attempt}"),
+				Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+			),
+			Span::styled(format!(": {error}"), Style::default().fg(Color::Gray)),
+		]),
+
+		SdlcEvent::EvaluationStarted { stage } => Line::from(vec![
+			Span::styled("◆ ", Style::default().fg(Color::Cyan)),
+			Span::styled(
+				format!("JEV evaluating {stage:?}"),
+				Style::default().fg(Color::Cyan),
+			),
+		]),
+
+		SdlcEvent::Evaluated {
+			stage,
+			score,
+			confidence,
+			passed,
+		} => {
+			let style = if *passed {
+				Style::default()
+					.fg(Color::Green)
+					.add_modifier(Modifier::BOLD)
+			} else {
+				Style::default()
+					.fg(Color::Yellow)
+					.add_modifier(Modifier::BOLD)
+			};
+
+			Line::from(vec![
+				Span::styled("◆ JEV ", Style::default().fg(Color::Cyan)),
+				Span::styled(
+					format!("{stage:?} · score={score:.2} confidence={confidence:.2}"),
+					Style::default().fg(Color::Gray),
+				),
+				Span::raw(" · "),
+				Span::styled(if *passed { "passed" } else { "rejected" }, style),
+			])
+		}
+
+		SdlcEvent::EvaluationFailed { stage, error } => Line::from(vec![
+			Span::styled("✗ JEV ", Style::default().fg(Color::Red)),
+			Span::styled(
+				format!("{stage:?}: {error}"),
+				Style::default().fg(Color::Gray),
+			),
+		]),
+
+		SdlcEvent::StageRetrying { stage, attempt } => Line::from(vec![
+			Span::styled("↻ ", Style::default().fg(Color::Yellow)),
+			Span::styled(
+				format!("{stage:?} · retry #{attempt}"),
+				Style::default()
+					.fg(Color::Yellow)
+					.add_modifier(Modifier::BOLD),
+			),
+		]),
+
+		SdlcEvent::StageTransitioned { from, to } => Line::from(vec![
+			Span::styled("→ ", Style::default().fg(Color::Cyan)),
+			Span::styled(format!("{from:?}"), Style::default().fg(Color::Gray)),
+			Span::raw(" → "),
+			Span::styled(
+				format!("{to:?}"),
+				Style::default()
+					.fg(Color::White)
+					.add_modifier(Modifier::BOLD),
+			),
+		]),
+
+		SdlcEvent::Completed => Line::from(Span::styled(
+			"✓ SDLC complete",
+			Style::default()
+				.fg(Color::Green)
+				.add_modifier(Modifier::BOLD),
+		)),
+
+		SdlcEvent::Exited { reason } => Line::from(vec![
+			Span::styled("→ exited ", Style::default().fg(Color::DarkGray)),
+			Span::styled(reason.clone(), Style::default().fg(Color::Gray)),
+		]),
+
+		SdlcEvent::Failed { stage, error } => {
+			let message = match stage {
+				Some(stage) => format!("{stage:?}: {error}"),
+				None => error.clone(),
+			};
+
+			Line::from(vec![
+				Span::styled("✗ ", Style::default().fg(Color::Red)),
+				Span::styled(message, Style::default().fg(Color::Red)),
+			])
+		}
+	}
+}
+fn stage_style(stage: Stage, current: Stage) -> Style {
+	match stage {
+		stage if stage == current => Style::default()
+			.fg(Color::White)
+			.add_modifier(Modifier::BOLD),
+
+		stage if stage.is_before(current) => Style::default()
+			.fg(Color::Green)
+			.add_modifier(Modifier::BOLD),
+
+		_ => Style::default()
+			.fg(Color::DarkGray)
+			.add_modifier(Modifier::DIM),
+	}
+}
+
+fn phase_style(phase: SdlcPhase) -> Style {
+	match phase {
+		SdlcPhase::Starting => Style::default()
+			.fg(Color::Yellow)
+			.add_modifier(Modifier::BOLD),
+
+		SdlcPhase::Executing => Style::default()
+			.fg(Color::White)
+			.add_modifier(Modifier::BOLD),
+
+		SdlcPhase::Evaluating => Style::default().fg(Color::Cyan),
+
+		SdlcPhase::Retrying => Style::default()
+			.fg(Color::Yellow)
+			.add_modifier(Modifier::BOLD),
+
+		SdlcPhase::Completed => Style::default()
+			.fg(Color::Green)
+			.add_modifier(Modifier::BOLD),
+
+		SdlcPhase::Failed => Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+	}
 }

@@ -1,4 +1,7 @@
-use crate::{model::{AgentTask, task::TaskResult}, native::{agent::SystemEvent, job::*}};
+use crate::{
+	model::{AgentTask, task::TaskResult},
+	native::{agent::SystemEvent, job::*},
+};
 
 #[derive(Clone, Debug)]
 pub enum RuntimeEvent {
