@@ -133,11 +133,10 @@ impl App<Context> {
 		let proxy = event_loop.create_proxy();
 		let handle = self.start_app_events(proxy.clone())?;
 		self.workers.push(handle);
-
 		let event_rx = self.host.event_bus.subscribe_broadcast("app");
 		let event_tx = self.host.event_bus.sender();
 		self.host.runtime.attach_event_proxy(proxy);
-		let mut renderer = Renderer::<Context, <Context as Ctx>::AppState>::new(
+		let mut renderer = structs::Renderer::<Context, <Context as Ctx>::AppState>::new(
 			self.host.context(),
 			self.state.clone(),
 			cancel,

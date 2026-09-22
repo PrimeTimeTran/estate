@@ -21,6 +21,7 @@ pub mod ui;
 pub mod util;
 pub mod window;
 
+pub use agent::*;
 pub use prelude_native::*;
 pub use util::*;
 

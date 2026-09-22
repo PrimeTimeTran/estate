@@ -30,7 +30,7 @@ impl MyServer {
 			.build();
 		handler
 	}
-	pub fn add(&self, Parameters(args): Parameters<tool::AddVars>) -> String {
+	pub fn add(&self, Parameters(args): Parameters<backend::tool::AddVars>) -> String {
 		(args.a + args.b).to_string()
 	}
 }

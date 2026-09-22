@@ -77,6 +77,9 @@ pub trait DiscoverySink {
 	async fn emit(&mut self, event: DiscoveryEvent);
 }
 
+fn filesystem_root(path: &Path) -> PathBuf {
+	PathBuf::from(path.components().next().unwrap().as_os_str())
+}
 pub fn walk_root_to_path<F>(target: impl AsRef<Path>, mut visit: F) -> std::io::Result<WalkControl>
 where
 	F: FnMut(&Path) -> WalkControl,
@@ -93,9 +96,6 @@ where
 		}
 	}
 	Ok(WalkControl::Continue)
-}
-fn filesystem_root(path: &Path) -> PathBuf {
-	PathBuf::from(path.components().next().unwrap().as_os_str())
 }
 pub async fn worker(mut rx: mpsc::Receiver<DiscoveryTask>) {
 	while let Some(task) = rx.recv().await {

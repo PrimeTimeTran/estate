@@ -3,7 +3,7 @@ use super::{
 	agent_event::{AgentEvent, RuntimeEvent},
 	agent_runtime::{AgentRegistry, AgentRuntime},
 };
-use crate::{native::job::AgentTask, prelude::*};
+use crate::{model::task::TaskResult, prelude::*};
 
 #[derive(Debug, Clone)]
 pub enum SystemEvent {

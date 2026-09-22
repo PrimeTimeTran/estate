@@ -2,7 +2,7 @@ use super::{
 	Agent, SystemEvent,
 	agent_event::{AgentEvent, RuntimeEvent},
 };
-use crate::{native::job, prelude::*};
+use crate::{model::task::TaskResult, native::job, prelude::*};
 
 #[derive(Debug, Default)]
 pub struct AgentRegistry;
@@ -15,11 +15,11 @@ pub struct AgentRuntime {
 }
 
 impl AgentRuntime {
-	pub async fn run_agent(&self, task: job::AgentTask) -> Result<TaskResult> {
+	pub async fn run_agent(&self, task: AgentTask) -> Result<TaskResult> {
 		let agent = Agent::new();
 		agent.run_agent_loop(task, self.event_tx.clone()).await
 	}
-	pub async fn spawn_agent(&self, task: job::AgentTask) {
+	pub async fn spawn_agent(&self, task: AgentTask) {
 		let event_tx = self.event_tx.clone();
 		tokio::spawn(async move {
 			let agent = Agent::new();
