@@ -50,7 +50,7 @@ fn render_symbols(json: &serde_json::Value) -> String {
 	{
 		out.push_str("### File Registry\n\n");
 
-		let root = project_root().unwrap_or_else(|_| PathBuf::from("."));
+		let root = workspace_root().unwrap_or_else(|_| PathBuf::from("."));
 
 		for (uid, path) in map {
 			let rel = path.as_str().unwrap_or("");
@@ -99,7 +99,7 @@ fn render_symbols(json: &serde_json::Value) -> String {
 }
 
 pub fn generate_explain_doc() -> Result<()> {
-	let workspace = project_root()?;
+	let workspace = workspace_root()?;
 
 	EstateState::save_workspace(&workspace);
 

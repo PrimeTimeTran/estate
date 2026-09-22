@@ -7,6 +7,10 @@ pub fn home_dir() -> Result<PathBuf> {
 		.ok_or_else(|| Error::new(ErrorKind::NotFound, "Could not determine home directory"))
 }
 
+pub fn workspace_cargo_path() -> PathBuf {
+	PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+}
+
 /// User global estate.
 /// Example:
 /// ~/.estate
@@ -17,7 +21,7 @@ pub fn global_estate_dir() -> Result<PathBuf> {
 /// Current workspace/project root.
 /// Example:
 /// /Users/loi/projects/my-app
-pub fn project_root() -> Result<PathBuf> {
+pub fn workspace_root() -> Result<PathBuf> {
 	std::env::current_dir()
 }
 
@@ -25,7 +29,7 @@ pub fn project_root() -> Result<PathBuf> {
 /// Example:
 /// /Users/loi/projects/my-app/.estate
 pub fn project_estate_dir() -> Result<PathBuf> {
-	Ok(project_root()?.join(".estate"))
+	Ok(workspace_root()?.join(".estate"))
 }
 
 /// Legacy/project metadata directory.
@@ -62,6 +66,5 @@ pub fn engine_cache_dir() -> Result<PathBuf> {
 
 pub fn path() -> Result<PathBuf> {
 	let path = engine_data_dir()?.join("state.json");
-	println!("STATE PATH: {}", path.display());
 	Ok(path)
 }

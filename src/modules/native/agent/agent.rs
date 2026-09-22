@@ -180,8 +180,10 @@ impl AgentContext {
 			verification: None,
 		}
 	}
-
 	pub fn from_session(session: &SdlcSession) -> Result<Self> {
+
+		// read(from_session(session))
+		// read_from_session(name, session);
 		let intent = std::fs::read_to_string(session.dir.join("intent.md"))?;
 		let spec = std::fs::read_to_string(session.dir.join("spec.md"))?;
 		let plan = std::fs::read_to_string(session.dir.join("plan.md"))?;

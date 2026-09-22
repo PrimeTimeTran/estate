@@ -19,6 +19,7 @@ pub use rmcp::{
 	model::{PromptMessage, PromptMessageContent},
 };
 pub use signal_hook::{consts::SIGINT, iterator::Signals};
+pub use std::fs::OpenOptions;
 pub use tokio::{
 	io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
 	net::{TcpListener, UnixListener, UnixStream},
@@ -31,6 +32,7 @@ pub use tokio::{
 };
 pub use tokio_util::sync::CancellationToken;
 pub use tonic::{Request, Response, Status, transport::Channel};
+pub use tracing::{debug, error, info, trace, warn};
 pub use tray_icon::{
 	Icon, TrayIcon, TrayIconBuilder,
 	menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu},

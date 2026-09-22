@@ -1,6 +1,10 @@
-use crate::model::{
-	AgentTask,
-	agent::{Agent, AgentContext},
+use crate::{
+	model::{
+		AgentTask,
+		agent::{Agent, AgentContext},
+		resolver::workspace_cargo_path,
+	},
+	prelude::*,
 };
 use anyhow::Result;
 use async_trait::async_trait;
@@ -875,13 +879,14 @@ impl Sdlc {
 	// ─────────────────────────────────────────────────────────────────────
 	// Artifacts
 	// ─────────────────────────────────────────────────────────────────────
+
 	fn read(&self, name: &str) -> Result<String> {
+		// self.session;
 		let session = self
 			.session
 			.as_ref()
 			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
-
-		Ok(std::fs::read_to_string(session.dir.join(name))?)
+		read_from_session(name, session)
 	}
 	fn write(path: PathBuf, contents: String) -> Result<()> {
 		Ok(std::fs::write(path, contents)?)
@@ -896,7 +901,6 @@ impl Sdlc {
 		let evaluation = match stage {
 			Stage::Intent => {
 				let intent = self.read("intent.md")?;
-
 				self.evaluator.evaluate_intent(&intent).await?
 			}
 			Stage::Spec => {
@@ -962,7 +966,8 @@ impl Sdlc {
 		self.persist()
 	}
 	fn root() -> PathBuf {
-		PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+		// PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+		workspace_cargo_path()
 	}
 	/// Return the directory containing the current session's artifacts.
 	pub fn dir(&self) -> Result<&Path> {

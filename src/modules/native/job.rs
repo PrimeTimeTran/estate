@@ -34,7 +34,6 @@ impl TaskManagerRuntime {
 		if let Some(parent) = path.parent() {
 			watcher.watch(parent, RecursiveMode::NonRecursive)?;
 		}
-
 		Ok(Self {
 			_watcher: watcher,
 			rx,

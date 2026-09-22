@@ -1,22 +1,11 @@
 use crate::prelude::*;
 
-// #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-#[cfg(not(target_arch = "wasm32"))]
-pub use crate::native;
-
-/// Sorting order of VSCode
-///
-/// Enum > Macros > Functions > Impl > Structs
-///
-/// Makes organization easier cross IDE.
-///
-use std::fs::OpenOptions;
-use tracing::{debug, error, info, trace, warn};
 use tracing_subscriber::{
 	EnvFilter, Layer, filter::LevelFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt,
 };
 
 /// ## [LogLevel]
+///
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum LogLevel {
@@ -87,7 +76,7 @@ pub fn init_logging(config: &LogConfig) -> Result<()> {
 		.init();
 	Ok(())
 }
-pub fn setup_logging() -> anyhow::Result<()> {
+pub fn setup_logging() -> Result<()> {
 	let cli = cli::context::parse();
 	let mut config = LogConfig::load()?;
 	config.apply_cli(&cli)?;
@@ -192,6 +181,14 @@ impl Default for LogLevel {
 		Self::Info
 	}
 }
+impl Default for OutputConfig {
+	fn default() -> Self {
+		Self {
+			enabled: true,
+			level: None,
+		}
+	}
+}
 impl LogLevel {
 	pub fn as_str(&self) -> &'static str {
 		match self {
@@ -203,7 +200,7 @@ impl LogLevel {
 		}
 	}
 }
-impl std::fmt::Display for LogLevel {
+impl Display for LogLevel {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		f.write_str(self.as_str())
 	}
@@ -225,7 +222,7 @@ impl Tracer {
 	}
 }
 impl TraceFlow {
-	fn event(&self, level: LogLevel, message: impl std::fmt::Display) {
+	fn event(&self, level: LogLevel, message: impl Display) {
 		let id = Tracer::next_flow_id();
 		let prefix = format!("{}#{}:{}", self.name, id, self.namespace);
 
@@ -238,26 +235,26 @@ impl TraceFlow {
 		}
 	}
 
-	pub fn trace(&self, message: impl std::fmt::Display) {
+	pub fn trace(&self, message: impl Display) {
 		self.event(LogLevel::Trace, message);
 	}
 
-	pub fn debug(&self, message: impl std::fmt::Display) {
+	pub fn debug(&self, message: impl Display) {
 		self.event(LogLevel::Debug, message);
 	}
 	/// [info]
 	///
 	/// "Always on" level
 	///
-	pub fn info(&self, message: impl std::fmt::Display) {
+	pub fn info(&self, message: impl Display) {
 		self.event(LogLevel::Info, message);
 	}
 
-	pub fn warn(&self, message: impl std::fmt::Display) {
+	pub fn warn(&self, message: impl Display) {
 		self.event(LogLevel::Warn, message);
 	}
 
-	pub fn error(&self, message: impl std::fmt::Display) {
+	pub fn error(&self, message: impl Display) {
 		self.event(LogLevel::Error, message);
 	}
 }
@@ -308,19 +305,12 @@ pub struct LogFields {
 	pub timestamp: bool,
 }
 /// ## [OutputConfig]
+///
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default)]
 pub struct OutputConfig {
 	pub enabled: bool,
 	pub level: Option<LogLevel>,
-}
-impl Default for OutputConfig {
-	fn default() -> Self {
-		Self {
-			enabled: true,
-			level: None,
-		}
-	}
 }
 /// ## [LogOptions]
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
