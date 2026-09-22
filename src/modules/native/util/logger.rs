@@ -1,4 +1,7 @@
-use crate::prelude::*;
+use crate::{
+	model::resolver::{SpecialFile, workspace_cargo_path},
+	prelude::*,
+};
 use anyhow::Result;
 use tracing_subscriber::{
 	EnvFilter, Layer, filter::LevelFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt,
@@ -146,18 +149,9 @@ impl LogConfig {
 		let manifest: CargoManifest = toml::from_str(&raw)?;
 		Ok(manifest.logging)
 	}
-	fn workspace_cargo_toml() -> PathBuf {
-		PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../estate.toml")
-	}
 	fn load_global() -> Result<Option<Self>> {
-		let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-			.parent()
-			.and_then(Path::parent)
-			.ok_or_else(|| anyhow::anyhow!("could not find workspace root"))?
-			.join("Estate.toml");
-		let raw = fs::read_to_string(path)?;
-		let cargo = toml::from_str::<CargoConfig>(&raw)?;
-		Ok(Some(cargo.logging))
+		let config = SpecialFile::EstateManifest.load::<CargoConfig>()?;
+		Ok(config.map(|config| config.logging))
 	}
 	fn merge(&mut self, other: Self) {
 		self.level = other.level;

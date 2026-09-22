@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-use anyhow::{Result, anyhow};
+use anyhow::{Context, Result, anyhow};
 use serde::{Serialize, de::DeserializeOwned};
 use std::{
 	fs,
@@ -26,6 +26,7 @@ pub enum SpecialFile {
 	SdlcCurrent,
 	SessionsDir,
 	SessionsIndex,
+	EstateManifest,
 }
 
 pub fn ws_path() -> Result<PathBuf> {
@@ -33,15 +34,12 @@ pub fn ws_path() -> Result<PathBuf> {
 
 	loop {
 		let cargo_toml = path.join("Cargo.toml");
-
 		if cargo_toml.is_file() {
 			let contents = fs::read_to_string(&cargo_toml)?;
-
 			if contents.contains("[workspace]") {
 				return Ok(path);
 			}
 		}
-
 		if !path.pop() {
 			break;
 		}
@@ -84,42 +82,89 @@ pub fn engine_state_file() -> Result<PathBuf> {
 	Ok(engine_data_dir()?.join("state.json"))
 }
 
-impl SessionFile {
-	pub fn name(self) -> &'static str {
-		match self {
-			Self::Intent => "intent.md",
-			Self::Spec => "spec.md",
-			Self::Tests => "tests.md",
-			Self::Verification => "verification.md",
-			Self::Plan => "plan.md",
-			Self::Progress => "progress.md",
+impl FS {
+	pub fn load<T>(path: impl AsRef<Path>) -> Result<Option<T>>
+	where
+		T: serde::de::DeserializeOwned,
+	{
+		let path = path.as_ref();
+
+		Self::ensure_parent(path.to_path_buf())?;
+
+		if !path.exists() {
+			return Ok(None);
+		}
+
+		let contents = fs::read_to_string(path)?;
+
+		match path.extension().and_then(|ext| ext.to_str()) {
+			Some("json") => Ok(Some(serde_json::from_str(&contents)?)),
+			Some("toml") => Ok(Some(toml::from_str(&contents)?)),
+			Some(ext) => Err(anyhow!(
+				"unsupported file format '.{ext}' for {}",
+				path.display()
+			)),
+			None => Err(anyhow!(
+				"cannot determine file format for {}",
+				path.display()
+			)),
 		}
 	}
+	pub fn read(path: impl AsRef<Path>) -> Result<String> {
+		let path = path.as_ref();
 
-	pub fn path(self, session: impl AsRef<Path>) -> PathBuf {
-		session.as_ref().join(self.name())
+		Self::ensure_parent(path.to_path_buf())
+			.with_context(|| format!("ensure parent for {}", path.display()))?;
+
+		fs::read_to_string(path).with_context(|| format!("read {}", path.display()))
 	}
-}
-impl SpecialFile {
-	pub fn path(self) -> Result<PathBuf> {
-		let root = ws_path()?;
-		Ok(match self {
-			Self::AiTemplateDir => root.join("ai").join("template"),
-			Self::LogDir => root.join("log"),
-			Self::TmpDir => root.join("log").join("tmp"),
-			Self::SdlcCurrent => root.join("log").join("tmp").join("sdlc.current.json"),
-			Self::SessionsDir => root.join("log").join("session"),
-			Self::SessionsIndex => root.join("log").join("sessions.json"),
-		})
+
+	pub fn write(path: impl Into<PathBuf>, contents: impl AsRef<[u8]>) -> Result<()> {
+		let path = Self::ensure_parent(path)?;
+
+		fs::write(&path, contents).with_context(|| format!("write {}", path.display()))?;
+
+		Ok(())
 	}
-}
-impl SpecialFiles {
-	pub fn ensure_dir(path: impl Into<PathBuf>) -> Result<PathBuf> {
-		let path = path.into();
 
-		fs::create_dir_all(&path)?;
+	pub fn append(path: impl Into<PathBuf>, contents: impl AsRef<[u8]>) -> Result<()> {
+		let path = Self::ensure_parent(path)?;
 
-		Ok(path)
+		let mut file = fs::OpenOptions::new()
+			.create(true)
+			.append(true)
+			.open(&path)
+			.with_context(|| format!("open {}", path.display()))?;
+
+		file
+			.write_all(contents.as_ref())
+			.with_context(|| format!("append {}", path.display()))?;
+
+		Ok(())
+	}
+
+	pub fn save<T>(path: impl Into<PathBuf>, value: &T) -> Result<()>
+	where
+		T: Serialize,
+	{
+		let path = Self::ensure_parent(path)?;
+
+		let contents = serde_json::to_string_pretty(value)?;
+
+		fs::write(&path, contents).with_context(|| format!("write {}", path.display()))?;
+
+		Ok(())
+	}
+	pub fn delete(path: impl AsRef<Path>) -> Result<()> {
+		let path = path.as_ref();
+
+		Self::ensure_parent(path.to_path_buf())?;
+
+		if path.exists() {
+			fs::remove_file(path)?;
+		}
+
+		Ok(())
 	}
 
 	pub fn ensure_parent(path: impl Into<PathBuf>) -> Result<PathBuf> {
@@ -131,72 +176,85 @@ impl SpecialFiles {
 
 		Ok(path)
 	}
+	pub fn ensure_dir(path: impl AsRef<Path>) -> Result<PathBuf> {
+		let path = path.as_ref();
 
-	pub fn read(path: impl AsRef<Path>) -> Result<String> {
-		Ok(fs::read_to_string(path)?)
+		fs::create_dir_all(path)?;
+
+		Ok(path.to_path_buf())
+	}
+	pub fn exists(path: impl AsRef<Path>) -> bool {
+		path.as_ref().exists()
 	}
 
-	pub fn write(path: impl Into<PathBuf>, contents: impl AsRef<[u8]>) -> Result<()> {
-		let path = Self::ensure_parent(path)?;
+	pub fn create(path: impl Into<PathBuf>, contents: impl AsRef<[u8]>) -> Result<()> {
+		let path = path.into();
 
+		if path.exists() {
+			return Err(anyhow!("file already exists: {}", path.display()));
+		}
+
+		Self::ensure_parent(&path)?;
 		fs::write(path, contents)?;
 
 		Ok(())
 	}
 
-	pub fn append(path: impl Into<PathBuf>, contents: impl AsRef<[u8]>) -> Result<()> {
-		let path = Self::ensure_parent(path)?;
+	pub fn update(path: impl Into<PathBuf>, contents: impl AsRef<[u8]>) -> Result<()> {
+		let path = path.into();
 
-		let mut file = fs::OpenOptions::new()
-			.create(true)
-			.append(true)
-			.open(path)?;
-
-		file.write_all(contents.as_ref())?;
+		Self::ensure_parent(&path)?;
+		fs::write(path, contents)?;
 
 		Ok(())
-	}
-
-	pub fn read_json<T: DeserializeOwned>(path: impl AsRef<Path>) -> Result<T> {
-		let contents = Self::read(path)?;
-
-		Ok(serde_json::from_str(&contents)?)
-	}
-
-	pub fn write_json<T: Serialize>(path: impl Into<PathBuf>, value: &T) -> Result<()> {
-		let contents = serde_json::to_string_pretty(value)?;
-
-		Self::write(path, contents)
-	}
-
-	pub fn remove_if_exists(path: impl AsRef<Path>) -> Result<()> {
-		let path = path.as_ref();
-
-		if path.exists() {
-			fs::remove_file(path)?;
-		}
-
-		Ok(())
-	}
-	pub fn read_session(session: impl AsRef<Path>, file: SessionFile) -> Result<String> {
-		Self::read(file.path(session))
-	}
-
-	pub fn write_session(
-		session: impl AsRef<Path>,
-		file: SessionFile,
-		contents: impl AsRef<[u8]>,
-	) -> Result<()> {
-		Self::write(file.path(session), contents)
-	}
-
-	pub fn append_session(
-		session: impl AsRef<Path>,
-		file: SessionFile,
-		contents: impl AsRef<[u8]>,
-	) -> Result<()> {
-		Self::append(file.path(session), contents)
 	}
 }
 
-pub struct SpecialFiles;
+impl SessionFile {
+	pub fn name(self) -> &'static str {
+		match self {
+			Self::Intent => "intent.md",
+			Self::Spec => "spec.md",
+			Self::Tests => "tests.md",
+			Self::Verification => "verification.md",
+			Self::Plan => "plan.md",
+			Self::Progress => "progress.md",
+		}
+	}
+	pub fn path(self, session: impl AsRef<Path>) -> PathBuf {
+		session.as_ref().join(self.name())
+	}
+	pub fn read(self, session: impl AsRef<Path>) -> Result<String> {
+		FS::read(self.path(session))
+	}
+	pub fn write(self, session: impl AsRef<Path>, contents: impl AsRef<[u8]>) -> Result<()> {
+		FS::write(self.path(session), contents)
+	}
+	pub fn append(self, session: impl AsRef<Path>, contents: impl AsRef<[u8]>) -> Result<()> {
+		FS::append(self.path(session), contents)
+	}
+}
+impl SpecialFile {
+	pub fn load<T>(self) -> Result<Option<T>>
+	where
+		T: serde::de::DeserializeOwned,
+	{
+		FS::load(self.path()?)
+	}
+
+	pub fn path(self) -> Result<PathBuf> {
+		let root = ws_path()?;
+
+		Ok(match self {
+			Self::AiTemplateDir => root.join("ai/template"),
+			Self::LogDir => root.join("log"),
+			Self::TmpDir => root.join("log/tmp"),
+			Self::SdlcCurrent => root.join("log/tmp/sdlc.current.json"),
+			Self::SessionsDir => root.join("log/session"),
+			Self::SessionsIndex => root.join("log/sdlc.session.index.json"),
+			Self::EstateManifest => root.join("estate.toml"),
+		})
+	}
+}
+
+pub struct FS;

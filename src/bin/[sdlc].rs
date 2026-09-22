@@ -7,9 +7,11 @@ use crossterm::{
 use estate::prelude::*;
 use jev_sdk::TypeSafeClient;
 
+use anyhow::{Context, anyhow};
+
 #[tokio::main]
 pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
-	dotenvy::dotenv()?;
+	dotenvy::dotenv().ok();
 
 	// 1. Normal run
 	// cargo run --bin sdlc
@@ -19,15 +21,17 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	//
 	let demo = std::env::var_os("ESTATE_SDLC_DEMO").is_some();
 
-	let client = TypeSafeClient::from_env()?;
-	let mut sdlc = Sdlc::load(client)?.expect("SDLC state should always exist");
+	let client = TypeSafeClient::from_env().context("creating TypeSafe client")?;
+
+	let mut sdlc = Sdlc::load(client)
+		.context("loading SDLC")?
+		.ok_or_else(|| anyhow!("no SDLC instance"))?;
 
 	if sdlc.stage().is_none() {
 		sdlc.start(prompt_for_intent()?).await?;
 	}
 
 	let mut events = sdlc.subscribe();
-
 	let mut view = SdlcView::new(sdlc.stage().unwrap_or(Stage::Intent));
 
 	// ------------------------------------------------------------
@@ -50,12 +54,14 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	// ------------------------------------------------------------
 	let (input_tx, input_rx) = tokio::sync::mpsc::unbounded_channel::<SdlcInput>();
 	let run = async {
-		if demo {
-			sdlc.run_simulated(input_rx).await
-		} else {
-			sdlc.run(input_rx).await
-		}
+		// if demo {
+		// 	sdlc.run_simulated(input_rx).await
+		// } else {
+		sdlc.run(input_rx).await
+		// }
 	};
+	// let run = sdlc.run(input_rx).await?;
+	// sdlc.run(input_rx).await
 
 	tokio::pin!(run);
 

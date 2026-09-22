@@ -506,23 +506,23 @@ impl Evaluator {
 	}
 	async fn evaluate_verification(&self, session: &Path) -> Result<StageEvaluation> {
 		let started_at = Utc::now();
-		let intent = SpecialFiles::read_session(&session, SessionFile::Intent)?;
-		let spec = SpecialFiles::read_session(&session, SessionFile::Spec)?;
-		let plan = SpecialFiles::read_session(&session, SessionFile::Plan)?;
-		let tests = SpecialFiles::read_session(&session, SessionFile::Tests)?;
+		let intent = SessionFile::Intent.read(&session)?;
+		let spec = SessionFile::Spec.read(&session)?;
+		let plan = SessionFile::Plan.read(&session)?;
+		let tests = SessionFile::Tests.read(&session)?;
 		// This should eventually come from the actual deterministic verifier.
 		// For now, `verification.md` can contain the commands that were run and
 		// their results.
-		let evidence = match SpecialFiles::read_session(&session, SessionFile::Verification) {
-			Ok(evidence) => evidence,
-			Err(_) => String::from("No verification evidence was recorded."),
-		};
+		let tests = SessionFile::Tests.read(&session)?;
+		let evidence = SessionFile::Verification
+			.read(&session)
+			.unwrap_or_else(|_| String::from("No verification evidence was recorded."));
 
 		let state = format!(
 			"## User Intent\n\n{intent}\n\n\
-		 ## Specification\n\n{spec}\n\n\
-		 ## Test Plan\n\n{tests}\n\n\
-		 ## Verification Evidence\n\n{evidence}"
+				## Specification\n\n{spec}\n\n\
+				## Test Plan\n\n{tests}\n\n\
+				## Verification Evidence\n\n{evidence}"
 		);
 
 		let response = self
@@ -578,16 +578,9 @@ impl Evaluator {
 }
 impl Sdlc {
 	pub fn load(jev: TypeSafeClient) -> Result<Option<Self>> {
-		let state_path = SpecialFile::SdlcCurrent.path()?;
 		let evaluator = Evaluator { jev };
 		let (event_tx, _) = broadcast::channel(256);
-
-		let session = if state_path.exists() {
-			Some(SpecialFiles::read_json(&state_path)?)
-		} else {
-			None
-		};
-
+		let session = SpecialFile::SdlcCurrent.load::<SdlcSession>()?;
 		Ok(Some(Self {
 			evaluator,
 			event_tx,
@@ -595,16 +588,9 @@ impl Sdlc {
 				agent: Agent::new(),
 			}),
 			stage_attempt: 0,
-			state_path,
+			state_path: SpecialFile::SdlcCurrent.path()?,
 			session,
 		}))
-	}
-	pub fn subscribe(&self) -> broadcast::Receiver<SdlcEvent> {
-		self.event_tx.subscribe()
-	}
-
-	fn emit(&self, event: SdlcEvent) {
-		let _ = self.event_tx.send(event);
 	}
 
 	/// Start a new lifecycle session from user-provided intent.
@@ -612,19 +598,15 @@ impl Sdlc {
 		if self.session.is_some() {
 			return Err(anyhow::anyhow!("an SDLC session is already active"));
 		}
-
 		let id = uuid::Uuid::new_v4().to_string();
-
 		let title = intent
 			.split_whitespace()
 			.take(8)
 			.collect::<Vec<_>>()
 			.join("-")
 			.to_lowercase();
-
 		let dir = self.create_dir(&title)?;
 		let now = Utc::now();
-
 		let session = SdlcSession {
 			id,
 			title,
@@ -634,9 +616,7 @@ impl Sdlc {
 			created_at: now,
 			updated_at: now,
 		};
-
 		self.session = Some(session);
-
 		self.initialize_templates(
 			self
 				.session()?
@@ -644,20 +624,24 @@ impl Sdlc {
 				.dir
 				.as_path(),
 		)?;
-
 		// The user's original intent is authoritative.
 		let intent_path = self
 			.session()?
 			.ok_or_else(|| anyhow::anyhow!("no active session"))?
 			.dir
 			.join("intent.md");
-
 		Self::write(intent_path, format!("# Intent\n\n{}\n", intent));
-
 		self.update_progress("SDLC session started")?;
 		self.persist()?;
-
 		Ok(())
+	}
+
+	pub fn subscribe(&self) -> broadcast::Receiver<SdlcEvent> {
+		self.event_tx.subscribe()
+	}
+
+	fn emit(&self, event: SdlcEvent) {
+		let _ = self.event_tx.send(event);
 	}
 
 	/// Resume the currently active lifecycle.
@@ -927,16 +911,14 @@ impl Sdlc {
 	/// This file is only the recovery cursor for the currently active session.
 	/// The actual lifecycle artifacts live in the session directory.
 	fn persist(&self) -> Result<()> {
-		SpecialFiles::write_json(&self.state_path, &self.session);
-		Ok(())
+		FS::save(&self.state_path, &self.session)
 	}
 
 	/// Remove the global active-session marker.
 	///
 	/// Called after the lifecycle reaches a terminal state.
 	pub fn clear_current(&self) -> Result<()> {
-		SpecialFiles::remove_if_exists(&self.state_path);
-		Ok(())
+		FS::delete(&self.state_path)
 	}
 
 	// ─────────────────────────────────────────────────────────────────────
@@ -1035,37 +1017,34 @@ impl Sdlc {
 			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))
 	}
 
-	/// Create a session directory.
-	///
-	/// Sessions live under:
-	///
-	///     crates/estate/log/session/
-	///
-	/// Templates live under:
-	///
-	///     crates/estate/ai/template/
 	pub fn create_dir(&self, title: &str) -> Result<PathBuf> {
-		let sessions_dir = SpecialFiles::ensure_dir(SpecialFile::SessionsDir.path()?)?;
-
+		let sessions_dir = FS::ensure_dir(SpecialFile::SessionsDir.path()?)?;
 		let date = Local::now().format("%Y-%m-%d");
 		let dir = sessions_dir.join(format!("{date}.{title}"));
-
-		SpecialFiles::ensure_dir(&dir)?;
-
+		FS::ensure_dir(&dir)?;
 		Ok(dir)
 	}
 
 	/// Materialize the template files for a new session.
 	fn initialize_templates(&self, dir: &Path) -> Result<()> {
-		for name in ["intent.md", "spec.md", "plan.md", "progress.md"] {
-			let source = SpecialFile::AiTemplateDir.path()?.join(name);
-			let destination = dir.join(name);
-			let contents = if source.exists() {
-				SpecialFiles::read(source)?
+		let template_dir = SpecialFile::AiTemplateDir.path()?;
+
+		for file in [
+			SessionFile::Intent,
+			SessionFile::Spec,
+			SessionFile::Plan,
+			SessionFile::Progress,
+		] {
+			let source = template_dir.join(file.name());
+			let destination = file.path(dir);
+
+			let contents = if FS::exists(&source) {
+				FS::read(source)?
 			} else {
-				format!("# {name}\n\n")
+				format!("# {}\n\n", file.name())
 			};
-			SpecialFiles::write(destination, contents)?;
+
+			FS::write(destination, contents)?;
 		}
 
 		Ok(())
@@ -1082,21 +1061,12 @@ impl Sdlc {
 			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
 
 		let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S");
-
 		let entry = format!("\n## {timestamp}\n\n{message}\n");
-		SpecialFiles::append_session(&session.dir, SessionFile::Progress, entry)?;
+
+		SessionFile::Progress.append(&session.dir, entry)?;
+
 		Ok(())
 	}
-
-	/// Record the completed session in the SDLC index.
-	///
-	/// The authoritative artifacts remain in:
-	///
-	///     crates/estate/log/session/<session>/
-	///
-	/// This file is only an index:
-	///
-	///     crates/estate/log/sessions.json
 	fn record_session(&self) -> Result<()> {
 		let session = self
 			.session
@@ -1105,11 +1075,7 @@ impl Sdlc {
 
 		let index_path = SpecialFile::SessionsIndex.path()?;
 
-		let mut sessions: Vec<SdlcSession> = if index_path.exists() {
-			SpecialFiles::read_json(&index_path)?
-		} else {
-			Vec::new()
-		};
+		let mut sessions: Vec<SdlcSession> = FS::load(&index_path)?.unwrap_or_default();
 
 		// Replace an existing entry for this session rather
 		// than creating duplicate index entries.
@@ -1117,7 +1083,8 @@ impl Sdlc {
 
 		sessions.push(session.clone());
 
-		SpecialFiles::write_json(index_path, &sessions)?;
+		FS::save(index_path, &sessions)?;
+
 		Ok(())
 	}
 	pub async fn run_simulated(
@@ -1223,8 +1190,6 @@ impl Sdlc {
 		&mut self,
 		mut input_rx: tokio::sync::mpsc::UnboundedReceiver<SdlcInput>,
 	) -> Result<()> {
-		let run_started = Instant::now();
-
 		let mut last_stage = None;
 		let mut attempt = 0u32;
 
@@ -1243,6 +1208,7 @@ impl Sdlc {
 				}
 			};
 
+			// Track attempts for the current stage.
 			if last_stage == Some(stage) {
 				attempt += 1;
 			} else {
@@ -1266,26 +1232,34 @@ impl Sdlc {
 				Stage::Plan => self.stage_plan().await,
 				Stage::Build => self.stage_build().await,
 				Stage::Verify => self.verify().await.map(|_| ()),
+
 				Stage::Complete => {
 					self.emit(SdlcEvent::PhaseChanged {
 						phase: SdlcPhase::Completed,
 					});
+
 					self.clear_current()?;
 					self.emit(SdlcEvent::Completed);
+
 					return Ok(());
 				}
+
 				Stage::Deploy | Stage::Maintain => {
 					let error = anyhow!("stage {stage:?} not implemented");
+
 					self.emit(SdlcEvent::Failed {
 						stage: Some(stage),
 						error: error.to_string(),
 					});
+
 					return Err(error);
 				}
 			};
+
 			// ------------------------------------------------------------
 			// EXECUTION FAILURE
 			// ------------------------------------------------------------
+
 			if let Err(error) = execution_result {
 				self.emit(SdlcEvent::ExecutionFailed {
 					stage,
@@ -1293,83 +1267,19 @@ impl Sdlc {
 					error: error.to_string(),
 				});
 
-				self.emit(SdlcEvent::StageRetrying {
-					stage,
-					attempt: attempt + 1,
-				});
-				self.emit(SdlcEvent::PhaseChanged {
-					phase: SdlcPhase::Retrying,
-				});
-				self.retry(stage)?;
-				continue;
-			}
-			self.emit(SdlcEvent::ExecutionComplete { stage });
-			// ------------------------------------------------------------
-			// JEV EVALUATION
-			// ------------------------------------------------------------
-			self.emit(SdlcEvent::PhaseChanged {
-				phase: SdlcPhase::Evaluating,
-			});
-			self.emit(SdlcEvent::EvaluationStarted { stage });
-			let evaluation = match self.evaluate_stage(stage).await {
-				Ok(evaluation) => evaluation,
-				Err(error) => {
-					self.emit(SdlcEvent::EvaluationFailed {
-						stage,
-						error: error.to_string(),
-					});
-					if attempt >= MAX_STAGE_ATTEMPTS {
-						let should_continue = self
-							.wait_for_intervention(
-								stage,
-								attempt,
-								format!("JEV evaluation failed after {MAX_STAGE_ATTEMPTS} attempts: {error}"),
-								&mut input_rx,
-							)
-							.await?;
-						if should_continue {
-							last_stage = None;
-							attempt = 0;
-							continue;
-						}
-						return Err(anyhow!("SDLC aborted by user at {stage:?}"));
-					}
-					self.emit(SdlcEvent::StageRetrying {
-						stage,
-						attempt: attempt + 1,
-					});
-					self.emit(SdlcEvent::PhaseChanged {
-						phase: SdlcPhase::Retrying,
-					});
-					continue;
-				}
-			};
-			self.emit(SdlcEvent::Evaluated {
-				stage,
-				score: evaluation.score as f32,
-				confidence: evaluation.confidence as f32,
-				passed: evaluation.passed,
-			});
-			// ------------------------------------------------------------
-			// ORCHESTRATION
-			// ------------------------------------------------------------
-			let action = stage_action(&evaluation, attempt, MAX_STAGE_ATTEMPTS);
-			match action {
-				StageAction::Intervene => {
+				if attempt >= MAX_STAGE_ATTEMPTS {
 					let should_continue = self
 						.wait_for_intervention(
 							stage,
 							attempt,
-							format!("Stage did not pass evaluation after {attempt} attempts."),
+							format!("Agent execution failed after {MAX_STAGE_ATTEMPTS} attempts: {error}"),
 							&mut input_rx,
 						)
 						.await?;
 
 					if should_continue {
-						// Start a fresh autonomous retry window.
 						last_stage = None;
 						attempt = 0;
-
 						continue;
 					}
 
@@ -1382,6 +1292,93 @@ impl Sdlc {
 
 					return Err(error);
 				}
+
+				self.emit(SdlcEvent::StageRetrying {
+					stage,
+					attempt: attempt + 1,
+				});
+
+				self.emit(SdlcEvent::PhaseChanged {
+					phase: SdlcPhase::Retrying,
+				});
+
+				self.retry(stage)?;
+				continue;
+			}
+
+			self.emit(SdlcEvent::ExecutionComplete { stage });
+
+			// ------------------------------------------------------------
+			// JEV EVALUATION
+			// ------------------------------------------------------------
+
+			self.emit(SdlcEvent::PhaseChanged {
+				phase: SdlcPhase::Evaluating,
+			});
+
+			self.emit(SdlcEvent::EvaluationStarted { stage });
+
+			let evaluation = match self.evaluate_stage(stage).await {
+				Ok(evaluation) => evaluation,
+
+				Err(error) => {
+					self.emit(SdlcEvent::EvaluationFailed {
+						stage,
+						error: error.to_string(),
+					});
+
+					if attempt >= MAX_STAGE_ATTEMPTS {
+						let should_continue = self
+							.wait_for_intervention(
+								stage,
+								attempt,
+								format!("JEV evaluation failed after {MAX_STAGE_ATTEMPTS} attempts: {error}"),
+								&mut input_rx,
+							)
+							.await?;
+
+						if should_continue {
+							last_stage = None;
+							attempt = 0;
+							continue;
+						}
+
+						let error = anyhow!("SDLC aborted by user at {stage:?}");
+
+						self.emit(SdlcEvent::Failed {
+							stage: Some(stage),
+							error: error.to_string(),
+						});
+
+						return Err(error);
+					}
+
+					self.emit(SdlcEvent::StageRetrying {
+						stage,
+						attempt: attempt + 1,
+					});
+
+					self.emit(SdlcEvent::PhaseChanged {
+						phase: SdlcPhase::Retrying,
+					});
+
+					self.retry(stage)?;
+					continue;
+				}
+			};
+
+			self.emit(SdlcEvent::Evaluated {
+				stage,
+				score: evaluation.score as f32,
+				confidence: evaluation.confidence as f32,
+				passed: evaluation.passed,
+			});
+
+			// ------------------------------------------------------------
+			// ORCHESTRATION
+			// ------------------------------------------------------------
+
+			match stage_action(&evaluation, attempt, MAX_STAGE_ATTEMPTS) {
 				StageAction::Continue => {
 					let next = stage
 						.next()
@@ -1408,7 +1405,7 @@ impl Sdlc {
 					self.retry(stage)?;
 				}
 
-				StageAction::Abort => {
+				StageAction::Intervene | StageAction::Abort => {
 					let should_continue = self
 						.wait_for_intervention(
 							stage,
@@ -1501,9 +1498,6 @@ impl Sdlc {
 			}
 		}
 	}
-	// ─────────────────────────────────────────────────────────────────────
-	// Verification
-	// ─────────────────────────────────────────────────────────────────────
 	async fn run_checks(&self) -> Result<Vec<CheckResult>> {
 		let checks = [
 			("cargo check", vec!["cargo", "check"]),
