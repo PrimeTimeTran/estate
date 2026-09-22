@@ -148,7 +148,6 @@ impl Run {
 		}
 		Ok(results)
 	}
-
 	pub async fn report_results(
 		&mut self,
 		flow: &TraceFlow,

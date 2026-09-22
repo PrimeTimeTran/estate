@@ -35,32 +35,12 @@ name = "base"
 path = "src/bin/_base.rs"
 
 [[bin]]
-name = "daemon"
-path = "src/bin/[daemon].rs"
-
-[[bin]]
-name = "dispatch"
-path = "src/bin/_dispatch.rs"
-
-[[bin]]
-name = "inquire"
-path = "src/bin/_inquire.rs"
-
-[[bin]]
-name = "macros"
-path = "src/bin/_macro.rs"
-
-[[bin]]
 name = "threads"
 path = "src/bin/_threads.rs"
 
 [[bin]]
 name = "mpl"
 path = "src/bin/_tmp.rs"
-
-[[bin]]
-name = "run"
-path = "src/bin/_run.rs"
 
 [[bin]]
 name = "type-state"
@@ -70,17 +50,16 @@ path = "src/bin/_type-state.rs"
 name = "lifetime"
 path = "src/bin/lifetime/main.rs"
 
-[[bin]]
-name = "sdlc"
-path = "src/bin/[sdlc].rs"
-
 # Bins of Estate or high likelyhood for seperate crate/project 
 # should be wrapped with [] to identify them clearly. It means we do have some
 # concrete idea of how we must have this in the src long term.
 # 
 # Each bin is not only entry point but should be the start of 
 # documentation of APIs, cli commands, etc.
-# 
+[[bin]]
+name = "daemon"
+path = "src/bin/[daemon].rs"
+
 [[bin]]
 name = "native"
 path = "src/bin/[native].rs"
@@ -92,6 +71,10 @@ path = "src/bin/[runner].rs"
 required-features = ["native"]
 
 [[bin]]
+name = "run"
+path = "src/bin/[run].rs"
+
+[[bin]]
 name = "settings"
 path = "src/bin/settings.rs"
 required-features = ["native"]
@@ -100,6 +83,11 @@ required-features = ["native"]
 name = "server"
 path = "src/bin/[server].rs"
 required-features = ["native"]
+
+[[bin]]
+name = "sdlc"
+path = "src/bin/[sdlc].rs"
+# required-features = ["native"]
 
 [[bin]]
 name = "web"

@@ -15,19 +15,14 @@ use estate::{
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	tracing_subscriber::fmt::init();
-
 	let builder = ServerBuilder::new();
 	let server = builder.build().await?;
-
-	let events = server.events.clone();
-
+	let _events = server.events.clone();
 	tokio::spawn(async move {
 		let mut interval = tokio::time::interval(std::time::Duration::from_secs(2));
-
 		loop {
 			interval.tick().await;
-
-			// events.emit(estate::e::Event::test());
+			// _events.emit(estate::e::Event::test());
 		}
 	});
 
