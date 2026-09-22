@@ -1,10 +1,42 @@
 [
   {
-    "id": "3aad2b9e-c816-4b26-9238-fe8f3ece8745",
-    "title": "finish-sdlc-module-which-creates-a-loop-for",
-    "stage": "Verify",
-    "dir": "/Users/future/kb/project/crates/estate/log/session/2026-09-21.finish-sdlc-module-which-creates-a-loop-for",
-    "created_at": "2026-09-22T01:48:32.171214Z",
-    "updated_at": "2026-09-22T02:03:10.568862Z"
+    "id": "bbb72200-3e74-4abc-9a14-f72e032b62aa",
+    "title": "create-a-file-named-hello-world.js-in-the-repository",
+    "stage": "Plan",
+    "stages": [
+      {
+        "stage": "Intent",
+        "status": "Completed",
+        "actor": "Human",
+        "started_at": "2026-09-22T03:23:40.189042Z",
+        "completed_at": "2026-09-22T03:23:40.189045Z",
+        "evaluation": {
+          "stage": "Intent",
+          "actor": "Human",
+          "started_at": "2026-09-22T03:23:40.189042Z",
+          "score": 3.26,
+          "confidence": 0.73,
+          "passed": true
+        }
+      },
+      {
+        "stage": "Spec",
+        "status": "Completed",
+        "actor": "Sdlc",
+        "started_at": "2026-09-22T03:23:40.365399Z",
+        "completed_at": "2026-09-22T03:23:40.365403Z",
+        "evaluation": {
+          "stage": "Spec",
+          "actor": "Sdlc",
+          "started_at": "2026-09-22T03:23:40.365399Z",
+          "score": 2.46,
+          "confidence": 0.42,
+          "passed": false
+        }
+      }
+    ],
+    "dir": "/Users/future/kb/project/crates/estate/log/session/2026-09-21.create-a-file-named-hello-world.js-in-the-repository",
+    "created_at": "2026-09-22T03:23:39.618361Z",
+    "updated_at": "2026-09-22T03:23:40.365910Z"
   }
 ]

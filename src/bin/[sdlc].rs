@@ -476,38 +476,53 @@
 use estate::modules::sdlc::*;
 use jev_sdk::{Choice, Noul, Question, Score, TypeSafeClient};
 use std::env;
-
 #[tokio::main]
 pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	dotenvy::dotenv()?;
-	// let key = std::env::var("TYPESAFE_API_KEY")?;
-	// println!("key {}", key);
+
 	let client = TypeSafeClient::from_env()?;
 	let mut sdlc = Sdlc::load(client)?.expect("SDLC state should always exist");
-	match sdlc.stage() {
-		None => {
-			// No active session.
-			// Prompt the user for intent.
-			sdlc.start(prompt_for_intent()?).await?;
-		}
-		Some(Stage::Intent) => sdlc.intent().await?,
-		Some(Stage::Spec) => sdlc.spec().await?,
-		Some(Stage::Plan) => sdlc.plan().await?,
-		Some(Stage::Build) => sdlc.build().await?,
-		Some(Stage::Verify) => {
-			let result = sdlc.verify().await?;
-			if !result.passed {
-				sdlc.transition(Stage::Build)?;
-			} else {
-				sdlc.transition(Stage::Deploy)?;
-			}
-		}
-		Some(Stage::Deploy) => sdlc.deploy().await?,
-		Some(Stage::Maintain) => sdlc.maintain().await?,
-		Some(Stage::Complete) => {
-			sdlc.clear_current()?;
-		}
+
+	if sdlc.stage().is_none() {
+		sdlc.start(prompt_for_intent()?).await?;
 	}
+
+	sdlc.run().await?;
 
 	Ok(())
 }
+
+// #[tokio::main]
+// pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
+// 	dotenvy::dotenv()?;
+// 	// let key = std::env::var("TYPESAFE_API_KEY")?;
+// 	// println!("key {}", key);
+// 	let client = TypeSafeClient::from_env()?;
+// 	let mut sdlc = Sdlc::load(client)?.expect("SDLC state should always exist");
+// 	match sdlc.stage() {
+// 		None => {
+// 			// No active session.
+// 			// Prompt the user for intent.
+// 			sdlc.start(prompt_for_intent()?).await?;
+// 		}
+// 		Some(Stage::Intent) => sdlc.stage_intent().await?,
+// 		Some(Stage::Spec) => sdlc.stage_spec().await?,
+// 		Some(Stage::Plan) => sdlc.stage_plan().await?,
+// 		Some(Stage::Build) => sdlc.stage_build().await?,
+// 		Some(Stage::Verify) => {
+// 			let result = sdlc.verify().await?;
+// 			if !result.passed {
+// 				sdlc.transition(Stage::Build)?;
+// 			} else {
+// 				sdlc.transition(Stage::Deploy)?;
+// 			}
+// 		}
+// 		Some(Stage::Deploy) => sdlc.deploy().await?,
+// 		Some(Stage::Maintain) => sdlc.maintain().await?,
+// 		Some(Stage::Complete) => {
+// 			sdlc.clear_current()?;
+// 		}
+// 	}
+
+// 	Ok(())
+// }

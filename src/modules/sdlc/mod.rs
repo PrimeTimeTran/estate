@@ -2,7 +2,8 @@ use crate::model::{
 	AgentTask,
 	agent::{Agent, AgentContext},
 };
-use anyhow::{Ok, Result};
+use anyhow::Result;
+use async_trait::async_trait;
 use chrono::{DateTime, Local, Utc};
 use jev_sdk::{Choice, Noul, Question, Score, TypeSafeClient};
 use serde::{Deserialize, Serialize};
@@ -12,6 +13,11 @@ use std::{
 	process::Command,
 };
 
+#[derive(Debug, Clone, Copy)]
+pub enum GenerationProvider {
+	Local,
+	Api,
+}
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Stage {
 	Intent,
@@ -23,10 +29,23 @@ pub enum Stage {
 	Maintain,
 	Complete,
 }
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum StageStatus {
+	Running,
+	Completed,
+	Failed,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum StageActor {
+	Human,
+	Sdlc,
+	Agent,
+}
 
 pub fn prompt_for_intent() -> Result<String> {
 	Ok(String::from(
-		"Finish SDLC Module which creates a loop for my SDLC. ",
+		// "Finish SDLC Module which creates a loop for my SDLC. ",
+		"Create a file named hello-world.js in the repository root. It should accept a command-line argument and write that value to hello-world.md. The user should be able to run node hello-world.js \"hi\". Add tests covering both the JavaScript logic and the CLI behavior.",
 	))
 }
 fn output_status(_output: &str) -> std::process::ExitStatus {
@@ -34,6 +53,381 @@ fn output_status(_output: &str) -> std::process::ExitStatus {
 	unimplemented!()
 }
 
+#[async_trait::async_trait]
+pub trait ArtifactGenerator: Send + Sync {
+	async fn generate(&self, prompt: &str) -> Result<String>;
+}
+trait TextModel {
+	async fn generate(&self, prompt: &str) -> Result<String>;
+}
+
+#[async_trait]
+impl ArtifactGenerator for LocalGenerator {
+	async fn generate(&self, prompt: &str) -> Result<String> {
+		println!("=== GENERATOR START ===");
+		println!("{prompt}");
+
+		let task = AgentTask::new(prompt.to_string());
+		let (event_tx, _) = tokio::sync::mpsc::unbounded_channel();
+
+		let result = self.agent.run_agent_loop(task, event_tx).await?;
+
+		println!("=== AGENT RESULT ===");
+		println!("status: {:?}", result.status);
+		println!("chat: {:?}", result.chat);
+		println!("summary: {:?}", result.summary);
+		println!("artifacts: {:?}", result.artifacts);
+		println!("logs: {:?}", result.logs);
+		println!("=====================");
+
+		Err(anyhow::anyhow!(
+			"debug: Agent completed but no generation result was extracted"
+		))
+	}
+}
+#[async_trait]
+impl ArtifactGenerator for ApiGenerator {
+	async fn generate(&self, prompt: &str) -> Result<String> {
+		// Call your API here.
+		//
+		// Return the generated markdown.
+		todo!()
+	}
+}
+impl Evaluator {
+	async fn evaluate_intent(&self, intent: &str) -> Result<StageEvaluation> {
+		let started_at = Utc::now();
+
+		let response = self
+			.jev
+			.system_one(
+				intent,
+				[
+					(
+						"quality",
+						Question::from(Score::new(
+							"How well does this intent define a concrete software task?",
+							[
+								"Unusable: the desired outcome is unclear or not actionable",
+								"Weak: some intent is present, but major ambiguity remains",
+								"Usable: the intended outcome is understandable with some ambiguity",
+								"Strong: the desired outcome is concrete and actionable",
+								"Excellent: the desired outcome is precise, bounded, and directly actionable",
+							],
+						)),
+					),
+					(
+						"meets_bar",
+						Question::from(Noul::new(
+							"Does this intent provide a sufficiently clear and concrete \
+							 desired outcome for an implementation agent to act on \
+							 without inventing major requirements?",
+						)),
+					),
+				],
+			)
+			.await?;
+
+		let quality = response
+			.score("quality")
+			.ok_or_else(|| anyhow::anyhow!("JEV returned no intent quality score"))?;
+
+		let meets_bar = response
+			.noul("meets_bar")
+			.ok_or_else(|| anyhow::anyhow!("JEV returned no intent decision"))?;
+
+		Ok(StageEvaluation {
+			stage: Stage::Intent,
+			actor: StageActor::Human,
+			started_at,
+			score: quality.score,
+			confidence: quality.confidence,
+			passed: meets_bar.noul >= 0.80 && quality.confidence >= 0.70,
+		})
+	}
+	async fn evaluate_spec(&self, intent: &str, spec: &str) -> Result<StageEvaluation> {
+		let started_at = Utc::now();
+
+		let state = format!(
+			"## User Intent\n\n{intent}\n\n\
+			 ## Specification\n\n{spec}"
+		);
+
+		let response = self
+			.jev
+			.system_one(
+				state,
+				[
+					(
+						"quality",
+						Question::from(Score::new(
+							"How faithfully does the specification translate the intent \
+							 into concrete, testable requirements?",
+							[
+								"Unusable: requirements are missing, contradictory, or unrelated",
+								"Weak: substantial requirements are missing or invented",
+								"Usable: the main intent is represented but some details are weak",
+								"Strong: requirements are concrete, relevant, and testable",
+								"Excellent: requirements comprehensively and precisely capture the intent \
+								 without inventing unnecessary scope",
+							],
+						)),
+					),
+					(
+						"meets_bar",
+						Question::from(Noul::new(
+							"Does the specification faithfully represent the user's intent \
+							 and provide sufficiently concrete requirements for planning \
+							 and verification?",
+						)),
+					),
+				],
+			)
+			.await?;
+
+		let quality = response
+			.score("quality")
+			.ok_or_else(|| anyhow::anyhow!("JEV returned no spec quality score"))?;
+
+		let meets_bar = response
+			.noul("meets_bar")
+			.ok_or_else(|| anyhow::anyhow!("JEV returned no spec decision"))?;
+
+		Ok(StageEvaluation {
+			stage: Stage::Spec,
+			actor: StageActor::Sdlc,
+			started_at,
+			score: quality.score,
+			confidence: quality.confidence,
+			passed: meets_bar.noul >= 0.80 && quality.confidence >= 0.70,
+		})
+	}
+	async fn evaluate_plan(
+		&self,
+		intent: &str,
+		spec: &str,
+		plan: &str,
+		tests: &str,
+	) -> Result<StageEvaluation> {
+		let started_at = Utc::now();
+
+		let state = format!(
+			"## User Intent\n\n{intent}\n\n\
+			 ## Specification\n\n{spec}\n\n\
+			 ## Implementation Plan\n\n{plan}\n\n\
+			 ## Test Plan\n\n{tests}"
+		);
+
+		let response = self
+			.jev
+			.system_one(
+				state,
+				[
+					(
+						"quality",
+						Question::from(Score::new(
+							"How well does the implementation and test plan cover \
+							 the specification?",
+							[
+								"Unusable: the plan does not provide a viable path to implementation",
+								"Weak: major requirements or verification steps are uncovered",
+								"Usable: the main implementation and verification work is covered",
+								"Strong: requirements map clearly to implementation and verification steps",
+								"Excellent: the plan is complete, ordered, dependency-aware, and provides \
+								 explicit verification coverage for every requirement",
+							],
+						)),
+					),
+					(
+						"meets_bar",
+						Question::from(Noul::new(
+							"Does the implementation plan provide a concrete path from the \
+							 specification to implementation, while ensuring that every \
+							 requirement has corresponding verification coverage?",
+						)),
+					),
+				],
+			)
+			.await?;
+
+		let quality = response
+			.score("quality")
+			.ok_or_else(|| anyhow::anyhow!("JEV returned no plan quality score"))?;
+
+		let meets_bar = response
+			.noul("meets_bar")
+			.ok_or_else(|| anyhow::anyhow!("JEV returned no plan decision"))?;
+
+		Ok(StageEvaluation {
+			stage: Stage::Plan,
+			actor: StageActor::Agent,
+			started_at,
+			score: quality.score,
+			confidence: quality.confidence,
+			passed: meets_bar.noul >= 0.80 && quality.confidence >= 0.70,
+		})
+	}
+	async fn evaluate_build(
+		&self,
+		session: &Path,
+		intent: &str,
+		spec: &str,
+		plan: &str,
+		tests: &str,
+	) -> Result<StageEvaluation> {
+		let started_at = Utc::now();
+
+		let implementation = std::fs::read_dir(session)?
+			.filter_map(|entry| entry.ok())
+			.filter_map(|entry| {
+				let path = entry.path();
+				let name = path.file_name()?.to_string_lossy().into_owned();
+
+				Some(if path.is_dir() {
+					format!("[directory] {name}")
+				} else {
+					format!("[file] {name}")
+				})
+			})
+			.collect::<Vec<_>>()
+			.join("\n");
+
+		let state = format!(
+			"## User Intent\n\n{intent}\n\n\
+		 ## Specification\n\n{spec}\n\n\
+		 ## Implementation Plan\n\n{plan}\n\n\
+		 ## Test Plan\n\n{tests}\n\n\
+		 ## Repository Artifacts\n\n{implementation}"
+		);
+
+		let response = self
+			.jev
+			.system_one(
+				state,
+				[
+					(
+						"quality",
+						Question::from(Score::new(
+							"How faithfully does the implemented work satisfy the \
+						 specification and implementation plan?",
+							[
+								"Unusable: the implementation does not meaningfully address the task",
+								"Weak: substantial requirements are missing or the implementation \
+							 diverges from the plan",
+								"Usable: the primary requirements appear implemented but some \
+							 gaps or deviations remain",
+								"Strong: the implementation closely follows the specification \
+							 and provides the planned functionality",
+								"Excellent: the implementation comprehensively satisfies the \
+							 specification and plan with no significant unexplained gaps",
+							],
+						)),
+					),
+					(
+						"meets_bar",
+						Question::from(Noul::new(
+							"Does the implementation appear to satisfy the specified requirements \
+						 and provide the functionality described by the implementation plan?",
+						)),
+					),
+				],
+			)
+			.await?;
+
+		let quality = response
+			.score("quality")
+			.ok_or_else(|| anyhow::anyhow!("JEV returned no build quality score"))?;
+
+		let meets_bar = response
+			.noul("meets_bar")
+			.ok_or_else(|| anyhow::anyhow!("JEV returned no build decision"))?;
+
+		Ok(StageEvaluation {
+			stage: Stage::Build,
+			actor: StageActor::Agent,
+			started_at,
+			score: quality.score,
+			confidence: quality.confidence,
+			passed: meets_bar.noul >= 0.80 && quality.confidence >= 0.70,
+		})
+	}
+	async fn evaluate_verification(&self, session: &Path) -> Result<StageEvaluation> {
+		let started_at = Utc::now();
+
+		let intent = std::fs::read_to_string(session.join("intent.md"))?;
+		let spec = std::fs::read_to_string(session.join("spec.md"))?;
+		let tests = std::fs::read_to_string(session.join("tests.md"))?;
+
+		// This should eventually come from the actual deterministic verifier.
+		// For now, `verification.md` can contain the commands that were run and
+		// their results.
+		let evidence = match std::fs::read_to_string(session.join("verification.md")) {
+			Ok(evidence) => evidence,
+			Err(_) => String::from("No verification evidence was recorded."),
+		};
+
+		let state = format!(
+			"## User Intent\n\n{intent}\n\n\
+		 ## Specification\n\n{spec}\n\n\
+		 ## Test Plan\n\n{tests}\n\n\
+		 ## Verification Evidence\n\n{evidence}"
+		);
+
+		let response = self
+			.jev
+			.system_one(
+				state,
+				[
+					(
+						"quality",
+						Question::from(Score::new(
+							"How strong is the verification evidence for establishing \
+						 that the implementation satisfies the specification?",
+							[
+								"Unusable: there is no meaningful verification evidence",
+								"Weak: some checks exist but important requirements are unverified",
+								"Usable: the primary requirements have verification evidence but \
+							 some gaps remain",
+								"Strong: deterministic and behavioral evidence covers the \
+							 requirements with only minor gaps",
+								"Excellent: verification provides comprehensive, concrete evidence \
+							 for every requirement and clearly establishes the intended behavior",
+							],
+						)),
+					),
+					(
+						"meets_bar",
+						Question::from(Noul::new(
+							"Does the verification evidence provide sufficient evidence that \
+						 every requirement in the specification has been satisfied?",
+						)),
+					),
+				],
+			)
+			.await?;
+
+		let quality = response
+			.score("quality")
+			.ok_or_else(|| anyhow::anyhow!("JEV returned no verification quality score"))?;
+
+		let meets_bar = response
+			.noul("meets_bar")
+			.ok_or_else(|| anyhow::anyhow!("JEV returned no verification decision"))?;
+
+		Ok(StageEvaluation {
+			stage: Stage::Verify,
+			actor: StageActor::Sdlc,
+			started_at,
+			score: quality.score,
+			confidence: quality.confidence,
+			passed: meets_bar.noul >= 0.80 && quality.confidence >= 0.70,
+		})
+	}
+
+	// async fn evaluate_verification(&self, session: &PathBufrust) -> Result<StageEvaluation> {
+	// 	todo!("evaluate_verification")
+	// }
+}
 impl Sdlc {
 	/// Path to the globally active SDLC session.
 	///
@@ -59,9 +453,12 @@ impl Sdlc {
 
 		if !state_path.exists() {
 			return Ok(Some(Self {
+				evaluator,
+				generator: Box::new(LocalGenerator {
+					agent: Agent::new(),
+				}),
 				state_path,
 				session: None,
-				evaluator,
 			}));
 		}
 
@@ -69,9 +466,12 @@ impl Sdlc {
 		let session = serde_json::from_str(&contents)?;
 
 		Ok(Some(Self {
+			evaluator,
+			generator: Box::new(LocalGenerator {
+				agent: Agent::new(),
+			}),
 			state_path,
 			session: Some(session),
-			evaluator,
 		}))
 	}
 
@@ -97,6 +497,7 @@ impl Sdlc {
 			id,
 			title,
 			stage: Stage::Intent,
+			stages: Vec::new(),
 			dir,
 			created_at: now,
 			updated_at: now,
@@ -119,7 +520,7 @@ impl Sdlc {
 			.dir
 			.join("intent.md");
 
-		std::fs::write(intent_path, format!("# Intent\n\n{}\n", intent))?;
+		Self::write(intent_path, format!("# Intent\n\n{}\n", intent));
 
 		self.update_progress("SDLC session started")?;
 		self.persist()?;
@@ -155,7 +556,7 @@ impl Sdlc {
 	// ─────────────────────────────────────────────────────────────────────
 	// Stages
 	// ─────────────────────────────────────────────────────────────────────
-	pub async fn intent(&mut self) -> Result<()> {
+	pub async fn stage_intent(&mut self) -> Result<()> {
 		let session = self
 			.session
 			.as_ref()
@@ -168,78 +569,178 @@ impl Sdlc {
 			));
 		}
 
-		self.update_progress("Intent stage completed")?;
+		let evaluation = self.evaluate_stage(Stage::Intent).await?;
 
+		self.record_evaluation(evaluation)?;
+		self.update_progress("Intent stage completed")?;
 		self.transition(Stage::Spec)?;
 
 		Ok(())
 	}
+	pub async fn stage_spec(&mut self) -> Result<()> {
+		let (stage, session_dir) = {
+			let session = self
+				.session
+				.as_ref()
+				.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
 
-	pub async fn spec(&mut self) -> Result<()> {
-		let session = self
-			.session
-			.as_ref()
-			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
+			(session.stage.clone(), session.dir.clone())
+		};
 
-		if session.stage != Stage::Spec {
+		if stage != Stage::Spec {
 			return Err(anyhow::anyhow!(
 				"cannot execute Spec stage while at {:?}",
-				session.stage
+				stage
 			));
 		}
 
-		let intent = std::fs::read_to_string(session.dir.join("intent.md"))?;
+		let intent = self.read("intent.md")?;
 
 		let spec = format!(
 			"# Specification\n\n\
-			 ## Intent\n\n\
-			 {}\n\n\
-			 ## Requirements\n\n\
-			 - The implementation must satisfy the intent above.\n\
-			 - The implementation must be testable.\n\
-			 - Verification must provide deterministic evidence.\n",
+		 ## Intent\n\n\
+		 {}\n\n\
+		 ## Requirements\n\n\
+		 - The implementation must satisfy the intent above.\n\
+		 - The implementation must be testable.\n\
+		 - Verification must provide deterministic evidence.\n",
 			intent.trim()
 		);
 
-		std::fs::write(session.dir.join("spec.md"), spec)?;
+		Self::write(session_dir.join("spec.md"), spec);
 
+		let evaluation = self.evaluate_stage(Stage::Spec).await?;
+
+		self.record_evaluation(evaluation)?;
 		self.update_progress("Spec stage completed")?;
 		self.transition(Stage::Plan)?;
 
 		Ok(())
 	}
+	pub async fn stage_plan(&mut self) -> Result<()> {
+		let (stage, session_dir) = {
+			let session = self
+				.session
+				.as_ref()
+				.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
 
-	pub async fn plan(&mut self) -> Result<()> {
-		let session = self
-			.session
-			.as_ref()
-			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
-		if session.stage != Stage::Plan {
+			(session.stage.clone(), session.dir.clone())
+		};
+		if stage != Stage::Plan {
 			return Err(anyhow::anyhow!(
 				"cannot execute Plan stage while at {:?}",
-				session.stage
+				stage
 			));
 		}
-		let spec = std::fs::read_to_string(session.dir.join("spec.md"))?;
-		let plan = format!(
-			"# Implementation Plan\n\n\
-			 ## Specification\n\n\
-			 {}\n\n\
-			 ## Steps\n\n\
-			 1. Inspect the existing implementation.\n\
-			 2. Implement the required functionality.\n\
-			 3. Add or update tests.\n\
-			 4. Run deterministic checks.\n\
-			 5. Fix any failures.\n\
-			 6. Verify the resulting implementation.\n",
-			spec.trim()
-		);
-		std::fs::write(session.dir.join("plan.md"), plan)?;
-		self.update_progress("Plan stage completed")?;
+		let intent = self.read("intent.md")?;
+		let spec = self.read("spec.md")?;
+		let plan = self.generate_plan(&intent, &spec).await?;
+		Self::write(session_dir.join("plan.md"), plan.clone())?;
+		let tests = self.generate_tests(&intent, &spec, &plan).await?;
+		Self::write(session_dir.join("tests.md"), tests)?;
+		let evaluation = self.evaluate_stage(Stage::Plan).await?;
+		self.record_evaluation(evaluation)?;
+		self.update_progress("Plan and test plan generated")?;
 		self.transition(Stage::Build)?;
 		Ok(())
 	}
 
+	async fn generate_plan(&self, intent: &str, spec: &str) -> Result<String> {
+		let prompt = format!(
+			r#"
+				You are creating an implementation plan for an SDLC system.
+
+				The user's intent is authoritative.
+
+				## Intent
+
+				{intent}
+
+				## Specification
+
+				{spec}
+
+				## Instructions
+
+				Create a concrete implementation plan.
+
+				The plan must:
+				- identify the implementation work required
+				- break the work into ordered steps
+				- identify files/components likely to change
+				- identify dependencies between steps
+				- identify how each requirement will be verified
+				- avoid inventing requirements not present in the intent or specification
+
+				Return only the contents of `plan.md`.
+			"#,
+		);
+
+		self.generator.generate(&prompt).await
+	}
+	async fn generate_tests(&self, intent: &str, spec: &str, plan: &str) -> Result<String> {
+		let prompt = format!(
+			r#"
+				You are designing the verification plan for an SDLC task.
+
+				The user's intent is authoritative.
+
+				## Intent
+
+				{intent}
+
+				## Specification
+
+				{spec}
+
+				## Implementation Plan
+
+				{plan}
+
+				## Instructions
+
+				Create `tests.md`.
+
+				Every requirement in the specification must have at least
+				one corresponding verification test.
+
+				Tests should distinguish between:
+
+				1. deterministic checks
+					- cargo test
+					- cargo check
+					- cargo clippy
+					- cargo fmt
+					- application-specific commands
+
+				2. behavioral tests
+					- unit tests
+					- integration tests
+					- end-to-end tests
+
+				3. semantic verification
+					- requirements that cannot be established purely through
+						deterministic commands and should later be evaluated by JEV
+
+				Each test must be concrete enough that another agent can implement
+				or execute it.
+
+				Use this format:
+
+				# Tests
+
+				## Requirement: <requirement>
+
+				- [ ] <test>
+
+				Do not mark any test as complete.
+
+				Return only the contents of `tests.md`.
+			"#,
+		);
+
+		self.generator.generate(&prompt).await
+	}
 	/// Execute the Build stage.
 	///
 	/// Produces:
@@ -249,21 +750,19 @@ impl Sdlc {
 	///     documentation
 	///
 	/// The agent performs implementation work here.
-	pub async fn build(&mut self) -> Result<()> {
+	pub async fn stage_build(&mut self) -> Result<()> {
 		let session = self
 			.session()?
 			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
 		let context = AgentContext::from_session(session)?;
 		self.update_progress("Build started")?;
 		let task = context.task.clone();
-		let agent = Agent::new();
-		// let result = agent.run_agent_loop(task).await?;
-		// self.update_progress(&format!("Agent completed: {}", result.summary()))?;
+		// Eventually:
+		//
+		// let result = self.agent_runtime.run_agent(task).await?;
 		self.transition(Stage::Verify)?;
-
 		Ok(())
 	}
-
 	/// Execute the Verify stage.
 	///
 	/// Runs deterministic checks and JEV evaluations.
@@ -290,7 +789,7 @@ impl Sdlc {
 	/// Execute the Deploy stage.
 	///
 	/// Only allowed after successful verification.
-	pub async fn deploy(&mut self) -> Result<()> {
+	pub async fn stage_deploy(&mut self) -> Result<()> {
 		todo!("sdlc deploy")
 	}
 
@@ -298,7 +797,7 @@ impl Sdlc {
 	///
 	/// Records the deployed state and determines whether a new lifecycle
 	/// session should be created.
-	pub async fn maintain(&mut self) -> Result<()> {
+	pub async fn stage_maintain(&mut self) -> Result<()> {
 		todo!("sdlc maintain")
 	}
 
@@ -380,11 +879,95 @@ impl Sdlc {
 	// ─────────────────────────────────────────────────────────────────────
 	// Artifacts
 	// ─────────────────────────────────────────────────────────────────────
+	fn read(&self, name: &str) -> Result<String> {
+		let session = self
+			.session
+			.as_ref()
+			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
 
+		Ok(std::fs::read_to_string(session.dir.join(name))?)
+	}
+	fn write(path: PathBuf, contents: String) -> Result<()> {
+		Ok(std::fs::write(path, contents)?)
+	}
+
+	async fn evaluate_stage(&self, stage: Stage) -> Result<StageEvaluation> {
+		let session = self
+			.session
+			.as_ref()
+			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
+		let started_at = Utc::now();
+		let evaluation = match stage {
+			Stage::Intent => {
+				let intent = self.read("intent.md")?;
+
+				self.evaluator.evaluate_intent(&intent).await?
+			}
+			Stage::Spec => {
+				let intent = self.read("intent.md")?;
+				let spec = self.read("spec.md")?;
+				self.evaluator.evaluate_spec(&intent, &spec).await?
+			}
+			Stage::Plan => {
+				let intent = self.read("intent.md")?;
+				let spec = self.read("spec.md")?;
+				let plan = self.read("plan.md")?;
+				let tests = self.read("tests.md")?;
+
+				self
+					.evaluator
+					.evaluate_plan(&intent, &spec, &plan, &tests)
+					.await?
+			}
+			Stage::Build => {
+				let intent = self.read("intent.md")?;
+				let spec = self.read("spec.md")?;
+				let plan = self.read("plan.md")?;
+				let tests = self.read("tests.md")?;
+
+				self
+					.evaluator
+					.evaluate_build(&session.dir, &intent, &spec, &plan, &tests)
+					.await?
+			}
+			Stage::Verify => self.evaluator.evaluate_verification(&session.dir).await?,
+			Stage::Deploy | Stage::Maintain | Stage::Complete => {
+				return Err(anyhow::anyhow!(
+					"stage {:?} does not have an evaluation defined",
+					stage
+				));
+			}
+		};
+
+		Ok(StageEvaluation {
+			stage,
+			started_at: Utc::now(),
+			actor: evaluation.actor,
+			score: evaluation.score,
+			confidence: evaluation.confidence,
+			passed: evaluation.passed,
+		})
+	}
+	fn record_evaluation(&mut self, evaluation: StageEvaluation) -> Result<()> {
+		let session = self
+			.session
+			.as_mut()
+			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
+		let record = StageRecord {
+			stage: evaluation.stage.clone(),
+			status: StageStatus::Completed,
+			actor: evaluation.actor.clone(),
+			started_at: evaluation.started_at,
+			completed_at: Some(Utc::now()),
+			evaluation: Some(evaluation),
+		};
+		session.stages.push(record);
+		session.updated_at = Utc::now();
+		self.persist()
+	}
 	fn root() -> PathBuf {
 		PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 	}
-
 	/// Return the directory containing the current session's artifacts.
 	pub fn dir(&self) -> Result<&Path> {
 		self
@@ -422,7 +1005,9 @@ impl Sdlc {
 			if source.exists() {
 				std::fs::copy(source, destination)?;
 			} else {
-				std::fs::write(destination, format!("# {}\n\n", name))?;
+				Self::write(destination, format!("# {}\n\n", name));
+
+				// std::fs::write(destination, format!("# {}\n\n", name))?;
 			}
 		}
 		Ok(())
@@ -488,7 +1073,7 @@ impl Sdlc {
 		sessions.retain(|existing| existing.id != session.id);
 		sessions.push(session.clone());
 		let contents = serde_json::to_string_pretty(&sessions)?;
-		std::fs::write(index_path, contents)?;
+		Self::write(index_path, contents);
 		Ok(())
 	}
 
@@ -496,10 +1081,10 @@ impl Sdlc {
 		loop {
 			match self.stage() {
 				// None => self.start(...).await?,
-				Some(Stage::Intent) => self.intent().await?,
-				Some(Stage::Spec) => self.spec().await?,
-				Some(Stage::Plan) => self.plan().await?,
-				Some(Stage::Build) => self.build().await?,
+				Some(Stage::Intent) => self.stage_intent().await?,
+				Some(Stage::Spec) => self.stage_spec().await?,
+				Some(Stage::Plan) => self.stage_plan().await?,
+				Some(Stage::Build) => self.stage_build().await?,
 
 				Some(Stage::Verify) => {
 					match self.verify().await? {
@@ -610,10 +1195,11 @@ impl Sdlc {
 			.session
 			.as_ref()
 			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
-		let intent = std::fs::read_to_string(session.dir.join("intent.md"))?;
-		let spec = std::fs::read_to_string(session.dir.join("spec.md"))?;
-		let plan = std::fs::read_to_string(session.dir.join("plan.md"))?;
-		let progress = std::fs::read_to_string(session.dir.join("progress.md"))?;
+
+		let intent = self.read("intent.md")?;
+		let spec = self.read("spec.md");
+		let plan = self.read("plan.md");
+		let progress = self.read("progress.md");
 
 		// Eventually:
 		//
@@ -630,7 +1216,6 @@ impl Sdlc {
 			&& evaluations.iter().all(|evaluation| evaluation.passed)
 	}
 }
-
 impl SdlcSession {
 	fn created_at_readable(&self) -> String {
 		self
@@ -692,6 +1277,9 @@ impl SdlcSession {
 	}
 }
 
+pub struct ApiGenerator {
+	// whatever API client you decide to use
+}
 pub struct Check {
 	pub name: String,
 	pub command: String,
@@ -717,6 +1305,15 @@ pub struct EvaluationResult {
 pub struct Evaluator {
 	jev: TypeSafeClient,
 }
+pub struct LocalGenerator {
+	agent: Agent,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Metric {
+	pub name: String,
+	pub score: f64,
+	pub confidence: f64,
+}
 /// Persistent state for the lifecycle runner.
 ///
 /// The global location means there can be one active lifecycle at a time,
@@ -726,6 +1323,7 @@ pub struct Sdlc {
 	session: Option<SdlcSession>,
 	// jev: TypeSafeClient,
 	evaluator: Evaluator,
+	generator: Box<dyn ArtifactGenerator>,
 }
 /// The persistent state of an active SDLC session.
 ///
@@ -736,9 +1334,34 @@ pub struct SdlcSession {
 	pub id: String,
 	pub title: String,
 	pub stage: Stage,
+	pub stages: Vec<StageRecord>,
 	pub dir: PathBuf,
 	pub created_at: DateTime<Utc>,
 	pub updated_at: DateTime<Utc>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StageRecord {
+	pub stage: Stage,
+	pub status: StageStatus,
+
+	/// What actually performed the work.
+	pub actor: StageActor,
+
+	pub started_at: DateTime<Utc>,
+	pub completed_at: Option<DateTime<Utc>>,
+
+	/// Semantic evaluation of the resulting artifact/work.
+	pub evaluation: Option<StageEvaluation>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StageEvaluation {
+	pub stage: Stage,
+	pub actor: StageActor,
+	pub started_at: DateTime<Utc>,
+	pub score: f64,
+	pub confidence: f64,
+	pub passed: bool,
+	// pub metrics: Vec<EvaluationMetric>,
 }
 /// Result of verification.
 ///

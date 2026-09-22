@@ -90,7 +90,6 @@ impl Agent {
 						.history
 						.push(AgentObservation::ReadFile { path, content });
 				}
-
 				AgentAction::WriteFile { path, content } => {
 					let _ = event_tx.send(RuntimeEvent::Agent(AgentEvent::Working {
 						task: task.clone(),
@@ -408,3 +407,4 @@ pub async fn ollama_generate(prompt: &str, system: Option<&str>, json: bool) -> 
 		.map(|s| s.to_string())
 		.ok_or_else(|| anyhow!("Failed to parse response field from Ollama"))
 }
+
