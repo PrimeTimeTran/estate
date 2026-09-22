@@ -37,6 +37,10 @@ pub use tray_icon::{
 	Icon, TrayIcon, TrayIconBuilder,
 	menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu},
 };
+
+pub use ratatui::{Terminal, backend::CrosstermBackend};
+pub use std::{io::stdout, time::Duration};
+
 pub use winit::platform::macos::{ActivationPolicy, EventLoopBuilderExtMacOS};
 
 /// # Description

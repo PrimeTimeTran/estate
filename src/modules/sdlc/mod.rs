@@ -2,7 +2,7 @@ use crate::{
 	model::{
 		AgentTask,
 		agent::{Agent, AgentContext},
-		resolver::{SpecialFiles, workspace_cargo_path, ws_path},
+		resolver::*,
 		task::TaskResult,
 	},
 	prelude::*,
@@ -506,14 +506,14 @@ impl Evaluator {
 	}
 	async fn evaluate_verification(&self, session: &Path) -> Result<StageEvaluation> {
 		let started_at = Utc::now();
-		let intent = SpecialFiles::read_intent(&session)?;
-		let spec = SpecialFiles::read_spec(&session)?;
-		let tests = SpecialFiles::read_tests(&session)?;
-
+		let intent = SpecialFiles::read_session(&session, SessionFile::Intent)?;
+		let spec = SpecialFiles::read_session(&session, SessionFile::Spec)?;
+		let plan = SpecialFiles::read_session(&session, SessionFile::Plan)?;
+		let tests = SpecialFiles::read_session(&session, SessionFile::Tests)?;
 		// This should eventually come from the actual deterministic verifier.
 		// For now, `verification.md` can contain the commands that were run and
 		// their results.
-		let evidence = match SpecialFiles::read_verification(&session) {
+		let evidence = match SpecialFiles::read_session(&session, SessionFile::Verification) {
 			Ok(evidence) => evidence,
 			Err(_) => String::from("No verification evidence was recorded."),
 		};
@@ -577,27 +577,16 @@ impl Evaluator {
 	}
 }
 impl Sdlc {
-	/// Load the current lifecycle, if one exists.
 	pub fn load(jev: TypeSafeClient) -> Result<Option<Self>> {
-		let state_path = SpecialFiles::ws_sdlc_current_file()?;
+		let state_path = SpecialFile::SdlcCurrent.path()?;
 		let evaluator = Evaluator { jev };
 		let (event_tx, _) = broadcast::channel(256);
 
-		if !state_path.exists() {
-			return Ok(Some(Self {
-				evaluator,
-				event_tx,
-				generator: Box::new(LocalGenerator {
-					agent: Agent::new(),
-				}),
-				stage_attempt: 0,
-				state_path,
-				session: None,
-			}));
-		}
-
-		let contents = std::fs::read_to_string(&state_path)?;
-		let session = serde_json::from_str(&contents)?;
+		let session = if state_path.exists() {
+			Some(SpecialFiles::read_json(&state_path)?)
+		} else {
+			None
+		};
 
 		Ok(Some(Self {
 			evaluator,
@@ -607,7 +596,7 @@ impl Sdlc {
 			}),
 			stage_attempt: 0,
 			state_path,
-			session: Some(session),
+			session,
 		}))
 	}
 	pub fn subscribe(&self) -> broadcast::Receiver<SdlcEvent> {
@@ -946,7 +935,7 @@ impl Sdlc {
 	///
 	/// Called after the lifecycle reaches a terminal state.
 	pub fn clear_current(&self) -> Result<()> {
-		SpecialFiles::remove_file_if_exists(&self.state_path);
+		SpecialFiles::remove_if_exists(&self.state_path);
 		Ok(())
 	}
 
@@ -1056,26 +1045,31 @@ impl Sdlc {
 	///
 	///     crates/estate/ai/template/
 	pub fn create_dir(&self, title: &str) -> Result<PathBuf> {
-		let sessions_dir = SpecialFiles::ensure_dir(SpecialFiles::ws_sessions_dir()?)?;
+		let sessions_dir = SpecialFiles::ensure_dir(SpecialFile::SessionsDir.path()?)?;
+
 		let date = Local::now().format("%Y-%m-%d");
 		let dir = sessions_dir.join(format!("{date}.{title}"));
+
 		SpecialFiles::ensure_dir(&dir)?;
+
 		Ok(dir)
 	}
 
 	/// Materialize the template files for a new session.
 	fn initialize_templates(&self, dir: &Path) -> Result<()> {
 		for name in ["intent.md", "spec.md", "plan.md", "progress.md"] {
+			let source = SpecialFile::AiTemplateDir.path()?.join(name);
 			let destination = dir.join(name);
-
-			let contents = SpecialFiles::read_template(name)?.unwrap_or_else(|| format!("# {name}\n\n"));
-
+			let contents = if source.exists() {
+				SpecialFiles::read(source)?
+			} else {
+				format!("# {name}\n\n")
+			};
 			SpecialFiles::write(destination, contents)?;
 		}
 
 		Ok(())
 	}
-
 	/// Update progress.md with the current lifecycle state.
 	///
 	/// The progress journal lives inside the active session directory:
@@ -1090,7 +1084,7 @@ impl Sdlc {
 		let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S");
 
 		let entry = format!("\n## {timestamp}\n\n{message}\n");
-		SpecialFiles::append_text(SpecialFiles::session_progress(&session.dir), entry);
+		SpecialFiles::append_session(&session.dir, SessionFile::Progress, entry)?;
 		Ok(())
 	}
 
@@ -1109,7 +1103,7 @@ impl Sdlc {
 			.as_ref()
 			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
 
-		let index_path = SpecialFiles::ws_sessions_index()?;
+		let index_path = SpecialFile::SessionsIndex.path()?;
 
 		let mut sessions: Vec<SdlcSession> = if index_path.exists() {
 			SpecialFiles::read_json(&index_path)?
@@ -1123,7 +1117,7 @@ impl Sdlc {
 
 		sessions.push(session.clone());
 
-		SpecialFiles::write_json(index_path, &sessions);
+		SpecialFiles::write_json(index_path, &sessions)?;
 		Ok(())
 	}
 	pub async fn run_simulated(

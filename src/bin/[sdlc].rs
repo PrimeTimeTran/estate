@@ -1,28 +1,22 @@
-use std::time::Duration;
-
 use crossterm::{
 	event::{self, Event, KeyCode, KeyEventKind},
 	execute,
 	terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 
-// use estate::sdlc::{Sdlc, SdlcEvent, SdlcInput, SdlcView, Stage, prompt_for_intent, *};
-use estate::sdlc::*;
+use estate::prelude::*;
 use jev_sdk::TypeSafeClient;
-use ratatui::{Terminal, backend::CrosstermBackend};
-
-use std::io::{self, stdout};
 
 #[tokio::main]
 pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	dotenvy::dotenv()?;
 
-	/// 1. Normal run
-	/// cargo run --bin sdlc
-	///
-	/// 2. Dry run (no ai invocation)
-	/// ESTATE_SDLC_DEMO=1 cargo run --bin sdlc
-	///
+	// 1. Normal run
+	// cargo run --bin sdlc
+	//
+	// 2. Dry run (no ai invocation)
+	// ESTATE_SDLC_DEMO=1 cargo run --bin sdlc
+	//
 	let demo = std::env::var_os("ESTATE_SDLC_DEMO").is_some();
 
 	let client = TypeSafeClient::from_env()?;
