@@ -1,5 +1,5 @@
 use estate::modules::sdlc::*;
-use jev_sdk::{Choice, Noul, Question, Score, TypeSafeClient};
+use jev_sdk::TypeSafeClient;
 
 #[tokio::main]
 pub async fn main() -> Result<(), Box<dyn std::error::Error>> {

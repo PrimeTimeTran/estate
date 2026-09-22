@@ -1,5 +1,5 @@
 use egui::{ScrollArea, Ui};
-use std::fmt;
+// use std::fmt;
 use strum::IntoStaticStr;
 
 use crate::{prelude::*, ui::Layout};

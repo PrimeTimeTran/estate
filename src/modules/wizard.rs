@@ -4,6 +4,7 @@
 use ratatui::{Frame, layout::Rect};
 use std::time::Duration;
 use tray_icon::TrayIcon;
+
 /// --- Enums
 ///
 pub enum Action {

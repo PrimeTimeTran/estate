@@ -13,3 +13,7 @@ pub fn read_from_disk(path: impl AsRef<Path>) -> anyhow::Result<String> {
 pub fn read_from_session(name: &str, session: &SdlcSession) -> anyhow::Result<String> {
 	read_from_disk(session.dir.join(name))
 }
+
+// pub fn read_(name: &str, session: &SdlcSession) -> anyhow::Result<String> {
+// 	read_from_disk(session.dir.join(name))
+// }

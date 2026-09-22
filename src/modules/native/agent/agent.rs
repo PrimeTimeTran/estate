@@ -97,19 +97,7 @@ fn format_history(history: &[AgentObservation]) -> String {
 	serde_json::to_string_pretty(history).unwrap_or_else(|_| "[]".to_string())
 }
 pub async fn prompt_chat(ctx: &AgentContext) -> Result<String> {
-	let prompt = format!(
-		r#"
-            You are a helpful assistant.
-            User request:
-            {}
-            History:
-            {}
-            Respond normally. No JSON. Just text.
-        "#,
-		ctx.prompt,
-		format_history(&ctx.history)
-	);
-
+	let prompt = structured_prompt_chat(ctx);
 	let result = ollama_generate(&prompt, None, false).await?;
 	Ok(result)
 }
@@ -182,22 +170,11 @@ impl AgentContext {
 		}
 	}
 	pub fn from_session(session: &SdlcSession) -> Result<Self> {
-		// read(from_session(session))
-		// read_from_session(name, session);
-		let intent = std::fs::read_to_string(session.dir.join("intent.md"))?;
-		let spec = std::fs::read_to_string(session.dir.join("spec.md"))?;
-		let plan = std::fs::read_to_string(session.dir.join("plan.md"))?;
-		let progress = std::fs::read_to_string(session.dir.join("progress.md"))?;
-
-		let prompt = format!(
-			"Execute the current SDLC plan.\n\n\
-			 Intent:\n{}\n\n\
-			 Specification:\n{}\n\n\
-			 Plan:\n{}\n\n\
-			 Progress:\n{}",
-			intent, spec, plan, progress
-		);
-
+		let intent = read_from_session("intent.md", session)?;
+		let spec = read_from_session("spec.md", session)?;
+		let plan = read_from_session("plan.md", session)?;
+		let progress = read_from_session("progress.md", session)?;
+		let prompt = structured_prompt_execute(&intent, &spec, &plan, &progress);
 		Ok(Self {
 			prompt: prompt.clone(),
 			task: AgentTask::new(prompt),
@@ -250,7 +227,6 @@ impl Agent {
 				));
 			}
 			let action = self.decide_next_action(&ctx).await?;
-
 			match action {
 				AgentAction::Current { message } => {
 					let now = chrono::Local::now().format("%Y-%m-%d").to_string();
@@ -274,6 +250,19 @@ impl Agent {
 						.history
 						.push(AgentObservation::ReadFile { path, content });
 				}
+				// AgentAction::WriteFile { path, content } => {
+				// 	self.tools.fs.write(&path, &content)?;
+
+				// 	ctx.history.push(AgentObservation::WriteFile {
+				// 		path: path.clone(),
+				// 		success: true,
+				// 	});
+
+				// 	ctx.artifacts.push(Artifact {
+				// 		path,
+				// 		// whatever fields your Artifact requires
+				// 	});
+				// }
 				AgentAction::WriteFile { path, content } => {
 					let _ = event_tx.send(RuntimeEvent::Agent(AgentEvent::Working {
 						task: task.clone(),
@@ -288,12 +277,15 @@ impl Agent {
 					});
 				}
 				AgentAction::Finish { message } => {
+					if ctx.history.is_empty() {
+						return Err(anyhow!(
+							"Agent attempted to finish without performing any work"
+						));
+					}
 					let result = TaskResult::completed_with_summary(task.id, ctx, message);
-
 					let _ = event_tx.send(RuntimeEvent::Agent(AgentEvent::Finished {
 						result: result.clone(),
 					}));
-
 					return Ok(result);
 				}
 				AgentAction::RunCommand { command } => {}
@@ -392,4 +384,53 @@ pub struct LlmAction {
 #[derive(Debug, Deserialize)]
 pub struct LlmMode {
 	pub mode: String,
+}
+
+pub fn structured_prompt_chat(ctx: &AgentContext) -> String {
+	format!(
+		r#"
+			You are a helpful assistant.
+			User request:
+			{}
+			History:
+			{}
+			Respond normally. No JSON. Just text.
+		"#,
+		ctx.prompt,
+		format_history(&ctx.history)
+	)
+}
+
+pub fn structured_prompt_execute(intent: &str, spec: &str, plan: &str, progress: &str) -> String {
+	format!(
+		r#"Execute the current SDLC plan.
+				You are an execution agent working in a repository.
+				You must perform the user's requested work using the available tools.
+
+				Do NOT use "finish" merely to acknowledge the request.
+				Do NOT use "finish" because you believe you have explained what should be done.
+				Only use "finish" after you have actually performed the requested changes.
+
+				For a file-creation or file-modification task:
+				1. Inspect the repository when necessary.
+				2. Perform the requested changes with write_file.
+				3. Perform any requested tests or verification.
+				4. Only then return finish.
+
+				The task is considered incomplete until the requested repository changes actually exist.
+
+				Intent:
+				{}
+
+				Specification:
+				{}
+
+				Plan:
+				{}
+
+				Progress:
+				{}
+			"#,
+		intent, spec, plan, progress,
+	)
 }
