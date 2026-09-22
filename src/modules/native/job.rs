@@ -42,7 +42,7 @@ impl TaskManagerRuntime {
 	}
 }
 impl TaskResult {
-	pub fn completed_chat(task_id: String, ctx: AgentContext, chat: String) -> Self {
+	pub fn completed_chat(task_id: Uuid, ctx: AgentContext, chat: String) -> Self {
 		Self {
 			artifacts: ctx.artifacts,
 			chat: Some(chat),
@@ -53,7 +53,7 @@ impl TaskResult {
 			task_id,
 		}
 	}
-	pub fn completed_with_summary(task_id: String, ctx: AgentContext, summary: String) -> Self {
+	pub fn completed_with_summary(task_id: Uuid, ctx: AgentContext, summary: String) -> Self {
 		Self {
 			artifacts: ctx.artifacts,
 			chat: None,
@@ -65,7 +65,7 @@ impl TaskResult {
 		}
 	}
 	pub fn failed(
-		task_id: String,
+		task_id: Uuid,
 		ctx: AgentContext,
 		reason: impl Into<String>,
 		summary: Option<String>,
@@ -84,8 +84,17 @@ impl TaskResult {
 
 #[derive(Debug, Clone)]
 pub struct AgentTask {
-	pub id: String,
+	pub id: Uuid,
 	pub prompt: String,
+}
+
+impl AgentTask {
+	pub fn new(prompt: String) -> Self {
+		Self {
+			id: Uuid::new_v4(),
+			prompt,
+		}
+	}
 }
 pub struct TaskContext {
 	pub task_id: String,
@@ -106,5 +115,5 @@ pub struct TaskResult {
 	pub spawned_tasks: Vec<AgentTask>,
 	pub status: TaskStatus,
 	pub summary: Option<String>,
-	pub task_id: String,
+	pub task_id: Uuid,
 }

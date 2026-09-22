@@ -484,22 +484,18 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 			// Prompt the user for intent.
 			sdlc.start(prompt_for_intent()?).await?;
 		}
-
 		Some(Stage::Intent) => sdlc.intent().await?,
 		Some(Stage::Spec) => sdlc.spec().await?,
 		Some(Stage::Plan) => sdlc.plan().await?,
 		Some(Stage::Build) => sdlc.build().await?,
-
 		Some(Stage::Verify) => {
 			let result = sdlc.verify().await?;
-
 			if !result.passed {
 				sdlc.transition(Stage::Build)?;
 			} else {
 				sdlc.transition(Stage::Deploy)?;
 			}
 		}
-
 		Some(Stage::Deploy) => sdlc.deploy().await?,
 		Some(Stage::Maintain) => sdlc.maintain().await?,
 		Some(Stage::Complete) => {

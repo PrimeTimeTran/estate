@@ -1,4 +1,7 @@
-use crate::prelude::{anyhow::anyhow, *};
+use crate::{
+	prelude::{anyhow::anyhow, *},
+	sdlc::{SdlcSession, Verification},
+};
 
 use super::{
 	ACTION_PROMPT, AgentTools, DECIDE_PROMPT, JSON_PROMPT, WorkspaceContext,
@@ -37,6 +40,7 @@ impl Agent {
 	) -> Result<TaskResult> {
 		let mut steps = 0;
 		let max_steps = 10;
+		// let mut ctx = AgentContext::new(task.prompt.clone(), (*self.workspace).clone());
 		let mut ctx = AgentContext::new(task.prompt.clone());
 		let _ = event_tx.send(RuntimeEvent::Agent(AgentEvent::Thinking {
 			task: task.clone(),
@@ -109,6 +113,7 @@ impl Agent {
 
 					return Ok(result);
 				}
+				AgentAction::RunCommand { command } => {}
 			}
 		}
 	}
@@ -127,6 +132,10 @@ impl Agent {
 		let raw = build_action(&prompt).await?;
 		let action = AgentAction::try_from(raw)?;
 		Ok(action)
+	}
+
+	async fn from_session(session: &Session) -> Result<Agent> {
+		todo!("from_session")
 	}
 }
 
@@ -160,23 +169,81 @@ pub struct LlmAction {
 #[derive(Debug)]
 pub struct AgentContext {
 	pub prompt: String,
+
+	// ───── SDLC input ─────
+	pub task: AgentTask,
+
+	pub intent: String,
+	pub spec: String,
+	pub plan: String,
+	pub progress: String,
+
+	// ───── Agent execution state ─────
 	pub workspace: WorkspaceContext,
 	pub history: Vec<AgentObservation>,
+
 	pub artifacts: Vec<Artifact>,
 	pub logs: Vec<String>,
 	pub spawned_tasks: Vec<AgentTask>,
+
+	// ───── Verification feedback ─────
+	pub verification: Option<Verification>,
 }
 
 impl AgentContext {
 	pub fn new(user_prompt: String) -> Self {
 		Self {
-			artifacts: vec![],
-			history: vec![],
-			logs: vec![],
-			prompt: user_prompt,
-			spawned_tasks: vec![],
+			prompt: user_prompt.clone(),
+			task: AgentTask::new(user_prompt),
+
+			intent: String::new(),
+			spec: String::new(),
+			plan: String::new(),
+			progress: String::new(),
+
 			workspace: WorkspaceContext::default(),
+			history: vec![],
+
+			artifacts: vec![],
+			logs: vec![],
+			spawned_tasks: vec![],
+
+			verification: None,
 		}
+	}
+
+	pub fn from_session(session: &SdlcSession) -> Result<Self> {
+		let intent = std::fs::read_to_string(session.session_dir.join("intent.md"))?;
+		let spec = std::fs::read_to_string(session.session_dir.join("spec.md"))?;
+		let plan = std::fs::read_to_string(session.session_dir.join("plan.md"))?;
+		let progress = std::fs::read_to_string(session.session_dir.join("progress.md"))?;
+
+		let prompt = format!(
+			"Execute the current SDLC plan.\n\n\
+			 Intent:\n{}\n\n\
+			 Specification:\n{}\n\n\
+			 Plan:\n{}\n\n\
+			 Progress:\n{}",
+			intent, spec, plan, progress
+		);
+
+		Ok(Self {
+			prompt: prompt.clone(),
+			task: AgentTask::new(prompt),
+
+			intent,
+			spec,
+			plan,
+			progress,
+			artifacts: vec![],
+			logs: vec![],
+			spawned_tasks: vec![],
+
+			workspace: WorkspaceContext::default(),
+			history: vec![],
+
+			verification: None,
+		})
 	}
 }
 
@@ -207,6 +274,9 @@ pub enum AgentAction {
 
 	#[serde(rename = "current")]
 	Current { message: String },
+
+	#[serde(rename = "run_command")]
+	RunCommand { command: String },
 }
 
 impl TryFrom<LlmAction> for AgentAction {

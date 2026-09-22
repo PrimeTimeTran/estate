@@ -67,16 +67,12 @@ name = "type-state"
 path = "src/bin/_type-state.rs"
 
 [[bin]]
-name = "type-state1"
-path = "src/bin/_type-state1.rs"
-
-[[bin]]
 name = "lifetime"
 path = "src/bin/lifetime/main.rs"
 
 [[bin]]
 name = "sdlc"
-path = "src/bin/_sdlc.rs"
+path = "src/bin/[sdlc].rs"
 
 # Bins of Estate or high likelyhood for seperate crate/project 
 # should be wrapped with [] to identify them clearly. It means we do have some

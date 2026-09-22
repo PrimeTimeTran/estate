@@ -95,9 +95,7 @@ impl ServerBuilder {
 impl Server {
 	pub async fn run(self) -> Result<(), Box<dyn std::error::Error>> {
 		let addr = estate::data::GRPC_SOCKET.parse()?;
-
 		println!("API listening on {addr}");
-
 		tonic::transport::Server::builder()
 			.add_service(ProblemServiceServer::new(self.problem_service))
 			.add_service(SubmissionServiceServer::new(self.submission_service))
@@ -107,17 +105,4 @@ impl Server {
 
 		Ok(())
 	}
-	// pub async fn run(self) -> Result<(), Box<dyn std::error::Error>> {
-	// 	let addr = estate::data::GRPC_SOCKET.parse()?;
-
-	// 	println!("API listening on {addr}");
-
-	// 	tonic::transport::Server::builder()
-	// 		.add_service(ProblemServiceServer::new(self.problem_service))
-	// 		.add_service(SubmissionServiceServer::new(self.submission_service))
-	// 		.serve(addr)
-	// 		.await?;
-
-	// 	Ok(())
-	// }
 }

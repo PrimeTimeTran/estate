@@ -33,7 +33,7 @@ impl AgentRuntime {
 
 				Err(e) => {
 					let _ = event_tx.send(RuntimeEvent::System(SystemEvent::TaskFailed {
-						task_id: task.id.clone(),
+						task_id: task.id.to_string(),
 						error: e.to_string(),
 					}));
 				}
