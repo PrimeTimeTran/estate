@@ -1,29 +1,24 @@
 use crossterm::{
-	event::{self, Event, KeyCode, KeyEventKind},
+	event::{self, Event, KeyCode, KeyEventKind, KeyModifiers},
 	execute,
 	terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-
 use estate::prelude::*;
-use jev_sdk::TypeSafeClient;
 
 use anyhow::{Context, anyhow};
 
+// 1. Normal run
+// cargo -q run --bin sdlc --features sdlc
+//
+// 2. Dry run (no ai invocation)
+// ESTATE_SDLC_DEMO=1 cargo -q run --bin sdlc --features sdlc
+//
+// let demo = std::env::var_os("ESTATE_SDLC_DEMO").is_some();
+//
+// cargo -q run --bin sdlc --features sdlc
 #[tokio::main]
 pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
-	dotenvy::dotenv().ok();
-
-	// 1. Normal run
-	// cargo run --bin sdlc
-	//
-	// 2. Dry run (no ai invocation)
-	// ESTATE_SDLC_DEMO=1 cargo run --bin sdlc
-	//
-	let demo = std::env::var_os("ESTATE_SDLC_DEMO").is_some();
-
-	let client = TypeSafeClient::from_env().context("creating TypeSafe client")?;
-
-	let mut sdlc = Sdlc::load(client)
+	let mut sdlc = Sdlc::init()
 		.context("loading SDLC")?
 		.ok_or_else(|| anyhow!("no SDLC instance"))?;
 
@@ -53,12 +48,13 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	// SDLC task
 	// ------------------------------------------------------------
 	let (input_tx, input_rx) = tokio::sync::mpsc::unbounded_channel::<SdlcInput>();
+	let demo = std::env::var_os("ESTATE_SDLC_DEMO").is_some();
 	let run = async {
-		// if demo {
-		// 	sdlc.run_simulated(input_rx).await
-		// } else {
-		sdlc.run(input_rx).await
-		// }
+		if demo {
+			sdlc.run_simulated(input_rx).await
+		} else {
+			sdlc.run(input_rx).await
+		}
 	};
 	// let run = sdlc.run(input_rx).await?;
 	// sdlc.run(input_rx).await
@@ -97,12 +93,17 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 			_ = ticker.tick() => {
 				if event::poll(Duration::from_millis(0))? {
 					if let Event::Key(key) = event::read()? {
-						if key.kind == KeyEventKind::Press {
-							match key.code {
-								KeyCode::Char('q') => {
-									break Ok(());
-								}
+					if key.kind == KeyEventKind::Press {
+						if key.code == KeyCode::Char('c')
+							&& key.modifiers.contains(KeyModifiers::CONTROL)
+						{
+							break Ok(());
+						}
 
+						if view.awaiting_input() {
+							view.handle_input_key(key, &input_tx)?;
+						} else {
+							match key.code {
 								KeyCode::Char('p') => {
 									view.toggle_pause();
 								}
@@ -112,20 +113,17 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 								}
 
 								KeyCode::Char('r') => {
-									let _ = input_tx.send(
-										SdlcInput::Retry
-									);
+									let _ = input_tx.send(SdlcInput::Retry);
 								}
 
 								KeyCode::Char('v') => {
-									let _ = input_tx.send(
-										SdlcInput::Reviewed
-									);
+									let _ = input_tx.send(SdlcInput::Reviewed);
 								}
 
 								_ => {}
 							}
 						}
+					}
 					}
 				}
 

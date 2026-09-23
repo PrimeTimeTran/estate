@@ -4,5 +4,5 @@ omit/
 private/
 target/
 tmp/
-
+.ollamassist
 .env*

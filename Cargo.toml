@@ -85,7 +85,6 @@ required-features = ["native"]
 [[bin]]
 name = "sdlc"
 path = "src/bin/[sdlc].rs"
-# required-features = ["native"]
 
 [[bin]]
 name = "web"
@@ -105,7 +104,7 @@ target = "wasm32-unknown-unknown"
 # default = []
 # default = ["web"]
 default = ["native"]
-
+sdlc = ["native"]
 mobile = []
 daemon = []
 web = [
