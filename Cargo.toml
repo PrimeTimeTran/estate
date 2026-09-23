@@ -2,16 +2,24 @@
 ## https://doc.rust-lang.org/cargo/reference/manifest.html
 
 # Configuration of Cargo build targets
-## https://doc.rust-lang.org/cargo/reference/cargo-targets.html#configuring-a-target
-
+# https://doc.rust-lang.org/cargo/reference/cargo-targets.html#configuring-a-target
 # https://github.com/dandavison/delta
 
+# https://github.com/nowtilous/GutchinTouchTool
+# https://github.com/pszypowicz/TrackpadKit
+# https://github.com/JitouchApp/Jitouch
+# https://github.com/jasonjmcghee/trackpad_haptic
+# https://github.com/nowtilous/GutchinTouchTool
+
+# MacOS Geatures
+# https://crates.io/crates/winit
+#  https://github.com/HuakunShen/monio
+#
 [package]
 name = "estate"
 version = "0.1.0"
 edition = "2024"
 description = "Estate"
-
 autobins = false
 
 [package.metadata.bundle.bin.estate]
@@ -26,10 +34,10 @@ icon = ["assets/icon.icns"]
 
 # Internal bins for document/testing/observing
 # abstractions like nightly rust should be prefixed with _ in the bin dir.
-# 
+#
 # These might become seperate crates one day but until we're certain they support estate or aren't rust/prototype examples
 # then leave them here so we can easily run & use soruce from the repo.
-# 
+#
 [[bin]]
 name = "base"
 path = "src/bin/_base.rs"
@@ -38,11 +46,11 @@ path = "src/bin/_base.rs"
 name = "mpl"
 path = "src/bin/_tmp.rs"
 
-# Bins of Estate or high likelyhood for seperate crate/project 
+# Bins of Estate or high likelyhood for seperate crate/project
 # should be wrapped with [] to identify them clearly. It means we do have some
 # concrete idea of how we must have this in the src long term.
-# 
-# Each bin is not only entry point but should be the start of 
+#
+# Each bin is not only entry point but should be the start of
 # documentation of APIs, cli commands, etc.
 [[bin]]
 # cargo run --bin native --no-default-features --features "native,daemon"

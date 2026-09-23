@@ -5,7 +5,6 @@ pub mod app;
 pub mod backend;
 pub mod daemon;
 pub mod discovery;
-pub mod host_env_provider;
 pub mod job;
 pub mod monitor;
 pub mod observer;
@@ -16,7 +15,6 @@ pub mod resolver;
 pub mod router;
 pub mod runtime;
 pub mod screens;
-pub mod scroll;
 pub mod state;
 pub mod task;
 pub mod ui;
@@ -33,6 +31,7 @@ pub mod linux;
 #[cfg(target_os = "windows")]
 pub mod windows;
 
+mod gestures;
 #[cfg(target_os = "macos")]
 pub mod macos;
 
