@@ -1,12 +1,13 @@
 use anyhow::{Context, anyhow};
 
 use crossterm::{
+	cursor,
 	event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
 	execute,
 	terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use jev_sdk::{Choice, Noul, Question, Score, TypeSafeClient};
-use std::process::Command;
+use std::{io::Stdout, process::Command};
 
 use crate::{
 	model::{
@@ -18,148 +19,12 @@ use crate::{
 	prelude::*,
 };
 
-mod enums {
-	use super::*;
-	#[derive(Debug, Clone)]
-	pub enum Intervention {
-		Human(String),
-		Retry,
-		ProvideContext(String),
-		Reviewed,
-		Abort,
-	}
-	#[derive(Debug, Clone, Copy)]
-	pub enum GenerationProvider {
-		Local,
-		Api,
-	}
-	#[derive(Debug, Clone)]
-	pub enum SdlcEvent {
-		Completed,
-		Failed {
-			stage: Option<Stage>,
-			error: String,
-		},
-		InterventionRequired {
-			stage: Stage,
-			attempt: u32,
-			reason: String,
-		},
-		InterventionResolved {
-			stage: Stage,
-			action: String,
-		},
-		Evaluated {
-			stage: Stage,
-			score: f32,
-			confidence: f32,
-			passed: bool,
-		},
-		EvaluationStarted {
-			stage: Stage,
-		},
-		EvaluationFailed {
-			stage: Stage,
-			error: String,
-		},
-		ExecutionComplete {
-			stage: Stage,
-		},
-		ExecutionFailed {
-			stage: Stage,
-			attempt: u32,
-			error: String,
-		},
-		Exited {
-			reason: String,
-		},
-		PhaseChanged {
-			phase: SdlcPhase,
-		},
-		RunStarted,
-		StageRetrying {
-			stage: Stage,
-			attempt: u32,
-		},
-		StageStarted {
-			stage: Stage,
-			attempt: u32,
-		},
-		StageTransitioned {
-			from: Stage,
-			to: Stage,
-		},
-		HumanInput {
-			stage: Stage,
-			input: String,
-		},
-	}
-	#[derive(Debug)]
-	pub enum SdlcInput {
-		Abort,
-		ProvideContext(String),
-		Retry,
-		Reviewed,
-		Human(String),
-	}
-	#[derive(Debug, Clone, Copy, PartialEq)]
-	pub enum SdlcPhase {
-		Starting,
-		Executing,
-		Evaluating,
-		Retrying,
-		AwaitingHuman,
-		Completed,
-		Failed,
-	}
-	#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-	pub enum Stage {
-		Intent,
-		Spec,
-		Plan,
-		Build,
-		Verify,
-		Deploy,
-		Maintain,
-		Complete,
-	}
-	#[derive(Debug, Clone, Copy)]
-	pub enum StageAction {
-		Continue,
-		Retry,
-		Intervene,
-		Abort,
-	}
-	#[derive(Debug, Clone, Serialize, Deserialize)]
-	pub enum StageActor {
-		Human,
-		Sdlc,
-		Agent,
-	}
-	pub enum StageOutcome {
-		Completed(TaskResult),
-		NeedsRetry(TaskResult),
-		Failed(anyhow::Error),
-	}
-	#[derive(Debug, Clone, Serialize, Deserialize)]
-	pub enum StageStatus {
-		Running,
-		Completed,
-		Failed,
-	}
-	pub enum InputMode {
-		Normal,
-		Human { buffer: String },
-		AwaitingHuman { prompt: String },
-	}
-}
-pub use enums::*;
-
-pub fn prompt_for_intent() -> Result<String> {
-	Ok(String::from(
-		"Create a file named hello-world.js in the repository root. It should accept a command-line argument and write that value to hello-world.md. The user should be able to run node hello-world.js \"hi\". Add tests covering both the JavaScript logic and the CLI behavior.",
-	))
-}
+// cmd+alt+f
+// - Search in all files overlay
+// cmd+shift+f
+// - Search in all files tab
+// cmd+f
+// - Search in file
 
 fn format_elapsed(duration: Duration) -> String {
 	let total_seconds = duration.as_secs();
@@ -215,7 +80,7 @@ const STATUS_INTERVAL: Duration = Duration::from_secs(30);
 const FMT_HUMAN_READABLE: &'static str = "%B %-d, %Y at %-I:%M:%S %p UTC";
 
 #[async_trait::async_trait]
-pub trait ArtifactGenerator: Send + Sync {
+trait ArtifactGenerator: Send + Sync {
 	async fn generate(&self, prompt: &str) -> Result<String>;
 }
 trait TextModel {
@@ -237,12 +102,6 @@ impl ArtifactGenerator for LocalGenerator {
 		println!("artifacts: {:?}", result.artifacts);
 		println!("logs: {:?}", result.logs);
 		println!("========================");
-
-		// Temporary smoke-test behavior:
-		//
-		// The goal right now is to let the SDLC state machine
-		// continue through all stages even if the agent did not
-		// produce a proper textual artifact.
 		Ok(
 			result
 				.chat
@@ -254,16 +113,12 @@ impl ArtifactGenerator for LocalGenerator {
 #[async_trait]
 impl ArtifactGenerator for ApiGenerator {
 	async fn generate(&self, prompt: &str) -> Result<String> {
-		// Call your API here.
-		//
-		// Return the generated markdown.
 		todo!("apigenerator generate")
 	}
 }
 impl Evaluator {
 	async fn evaluate_intent(&self, intent: &str) -> Result<StageEvaluation> {
 		let started_at = Utc::now();
-
 		let response = self
 			.jev
 			.system_one(
@@ -376,7 +231,6 @@ impl Evaluator {
 		tests: &str,
 	) -> Result<StageEvaluation> {
 		let started_at = Utc::now();
-
 		let state = format!(
 			"## User Intent\n\n{intent}\n\n\
 			 ## Specification\n\n{spec}\n\n\
@@ -586,7 +440,6 @@ impl Evaluator {
 		})
 	}
 }
-
 impl Sdlc {
 	// Lifecycle methods:
 	// This needs to be focused because its easy to break... cause infintite loops
@@ -679,7 +532,10 @@ impl Sdlc {
 			let execution_result = match stage {
 				Stage::Intent => self.stage_intent().await,
 				Stage::Spec => self.stage_spec().await,
-				Stage::Plan => self.stage_plan().await,
+				Stage::Plan => {
+					let input = pending_input.take();
+					self.stage_plan(input.as_deref()).await
+				}
 				Stage::Build => self.stage_build().await,
 				Stage::Verify => self.verify().await.map(|_| ()),
 				Stage::Complete => {
@@ -713,7 +569,6 @@ impl Sdlc {
 					attempt,
 					error: error.to_string(),
 				});
-
 				if attempt >= MAX_STAGE_ATTEMPTS {
 					match self
 						.wait_for_intervention(
@@ -725,11 +580,12 @@ impl Sdlc {
 						.await?
 					{
 						Intervention::Human(input) => {
+							pending_input = Some(input);
+
 							self.emit(SdlcEvent::PhaseChanged {
 								phase: SdlcPhase::Retrying,
 							});
 
-							// TODO: pass `input` into the next agent execution.
 							self.retry(stage)?;
 							last_stage = Some(stage);
 							continue;
@@ -758,32 +614,24 @@ impl Sdlc {
 							return Err(error);
 						}
 					}
-
 					let error = anyhow!("SDLC aborted by user at {stage:?}");
-
 					self.emit(SdlcEvent::Failed {
 						stage: Some(stage),
 						error: error.to_string(),
 					});
-
 					return Err(error);
 				}
-
 				self.emit(SdlcEvent::StageRetrying {
 					stage,
 					attempt: attempt + 1,
 				});
-
 				self.emit(SdlcEvent::PhaseChanged {
 					phase: SdlcPhase::Retrying,
 				});
-
 				self.retry(stage)?;
 				continue;
 			}
-
 			self.emit(SdlcEvent::ExecutionComplete { stage });
-
 			// ------------------------------------------------------------
 			// JEV EVALUATION
 			// ------------------------------------------------------------
@@ -791,9 +639,7 @@ impl Sdlc {
 			self.emit(SdlcEvent::PhaseChanged {
 				phase: SdlcPhase::Evaluating,
 			});
-
 			self.emit(SdlcEvent::EvaluationStarted { stage });
-
 			let evaluation = match self.evaluate_stage(stage).await {
 				Ok(evaluation) => evaluation,
 
@@ -867,18 +713,15 @@ impl Sdlc {
 					continue;
 				}
 			};
-
 			self.emit(SdlcEvent::Evaluated {
 				stage,
 				score: evaluation.score as f32,
 				confidence: evaluation.confidence as f32,
 				passed: evaluation.passed,
 			});
-
 			// ------------------------------------------------------------
 			// ORCHESTRATION
 			// ------------------------------------------------------------
-
 			match stage_action(&evaluation, attempt, MAX_STAGE_ATTEMPTS) {
 				StageAction::Continue => {
 					let next = stage
@@ -1054,16 +897,13 @@ impl Sdlc {
 			attempt,
 			reason,
 		});
-
 		self.emit(SdlcEvent::PhaseChanged {
 			phase: SdlcPhase::AwaitingHuman,
 		});
-
 		let input = input_rx
 			.recv()
 			.await
 			.ok_or_else(|| anyhow!("SDLC input channel closed"))?;
-
 		match input {
 			SdlcInput::Human(string) => {
 				self.emit(SdlcEvent::HumanInput {
@@ -1078,7 +918,6 @@ impl Sdlc {
 
 				Ok(Intervention::Human(string))
 			}
-
 			SdlcInput::Retry => {
 				self.emit(SdlcEvent::InterventionResolved {
 					stage,
@@ -1087,7 +926,6 @@ impl Sdlc {
 
 				Ok(Intervention::Retry)
 			}
-
 			SdlcInput::ProvideContext(context) => {
 				self.emit(SdlcEvent::InterventionResolved {
 					stage,
@@ -1096,7 +934,6 @@ impl Sdlc {
 
 				Ok(Intervention::ProvideContext(context))
 			}
-
 			SdlcInput::Reviewed => {
 				self.emit(SdlcEvent::InterventionResolved {
 					stage,
@@ -1105,7 +942,6 @@ impl Sdlc {
 
 				Ok(Intervention::Reviewed)
 			}
-
 			SdlcInput::Abort => {
 				self.emit(SdlcEvent::InterventionResolved {
 					stage,
@@ -1117,73 +953,64 @@ impl Sdlc {
 		}
 	}
 }
-
 impl Sdlc {
 	fn commit(&mut self) -> Result<()> {
 		Ok(())
 	}
+	fn clear_current(&self) -> Result<()> {
+		FS::delete(&self.state_path)
+	}
+	fn create_dir(&self, title: &str) -> Result<PathBuf> {
+		let sessions_dir = FS::ensure_dir(SpecialFile::SessionsDir.path()?)?;
+		let date = Local::now().format("%Y-%m-%d");
+		let dir = sessions_dir.join(format!("{date}.{title}"));
+		FS::ensure_dir(&dir)?;
+		Ok(dir)
+	}
+	fn dir(&self) -> Result<&Path> {
+		self
+			.session
+			.as_ref()
+			.map(|session| session.dir.as_path())
+			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))
+	}
+	fn initialize_templates(&self, dir: &Path) -> Result<()> {
+		let template_dir = SpecialFile::AiTemplateDir.path()?;
+		for file in [
+			SessionFile::Intent,
+			SessionFile::Spec,
+			SessionFile::Plan,
+			SessionFile::Progress,
+		] {
+			let source = template_dir.join(file.name());
+			let destination = file.path(dir);
 
-	pub fn subscribe(&self) -> broadcast::Receiver<SdlcEvent> {
-		self.event_tx.subscribe()
+			let contents = if FS::exists(&source) {
+				FS::read(source)?
+			} else {
+				format!("# {}\n\n", file.name())
+			};
+
+			FS::write(destination, contents)?;
+		}
+
+		Ok(())
 	}
 	fn emit(&self, event: SdlcEvent) {
 		let _ = self.event_tx.send(event);
 	}
-
 	async fn generate_plan(&self, intent: &str, spec: &str) -> Result<String> {
-		let prompt = format!(
-			r#"
-				You are creating an implementation plan for an SDLC system.
-
-				The user's intent is authoritative.
-
-				## Intent
-
-				{intent}
-
-				## Specification
-
-				{spec}
-
-				## Instructions
-
-				Create a concrete implementation plan.
-
-				The plan must:
-				- identify the implementation work required
-				- break the work into ordered steps
-				- identify files/components likely to change
-				- identify dependencies between steps
-				- identify how each requirement will be verified
-				- avoid inventing requirements not present in the intent or specification
-
-				Return only the contents of `plan.md`.
-			"#,
-		);
-
+		let prompt = prompt_plan_gen(intent, spec);
 		self.generator.generate(&prompt).await
 	}
 	async fn generate_tests(&self, intent: &str, spec: &str, plan: &str) -> Result<String> {
-		let prompt = generate_tests_prompt(intent, spec, plan);
+		let prompt = prompt_tests_gen(intent, spec, plan);
 		self.generator.generate(&prompt).await
 	}
-
 	fn persist(&self) -> Result<()> {
 		FS::save(&self.state_path, &self.session)
 	}
-	pub fn clear_current(&self) -> Result<()> {
-		FS::delete(&self.state_path)
-	}
-	fn read_session(&self, name: &str) -> Result<String> {
-		let session = self
-			.session
-			.as_ref()
-			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
-		read_from_session(name, session)
-	}
-	fn write(path: PathBuf, contents: String) -> Result<()> {
-		Ok(std::fs::write(path, contents)?)
-	}
+
 	async fn evaluate_stage(&self, stage: Stage) -> Result<StageEvaluation> {
 		let session = self
 			.session
@@ -1237,17 +1064,22 @@ impl Sdlc {
 			passed: evaluation.passed,
 		})
 	}
-
 	async fn evaluate(&self, checks: &[CheckResult]) -> Result<Vec<EvaluationResult>> {
 		let session = self
 			.session()?
 			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
-
 		let intent = self.read_session("intent.md")?;
 		let spec = self.read_session("spec.md");
 		let plan = self.read_session("plan.md");
 		let progress = self.read_session("progress.md");
 		Ok(vec![])
+	}
+	fn read_session(&self, name: &str) -> Result<String> {
+		let session = self
+			.session
+			.as_ref()
+			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
+		read_from_session(name, session)
 	}
 	fn record_evaluation(&mut self, evaluation: StageEvaluation) -> Result<()> {
 		let session = self
@@ -1266,53 +1098,7 @@ impl Sdlc {
 		session.updated_at = Utc::now();
 		self.persist()
 	}
-	pub fn dir(&self) -> Result<&Path> {
-		self
-			.session
-			.as_ref()
-			.map(|session| session.dir.as_path())
-			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))
-	}
 
-	pub fn create_dir(&self, title: &str) -> Result<PathBuf> {
-		let sessions_dir = FS::ensure_dir(SpecialFile::SessionsDir.path()?)?;
-		let date = Local::now().format("%Y-%m-%d");
-		let dir = sessions_dir.join(format!("{date}.{title}"));
-		FS::ensure_dir(&dir)?;
-		Ok(dir)
-	}
-	fn initialize_templates(&self, dir: &Path) -> Result<()> {
-		let template_dir = SpecialFile::AiTemplateDir.path()?;
-		for file in [
-			SessionFile::Intent,
-			SessionFile::Spec,
-			SessionFile::Plan,
-			SessionFile::Progress,
-		] {
-			let source = template_dir.join(file.name());
-			let destination = file.path(dir);
-
-			let contents = if FS::exists(&source) {
-				FS::read(source)?
-			} else {
-				format!("# {}\n\n", file.name())
-			};
-
-			FS::write(destination, contents)?;
-		}
-
-		Ok(())
-	}
-	fn update_progress(&self, message: &str) -> Result<()> {
-		let session = self
-			.session
-			.as_ref()
-			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
-		let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S");
-		let entry = format!("\n## {timestamp}\n\n{message}\n");
-		SessionFile::Progress.append(&session.dir, entry)?;
-		Ok(())
-	}
 	fn record_session(&self) -> Result<()> {
 		let session = self
 			.session
@@ -1326,9 +1112,6 @@ impl Sdlc {
 
 		Ok(())
 	}
-	pub fn retry(&mut self, _stage: Stage) -> Result<()> {
-		Ok(())
-	}
 	async fn resume(&mut self) -> Result<()> {
 		if self.session.is_none() {
 			return Err(anyhow::anyhow!("no active SDLC session to resume"));
@@ -1339,6 +1122,10 @@ impl Sdlc {
 
 		Ok(())
 	}
+	pub fn retry(&mut self, _stage: Stage) -> Result<()> {
+		Ok(())
+	}
+
 	async fn run_checks(&self) -> Result<Vec<CheckResult>> {
 		let checks = [
 			("cargo check", vec!["cargo", "check"]),
@@ -1458,7 +1245,8 @@ impl Sdlc {
 
 		Ok(())
 	}
-	pub async fn stage_plan(&mut self) -> Result<()> {
+
+	pub async fn stage_plan(&mut self, human_input: Option<&str>) -> Result<()> {
 		let (stage, session_dir) = {
 			let session = self
 				.session
@@ -1483,6 +1271,9 @@ impl Sdlc {
 		self.update_progress("Plan and test plan generated")?;
 		self.transition(Stage::Build)?;
 		Ok(())
+	}
+	pub fn subscribe(&self) -> broadcast::Receiver<SdlcEvent> {
+		self.event_tx.subscribe()
 	}
 	pub fn transition(&mut self, next: Stage) -> Result<()> {
 		let session = self
@@ -1528,20 +1319,88 @@ impl Sdlc {
 
 		Ok(verification)
 	}
+	fn update_progress(&self, message: &str) -> Result<()> {
+		let session = self
+			.session
+			.as_ref()
+			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
+		let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S");
+		let entry = format!("\n## {timestamp}\n\n{message}\n");
+		SessionFile::Progress.append(&session.dir, entry)?;
+		Ok(())
+	}
 	fn verification_passed(&self, checks: &[CheckResult], evaluations: &[EvaluationResult]) -> bool {
 		checks.iter().all(|check| check.passed)
 			&& evaluations.iter().all(|evaluation| evaluation.passed)
+	}
+	fn write(path: PathBuf, contents: String) -> Result<()> {
+		Ok(std::fs::write(path, contents)?)
+	}
+}
+impl SdlcRuntime {
+	pub fn new(stage: Stage) -> Self {
+		Self {
+			activity: vec![],
+			stage,
+			attempt: 0,
+			started_at: Instant::now(),
+			stage_started_at: Instant::now(),
+			phase: SdlcPhase::Starting,
+			score: None,
+			confidence: None,
+			passed: None,
+			message: None,
+			history: Vec::new(),
+			total_tokens: 0,
+			total_agent_calls: 0,
+		}
+	}
+}
+impl SdlcSession {
+	fn created_at_readable(&self) -> String {
+		self.created_at.format(FMT_HUMAN_READABLE).to_string()
+	}
+	fn updated_at_readable(&self) -> String {
+		self.updated_at.format(FMT_HUMAN_READABLE).to_string()
+	}
+	fn create_readable(&self) -> String {
+		let current = Utc::now();
+		current.format(FMT_HUMAN_READABLE).to_string()
 	}
 }
 impl SdlcView {
 	pub fn new(stage: Stage) -> Self {
 		Self {
+			input_active: false,
 			input: String::new(),
 			paused: false,
 			show_logs: false,
 			runtime: SdlcRuntime::new(stage),
 		}
 	}
+
+	pub fn begin_input(&mut self) {
+		self.input_active = true;
+		self.input.clear();
+	}
+
+	pub fn end_input(&mut self) {
+		self.input_active = false;
+		self.input.clear();
+	}
+
+	pub fn is_input_active(&self) -> bool {
+		self.input_active
+	}
+
+	pub fn toggle_pause(&mut self) {
+		self.paused = !self.paused;
+	}
+
+	pub fn toggle_logs(&mut self) {
+		self.show_logs = !self.show_logs;
+	}
+
 	pub fn handle_input_key(
 		&mut self,
 		key: KeyEvent,
@@ -1555,34 +1414,22 @@ impl SdlcView {
 			KeyCode::Backspace => {
 				self.input.pop();
 			}
-
 			KeyCode::Enter => {
 				let input = std::mem::take(&mut self.input);
-
-				if !input.trim().is_empty() {
-					input_tx.send(SdlcInput::Human(input))?;
-				}
+				input_tx.send(SdlcInput::Human(input))?;
+				self.input_active = false;
 			}
 
 			KeyCode::Esc => {
+				self.input_active = false;
 				self.input.clear();
 			}
-			_ => {
-				todo!("handle_input_key")
-			}
+
+			_ => {}
 		}
+
 		Ok(())
 	}
-	pub fn awaiting_input(&self) -> bool {
-		self.runtime.phase == SdlcPhase::AwaitingHuman
-	}
-	pub fn toggle_pause(&mut self) {
-		self.paused = !self.paused;
-	}
-	pub fn toggle_logs(&mut self) {
-		self.show_logs = !self.show_logs;
-	}
-
 	pub fn render(frame: &mut Frame, view: &SdlcView) {
 		let area = frame.area();
 		frame.render_widget(Clear, area);
@@ -1612,10 +1459,19 @@ impl SdlcView {
 	pub fn apply(&mut self, event: SdlcEvent) {
 		self.runtime.history.push(event.clone());
 		match event {
-			SdlcEvent::HumanInput { input, stage } => {
-				self.input = input;
-				// self.stage = stage;
+			SdlcEvent::HumanInput { stage, input } => {
+				self.input_active = true;
+				self.input.clear();
+
+				self.runtime.stage = stage;
+				self.runtime.phase = SdlcPhase::AwaitingHuman;
+
+				self
+					.runtime
+					.activity
+					.push(format!("Awaiting input: {input}"));
 			}
+			// SdlcEvent::HumanInput { .. } => {}
 			SdlcEvent::InterventionRequired {
 				stage,
 				attempt,
@@ -1625,12 +1481,16 @@ impl SdlcView {
 				self.runtime.attempt = attempt;
 				self.runtime.phase = SdlcPhase::AwaitingHuman;
 				self.runtime.message = Some(reason);
+
+				self.begin_input();
 			}
 
 			SdlcEvent::InterventionResolved { stage, action } => {
 				self.runtime.stage = stage;
 				self.runtime.phase = SdlcPhase::Retrying;
 				self.runtime.message = Some(format!("intervention resolved: {action}"));
+
+				self.end_input();
 			}
 			SdlcEvent::RunStarted => {
 				self.runtime.started_at = Instant::now();
@@ -1722,36 +1582,6 @@ impl SdlcView {
 		}
 	}
 }
-impl SdlcSession {
-	fn created_at_readable(&self) -> String {
-		self.created_at.format(FMT_HUMAN_READABLE).to_string()
-	}
-	fn updated_at_readable(&self) -> String {
-		self.updated_at.format(FMT_HUMAN_READABLE).to_string()
-	}
-	fn create_readable(&self) -> String {
-		let current = Utc::now();
-		current.format(FMT_HUMAN_READABLE).to_string()
-	}
-}
-impl SdlcRuntime {
-	pub fn new(stage: Stage) -> Self {
-		Self {
-			stage,
-			attempt: 0,
-			started_at: Instant::now(),
-			stage_started_at: Instant::now(),
-			phase: SdlcPhase::Starting,
-			score: None,
-			confidence: None,
-			passed: None,
-			message: None,
-			history: Vec::new(),
-			total_tokens: 0,
-			total_agent_calls: 0,
-		}
-	}
-}
 impl Stage {
 	pub fn next(&self) -> Option<Self> {
 		match self {
@@ -1765,8 +1595,6 @@ impl Stage {
 			Self::Complete => None,
 		}
 	}
-}
-impl Stage {
 	pub fn is_before(self, other: Stage) -> bool {
 		let rank = |stage: Stage| match stage {
 			Stage::Intent => 0,
@@ -1778,7 +1606,6 @@ impl Stage {
 			Stage::Maintain => 6,
 			Stage::Complete => 7,
 		};
-
 		rank(self) < rank(other)
 	}
 }
@@ -1831,8 +1658,9 @@ pub struct Sdlc {
 }
 #[derive(Debug, Clone)]
 pub struct SdlcRuntime {
-	pub stage: Stage,
+	pub activity: Vec<String>,
 	pub attempt: u32,
+	pub stage: Stage,
 
 	pub started_at: Instant,
 	pub stage_started_at: Instant,
@@ -1863,11 +1691,10 @@ pub struct SdlcSession {
 }
 pub struct SdlcView {
 	pub runtime: SdlcRuntime,
-
 	pub paused: bool,
 	pub show_logs: bool,
 	pub input: String,
-	// pub input_mode: InputMode,
+	pub input_active: bool,
 }
 
 pub struct StageExecution {
@@ -1917,67 +1744,6 @@ use ratatui::{
 	widgets::{Block, BorderType, Borders, Clear, List, ListItem, Paragraph, Wrap},
 };
 
-fn generate_tests_prompt(intent: &str, spec: &str, plan: &str) -> String {
-	format!(
-		r#"
-			You are designing the verification plan for an SDLC task.
-
-			The user's intent is authoritative.
-
-			## Intent
-
-			{intent}
-
-			## Specification
-
-			{spec}
-
-			## Implementation Plan
-
-			{plan}
-
-			## Instructions
-
-			Create `tests.md`.
-
-			Every requirement in the specification must have at least
-			one corresponding verification test.
-
-			Tests should distinguish between:
-
-			1. deterministic checks
-				- cargo test
-				- cargo check
-				- cargo clippy
-				- cargo fmt
-				- application-specific commands
-
-			2. behavioral tests
-				- unit tests
-				- integration tests
-				- end-to-end tests
-
-			3. semantic verification
-				- requirements that cannot be established purely through
-					deterministic commands and should later be evaluated by JEV
-
-			Each test must be concrete enough that another agent can implement
-			or execute it.
-
-			Use this format:
-
-			# Tests
-
-			## Requirement: <requirement>
-
-			- [ ] <test>
-
-			Do not mark any test as complete.
-
-			Return only the contents of `tests.md`.
-		"#,
-	)
-}
 fn render_header(frame: &mut Frame, view: &SdlcView, area: Rect) {
 	let elapsed = format_elapsed(view.runtime.started_at.elapsed());
 
@@ -2111,7 +1877,6 @@ fn render_current_stage(frame: &mut Frame, view: &SdlcView, area: Rect) {
 				),
 			])
 		}
-
 		SdlcPhase::Retrying => Line::from(vec![
 			Span::styled(
 				"↻ ",
@@ -2130,7 +1895,6 @@ fn render_current_stage(frame: &mut Frame, view: &SdlcView, area: Rect) {
 				Style::default().fg(Color::Gray),
 			),
 		]),
-
 		SdlcPhase::Evaluating => Line::from(vec![
 			Span::styled(
 				"◆ ",
@@ -2146,7 +1910,6 @@ fn render_current_stage(frame: &mut Frame, view: &SdlcView, area: Rect) {
 			),
 			Span::styled("   evaluating", Style::default().fg(Color::Cyan)),
 		]),
-
 		SdlcPhase::AwaitingHuman => Line::from(vec![
 			Span::styled(
 				"⚠ ",
@@ -2162,7 +1925,6 @@ fn render_current_stage(frame: &mut Frame, view: &SdlcView, area: Rect) {
 			),
 			Span::styled("   awaiting input", Style::default().fg(Color::Gray)),
 		]),
-
 		SdlcPhase::Failed => Line::from(vec![
 			Span::styled(
 				"✗ ",
@@ -2174,7 +1936,6 @@ fn render_current_stage(frame: &mut Frame, view: &SdlcView, area: Rect) {
 			),
 			Span::styled("   failed", Style::default().fg(Color::Gray)),
 		]),
-
 		SdlcPhase::Starting => Line::from(vec![
 			Span::styled("· ", Style::default().fg(Color::Yellow)),
 			Span::styled(
@@ -2184,7 +1945,6 @@ fn render_current_stage(frame: &mut Frame, view: &SdlcView, area: Rect) {
 					.add_modifier(Modifier::BOLD),
 			),
 		]),
-
 		SdlcPhase::Completed => Line::from(vec![
 			Span::styled("✓ ", Style::default().fg(Color::Green)),
 			Span::styled(
@@ -2305,7 +2065,7 @@ fn render_activity(frame: &mut Frame, view: &SdlcView, area: Rect) {
 	);
 }
 fn render_footer(frame: &mut Frame, view: &SdlcView, area: Rect) {
-	if view.awaiting_input() {
+	if view.is_input_active() {
 		let input = Paragraph::new(view.input.as_str())
 			.block(
 				Block::default()
@@ -2327,7 +2087,6 @@ fn render_footer(frame: &mut Frame, view: &SdlcView, area: Rect) {
 		frame.render_widget(footer, area);
 	}
 }
-
 fn event_line(event: &SdlcEvent) -> Line<'static> {
 	match event {
 		SdlcEvent::HumanInput { stage, input } => Line::from(vec![
@@ -2560,4 +2319,250 @@ fn spinner(elapsed: Duration) -> &'static str {
 	let index = (elapsed.as_millis() / 100) as usize % FRAMES.len();
 
 	FRAMES[index]
+}
+
+pub fn prompt_for_intent() -> Result<String> {
+	Ok(String::from(
+		"Create a file named hello-world.js in the repository root. It should accept a command-line argument and write that value to hello-world.md. The user should be able to run node hello-world.js \"hi\". Add tests covering both the JavaScript logic and the CLI behavior.",
+	))
+}
+
+fn prompt_tests_gen(intent: &str, spec: &str, plan: &str) -> String {
+	format!(
+		r#"
+			You are designing the verification plan for an SDLC task.
+
+			The user's intent is authoritative.
+
+			## Intent
+
+			{intent}
+
+			## Specification
+
+			{spec}
+
+			## Implementation Plan
+
+			{plan}
+
+			## Instructions
+
+			Create `tests.md`.
+
+			Every requirement in the specification must have at least
+			one corresponding verification test.
+
+			Tests should distinguish between:
+
+			1. deterministic checks
+				- cargo test
+				- cargo check
+				- cargo clippy
+				- cargo fmt
+				- application-specific commands
+
+			2. behavioral tests
+				- unit tests
+				- integration tests
+				- end-to-end tests
+
+			3. semantic verification
+				- requirements that cannot be established purely through
+					deterministic commands and should later be evaluated by JEV
+
+			Each test must be concrete enough that another agent can implement
+			or execute it.
+
+			Use this format:
+
+			# Tests
+
+			## Requirement: <requirement>
+
+			- [ ] <test>
+
+			Do not mark any test as complete.
+
+			Return only the contents of `tests.md`.
+		"#,
+	)
+}
+fn prompt_plan_gen(intent: &str, spec: &str) -> String {
+	format!(
+		r#"
+				You are creating an implementation plan for an SDLC system.
+
+				The user's intent is authoritative.
+
+				## Intent
+
+				{intent}
+
+				## Specification
+
+				{spec}
+
+				## Instructions
+
+				Create a concrete implementation plan.
+
+				The plan must:
+				- identify the implementation work required
+				- break the work into ordered steps
+				- identify files/components likely to change
+				- identify dependencies between steps
+				- identify how each requirement will be verified
+				- avoid inventing requirements not present in the intent or specification
+
+				Return only the contents of `plan.md`.
+			"#,
+	)
+}
+
+mod enums {
+	use super::*;
+	#[derive(Debug, Clone)]
+	pub enum Intervention {
+		Human(String),
+		Retry,
+		ProvideContext(String),
+		Reviewed,
+		Abort,
+	}
+	#[derive(Debug, Clone, Copy)]
+	pub enum GenerationProvider {
+		Local,
+		Api,
+	}
+	#[derive(Debug, Clone)]
+	pub enum SdlcEvent {
+		Completed,
+		Failed {
+			stage: Option<Stage>,
+			error: String,
+		},
+		InterventionRequired {
+			stage: Stage,
+			attempt: u32,
+			reason: String,
+		},
+		InterventionResolved {
+			stage: Stage,
+			action: String,
+		},
+		Evaluated {
+			stage: Stage,
+			score: f32,
+			confidence: f32,
+			passed: bool,
+		},
+		EvaluationStarted {
+			stage: Stage,
+		},
+		EvaluationFailed {
+			stage: Stage,
+			error: String,
+		},
+		ExecutionComplete {
+			stage: Stage,
+		},
+		ExecutionFailed {
+			stage: Stage,
+			attempt: u32,
+			error: String,
+		},
+		Exited {
+			reason: String,
+		},
+		PhaseChanged {
+			phase: SdlcPhase,
+		},
+		RunStarted,
+		StageRetrying {
+			stage: Stage,
+			attempt: u32,
+		},
+		StageStarted {
+			stage: Stage,
+			attempt: u32,
+		},
+		StageTransitioned {
+			from: Stage,
+			to: Stage,
+		},
+		HumanInput {
+			stage: Stage,
+			input: String,
+		},
+	}
+	#[derive(Debug)]
+	pub enum SdlcInput {
+		Abort,
+		ProvideContext(String),
+		Retry,
+		Reviewed,
+		Human(String),
+	}
+	#[derive(Debug, Clone, Copy, PartialEq)]
+	pub enum SdlcPhase {
+		Starting,
+		Executing,
+		Evaluating,
+		Retrying,
+		AwaitingHuman,
+		Completed,
+		Failed,
+	}
+	#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+	pub enum Stage {
+		Intent,
+		Spec,
+		Plan,
+		Build,
+		Verify,
+		Deploy,
+		Maintain,
+		Complete,
+	}
+	#[derive(Debug, Clone, Copy)]
+	pub enum StageAction {
+		Continue,
+		Retry,
+		Intervene,
+		Abort,
+	}
+	#[derive(Debug, Clone, Serialize, Deserialize)]
+	pub enum StageActor {
+		Human,
+		Sdlc,
+		Agent,
+	}
+	pub enum StageOutcome {
+		Completed(TaskResult),
+		NeedsRetry(TaskResult),
+		Failed(anyhow::Error),
+	}
+	#[derive(Debug, Clone, Serialize, Deserialize)]
+	pub enum StageStatus {
+		Running,
+		Completed,
+		Failed,
+	}
+	pub enum InputMode {
+		Normal,
+		Human { buffer: String },
+		AwaitingHuman { prompt: String },
+	}
+}
+pub use enums::*;
+pub struct TerminalGuard;
+
+impl Drop for TerminalGuard {
+	fn drop(&mut self) {
+		let _ = disable_raw_mode();
+		let mut stdout = stdout();
+		let _ = execute!(stdout, LeaveAlternateScreen);
+		let _ = execute!(stdout, cursor::Show);
+	}
 }

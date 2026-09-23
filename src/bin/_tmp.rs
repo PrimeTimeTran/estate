@@ -128,16 +128,16 @@ fn try3(url: &str, output: &Path) -> Result<bool> {
 }
 
 fn post_process(path: &Path) -> Result<()> {
-	fn validate_file(path: &Path) -> Result<()> {
+	fn validate_file(_path: &Path) -> Result<()> {
 		todo!("validate_file");
 	}
-	fn repair_container(path: &Path) -> Result<()> {
+	fn repair_container(_path: &Path) -> Result<()> {
 		todo!("repair_container");
 	}
-	fn validate_media(path: &Path) -> Result<()> {
+	fn validate_media(_path: &Path) -> Result<()> {
 		todo!("validate_media");
 	}
-	fn refresh_quicklook(path: &Path) -> Result<()> {
+	fn refresh_quicklook(_path: &Path) -> Result<()> {
 		todo!("refresh_quicklook");
 	}
 
