@@ -11,9 +11,9 @@ use anyhow::{Context, anyhow};
 // cargo -q run --bin sdlc --features sdlc
 //
 // 2. Dry run (no ai invocation)
-// ESTATE_SDLC_DEMO=1 cargo -q run --bin sdlc --features sdlc
+// DRY_RUN=1 cargo -q run --bin sdlc --features sdlc
 //
-// let demo = std::env::var_os("ESTATE_SDLC_DEMO").is_some();
+// let demo = std::env::var_os("DRY_RUN").is_some();
 //
 // cargo -q run --bin sdlc --features sdlc
 #[tokio::main]
@@ -40,12 +40,12 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let _terminal_guard = TerminalGuard;
 
 	let (input_tx, input_rx) = tokio::sync::mpsc::unbounded_channel::<SdlcInput>();
-	let demo = std::env::var_os("ESTATE_SDLC_DEMO").is_some();
+	let is_not_dry_run = !std::env::var_os("DRY_RUN").is_some();
 	let run = async {
-		if demo {
-			sdlc.run_simulated(input_rx).await
-		} else {
+		if is_not_dry_run {
 			sdlc.run(input_rx).await
+		} else {
+			sdlc.run_simulated(input_rx).await
 		}
 	};
 	tokio::pin!(run);

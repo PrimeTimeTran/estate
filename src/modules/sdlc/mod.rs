@@ -6,8 +6,10 @@ use crossterm::{
 	execute,
 	terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
+use egui_plot::Corner;
 use jev_sdk::{Choice, Noul, Question, Score, TypeSafeClient};
 use std::{io::Stdout, process::Command};
+use tokio::time::{Duration, sleep};
 
 use crate::{
 	model::{
@@ -75,11 +77,13 @@ fn stage_action(outcome: &StageOutcome, attempt: u32) -> StageAction {
 	}
 }
 
-const DEMO_EXECUTION_TIME: Duration = Duration::from_secs(5);
+const DEMO_COMPLETE_DELAY: Duration = Duration::from_secs(3);
 const DEMO_EVALUATION_TIME: Duration = Duration::from_secs(2);
+const DEMO_EXECUTION_TIME: Duration = Duration::from_secs(5);
+const DEMO_RETRY_DELAY: Duration = Duration::from_secs(1);
+const FMT_HUMAN_READABLE: &'static str = "%B %-d, %Y at %-I:%M:%S %p UTC";
 const MAX_STAGE_ATTEMPTS: u32 = 3;
 const STATUS_INTERVAL: Duration = Duration::from_secs(30);
-const FMT_HUMAN_READABLE: &'static str = "%B %-d, %Y at %-I:%M:%S %p UTC";
 
 #[async_trait::async_trait]
 trait ArtifactGenerator: Send + Sync {
@@ -446,346 +450,6 @@ impl Sdlc {
 	// Lifecycle methods:
 	// This needs to be focused because its easy to break... cause infintite loops
 	//
-	pub fn init() -> Result<Option<Self>> {
-		dotenvy::dotenv().ok();
-		let jev = TypeSafeClient::from_env().context("creating TypeSafe client")?;
-		let evaluator = Evaluator { jev };
-		let (event_tx, _) = broadcast::channel(256);
-		let session = SpecialFile::SdlcCurrent.load::<SdlcSession>()?;
-		Ok(Some(Self {
-			evaluator,
-			event_tx,
-			generator: Box::new(LocalGenerator {
-				agent: Agent::new(),
-			}),
-			stage_attempt: 0,
-			state_path: SpecialFile::SdlcCurrent.path()?,
-			session,
-		}))
-	}
-	pub async fn start(&mut self, intent: String) -> Result<()> {
-		if self.session.is_some() {
-			return Err(anyhow::anyhow!("an SDLC session is already active"));
-		}
-		let id = uuid::Uuid::new_v4().to_string();
-		let title = intent
-			.split_whitespace()
-			.take(8)
-			.collect::<Vec<_>>()
-			.join("-")
-			.to_lowercase();
-		let dir = self.create_dir(&title)?;
-		let now = Utc::now();
-		let session = SdlcSession {
-			id,
-			title,
-			stage: Stage::Intent,
-			stages: Vec::new(),
-			dir,
-			created_at: now,
-			updated_at: now,
-		};
-		self.session = Some(session);
-		self.initialize_templates(
-			self
-				.session()?
-				.ok_or_else(|| anyhow::anyhow!("failed to create session"))?
-				.dir
-				.as_path(),
-		)?;
-		let intent_path = self
-			.session()?
-			.ok_or_else(|| anyhow::anyhow!("no active session"))?
-			.dir
-			.join("intent.md");
-		Self::write(intent_path, format!("# Intent\n\n{}\n", intent));
-		self.update_progress("SDLC session started")?;
-		self.persist()?;
-		Ok(())
-	}
-	pub async fn run(
-		&mut self,
-		mut input_rx: tokio::sync::mpsc::UnboundedReceiver<SdlcInput>,
-	) -> Result<()> {
-		let mut pending_input = None;
-		let mut last_stage = None;
-		let mut attempt = 0;
-		self.emit(SdlcEvent::RunStarted);
-
-		loop {
-			let stage = match self.stage() {
-				Some(stage) => stage,
-				None => return self.exit_no_stage(),
-			};
-			attempt = self.next_attempt(stage, &mut last_stage, &mut attempt);
-
-			self.emit(SdlcEvent::StageStarted { stage, attempt });
-			self.emit(SdlcEvent::PhaseChanged {
-				phase: SdlcPhase::Executing,
-			});
-
-			// ------------------------------------------------------------
-			// EXECUTION FAILURE:
-			// Error executing logic.
-			// ------------------------------------------------------------
-			let execution = self.execute_stage(stage, &mut pending_input).await;
-			self.emit(SdlcEvent::ExecutionComplete { stage });
-			// ------------------------------------------------------------
-			// JEV EVALUATION
-			// Generated artifacts didn't pass QA.
-			// ------------------------------------------------------------
-			let outcome = match execution {
-				Ok(()) => {
-					self.emit(SdlcEvent::ExecutionComplete { stage });
-					self.evaluate_stage_outcome(stage).await?
-				}
-				Err(error) => {
-					self.emit(SdlcEvent::ExecutionFailed {
-						stage,
-						attempt,
-						error: error.to_string(),
-					});
-
-					StageOutcome::ExecutionFailed(error)
-				}
-			};
-			// ------------------------------------------------------------
-			// ORCHESTRATION
-			// Route the results of previous steps to a p
-			// ------------------------------------------------------------
-			let control = match outcome {
-				StageOutcome::Complete(_) => {
-					let next = stage
-						.next()
-						.ok_or_else(|| anyhow!("Stage {stage:?} has no next stage"))?;
-
-					self.transition(next)?;
-
-					self.emit(SdlcEvent::StageTransitioned {
-						from: stage,
-						to: next,
-					});
-
-					RunControl::Continue
-				}
-
-				StageOutcome::NeedsRevision(_) => {
-					self
-						.handle_revision(stage, attempt, &mut input_rx, &mut pending_input)
-						.await?
-				}
-
-				StageOutcome::ExecutionFailed(error) => {
-					self
-						.handle_execution_failure(stage, attempt, error, &mut input_rx, &mut pending_input)
-						.await?
-				}
-
-				StageOutcome::EvaluationFailed(error) => {
-					self
-						.handle_evaluation_failure(stage, attempt, error, &mut input_rx, &mut pending_input)
-						.await?
-				}
-			};
-		}
-	}
-	// 	pub async fn _run_stage_evaluate(&mut self, stage: Stage, attempt: u32) -> Result<()> {
-	// 		self.emit(SdlcEvent::PhaseChanged {
-	// 			phase: SdlcPhase::Evaluating,
-	// 		});
-	// 		self.emit(SdlcEvent::EvaluationStarted { stage });
-	// 		match self.evaluate_stage(stage).await {
-	// 			Ok(evaluation) => evaluation,
-	//
-	// 			Err(error) => {
-	// 				self.emit(SdlcEvent::EvaluationFailed {
-	// 					stage,
-	// 					error: error.to_string(),
-	// 				});
-	//
-	// 				if attempt >= MAX_STAGE_ATTEMPTS {
-	// 					match self
-	// 						.wait_for_intervention(
-	// 							stage,
-	// 							attempt,
-	// 							format!("JEV evaluation failed after {MAX_STAGE_ATTEMPTS} attempts: {error}"),
-	// 							&mut input_rx,
-	// 						)
-	// 						.await?
-	// 					{
-	// 						Intervention::Human(input) => {
-	// 							// TODO: make `input` available to the next agent execution.
-	// 							self.retry(stage)?;
-	// 							last_stage = Some(stage);
-	// 							continue;
-	// 						}
-	//
-	// 						Intervention::Retry => {
-	// 							self.retry(stage)?;
-	// 							last_stage = Some(stage);
-	// 							continue;
-	// 						}
-	//
-	// 						Intervention::ProvideContext(_) | Intervention::Reviewed => {
-	// 							self.retry(stage)?;
-	// 							last_stage = Some(stage);
-	// 							continue;
-	// 						}
-	//
-	// 						Intervention::Abort => {
-	// 							let error = anyhow!("SDLC aborted by user at {stage:?}");
-	//
-	// 							self.emit(SdlcEvent::Failed {
-	// 								stage: Some(stage),
-	// 								error: error.to_string(),
-	// 							});
-	//
-	// 							return Err(error);
-	// 						}
-	// 					}
-	//
-	// 					let error = anyhow!("SDLC aborted by user at {stage:?}");
-	//
-	// 					self.emit(SdlcEvent::Failed {
-	// 						stage: Some(stage),
-	// 						error: error.to_string(),
-	// 					});
-	//
-	// 					return Err(error);
-	// 				}
-	//
-	// 				self.emit(SdlcEvent::StageRetrying {
-	// 					stage,
-	// 					attempt: attempt + 1,
-	// 				});
-	//
-	// 				self.emit(SdlcEvent::PhaseChanged {
-	// 					phase: SdlcPhase::Retrying,
-	// 				});
-	//
-	// 				self.retry(stage)?;
-	// 				continue;
-	// 			}
-	// 		}
-	// 	}
-
-	async fn evaluate_stage_outcome(&mut self, stage: Stage) -> Result<StageOutcome> {
-		todo!("evaluate_stage_outcome");
-		// 		self.emit(SdlcEvent::PhaseChanged {
-		// 			phase: SdlcPhase::Evaluating,
-		// 		});
-		// 		self.emit(SdlcEvent::EvaluationStarted { stage });
-		//
-		// 		match self.evaluate_stage(stage).await {
-		// 			Ok(evaluation) => {
-		// 				self.record_evaluation(evaluation)?;
-		//
-		// 				// TODO: determine this from JEV metrics.
-		// 				// if evaluation.meets_requirements() {
-		// 				// 	StageOutcome::Complete(...)
-		// 				// } else {
-		// 				// 	StageOutcome::NeedsRevision(...)
-		// 				// }
-		// 			}
-		//
-		// 			Err(error) => {
-		// 				self.emit(SdlcEvent::EvaluationFailed {
-		// 					stage,
-		// 					error: error.to_string(),
-		// 				});
-		//
-		// 				StageOutcome::EvaluationFailed(error)
-		// 			}
-		// 		}
-	}
-
-	fn exit_no_stage(&mut self) -> Result<()> {
-		todo!("exit_no_stage")
-	}
-	pub async fn run_simulated(
-		&mut self,
-		_input_rx: tokio::sync::mpsc::UnboundedReceiver<SdlcInput>,
-	) -> Result<()> {
-		use tokio::time::{Duration, sleep};
-		const DEMO_EXECUTION_TIME: Duration = Duration::from_secs(5);
-		const DEMO_EVALUATION_TIME: Duration = Duration::from_secs(2);
-		const DEMO_RETRY_DELAY: Duration = Duration::from_secs(1);
-		const DEMO_COMPLETE_DELAY: Duration = Duration::from_secs(3);
-		loop {
-			self.emit(SdlcEvent::RunStarted);
-			for stage in [
-				Stage::Intent,
-				Stage::Spec,
-				Stage::Plan,
-				Stage::Build,
-				Stage::Verify,
-			] {
-				let attempt = if stage == Stage::Plan { 2 } else { 1 };
-				self.emit(SdlcEvent::StageStarted { stage, attempt: 1 });
-				self.emit(SdlcEvent::PhaseChanged {
-					phase: SdlcPhase::Executing,
-				});
-				sleep(DEMO_EXECUTION_TIME).await;
-				if stage == Stage::Plan {
-					self.emit(SdlcEvent::ExecutionFailed {
-						stage,
-						attempt: 1,
-						error: "Simulated execution failure".into(),
-					});
-
-					self.emit(SdlcEvent::StageRetrying { stage, attempt });
-
-					self.emit(SdlcEvent::PhaseChanged {
-						phase: SdlcPhase::Retrying,
-					});
-
-					sleep(DEMO_RETRY_DELAY).await;
-
-					self.emit(SdlcEvent::StageStarted { stage, attempt });
-
-					self.emit(SdlcEvent::PhaseChanged {
-						phase: SdlcPhase::Executing,
-					});
-
-					sleep(DEMO_EXECUTION_TIME).await;
-				}
-
-				self.emit(SdlcEvent::ExecutionComplete { stage });
-
-				self.emit(SdlcEvent::PhaseChanged {
-					phase: SdlcPhase::Evaluating,
-				});
-
-				self.emit(SdlcEvent::EvaluationStarted { stage });
-
-				sleep(DEMO_EVALUATION_TIME).await;
-
-				self.emit(SdlcEvent::Evaluated {
-					stage,
-					score: 0.91,
-					confidence: 0.94,
-					passed: true,
-				});
-
-				let next = stage.next().ok_or_else(|| anyhow!("no next stage"))?;
-
-				self.emit(SdlcEvent::StageTransitioned {
-					from: stage,
-					to: next,
-				});
-			}
-			self.emit(SdlcEvent::StageStarted {
-				stage: Stage::Complete,
-				attempt: 1,
-			});
-
-			self.emit(SdlcEvent::PhaseChanged {
-				phase: SdlcPhase::Completed,
-			});
-			self.emit(SdlcEvent::Completed);
-			sleep(DEMO_COMPLETE_DELAY).await;
-		}
-	}
 	async fn complete_stage(&mut self) -> Result<RunControl> {
 		todo!("complete_stage")
 	}
@@ -807,7 +471,13 @@ impl Sdlc {
 			Stage::Deploy | Stage::Maintain => Err(anyhow!("stage {stage:?} not implemented")),
 		}
 	}
-	async fn handle_execution_failure(
+	async fn evaluate_stage_outcome(&mut self, stage: Stage) -> Result<StageOutcome> {
+		todo!("evaluate_stage_outcome");
+	}
+	fn exit_no_stage(&mut self) -> Result<()> {
+		todo!("exit_no_stage")
+	}
+	async fn handle_failure_execution(
 		&mut self,
 		stage: Stage,
 		attempt: u32,
@@ -880,7 +550,7 @@ impl Sdlc {
 			}
 		}
 	}
-	async fn handle_evaluation_failure(
+	async fn handle_failure_evaluation(
 		&mut self,
 		stage: Stage,
 		attempt: u32,
@@ -954,7 +624,7 @@ impl Sdlc {
 			}
 		}
 	}
-	async fn handle_revision(
+	async fn handle_failure_of_quality(
 		&mut self,
 		stage: Stage,
 		attempt: u32,
@@ -1037,6 +707,25 @@ impl Sdlc {
 			}
 		}
 	}
+
+	pub fn init() -> Result<Option<Self>> {
+		dotenvy::dotenv().ok();
+		let jev = TypeSafeClient::from_env().context("creating TypeSafe client")?;
+		let evaluator = Evaluator { jev };
+		let (event_tx, _) = broadcast::channel(256);
+		let session = SpecialFile::SdlcCurrent.load::<SdlcSession>()?;
+		Ok(Some(Self {
+			evaluator,
+			event_tx,
+			generator: Box::new(LocalGenerator {
+				agent: Agent::new(),
+			}),
+			stage_attempt: 0,
+			state_path: SpecialFile::SdlcCurrent.path()?,
+			session,
+		}))
+	}
+
 	fn next_attempt(
 		&mut self,
 		stage: Stage,
@@ -1052,40 +741,196 @@ impl Sdlc {
 		*attempt
 	}
 
-	// 	async fn resolve_outcome(
-	// 		&mut self,
-	// 		stage: Stage,
-	// 		attempt: u32,
-	// 		outcome: StageOutcome,
-	// 		input_rx: &mut tokio::sync::mpsc::UnboundedReceiver<SdlcInput>,
-	// 		pending_input: &mut Option<String>,
-	// 	) -> Result<RunControl> {
-	// 		match outcome {
-	// 			StageOutcome::Complete(result) => {
-	// 				self.complete_stage(stage, result)?;
-	// 				Ok(RunControl::Continue)
-	// 			}
-	//
-	// 			StageOutcome::NeedsRevision(result) => {
-	// 				self
-	// 					.handle_revision(stage, attempt, result, input_rx, pending_input)
-	// 					.await
-	// 			}
-	//
-	// 			StageOutcome::ExecutionFailed(error) => {
-	// 				self
-	// 					.handle_execution_failure(stage, attempt, error, input_rx, pending_input)
-	// 					.await
-	// 			}
-	//
-	// 			StageOutcome::EvaluationFailed(error) => {
-	// 				self
-	// 					.handle_evaluation_failure(stage, attempt, error, input_rx, pending_input)
-	// 					.await
-	// 			}
-	// 		}
-	// 		Ok(result)
-	// 	}
+	pub async fn run(
+		&mut self,
+		mut input_rx: tokio::sync::mpsc::UnboundedReceiver<SdlcInput>,
+	) -> Result<()> {
+		let mut pending_input = None;
+		let mut last_stage = None;
+		let mut attempt = 0;
+		self.emit(SdlcEvent::RunStarted);
+		loop {
+			let stage = match self.stage() {
+				Some(stage) => stage,
+				None => return self.exit_no_stage(),
+			};
+			attempt = self.next_attempt(stage, &mut last_stage, &mut attempt);
+
+			self.emit(SdlcEvent::StageStarted { stage, attempt });
+			self.emit(SdlcEvent::PhaseChanged {
+				phase: SdlcPhase::Executing,
+			});
+
+			// ------------------------------------------------------------
+			// EXECUTION FAILURE:
+			// Error executing logic.
+			// ------------------------------------------------------------
+			let execution = self.execute_stage(stage, &mut pending_input).await;
+			// ------------------------------------------------------------
+			// JEV EVALUATION
+			// Generated artifacts didn't pass QA.
+			// ------------------------------------------------------------
+			let outcome = match execution {
+				Ok(()) => {
+					self.emit(SdlcEvent::ExecutionComplete { stage });
+					self.evaluate_stage_outcome(stage).await?
+				}
+				Err(error) => {
+					self.emit(SdlcEvent::ExecutionFailed {
+						stage,
+						attempt,
+						error: error.to_string(),
+					});
+					StageOutcome::ExecutionFailed(error)
+				}
+			};
+			// ------------------------------------------------------------
+			// ORCHESTRATION
+			// Route the results of previous steps to a p
+			// ------------------------------------------------------------
+			let control = match outcome {
+				StageOutcome::Complete(_) => {
+					let next = stage
+						.next()
+						.ok_or_else(|| anyhow!("Stage {stage:?} has no next stage"))?;
+					self.transition(next)?;
+					self.emit(SdlcEvent::StageTransitioned {
+						from: stage,
+						to: next,
+					});
+					RunControl::Continue
+				}
+				StageOutcome::NeedsRevision(_) => {
+					self
+						.handle_failure_of_quality(stage, attempt, &mut input_rx, &mut pending_input)
+						.await?
+				}
+				StageOutcome::ExecutionFailed(error) => {
+					self
+						.handle_failure_execution(stage, attempt, error, &mut input_rx, &mut pending_input)
+						.await?
+				}
+				StageOutcome::EvaluationFailed(error) => {
+					self
+						.handle_failure_evaluation(stage, attempt, error, &mut input_rx, &mut pending_input)
+						.await?
+				}
+			};
+			// ------------------------------------------------------------
+			// Follow up
+			// Given stage outcome what comes next?
+			// ------------------------------------------------------------
+			match control {
+				RunControl::Continue => continue,
+				RunControl::Exit => return Ok(()),
+			}
+		}
+	}
+	pub async fn run_simulated(
+		&mut self,
+		_input_rx: tokio::sync::mpsc::UnboundedReceiver<SdlcInput>,
+	) -> Result<()> {
+		loop {
+			self.emit(SdlcEvent::RunStarted);
+			for stage in [
+				Stage::Intent,
+				Stage::Spec,
+				Stage::Plan,
+				Stage::Build,
+				Stage::Verify,
+			] {
+				let attempt = if stage == Stage::Plan { 2 } else { 1 };
+				self.emit(SdlcEvent::StageStarted { stage, attempt: 1 });
+				self.emit(SdlcEvent::PhaseChanged {
+					phase: SdlcPhase::Executing,
+				});
+				sleep(DEMO_EXECUTION_TIME).await;
+				if stage == Stage::Plan {
+					self.emit(SdlcEvent::ExecutionFailed {
+						stage,
+						attempt: 1,
+						error: "Simulated execution failure".into(),
+					});
+					self.emit(SdlcEvent::StageRetrying { stage, attempt });
+					self.emit(SdlcEvent::PhaseChanged {
+						phase: SdlcPhase::Retrying,
+					});
+					sleep(DEMO_RETRY_DELAY).await;
+					self.emit(SdlcEvent::StageStarted { stage, attempt });
+					self.emit(SdlcEvent::PhaseChanged {
+						phase: SdlcPhase::Executing,
+					});
+					sleep(DEMO_EXECUTION_TIME).await;
+				}
+				self.emit(SdlcEvent::ExecutionComplete { stage });
+				self.emit(SdlcEvent::PhaseChanged {
+					phase: SdlcPhase::Evaluating,
+				});
+				self.emit(SdlcEvent::EvaluationStarted { stage });
+				sleep(DEMO_EVALUATION_TIME).await;
+				self.emit(SdlcEvent::Evaluated {
+					stage,
+					score: 0.91,
+					confidence: 0.94,
+					passed: true,
+				});
+				let next = stage.next().ok_or_else(|| anyhow!("no next stage"))?;
+				self.emit(SdlcEvent::StageTransitioned {
+					from: stage,
+					to: next,
+				});
+			}
+			self.emit(SdlcEvent::StageStarted {
+				stage: Stage::Complete,
+				attempt: 1,
+			});
+			self.emit(SdlcEvent::PhaseChanged {
+				phase: SdlcPhase::Completed,
+			});
+			self.emit(SdlcEvent::Completed);
+			sleep(DEMO_COMPLETE_DELAY).await;
+		}
+	}
+	pub async fn start(&mut self, intent: String) -> Result<()> {
+		if self.session.is_some() {
+			return Err(anyhow::anyhow!("an SDLC session is already active"));
+		}
+		let id = uuid::Uuid::new_v4().to_string();
+		let title = intent
+			.split_whitespace()
+			.take(8)
+			.collect::<Vec<_>>()
+			.join("-")
+			.to_lowercase();
+		let dir = self.create_dir(&title)?;
+		let now = Utc::now();
+		let session = SdlcSession {
+			id,
+			title,
+			stage: Stage::Intent,
+			stages: Vec::new(),
+			dir,
+			created_at: now,
+			updated_at: now,
+		};
+		self.session = Some(session);
+		self.initialize_templates(
+			self
+				.session()?
+				.ok_or_else(|| anyhow::anyhow!("failed to create session"))?
+				.dir
+				.as_path(),
+		)?;
+		let intent_path = self
+			.session()?
+			.ok_or_else(|| anyhow::anyhow!("no active session"))?
+			.dir
+			.join("intent.md");
+		Self::write(intent_path, format!("# Intent\n\n{}\n", intent));
+		self.update_progress("SDLC session started")?;
+		self.persist()?;
+		Ok(())
+	}
 
 	async fn wait_for_intervention(
 		&mut self,
@@ -1636,6 +1481,7 @@ impl SdlcView {
 
 		Ok(())
 	}
+
 	pub fn render(frame: &mut Frame, view: &SdlcView) {
 		let area = frame.area();
 		frame.render_widget(Clear, area);
@@ -2129,7 +1975,7 @@ fn render_current_stage(frame: &mut Frame, view: &SdlcView, area: Rect) {
 					.fg(Color::Magenta)
 					.add_modifier(Modifier::BOLD),
 			),
-			Span::styled("   awaiting input", Style::default().fg(Color::Gray)),
+			Span::styled("  Input", Style::default().fg(Color::Gray)),
 		]),
 		SdlcPhase::Failed => Line::from(vec![
 			Span::styled(
@@ -2269,6 +2115,18 @@ fn render_activity(frame: &mut Frame, view: &SdlcView, area: Rect) {
 		),
 		area,
 	);
+}
+fn _render_activity(frame: &mut Frame, view: &SdlcView, area: Rect) {
+	let items = view
+		.runtime
+		.activity
+		.iter()
+		.rev()
+		.take(12)
+		.map(|activity| ListItem::new(activity.as_str()))
+		.collect::<Vec<_>>();
+	let list = List::new(items).block(Block::default().title(" Activity ").borders(Borders::ALL));
+	frame.render_widget(list, area);
 }
 fn render_footer(frame: &mut Frame, view: &SdlcView, area: Rect) {
 	if view.is_input_active() {
@@ -2529,7 +2387,7 @@ fn spinner(elapsed: Duration) -> &'static str {
 
 pub use enums::*;
 pub use prompt as agent_prompts;
-pub use prompt::*;
+use prompt::*;
 
 pub mod prompt {
 	use super::*;
