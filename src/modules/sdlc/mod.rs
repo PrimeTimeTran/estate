@@ -27,6 +27,9 @@ use tokio::time::{Duration, sleep};
 // cmd+f
 // - Search in file
 
+// fn from_session(session: &SdlcSession) -> String {
+// 	session.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?
+// }
 fn format_elapsed(duration: Duration) -> String {
 	let total_seconds = duration.as_secs();
 	let hours = total_seconds / 3600;
@@ -714,21 +717,6 @@ impl Sdlc {
 		}))
 	}
 
-	fn next_attempt(
-		&mut self,
-		stage: Stage,
-		last_stage: &mut Option<Stage>,
-		attempt: &mut u32,
-	) -> u32 {
-		if *last_stage == Some(stage) {
-			*attempt += 1;
-		} else {
-			*last_stage = Some(stage);
-			*attempt = 1;
-		}
-		*attempt
-	}
-
 	pub async fn run(
 		&mut self,
 		mut input_rx: tokio::sync::mpsc::UnboundedReceiver<SdlcInput>,
@@ -904,7 +892,7 @@ impl Sdlc {
 			updated_at: now,
 		};
 		self.session = Some(session);
-		self.initialize_templates(
+		self.init_templates(
 			self
 				.session()?
 				.ok_or_else(|| anyhow::anyhow!("failed to create session"))?
@@ -994,9 +982,6 @@ impl Sdlc {
 	fn commit(&mut self) -> Result<()> {
 		Ok(())
 	}
-	fn clear_current(&self) -> Result<()> {
-		FS::delete(&self.state_path)
-	}
 	fn create_dir(&self, title: &str) -> Result<PathBuf> {
 		let sessions_dir = FS::ensure_dir(SpecialFile::SessionsDir.path()?)?;
 		let date = Local::now().format("%Y-%m-%d");
@@ -1011,7 +996,7 @@ impl Sdlc {
 			.map(|session| session.dir.as_path())
 			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))
 	}
-	fn initialize_templates(&self, dir: &Path) -> Result<()> {
+	fn init_templates(&self, dir: &Path) -> Result<()> {
 		let template_dir = SpecialFile::AiTemplateDir.path()?;
 		for file in [
 			SessionFile::Intent,
@@ -1021,22 +1006,22 @@ impl Sdlc {
 		] {
 			let source = template_dir.join(file.name());
 			let destination = file.path(dir);
-
 			let contents = if FS::exists(&source) {
 				FS::read(source)?
 			} else {
 				format!("# {}\n\n", file.name())
 			};
-
 			FS::write(destination, contents)?;
 		}
-
 		Ok(())
+	}
+	fn is_passing(&self, checks: &[CheckResult], evaluations: &[EvaluationResult]) -> bool {
+		checks.iter().all(|check| check.passed)
+			&& evaluations.iter().all(|evaluation| evaluation.passed)
 	}
 	fn emit(&self, event: SdlcEvent) {
 		let _ = self.event_tx.send(event);
 	}
-
 	async fn generate_plan(&self, intent: &str, spec: &str) -> Result<String> {
 		let prompt = prompt::plan_gen(intent, spec);
 		self.generator.generate(&prompt).await
@@ -1109,7 +1094,20 @@ impl Sdlc {
 		let progress = self.read_session("progress.md");
 		Ok(vec![])
 	}
-
+	fn next_attempt(
+		&mut self,
+		stage: Stage,
+		last_stage: &mut Option<Stage>,
+		attempt: &mut u32,
+	) -> u32 {
+		if *last_stage == Some(stage) {
+			*attempt += 1;
+		} else {
+			*last_stage = Some(stage);
+			*attempt = 1;
+		}
+		*attempt
+	}
 	fn persist(&self) -> Result<()> {
 		FS::save(&self.state_path, &self.session)
 	}
@@ -1415,7 +1413,7 @@ impl Sdlc {
 		let checks = self.run_checks().await?;
 		let evaluations = self.evaluate(&checks).await?;
 		let verification = Verification {
-			passed: self.verification_passed(&checks, &evaluations),
+			passed: self.is_passing(&checks, &evaluations),
 			checks,
 			evaluations,
 		};
@@ -1436,10 +1434,7 @@ impl Sdlc {
 		SessionFile::Progress.append(&session.dir, entry)?;
 		Ok(())
 	}
-	fn verification_passed(&self, checks: &[CheckResult], evaluations: &[EvaluationResult]) -> bool {
-		checks.iter().all(|check| check.passed)
-			&& evaluations.iter().all(|evaluation| evaluation.passed)
-	}
+
 	fn write(path: PathBuf, contents: String) -> Result<()> {
 		Ok(std::fs::write(path, contents)?)
 	}
@@ -1735,13 +1730,12 @@ pub struct Evaluator {
 pub struct LocalGenerator {
 	agent: Agent,
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Metric {
-	pub name: String,
-	pub score: f64,
-	pub confidence: f64,
-}
-
+// #[derive(Debug, Clone, Serialize, Deserialize)]
+// pub struct Metric {
+// 	pub name: String,
+// 	pub score: f64,
+// 	pub confidence: f64,
+// }
 pub struct Sdlc {
 	state_path: PathBuf,
 	session: Option<SdlcSession>,
