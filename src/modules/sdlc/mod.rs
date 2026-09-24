@@ -16,7 +16,7 @@ use crossterm::{
 };
 use egui_plot::Corner;
 use jev_sdk::{Choice, Noul, Question, Score, TypeSafeClient};
-use ratatui::layout::Layout as RatatuiLayout;
+
 use std::{io::Stdout, process::Command};
 use tokio::time::{Duration, sleep};
 
@@ -1162,7 +1162,6 @@ impl Sdlc {
 
 		self.persist()
 	}
-
 	fn record_stage_outcome(&mut self, outcome: &StageOutcome, attempt: u32) -> Result<()> {
 		let stage = match outcome {
 			StageOutcome::Complete { evaluation, .. }
@@ -1178,7 +1177,6 @@ impl Sdlc {
 
 		self.record_outcome(stage, attempt, outcome)
 	}
-
 	fn record_session(&self) -> Result<()> {
 		let session = self
 			.session
@@ -1196,7 +1194,6 @@ impl Sdlc {
 
 		Ok(())
 	}
-
 	fn record_evaluation(&mut self, evaluation: StageEvaluation) -> Result<()> {
 		let session = self
 			.session
@@ -1220,6 +1217,7 @@ impl Sdlc {
 		session.updated_at = Utc::now();
 		self.persist()
 	}
+
 	async fn resume(&mut self) -> Result<()> {
 		if self.session.is_none() {
 			return Err(anyhow::anyhow!("no active SDLC session to resume"));
@@ -1492,7 +1490,6 @@ impl SdlcView {
 		self.input_active = true;
 		self.input.clear();
 	}
-
 	pub fn end_input(&mut self) {
 		self.input_active = false;
 		self.input.clear();
@@ -1505,7 +1502,6 @@ impl SdlcView {
 	pub fn toggle_pause(&mut self) {
 		self.paused = !self.paused;
 	}
-
 	pub fn toggle_logs(&mut self) {
 		self.show_logs = !self.show_logs;
 	}
@@ -1553,18 +1549,11 @@ impl SdlcView {
 			])
 			.split(area);
 
-		ui::render_stepper(frame, view, chunks[1]);
-		let body = RatatuiLayout::default()
-			.direction(Direction::Horizontal)
-			.constraints([
-				Constraint::Percentage(54),
-				Constraint::Length(1),
-				Constraint::Percentage(45),
-			])
-			.split(chunks[2]);
-		ui::render_current_stage(frame, view, body[0]);
-		ui::render_activity(frame, view, body[2]);
-		ui::render_footer(frame, view, chunks[3]);
+		ui::stepper(frame, view, chunks[1]);
+		let body = ui::body(chunks[2]);
+		ui::left_stage_panel(frame, view, body[0]);
+		ui::right_activity_panel(frame, view, body[2]);
+		ui::footer(frame, view, chunks[3]);
 	}
 	pub fn apply(&mut self, event: SdlcEvent) {
 		self.runtime.history.push(event.clone());
@@ -1849,25 +1838,34 @@ use prompt::*;
 
 pub use ratatui::{
 	Frame,
-	layout::{Constraint, Direction, Position, Rect},
-	style::{Color, Modifier, Style},
-	text::{Line, Span},
-	widgets::{Block, BorderType, Borders, Clear, List, ListItem, Paragraph, Wrap},
+	layout::{Constraint, Direction, Layout as RatatuiLayout, Position, Rect},
+	// style::{Color, Modifier, Style},
+	// text::{Line, Span},
+	widgets::Clear,
 };
 
 mod ui {
 	use crate::sdlc::{SdlcEvent, SdlcPhase, SdlcView, Stage, format_elapsed};
-	use chrono::Duration;
-	pub use ratatui::{
+	use ratatui::{
 		Frame,
-		layout::{Constraint, Direction, Position, Rect},
+		layout::{Constraint, Direction, Layout as RatatuiLayout, Position, Rect},
 		style::{Color, Modifier, Style},
 		text::{Line, Span},
 		widgets::{Block, BorderType, Borders, Clear, List, ListItem, Paragraph, Wrap},
 	};
+	pub fn body(chunk: Rect) -> Vec<Rect> {
+		RatatuiLayout::default()
+			.direction(Direction::Horizontal)
+			.constraints([
+				Constraint::Percentage(54),
+				Constraint::Length(1),
+				Constraint::Percentage(45),
+			])
+			.split(chunk)
+			.to_vec()
+	}
 	pub fn header(frame: &mut Frame<'_>, view: &SdlcView, area: Rect) {
 		let elapsed = format_elapsed(view.runtime.started_at.elapsed());
-
 		let line = Line::from(vec![
 			Span::styled(
 				format!("{:?}", view.runtime.stage),
@@ -1882,7 +1880,7 @@ mod ui {
 
 		frame.render_widget(Paragraph::new(line), area);
 	}
-	pub fn render_stepper(frame: &mut Frame<'_>, view: &SdlcView, area: Rect) {
+	pub fn stepper(frame: &mut Frame<'_>, view: &SdlcView, area: Rect) {
 		let stages = [
 			Stage::Intent,
 			Stage::Spec,
@@ -1944,7 +1942,7 @@ mod ui {
 
 		frame.render_widget(Paragraph::new(Line::from(spans)), area);
 	}
-	pub fn render_current_stage(frame: &mut Frame<'_>, view: &SdlcView, area: Rect) {
+	pub fn left_stage_panel(frame: &mut Frame<'_>, view: &SdlcView, area: Rect) {
 		let runtime = &view.runtime;
 
 		let phase_style = phase_style(runtime.phase);
@@ -2121,7 +2119,7 @@ mod ui {
 			area,
 		);
 	}
-	pub fn render_activity(frame: &mut Frame<'_>, view: &SdlcView, area: Rect) {
+	pub fn right_activity_panel(frame: &mut Frame<'_>, view: &SdlcView, area: Rect) {
 		let runtime = &view.runtime;
 
 		let spinner = spinner(runtime.stage_started_at.elapsed());
@@ -2218,7 +2216,7 @@ mod ui {
 			area,
 		);
 	}
-	pub fn render_footer(frame: &mut Frame<'_>, view: &SdlcView, area: Rect) {
+	pub fn footer(frame: &mut Frame<'_>, view: &SdlcView, area: Rect) {
 		if view.is_input_active() {
 			let input = Paragraph::new(view.input.as_str())
 				.block(
