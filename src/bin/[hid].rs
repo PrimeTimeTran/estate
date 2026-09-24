@@ -207,18 +207,14 @@ static START: std::sync::OnceLock<Instant> = std::sync::OnceLock::new();
 
 extern "C" fn callback(touches: *const EstateTouch, count: c_int, timestamp: f64, frame: c_int) {
 	let start = START.get_or_init(Instant::now);
-
 	let elapsed = start.elapsed();
-
 	let touches = unsafe { std::slice::from_raw_parts(touches, count as usize) };
-
 	println!(
 		"\n[{:.3}s] frame={} fingers={}",
 		elapsed.as_secs_f64(),
 		frame,
 		touches.len(),
 	);
-
 	for (i, touch) in touches.iter().enumerate() {
 		println!(
 			"  {:>2}: id={:<3} state={:<2} \
@@ -232,16 +228,12 @@ extern "C" fn callback(touches: *const EstateTouch, count: c_int, timestamp: f64
 
 pub fn main() {
 	START.set(Instant::now()).ok();
-
 	let result = unsafe { estate_multitouch_start(callback) };
-
 	if result != 0 {
 		panic!("Multitouch initialization failed: {result}");
 	}
-
 	println!("Trackpad monitor running.");
 	println!("Put fingers on the trackpad...\n");
-
 	loop {
 		std::thread::sleep(Duration::from_secs(1));
 	}

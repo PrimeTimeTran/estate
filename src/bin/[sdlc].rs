@@ -1,10 +1,10 @@
+use anyhow::{Context, anyhow};
 use crossterm::{
 	event::{self, Event, KeyCode, KeyEventKind, KeyModifiers},
 	execute,
 	terminal::{EnterAlternateScreen, enable_raw_mode},
 };
 use estate::prelude::*;
-use anyhow::{Context, anyhow};
 
 // 1. Normal run
 // cargo -q run --bin sdlc --features sdlc

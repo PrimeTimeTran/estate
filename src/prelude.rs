@@ -78,8 +78,9 @@ pub use crate::{
 			util::{logger::*, *},
 			*,
 		},
+		os::*,
 		sdlc::*,
-		server::{self, channel, event::*, fs_deps::*},
+		server::{self, channel, event::*},
 	},
 };
 

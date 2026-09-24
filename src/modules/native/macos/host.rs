@@ -2,10 +2,7 @@ use anyhow::Context;
 use objc2_app_kit::{NSRunningApplication, NSWorkspace};
 use objc2_foundation::NSString;
 
-use crate::{
-	model::resolver::{FS, SpecialFile, crate_root},
-	prelude::*,
-};
+use crate::{model::resolver::crate_root, prelude::*};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum ContextSource {
@@ -410,6 +407,15 @@ impl MacosHostContextProvider {
 	}
 }
 
+// # What is "Tracking"?
+//
+// - Active:       What is happening right now.
+// - Event:        A discrete thing that happened.
+// - Log:          Recorded observations/events we care about.
+// - Snapshot:     State of something at a specific point in time.
+// - Metric:       A quantified measurement derived from observations.
+// - Index:        A derived/composite representation of related metrics/data.
+//
 impl MacosHostContextProvider {
 	pub fn new(app: ContextOrigin) -> Self {
 		Self { app }

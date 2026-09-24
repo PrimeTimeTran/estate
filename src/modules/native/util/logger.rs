@@ -1,5 +1,5 @@
 use crate::{
-	model::resolver::{SpecialFile, workspace_cargo_path},
+	model::resolver::{workspace_cargo_path},
 	prelude::*,
 };
 use anyhow::Result;

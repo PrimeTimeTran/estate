@@ -37,14 +37,20 @@ icon = ["assets/icon.icns"]
 #
 # These might become seperate crates one day but until we're certain they support estate or aren't rust/prototype examples
 # then leave them here so we can easily run & use soruce from the repo.
-#
+
 [[bin]]
 name = "base"
 path = "src/bin/_base.rs"
 
 [[bin]]
+# Primary Estate/IDE/OS Daemon which monitors trackpad, keyboard, apps to
+# hopefully enable unified cmd palette, shortcuts, outline, etc.
+name = "core"
+path = "src/bin/[core].rs"
+
+[[bin]]
 name = "mpl"
-path = "src/bin/_tmp.rs"
+path = "src/bin/[mpl].rs"
 
 # Bins of Estate or high likelyhood for seperate crate/project
 # should be wrapped with [] to identify them clearly. It means we do have some
@@ -59,13 +65,13 @@ path = "src/bin/[daemon].rs"
 required-features = ["daemon"]
 
 [[bin]]
-name = "native"
-path = "src/bin/[native].rs"
+name = "gestures"
+path = "src/bin/[gestures].rs"
 required-features = ["native"]
 
 [[bin]]
-name = "runner-main"
-path = "src/bin/[runner].rs"
+name = "native"
+path = "src/bin/[native].rs"
 required-features = ["native"]
 
 [[bin]]
@@ -73,13 +79,8 @@ name = "run"
 path = "src/bin/[run].rs"
 
 [[bin]]
-name = "settings"
-path = "src/bin/settings.rs"
-required-features = ["native"]
-
-[[bin]]
-name = "server"
-path = "src/bin/[server].rs"
+name = "runner"
+path = "src/bin/[runner].rs"
 required-features = ["native"]
 
 [[bin]]
@@ -87,10 +88,20 @@ name = "sdlc"
 path = "src/bin/[sdlc].rs"
 
 [[bin]]
+name = "server"
+path = "src/bin/[server].rs"
+required-features = ["native"]
+
+[[bin]]
 name = "web"
 path = "src/bin/[web].rs"
 required-features = ["web"]
 target = "wasm32-unknown-unknown"
+
+[[bin]]
+name = "settings"
+path = "src/bin/settings.rs"
+required-features = ["native"]
 
 # Cargo Features
 ## https://doc.rust-lang.org/cargo/reference/features.html
@@ -118,6 +129,7 @@ web = [
 ]
 native = [
   "dep:notify",
+  "dep:axuielement",
   "dep:cli",
   "dep:demand",
   "dep:rmcp",
@@ -146,14 +158,16 @@ revelation.workspace = true
 
 # External
 anyhow.workspace = true
-async-broadcast = "0.7.2"
+async-broadcast.workspace = true
 async-trait.workspace = true
 chrono.workspace = true
 dirs.workspace = true
+dotenvy.workspace = true
 futures.workspace = true
 global-hotkey.workspace = true
 image.workspace = true
 lazy_static.workspace = true
+libc.workspace = true
 owo-colors.workspace = true
 pollster.workspace = true
 prost-types.workspace = true
@@ -166,7 +180,8 @@ serde-wasm-bindgen.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true
-strum = { version = "0.28", features = ["derive"] }
+strum.workspace = true
+tokio-stream.workspace = true
 toml.workspace = true
 tracing-subscriber.workspace = true
 tracing.workspace = true
@@ -174,7 +189,6 @@ url.workspace = true
 uuid.workspace = true
 wasm-bindgen-futures.workspace = true
 wasm-bridge.workspace = true
-dotenvy = "0.15.7"
 wgpu.workspace = true
 
 # Make all these optional so they can be toggled by the native feature
@@ -183,17 +197,15 @@ comfy-table = { workspace = true, optional = true }
 core-foundation = { workspace = true, optional = true }
 core-graphics = { workspace = true, optional = true }
 demand = { workspace = true, optional = true }
-egui_commonmark = { workspace = true }
-egui_extras = { workspace = true, optional = true }
 jsonc-parser = { workspace = true, optional = true }
 jsonschema = { workspace = true, optional = true }
 macos-accessibility-client = { workspace = true, optional = true }
 notify = { workspace = true, optional = true }
 signal-hook = { workspace = true, optional = true }
+tokio-util = { workspace = true, optional = true }
 tray-icon = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 web-sys = { workspace = true, optional = true }
-tokio-util = { workspace = true, optional = true }
 
 # EGUI Family Deps
 winit.workspace = true
@@ -202,18 +214,17 @@ egui-wgpu.workspace = true
 egui.workspace = true
 egui-winit.workspace = true
 eframe = { workspace = true, optional = true }
-tokio-stream = { version = "0.1.19", features = ["sync"] }
-axuielement = "0.9.1"
-libc.workspace = true
+egui_commonmark = { workspace = true }
+egui_extras = { workspace = true, optional = true }
 
+# NATIVE/OS/SERVER
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+axuielement = { workspace = true, optional = true }
 jev-sdk = { version = "0.1.0", default-features = false }
 tokio = { workspace = true, features = ["rt", "macros", "time", "sync"] }
-
-inquire = "0.9"
-ratatui = "0.30.2"
+inquire  = { workspace = true }
+ratatui.workspace = true
 crossterm = { workspace = true }
-
 objc2 = { workspace = true, optional = true }
 objc2-app-kit = { workspace = true, optional = true }
 objc2-foundation = { workspace = true, optional = true }
@@ -221,12 +232,13 @@ rmcp = { workspace = true, optional = true }
 tonic = { workspace = true, features = ["transport"] }
 tower-lsp = { workspace = true, optional = true }
 
+# CLIENT/BROWSER/WEB
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 tokio = { version = "1", default-features = false, features = ["rt", "macros", "time", "sync"] }
 getrandom = { version = "0.4.3", features = ["wasm_js"] }
 gloo-timers = { version = "0.4", features = ["futures"] }
-js-sys = { version = "0.3", optional = true }
-wasm-bindgen-futures = "0.4"
+js-sys  = { workspace = true, optional = true }
+wasm-bindgen-futures.workspace = true
 
 [build-dependencies]
 prost-build = "0.14.4"
@@ -235,7 +247,7 @@ tonic-build = "0.13.1"
 
 [profile.dev]
 # Keep file names/line numbers for panics, but drop full debug info overhead
-debug = "line-tables-only" #
+debug = "line-tables-only"
 
 [profile.dev.package."*"]
 # Compile dependencies with high optimization so your dev binary runs fast,

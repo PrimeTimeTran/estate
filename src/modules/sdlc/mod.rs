@@ -731,7 +731,6 @@ impl Sdlc {
 				None => return self.exit_no_stage(),
 			};
 			attempt = self.next_attempt(stage, &mut last_stage, &mut attempt);
-
 			self.emit(SdlcEvent::StageStarted { stage, attempt });
 			self.emit(SdlcEvent::PhaseChanged {
 				phase: SdlcPhase::Executing,

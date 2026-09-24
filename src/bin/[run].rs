@@ -11,7 +11,6 @@ mod demand_main;
 mod gestures;
 
 fn main() -> Result<()> {
-	// demand_main::main();
 	gestures::main();
 	Ok(())
 }

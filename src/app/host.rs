@@ -15,6 +15,13 @@ pub enum TerminalHost {
 }
 
 fn append_to_file(_str: String) {}
+fn sleep(_str: String) {}
+fn task() {
+	println!(
+		"The task asts the time that's used by the clock. {}",
+		time_now()
+	)
+}
 fn terminal_host() -> TerminalHost {
 	let env = std::env::vars().collect::<std::collections::HashMap<_, _>>();
 	if env.contains_key("VSCODE_INJECTION")
@@ -38,13 +45,6 @@ fn terminal_host() -> TerminalHost {
 	}
 
 	TerminalHost::Unknown
-}
-fn sleep(_str: String) {}
-fn task() {
-	println!(
-		"The task asts the time that's used by the clock. {}",
-		time_now()
-	)
 }
 fn time_now() -> String {
 	use chrono::Utc;

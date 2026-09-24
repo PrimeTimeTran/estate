@@ -12,6 +12,9 @@
 // pub use runtime::*;
 
 #[cfg(not(target_arch = "wasm32"))]
+pub mod os;
+
+#[cfg(not(target_arch = "wasm32"))]
 pub mod sdlc;
 
 #[cfg(not(target_arch = "wasm32"))]
