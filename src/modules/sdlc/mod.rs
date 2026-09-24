@@ -1448,18 +1448,18 @@ impl SdlcRuntime {
 	pub fn new(stage: Stage) -> Self {
 		Self {
 			activity: vec![],
-			stage,
 			attempt: 0,
-			started_at: Instant::now(),
-			stage_started_at: Instant::now(),
+			confidence: None,
+			history: Vec::new(),
+			message: None,
+			passed: None,
 			phase: SdlcPhase::Starting,
 			score: None,
-			confidence: None,
-			passed: None,
-			message: None,
-			history: Vec::new(),
-			total_tokens: 0,
+			stage,
+			stage_started_at: Instant::now(),
+			started_at: Instant::now(),
 			total_agent_calls: 0,
+			total_tokens: 0,
 		}
 	}
 }

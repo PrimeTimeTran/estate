@@ -4,7 +4,6 @@ use crossterm::{
 	terminal::{EnterAlternateScreen, enable_raw_mode},
 };
 use estate::prelude::*;
-
 use anyhow::{Context, anyhow};
 
 // 1. Normal run
