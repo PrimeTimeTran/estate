@@ -12,22 +12,27 @@
 # trunk-run = "trunk serve src/web/public/index.html --features web"
 
 [alias]
+# ─────────────────────────────────────────────
+# Lints
+# Fix lint issues
+# ─────────────────────────────────────────────
 fix-all-web = "fix --bin web --no-default-features --features web --target wasm32-unknown-unknown --allow-dirty"
 fix-all-native = "fix --bin native --no-default-features --features native --allow-dirty"
 
 # ─────────────────────────────────────────────
 # Builds
+# Create builds of specific binaries
 # ─────────────────────────────────────────────
 web = "build --bin web --no-default-features --target wasm32-unknown-unknown --features web"
-server = "build -q --bin server --no-default-features --features native"
-native = "build -q --bin native --no-default-features --features native"
+server = "build --bin server --no-default-features --features native"
+native = "build --bin native --no-default-features --features native"
 
 # ─────────────────────────────────────────────
 # Direct execution
 # ─────────────────────────────────────────────
 
-run-native = "run -q --bin native --no-default-features --features native"
-run-server = "run -q --bin server --no-default-features --features native"
+run-native = "run --bin native --no-default-features --features native"
+run-server = "run --bin server --no-default-features --features native"
 run-daemon = [
   "run",
   "-q",
@@ -64,7 +69,6 @@ window = "run -q --bin native --no-default-features --features native -- window"
 window-bg = "run -q --bin native --no-default-features --features native -- window --tail=false"
 window-fg = "run -q --bin native --no-default-features --features native -- window --tail=true"
 
-
 # ─────────────────────────────────────────────
 # CLI commands
 # ─────────────────────────────────────────────
@@ -74,7 +78,6 @@ doctor = "run -q --bin native --no-default-features --features native -- doctor"
 metrics = "run -q --bin native --no-default-features --features native -- metrics"
 format = "run -q --bin native --no-default-features --features native -- format"
 
-
 # ─────────────────────────────────────────────
 # Web
 # ─────────────────────────────────────────────
@@ -82,3 +85,13 @@ format = "run -q --bin native --no-default-features --features native -- format"
 trunk = "trunk build -q --release"
 trunk-run = "trunk serve src/web/public/index.html --features web"
 # trunk-it = "cargo build --bin web --target wasm32-unknown-unknown --features web && trunk serve src/web/public/index.html "
+
+[term]
+quiet = true                    # whether cargo output is quiet
+verbose = false                  # whether cargo provides verbose output
+color = 'auto'                   # whether cargo colorizes output
+hyperlinks = true                # whether cargo inserts links into output
+unicode = true                   # whether cargo can render output using non-ASCII unicode characters
+progress.when = 'auto'           # whether cargo shows progress bar
+progress.width = 80              # width of progress bar
+progress.term-integration = true # whether cargo reports progress to terminal emulator

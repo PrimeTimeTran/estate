@@ -95,7 +95,6 @@ pub enum OverlayContentInteractive {
 	Modal(Modal),
 	ShortcutHelp(ShortcutHelp),
 }
-
 pub enum OverlayContentPassive {
 	Notification(Notification),
 	Progress(ProgressOverlay),
