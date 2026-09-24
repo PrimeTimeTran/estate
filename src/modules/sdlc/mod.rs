@@ -2219,17 +2219,12 @@ mod ui {
 						.title("Human input — Enter to send"),
 				)
 				.wrap(Wrap { trim: false });
-
 			frame.render_widget(input, area);
-
 			let x = area.x + 1 + view.input.chars().count() as u16;
-
 			let y = area.y + 1;
-
 			frame.set_cursor_position(Position::new(x, y));
 		} else {
 			let footer = Paragraph::new("p pause  l logs  Ctrl+C quit");
-
 			frame.render_widget(footer, area);
 		}
 	}
