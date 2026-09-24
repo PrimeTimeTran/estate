@@ -53,68 +53,6 @@ impl Ctx for Context {
 	type GuiState = WebState;
 }
 
-impl Host<Context> {
-	pub fn init() -> Result<Self> {
-		let api = ApiService::default();
-		Self::new(Arc::new(Context::default()), api)
-	}
-}
-
-impl<Context> Host<Context>
-where
-	Context: Ctx,
-{
-	pub fn clock(&self) -> &HostClock {
-		&self.clock
-	}
-	pub fn context(&self) -> Arc<Context> {
-		self.context.clone()
-	}
-	pub fn wait_for_shutdown(&self) {
-		#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-		{
-			self.worker.block_on(async {
-				tokio::signal::ctrl_c()
-					.await
-					.expect("failed to listen for Ctrl+C");
-
-				tracing::info!("Ctrl+C received");
-			});
-		}
-	}
-	pub fn worker(&self) -> &HostWorker<Context> {
-		&self.worker
-	}
-}
-impl<C> Worker<C> for HostWorker<C>
-where
-	C: Ctx,
-{
-	type Handle = WorkHandle<C, tokio::task::JoinHandle<()>>;
-
-	fn run_background<F, Fut>(&self, task: F) -> Self::Handle
-	where
-		F: FnOnce(CancellationToken) -> Fut + 'static,
-		Fut: Future<Output = ()> + 'static,
-	{
-		let cancel = CancellationToken::new();
-		let task_cancel = cancel.clone();
-
-		wasm_bindgen_futures::spawn_local(async move {
-			task(task_cancel).await;
-		});
-
-		WorkHandle::new(cancel)
-	}
-
-	fn run_foreground<F>(&self, task: F)
-	where
-		F: Fn() + 'static,
-	{
-		task();
-	}
-}
-
 pub struct App<C: Ctx> {
 	pub host: Host<C>,
 	pub state: C::AppState,

@@ -1,3 +1,4 @@
+use crate::model::resolver::crate_root;
 use crate::{
 	prelude::*,
 	proto::{
@@ -6,6 +7,10 @@ use crate::{
 	},
 };
 use std::cmp::PartialEq;
+use tray_icon::{Icon, TrayIconBuilder};
+
+const TRAY_ICON_WIDTH: u32 = 16;
+const TRAY_ICON_HEIGHT: u32 = 16;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum AppMode {
@@ -119,13 +124,16 @@ where
 	C: Ctx,
 {
 	pub fn new(host: Host<C>) -> Result<Self> {
-		tracing::debug!("New App Native Context");
+		tracing::info!("App::new Native Context");
 		let state = C::initial_state();
 		let (cursor_event_tx, cursor_events) = std::sync::mpsc::channel();
 		let cancel = CancellationToken::new();
 
-		return Ok(Self {
+		let settings = Self::init()?;
+
+		Ok(Self {
 			cancel,
+			settings,
 			cursor_event_tx,
 			cursor_events,
 			host,
@@ -135,15 +143,16 @@ where
 			menu_bar: None,
 			tray_clock: None,
 			tray_cursor: None,
-		});
+		})
+	}
+
+	fn init() -> Result<Settings> {
+		tracing::info!("init");
+		let settings = resolver::resolve_settings(resolver::source_file(file!()), "settings.json")?;
+		println!("{}", serde_json::to_string_pretty(&settings)?);
+		Ok(settings)
 	}
 }
-
-// impl PartialEq for AppMode {
-// 	fn eq(&self, other: &Self) -> bool {
-// 		todo!()
-// 	}
-// }
 
 impl App<Context> {
 	pub fn api(&self) -> &ApiService {
@@ -171,11 +180,12 @@ impl App<Context> {
 		let event_tx = self.host.event_bus.sender();
 		self.host.runtime.attach_event_proxy(proxy);
 
-		#[cfg(not(feature = "daemon"))]
+		// #[cfg(not(feature = "daemon"))]
 		{
 			let mut renderer = structs::Renderer::<Context, <Context as Ctx>::AppState>::new(
 				self.host.context(),
 				self.state.clone(),
+				Arc::new(self.settings.clone()),
 				cancel,
 				event_rx,
 				event_tx,
@@ -332,41 +342,20 @@ where
 	NativeCtx: Ctx + 'static,
 	S: Send + Sync + 'static,
 {
-	fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
-		tracing::debug!("about_to_wait");
-		// self.app.update();
-		#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-		while let Ok(event) = MenuEvent::receiver().try_recv() {
-			tracing::info!("MenuEvent::receiver");
-			println!("MenuEvent::receiver");
-			self.handle_event(event, event_loop);
-		}
-	}
-	fn device_event(
-		&mut self,
-		_event_loop: &ActiveEventLoop,
-		_device_id: winit::event::DeviceId,
-		_event: winit::event::DeviceEvent,
-	) {
-		tracing::debug!("device_event");
-	}
-	fn exiting(&mut self, _event_loop: &ActiveEventLoop) {
-		tracing::debug!("exiting")
-	}
-	fn memory_warning(&mut self, _event_loop: &ActiveEventLoop) {
-		tracing::debug!("memory_warning")
-	}
 	fn new_events(&mut self, _event_loop: &ActiveEventLoop, _cause: winit::event::StartCause) {
 		tracing::debug!("new_events")
 	}
 	fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+		#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+		if self.settings.has_tray_icon == Some(true) {
+			self.init_tray();
+		}
+
 		tracing::debug!("🔥 RESUMED");
+
 		if self.windows.is_empty() {
 			self.open_window(event_loop, crate::START_WINDOW);
 		}
-	}
-	fn suspended(&mut self, _event_loop: &ActiveEventLoop) {
-		tracing::info!("suspended")
 	}
 	fn user_event(&mut self, _event_loop: &ActiveEventLoop, event: AppEvent) {
 		tracing::debug!("user_event");
@@ -398,7 +387,6 @@ where
 			_ => {}
 		}
 	}
-
 	fn window_event(
 		&mut self,
 		_event_loop: &ActiveEventLoop,
@@ -451,8 +439,97 @@ where
 			_ => {}
 		}
 	}
-}
+	fn device_event(
+		&mut self,
+		_event_loop: &ActiveEventLoop,
+		_device_id: winit::event::DeviceId,
+		_event: winit::event::DeviceEvent,
+	) {
+		tracing::debug!("device_event");
+	}
+	fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
+		tracing::debug!("about_to_wait");
+		// self.app.update();
+		#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+		while let Ok(event) = MenuEvent::receiver().try_recv() {
+			tracing::info!("MenuEvent::receiver");
+			println!("MenuEvent::receiver");
+			self.handle_event(event, event_loop);
+		}
+	}
+	fn suspended(&mut self, _event_loop: &ActiveEventLoop) {
+		tracing::info!("suspended")
+	}
+	fn exiting(&mut self, _event_loop: &ActiveEventLoop) {
+		tracing::debug!("exiting")
+	}
 
+	fn memory_warning(&mut self, _event_loop: &ActiveEventLoop) {
+		tracing::debug!("memory_warning")
+	}
+}
+impl<NativeCtx, S> structs::Renderer<NativeCtx, S>
+where
+	NativeCtx: Ctx,
+{
+	// #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+	fn _init_tray(&mut self) -> anyhow::Result<()> {
+		if self.tray_cursor.is_some() {
+			return Ok(());
+		}
+
+		let mut rgba = vec![0u8; (TRAY_ICON_WIDTH * TRAY_ICON_HEIGHT * 4) as usize];
+
+		for y in 0..TRAY_ICON_HEIGHT {
+			for x in 0..TRAY_ICON_WIDTH {
+				let dx = x as f32 - 7.5;
+				let dy = y as f32 - 7.5;
+
+				if dx * dx + dy * dy <= 49.0 {
+					let i = ((y * TRAY_ICON_WIDTH + x) * 4) as usize;
+					rgba[i..i + 4].copy_from_slice(&[0, 0, 0, 255]);
+				}
+			}
+		}
+
+		let icon = Icon::from_rgba(rgba, TRAY_ICON_WIDTH, TRAY_ICON_HEIGHT)?;
+
+		// let tray = TrayIconBuilder::new()
+		// 	.with_icon(icon)
+		// 	.with_icon_as_template(true)
+		// 	.with_tooltip("Estate")
+		// 	.build()?;
+
+		let tray = TrayIconBuilder::new()
+			.with_icon(icon)
+			.with_icon_as_template(true)
+			.with_tooltip("Estate")
+			.build()
+			.expect("failed to create tray icon");
+
+		self.tray_cursor = Some(tray);
+		Ok(())
+	}
+
+	fn init_tray(&mut self) -> anyhow::Result<()> {
+		if self.tray_cursor.is_some() {
+			return Ok(());
+		}
+		const TRAY_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/estate-tray.png"));
+		let image = image::load_from_memory(TRAY_PNG)?.into_rgba8();
+		let (width, height) = image.dimensions();
+		let icon = Icon::from_rgba(image.into_raw(), width, height)?;
+		let tray = TrayIconBuilder::new()
+			.with_icon(icon)
+			.with_icon_as_template(true)
+			.with_tooltip("Estate")
+			.build()?;
+
+		self.tray_cursor = Some(tray);
+
+		Ok(())
+	}
+}
 impl Context {
 	fn new(state: NativeState, api: ApiService) -> Self {
 		Self { state, api }
@@ -536,7 +613,8 @@ impl Host<Context> {
 		// Context is still uniquely owned here.
 		let mut context = Context::default();
 
-		// Daemon doesn't need this yet.
+		// Daemon may not need this
+		// This requires server access
 		#[cfg(not(feature = "daemon"))]
 		{
 			// Connect using the same runtime that Host will retain.
@@ -589,6 +667,10 @@ where
 	}
 	fn open_window(&mut self, event_loop: &ActiveEventLoop, kind: WindowType) {
 		tracing::info!(" open window start");
+		#[cfg(feature = "daemon")]
+		{
+			return;
+		}
 		if self.window_by_type(kind).is_some() {
 			return;
 		}
@@ -728,6 +810,7 @@ pub struct App<C: Ctx> {
 	pub state: C::AppState,
 	pub workers: Vec<WorkHandle<C, tokio::task::JoinHandle<()>>>,
 	mode: AppMode,
+	pub settings: Settings,
 	pub cancel: CancellationToken,
 	pub menu_bar: Option<MenuBar>,
 	pub tray_clock: Option<MenuBar>,

@@ -1,39 +1,96 @@
 use crate::prelude::*;
 
 use anyhow::{Context, Result, anyhow};
-use serde::{Serialize, de::DeserializeOwned};
-use std::{
-	fs,
-	io::Write,
-	path::{Path, PathBuf},
-};
+// use std::{
+// 	fs,
+// 	path::{Path, PathBuf},
+// };
+
+pub fn crate_root() -> PathBuf {
+	PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+}
+
+pub fn source_file(file: &str) -> PathBuf {
+	crate_root().join(file)
+}
 
 pub fn filesystem_root(path: &Path) -> PathBuf {
 	path.ancestors().last().unwrap().to_path_buf()
 }
-pub fn crate_root() -> PathBuf {
-	PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+const PRECEDENCE: &[&str] = &["default", "profile", "project", "workspace"];
+
+pub fn resolve_settings(file: impl AsRef<Path>, filename: &str) -> Result<Settings> {
+	let walker = FsWalker::new_from_ref(file);
+
+	let files = walker
+		.find_named(filename)
+		.with_context(|| format!("failed to find `{filename}`"))?;
+
+	let mut layers: Vec<(String, serde_json::Map<String, serde_json::Value>)> = Vec::new();
+
+	for path in files {
+		let contents =
+			fs::read_to_string(&path).with_context(|| format!("failed to read {}", path.display()))?;
+
+		let value: serde_json::Value = serde_json::from_str(&contents)
+			.with_context(|| format!("failed to parse {}", path.display()))?;
+
+		let object = value
+			.as_object()
+			.with_context(|| format!("{} must contain a JSON object", path.display()))?;
+
+		let type_name = object
+			.get("type")
+			.and_then(serde_json::Value::as_str)
+			.with_context(|| format!("{} is missing a string `type`", path.display()))?;
+
+		if !PRECEDENCE.contains(&type_name) {
+			anyhow::bail!("{} has unknown settings type `{type_name}`", path.display());
+		}
+
+		layers.push((type_name.to_owned(), object.clone()));
+	}
+
+	// Lowest → highest precedence.
+	layers.sort_by_key(|(type_name, _)| {
+		PRECEDENCE
+			.iter()
+			.position(|name| *name == type_name)
+			.unwrap()
+	});
+
+	let mut resolved = serde_json::Map::new();
+
+	for (_, settings) in layers {
+		for (key, value) in settings {
+			resolved.insert(key, value);
+		}
+	}
+
+	let settings: Settings = serde_json::from_value(serde_json::Value::Object(resolved))?;
+
+	Ok(settings)
 }
 pub fn ws_path() -> Result<PathBuf> {
 	let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
 
 	loop {
 		let cargo_toml = path.join("Cargo.toml");
+
 		if cargo_toml.is_file() {
 			let contents = fs::read_to_string(&cargo_toml)?;
+
 			if contents.contains("[workspace]") {
 				return Ok(path);
 			}
 		}
+
 		if !path.pop() {
 			break;
 		}
 	}
 
-	Err(anyhow!(
-		"could not locate workspace root from {}",
-		env!("CARGO_MANIFEST_DIR")
-	))
+	anyhow::bail!("could not find workspace root")
 }
 pub fn home_dir() -> Result<PathBuf> {
 	dirs::home_dir().ok_or_else(|| anyhow!("Could not determine home directory"))

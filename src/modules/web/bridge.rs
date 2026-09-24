@@ -1,4 +1,4 @@
-use crate::{prelude::*, ui::*};
+use crate::{modules::web::*, prelude::*, ui::*};
 
 use eframe::{self, WebOptions, WebRunner};
 use serde::{Deserialize, Serialize};

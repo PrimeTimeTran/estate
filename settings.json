@@ -1,0 +1,10 @@
+{
+  "type": "project",
+  "file_path": "/Users/future/kb/project/crates/estate/settings.json",
+  "collision_key": "a_project/settings.json",
+  "is_from": "a_project/settings.json",
+  "is_tray_app": true,
+  "has_tray_icon": true,
+  "is_collision": "a_project/settings.json",
+  "setting_from_type_project": "is_project"
+}

@@ -49,6 +49,11 @@ pub struct EstateState {
 	pub jobs: VecDeque<Job>,
 }
 
+#[cfg(feature = "web")]
+#[derive(Clone)]
+pub struct HostClock;
+
+#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 #[derive(Clone)]
 pub struct HostClock {
 	#[cfg(feature = "native")]
@@ -83,7 +88,16 @@ where
 	pub cancel: CancellationToken,
 	pub event_rx: C::EventReceiver,
 	pub event_tx: C::EventSender,
+	pub settings: Arc<Settings>,
+
+	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 	pub windows: Vec<AppWindow<C, S>>,
+	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+	pub menu_bar: Option<MenuBar>,
+	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+	pub tray_clock: Option<MenuBar>,
+	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+	pub tray_cursor: Option<TrayIcon>,
 }
 /// ## [S]
 ///

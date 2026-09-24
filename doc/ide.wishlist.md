@@ -5,6 +5,7 @@
 3. Dup press revealed palettes
 4. Sustained revealed palettes
 5. Dock Regex search, option arrow filter cycle results
+6. Cmd palette tabs with focus
 
 Outline panel should support multiple ways of searching
 

@@ -108,9 +108,9 @@ required-features = ["native"]
 
 # [PICK 1]
 # default = []
-# default = ["web"]
-default = ["native"]
-sdlc = ["native"]
+default = ["web"]
+# default = ["native"]
+# sdlc = ["native"]
 mobile = []
 daemon = []
 web = [

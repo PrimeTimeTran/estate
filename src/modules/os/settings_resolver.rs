@@ -17,7 +17,7 @@
 // For example
 // 1. VSCode settings global
 // 2. VSCode settings project
-// 3. VScode settings workspace
+// 3. VSCode settings workspace
 //
 // They all have different page but the same shape and name.
 // So I want to do this for my estate project again.
@@ -31,9 +31,16 @@ pub struct FsWalker {
 }
 
 impl FsWalker {
+	pub fn new_from_ref(target: impl AsRef<Path>) -> Self {
+		let target = target.as_ref().to_path_buf();
+
+		Self {
+			root: Self::fs_root(&target),
+			target,
+		}
+	}
 	pub fn new(target: impl Into<PathBuf>) -> Self {
 		let target = target.into();
-
 		Self {
 			root: Self::fs_root(&target),
 			target,
@@ -79,130 +86,269 @@ impl FsWalker {
 	}
 }
 
-// Example resolution hierarchy:
-//
-// /Users/install-of-app-bin-tool-framework/settings.default.json
-// /Users/future/personal/settings.global.json
-// /Users/future/kb/project/settings.workspace.json
-// /Users/future/kb/project/crates/estate/settings.project.json
-//
 
-// cargo nextest run -p estate -E 'test(/settings_resolver_/)'
-// cargo nextest run -p estate -E 'test(settings_resolver_finds_files) or test(settings_resolver_resolves_precedence) or test(settings_resolver_falls_back)'
-const SETTINGS_FILES: &[&str] = &[
-	// Lowest precedence
-	"settings.default.json",
-	// Global personal
-	"settings.global.json",
-	// Project specific
-	"settings.project.json",
-	// Highest precedence
-	"settings.workspace.json",
-];
-fn find_settings(walker: &FsWalker) -> std::io::Result<Vec<PathBuf>> {
-	let mut found = Vec::new();
-	for name in SETTINGS_FILES {
-		found.extend(walker.find_named(name)?);
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use ::macros::vow;
+	use serde_json::{Value, json};
+	use std::{
+		fs,
+		path::{Path, PathBuf},
+		sync::atomic::{AtomicU64, Ordering},
+	};
+	use crate::prelude::*;
+	use crate::native::resolver::resolve_settings;
+
+	const SETTINGS_FILENAME: &str = "settings.json";
+
+	// Each file is on the target's ancestor path:
+	//
+	// root/settings.json                         default
+	// root/future/settings.json                  profile
+	// root/future/kb/project/settings.json       workspace
+	// root/future/kb/project/crates/estate/
+	//     settings.json                          project
+	//
+	// The workspace file is farther from the target than
+	// the project file. It must still take precedence because
+	// the JSON "type", not path proximity, determines priority.
+
+	static NEXT_FIXTURE_ID: AtomicU64 = AtomicU64::new(0);
+
+	struct SettingsFixture {
+		root: PathBuf,
+		target: PathBuf,
 	}
-	Ok(found)
-}
-fn create_settings_fixture() -> std::io::Result<(PathBuf, PathBuf)> {
-	let root = std::env::temp_dir().join(format!("estate-fs-walker-{}", std::process::id()));
-	let project = root.join("future/kb/project");
-	let target = project.join("crates/estate");
-	std::fs::create_dir_all(root.join("install-of-app-bin-tool-framework"))?;
-	std::fs::create_dir_all(root.join("future/personal"))?;
-	std::fs::create_dir_all(&target)?;
-	std::fs::write(
-		root.join("install-of-app-bin-tool-framework/settings.default.json"),
-		r#"{"source":"default"}"#,
-	)?;
-	std::fs::write(
-		root.join("future/personal/settings.global.json"),
-		r#"{"source":"global"}"#,
-	)?;
-	std::fs::write(
-		project.join("settings.workspace.json"),
-		r#"{"source":"workspace"}"#,
-	)?;
-	std::fs::write(
-		target.join("settings.project.json"),
-		r#"{"source":"project"}"#,
-	)?;
-	Ok((root, target))
-}
 
-#[test]
-fn settings_resolver_finds_files() -> std::io::Result<()> {
-	let (root, target) = create_settings_fixture()?;
-	let walker = FsWalker::new(&target);
-	let found = find_settings(&walker)?;
-	println!("\nSettings files found:");
-	for path in &found {
-		println!("  {}", path.display());
+	impl SettingsFixture {
+		fn new() -> std::io::Result<Self> {
+			let id = NEXT_FIXTURE_ID.fetch_add(1, Ordering::Relaxed);
+
+			let root = std::env::temp_dir().join(format!(
+				"estate-settings-{}-{id}",
+				std::process::id()
+			));
+
+			let target = root.join("future/kb/project/crates/estate");
+			fs::create_dir_all(&target)?;
+
+			let fixture = Self { root, target };
+
+			fixture.write_default(json!({
+				"type": "default",
+				"log_path": false,
+				"is_tray_visible": false
+			}))?;
+
+			fixture.write_profile(json!({
+				"type": "profile",
+				"log_path": true
+			}))?;
+
+			fixture.write_project(json!({
+				"type": "project",
+				"is_tray_app": true,
+				"is_tray_visible": false
+			}))?;
+
+			fixture.write_workspace(json!({
+				"type": "workspace",
+				"is_tray_visible": true
+			}))?;
+
+			Ok(fixture)
+		}
+		fn default_path(&self) -> PathBuf {
+			self.root.join(SETTINGS_FILENAME)
+		}
+		fn profile_path(&self) -> PathBuf {
+			self.root.join("future").join(SETTINGS_FILENAME)
+		}
+		fn project_path(&self) -> PathBuf {
+			self.target.join(SETTINGS_FILENAME)
+		}
+		fn workspace_path(&self) -> PathBuf {
+			self.root
+				.join("future/kb/project")
+				.join(SETTINGS_FILENAME)
+		}
+		fn write(path: &Path, value: Value) -> std::io::Result<()> {
+			fs::write(path, serde_json::to_string_pretty(&value)?)
+		}
+		fn write_default(&self, value: Value) -> std::io::Result<()> {
+			Self::write(&self.default_path(), value)
+		}
+		fn write_profile(&self, value: Value) -> std::io::Result<()> {
+			Self::write(&self.profile_path(), value)
+		}
+		fn write_project(&self, value: Value) -> std::io::Result<()> {
+			Self::write(&self.project_path(), value)
+		}
+		fn write_workspace(&self, value: Value) -> std::io::Result<()> {
+			Self::write(&self.workspace_path(), value)
+		}
+
+		fn resolve(&self) -> anyhow::Result<Value> {
+			let settings =
+				resolve_settings(&self.target, SETTINGS_FILENAME)?;
+			Ok(serde_json::to_value(settings)?)
+		}
 	}
-	assert_eq!(found.len(), 2);
-	assert!(found.iter().any(|p| p.ends_with("settings.workspace.json")));
-	assert!(found.iter().any(|p| p.ends_with("settings.project.json")));
-	std::fs::remove_dir_all(root)?;
-	Ok(())
-}
 
-
-#[test]
-fn settings_resolver_resolves_precedence() -> std::io::Result<()> {
-	let (root, target) = create_settings_fixture()?;
-	let walker = FsWalker::new(&target);
-	let names = [
-		"settings.default.json",
-		"settings.global.json",
-		"settings.workspace.json",
-		"settings.project.json",
-	];
-
-	let mut found = Vec::new();
-	for name in names {
-		found.extend(walker.find_named(name)?);
+	impl Drop for SettingsFixture {
+		fn drop(&mut self) {
+			let _ = fs::remove_dir_all(&self.root);
+		}
 	}
-	// For now, make the precedence explicit:
-	// workspace > project > global > default
-	let resolved = found
-		.iter()
-		.find(|path| path.ends_with("settings.project.json"))
-		.unwrap();
-	let contents = std::fs::read_to_string(resolved)?;
-	assert!(contents.contains(r#""source":"project""#));
-	println!("\nResolved settings:");
-	println!("  {}", resolved.display());
-	println!("  {}", contents);
-	std::fs::remove_dir_all(root)?;
-	Ok(())
-}
 
-#[test]
-fn settings_resolver_falls_back() -> std::io::Result<()> {
-	let (root, target) = create_settings_fixture()?;
-	std::fs::remove_file(target.join("settings.project.json"))?;
-	let walker = FsWalker::new(&target);
-	let names = [
-		"settings.default.json",
-		"settings.global.json",
-		"settings.workspace.json",
-		"settings.project.json",
-	];
-	let mut found = Vec::new();
-	for name in names {
-		found.extend(walker.find_named(name)?);
-	}
-	let resolved = found
-		.iter()
-		.find(|path| path.ends_with("settings.workspace.json"))
-		.unwrap();
-	let contents = std::fs::read_to_string(resolved)?;
-	assert!(contents.contains(r#""source":"workspace""#));
-	println!("\nResolved settings after removing project:");
-	println!("  {}", resolved.display());
-	println!("  {}", contents);
-	std::fs::remove_dir_all(root)?;
-	Ok(())
+	vow!(settings_resolver_finds_files, {
+		let fixture = SettingsFixture::new().unwrap();
+		let walker = FsWalker::new(&fixture.target);
+
+		let found = walker.find_named(SETTINGS_FILENAME).unwrap();
+
+		assert_eq!(found.len(), 4);
+		assert!(found.contains(&fixture.default_path()));
+		assert!(found.contains(&fixture.profile_path()));
+		assert!(found.contains(&fixture.project_path()));
+		assert!(found.contains(&fixture.workspace_path()));
+
+		println!("Discovered settings:");
+		for path in found {
+			println!("  {}", path.display());
+		}
+	});
+
+	vow!(settings_resolver_resolves_precedence, {
+		let fixture = SettingsFixture::new().unwrap();
+		let resolved = fixture.resolve().unwrap();
+
+		// Workspace overrides project, even though project
+		// is physically closer to the target.
+		assert_eq!(resolved["type"], "workspace");
+		assert_eq!(resolved["is_tray_visible"], true);
+
+		// Values absent from workspace survive from lower layers.
+		assert_eq!(resolved["is_tray_app"], true);
+		assert_eq!(resolved["log_path"], true);
+
+		println!(
+			"Resolved settings:\n{}",
+			serde_json::to_string_pretty(&resolved).unwrap()
+		);
+	});
+
+	vow!(settings_resolver_falls_back, {
+		let fixture = SettingsFixture::new().unwrap();
+
+		fs::remove_file(fixture.workspace_path()).unwrap();
+
+		let resolved = fixture.resolve().unwrap();
+
+		assert_eq!(resolved["type"], "project");
+		assert_eq!(resolved["is_tray_visible"], false);
+		assert_eq!(resolved["is_tray_app"], true);
+		assert_eq!(resolved["log_path"], true);
+	});
+
+	vow!(settings_resolver_falls_back_to_profile, {
+		let fixture = SettingsFixture::new().unwrap();
+
+		fs::remove_file(fixture.workspace_path()).unwrap();
+		fs::remove_file(fixture.project_path()).unwrap();
+
+		let resolved = fixture.resolve().unwrap();
+
+		assert_eq!(resolved["type"], "profile");
+		assert_eq!(resolved["log_path"], true);
+		assert_eq!(resolved["is_tray_visible"], false);
+	});
+
+	vow!(settings_resolver_falls_back_to_default, {
+		let fixture = SettingsFixture::new().unwrap();
+
+		fs::remove_file(fixture.workspace_path()).unwrap();
+		fs::remove_file(fixture.project_path()).unwrap();
+		fs::remove_file(fixture.profile_path()).unwrap();
+
+		let resolved = fixture.resolve().unwrap();
+
+		assert_eq!(resolved["type"], "default");
+		assert_eq!(resolved["log_path"], false);
+		assert_eq!(resolved["is_tray_visible"], false);
+	});
+
+	vow!(settings_resolver_uses_json_type_not_filename, {
+		let fixture = SettingsFixture::new().unwrap();
+
+		// Deliberately swap the types without moving the files.
+		fixture.write_project(json!({
+			"type": "workspace",
+			"is_tray_app": true,
+			"is_tray_visible": true
+		})).unwrap();
+
+		fixture.write_workspace(json!({
+			"type": "project",
+			"is_tray_visible": false
+		})).unwrap();
+
+		let resolved = fixture.resolve().unwrap();
+
+		assert_eq!(resolved["type"], "workspace");
+		assert_eq!(resolved["is_tray_visible"], true);
+	});
+
+	vow!(settings_resolver_rejects_unknown_type, {
+		let fixture = SettingsFixture::new().unwrap();
+
+		fixture.write_workspace(json!({
+			"type": "unrecognized",
+			"is_tray_visible": true
+		})).unwrap();
+
+		assert!(fixture.resolve().is_err());
+	});
+
+	vow!(settings_resolver_rejects_missing_type, {
+		let fixture = SettingsFixture::new().unwrap();
+
+		fixture.write_workspace(json!({
+			"is_tray_visible": true
+		})).unwrap();
+
+		assert!(fixture.resolve().is_err());
+	});
+
+	vow!(settings_resolver_rejects_invalid_json, {
+		let fixture = SettingsFixture::new().unwrap();
+
+		fs::write(
+			fixture.workspace_path(),
+			r#"{"type":"workspace","log_path":}"#,
+		).unwrap();
+
+		assert!(fixture.resolve().is_err());
+	});
+
+	vow!(settings_resolver_serializes_in_schema_order, {
+		let fixture = SettingsFixture::new().unwrap();
+
+		// Serialize the typed Settings directly.
+		// Converting to Value first can reorder map keys.
+		let settings =
+			resolve_settings(&fixture.target, SETTINGS_FILENAME).unwrap();
+
+		let output = serde_json::to_string_pretty(&settings).unwrap();
+
+		let type_pos = output.find("\"type\"").unwrap();
+		let tray_pos = output.find("\"is_tray_app\"").unwrap();
+		let logging_pos = output.find("\"log_path\"").unwrap();
+
+		// Adjust these assertions to your actual Settings
+		// struct declaration order.
+		assert!(type_pos < tray_pos);
+		assert!(tray_pos < logging_pos);
+	});
 }

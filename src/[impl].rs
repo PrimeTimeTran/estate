@@ -101,19 +101,28 @@ where
 	pub fn new(
 		context: Arc<C>,
 		state: S,
+		settings: Arc<Settings>,
 		cancel: CancellationToken,
 		event_rx: C::EventReceiver,
 		event_tx: C::EventSender,
 	) -> Self {
 		Self {
-			cancel,
-			state,
 			event_rx,
+			cancel,
+			settings,
+			state,
 			event_tx,
 			context,
 			view: ViewType::MarkdownScreen,
-			// #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+			#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 			windows: vec![],
+
+			#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+			menu_bar: None,
+			#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+			tray_clock: None,
+			#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+			tray_cursor: None,
 		}
 	}
 	pub fn process_events(&mut self) {
@@ -129,8 +138,10 @@ where
 					last_revision: 0,
 				};
 
+				#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 				tracing::info!("windows: {}", self.windows.len());
 
+				#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 				for window in &mut self.windows {
 					tracing::info!("dispatching event to screen");
 					window.window.screen.event(&event, &mut ctx);
@@ -158,8 +169,11 @@ where
 					last_revision: 0,
 				};
 
-				tracing::info!("windows: {}", self.windows.len());
 
+
+				#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+				tracing::info!("windows: {}", self.windows.len());
+				#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 				for window in &mut self.windows {
 					tracing::info!("dispatching event to screen");
 					window.window.screen.event(&event, &mut ctx);
@@ -173,6 +187,7 @@ where
 			}
 		}
 	}
+	
 	pub fn sync_views(&mut self) {
 		tracing::info!("sync_views");
 		#[cfg(all(feature = "native", not(target_arch = "wasm32")))]

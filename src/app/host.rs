@@ -54,51 +54,6 @@ fn time_now() -> String {
 }
 
 impl<C: Ctx> Host<C> {
-	#[cfg(all(feature = "web", target_arch = "wasm32"))]
-	pub fn new(context: Arc<C>, _api: ApiService) -> anyhow::Result<Self> {
-		let clock = HostClock {};
-
-		Ok(Self {
-			context,
-			clock,
-			worker: HostWorker::new(),
-		})
-	}
-
-	// #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-	// pub fn new(context: Arc<C>) -> anyhow::Result<Self> {
-	// 	let tokio = tokio::runtime::Runtime::new()?;
-	// 	let handle = tokio.handle().clone();
-	// 	let event_bus = EventBus::new();
-	// 	let runtime = NativeRuntime::new(Arc::clone(&context), handle.clone(), event_bus.clone())?;
-	// 	runtime.start_dispatcher();
-	// 	Ok(Self {
-	// 		context,
-	// 		runtime,
-	// 		event_bus,
-	// 		worker: HostWorker::new(),
-	// 		clock: HostClock::new(handle),
-	// 		tokio,
-	// 	})
-	// }
-	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-	pub fn new(context: Arc<C>, tokio: tokio::runtime::Runtime) -> anyhow::Result<Self> {
-		let handle = tokio.handle().clone();
-		let event_bus = EventBus::new();
-
-		let runtime = NativeRuntime::new(Arc::clone(&context), handle.clone(), event_bus.clone())?;
-
-		runtime.start_dispatcher();
-
-		Ok(Self {
-			context,
-			runtime,
-			event_bus,
-			worker: HostWorker::new(),
-			clock: HostClock::new(handle),
-			tokio,
-		})
-	}
 	pub fn context_ref(&self) -> &C {
 		&self.context
 	}
@@ -278,7 +233,6 @@ where
 
 	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 	pub event_bus: EventBus,
-
 	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 	pub runtime: Arc<NativeRuntime<C>>,
 	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]

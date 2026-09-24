@@ -50,14 +50,14 @@ use uuid::Timestamp;
 
 #[path = "[enum].rs"]
 pub mod enums;
+#[path = "[struct].rs"]
+pub mod event_structs;
 #[path = "[impl].rs"]
 pub mod impls;
-#[path = "[struct].rs"]
-pub mod structs;
 
 pub use enums::*;
+pub use event_structs::*;
 pub use impls::*;
-pub use structs::*;
 
 /// Client-side event service.
 ///

@@ -284,6 +284,23 @@ fn frontmost_app(workspace: &NSWorkspace) -> serde_json::Value {
 			.map(|path| path.to_string()),
 	})
 }
+
+impl<C: Ctx> Host<C> {
+	pub fn new(context: Arc<C>, tokio: tokio::runtime::Runtime) -> anyhow::Result<Self> {
+		let handle = tokio.handle().clone();
+		let event_bus = EventBus::new();
+		let runtime = NativeRuntime::new(Arc::clone(&context), handle.clone(), event_bus.clone())?;
+		runtime.start_dispatcher();
+		Ok(Self {
+			context,
+			runtime,
+			event_bus,
+			worker: HostWorker::new(),
+			clock: HostClock::new(handle),
+			tokio,
+		})
+	}
+}
 impl<P> HostContextWatcher<P>
 where
 	P: HostContextProvider,

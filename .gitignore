@@ -6,3 +6,6 @@ target/
 tmp/
 .ollamassist
 .env*
+*.mp4
+*.part
+*.ytdl
