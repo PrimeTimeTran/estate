@@ -6,11 +6,6 @@ use crate::{
 
 use anyhow::{Context, Result, anyhow};
 use serde::{Serialize, de::DeserializeOwned};
-// use std::{
-// 	fs,
-// 	io::Write,
-// 	path::{Path, PathBuf},
-// };
 
 #[derive(Debug, Clone, Copy)]
 pub enum SessionFile {

@@ -875,43 +875,45 @@ use crate::prelude::*;
 // 		Ok(())
 // 	}
 // }
-// impl NativeApp {
-// 	fn bootstrap() -> Result<(TrayMenu, TrayIcon)> {
-// 		bootstrap()
-// 	}
-// 	fn window_by_type(&mut self, kind: WindowType) -> Option<&mut AppWindow> {
-// 		self.windows.iter_mut().find(|window| window.kind == kind)
-// 	}
-// 	fn handle_event(&mut self, event: MenuEvent, event_loop: &ActiveEventLoop) {
-// 		let Some(menu) = self.menu.as_ref() else {
-// 			return;
-// 		};
-// 		let id = event.id();
-// 		if id == menu.quit.id() {
-// 			tracing::debug!(">>> tray quit requested");
-// 			self.request_shutdown(event_loop);
-// 			tracing::debug!(">>> event_loop.exit() called");
-// 		} else if id == menu.dev.id() {
-// 			self.open_window(event_loop, WindowType::DashboardScreen);
-// 		} else if id == menu.oracle.id() {
-// 			self.open_window(event_loop, WindowType::OracleScreen);
-// 		} else if id == menu.task_manager.id() {
-// 			self.open_window(event_loop, WindowType::TaskManagerScreen);
-// 		} else if id == menu.new_task.id() {
-// 			self.new_task();
-// 		} else if id == menu.list_tasks.id() {
-// 			self.show_tasks();
-// 		} else if id == menu.clear_tasks.id() {
-// 			self.clear_tasks();
-// 		} else if id == menu.problem_screen.id() {
-// 			tracing::info!("🧭 Menu → ProblemsScreen");
-// 			self
-// 				.runtime()
-// 				.emit(e::Event::app(e::Klass::Navigate(ViewType::ProblemsScreen)));
-// 			self.open_window(event_loop, WindowType::ProblemsScreen);
-// 		}
-// 	}
-// }
+struct DesktopApp() {
+}
+impl DesktopApp {
+	fn bootstrap() -> Result<(TrayMenu, TrayIcon)> {
+		bootstrap()
+	}
+	fn window_by_type(&mut self, kind: WindowType) -> Option<&mut AppWindow> {
+		self.windows.iter_mut().find(|window| window.kind == kind)
+	}
+	fn handle_event(&mut self, event: MenuEvent, event_loop: &ActiveEventLoop) {
+		let Some(menu) = self.menu.as_ref() else {
+			return;
+		};
+		let id = event.id();
+		if id == menu.quit.id() {
+			tracing::debug!(">>> tray quit requested");
+			self.request_shutdown(event_loop);
+			tracing::debug!(">>> event_loop.exit() called");
+		} else if id == menu.dev.id() {
+			self.open_window(event_loop, WindowType::DashboardScreen);
+		} else if id == menu.oracle.id() {
+			self.open_window(event_loop, WindowType::OracleScreen);
+		} else if id == menu.task_manager.id() {
+			self.open_window(event_loop, WindowType::TaskManagerScreen);
+		} else if id == menu.new_task.id() {
+			self.new_task();
+		} else if id == menu.list_tasks.id() {
+			self.show_tasks();
+		} else if id == menu.clear_tasks.id() {
+			self.clear_tasks();
+		} else if id == menu.problem_screen.id() {
+			tracing::info!("🧭 Menu → ProblemsScreen");
+			self
+				.runtime()
+				.emit(e::Event::app(e::Klass::Navigate(ViewType::ProblemsScreen)));
+			self.open_window(event_loop, WindowType::ProblemsScreen);
+		}
+	}
+}
 // impl NativeApp {
 // 	fn new_task(&mut self) {
 // 		self.runtime().emit(e::Event::app(e::Klass::TaskRequested {

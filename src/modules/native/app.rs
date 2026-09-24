@@ -132,10 +132,13 @@ where
 			state,
 			workers: vec![],
 			mode: get_app_mode(),
+			menu_bar: None,
+			tray_clock: None,
+			tray_cursor: None,
 		});
 	}
 }
-//
+
 // impl PartialEq for AppMode {
 // 	fn eq(&self, other: &Self) -> bool {
 // 		todo!()
@@ -239,7 +242,6 @@ where
 				}
 			}
 		});
-
 		Ok(handle)
 	}
 	pub fn start_cargo_watcher(&mut self) -> Result<WorkHandle<C, tokio::task::JoinHandle<()>>> {
@@ -727,15 +729,15 @@ pub struct App<C: Ctx> {
 	pub workers: Vec<WorkHandle<C, tokio::task::JoinHandle<()>>>,
 	mode: AppMode,
 	pub cancel: CancellationToken,
+	pub menu_bar: Option<MenuBar>,
+	pub tray_clock: Option<MenuBar>,
+	pub tray_cursor: Option<TrayIcon>,
 }
 
 #[derive(Clone)]
 pub struct Context {
 	pub state: NativeState,
 	pub api: ApiService,
-	// pub menu_bar: Option<MenuBar>,
-	// pub tray_clock: Option<MenuBar>,
-	// pub tray_cursor: Option<TrayIcon>,
 }
 
 #[derive(Debug, Clone)]

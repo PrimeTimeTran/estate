@@ -3,8 +3,8 @@
 # false positive if we don't use --no-default-features flag when testing.
 # [alias]
 # server = "build -q --bin server --no-default-features --features native"
-# run-server = "run -q --bin server --no-default-features --features=native"
-# run-native = "run -q --bin native --no-default-features --features native"
+# run-server = "run --bin server --no-default-features --features=native"
+# run-native = "run --bin native --no-default-features --features native"
 
 # # No build. The Wasm is run with other server.
 # web = "build -q --bin web --no-default-features --features web --target wasm32-unknown-unknown"
@@ -30,7 +30,6 @@ native = "build --bin native --no-default-features --features native"
 # ─────────────────────────────────────────────
 # Direct execution
 # ─────────────────────────────────────────────
-
 run-native = "run --bin native --no-default-features --features native"
 run-server = "run --bin server --no-default-features --features native"
 run-daemon = [
@@ -46,42 +45,37 @@ run-daemon = [
 # ─────────────────────────────────────────────
 # Daemon
 # ─────────────────────────────────────────────
-
-daemon = "run -q --bin native --no-default-features --features native -- start"
-daemon-bg = "run -q --bin native --no-default-features --features native -- start"
-daemon-fg = "run -q --bin native --no-default-features --features native -- start --tail=true"
-
+daemon = "run --bin native --no-default-features --features native -- start"
+daemon-bg = "run --bin native --no-default-features --features native -- start"
+daemon-fg = "run --bin native --no-default-features --features native -- start --tail=true"
 
 # ─────────────────────────────────────────────
 # Tray
 # ─────────────────────────────────────────────
 
-tray = "run -q --bin native --no-default-features --features native -- tray"
-tray-bg = "run -q --bin native --no-default-features --features native -- tray --tail=false"
-tray-fg = "run -q --bin native --no-default-features --features native -- tray --tail=true"
+tray = "run --bin native --no-default-features --features native -- tray"
+tray-bg = "run --bin native --no-default-features --features native -- tray --tail=false"
+tray-fg = "run --bin native --no-default-features --features native -- tray --tail=true"
 
 
 # ─────────────────────────────────────────────
 # Window
 # ─────────────────────────────────────────────
-
-window = "run -q --bin native --no-default-features --features native -- window"
-window-bg = "run -q --bin native --no-default-features --features native -- window --tail=false"
-window-fg = "run -q --bin native --no-default-features --features native -- window --tail=true"
+window = "run --bin native --no-default-features --features native -- window"
+window-bg = "run --bin native --no-default-features --features native -- window --tail=false"
+window-fg = "run --bin native --no-default-features --features native -- window --tail=true"
 
 # ─────────────────────────────────────────────
 # CLI commands
 # ─────────────────────────────────────────────
-
-status = "run -q --bin native --no-default-features --features native -- status"
-doctor = "run -q --bin native --no-default-features --features native -- doctor"
-metrics = "run -q --bin native --no-default-features --features native -- metrics"
-format = "run -q --bin native --no-default-features --features native -- format"
+status = "run --bin native --no-default-features --features native -- status"
+doctor = "run --bin native --no-default-features --features native -- doctor"
+metrics = "run --bin native --no-default-features --features native -- metrics"
+format = "run --bin native --no-default-features --features native -- format"
 
 # ─────────────────────────────────────────────
 # Web
 # ─────────────────────────────────────────────
-
 trunk = "trunk build -q --release"
 trunk-run = "trunk serve src/web/public/index.html --features web"
 # trunk-it = "cargo build --bin web --target wasm32-unknown-unknown --features web && trunk serve src/web/public/index.html "

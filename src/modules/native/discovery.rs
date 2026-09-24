@@ -586,48 +586,11 @@ impl EstateDiscovery {
 impl EstateDiscovery<Disconnected> {
 	pub fn connect(self, handle: &tokio::runtime::Handle) -> EstateDiscovery<Connected> {
 		let (task_tx, rx) = mpsc::channel::<DiscoveryTask>(100);
-
 		handle.spawn(worker(rx));
-
 		EstateDiscovery {
 			store: self.store,
 			state: Connected { task_tx },
 		}
-	}
-}
-impl FsWalker {
-	pub fn new(target: impl Into<PathBuf>) -> Self {
-		let target = target.into();
-		Self {
-			root: Self::filesystem_root(&target),
-			target,
-		}
-	}
-	pub fn walk_up_to_target<F>(&self, mut visit: F) -> std::io::Result<()>
-	where
-		F: FnMut(&Path),
-	{
-		let mut current = self.root.clone();
-		loop {
-			visit(&current);
-			if current == self.target {
-				break;
-			}
-			let next = current.join(
-				self
-					.target
-					.strip_prefix(&current)
-					.unwrap()
-					.components()
-					.next()
-					.unwrap(),
-			);
-			current = next;
-		}
-		Ok(())
-	}
-	fn filesystem_root(path: &Path) -> PathBuf {
-		path.ancestors().last().unwrap().to_path_buf()
 	}
 }
 
@@ -652,11 +615,6 @@ pub struct DiscoveryStore {
 	pub configs: Vec<PathBuf>,
 }
 
-#[derive(Debug)]
-pub struct FsWalker {
-	root: PathBuf,
-	target: PathBuf,
-}
 pub struct DiscoveryResult {
 	pub workspace: Workspace,
 	pub packages: Vec<Package>,

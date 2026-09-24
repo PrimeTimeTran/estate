@@ -697,7 +697,7 @@ pub struct Role;
 pub struct Subrole;
 pub struct Point;
 pub struct Size;
-struct UiElement {
+pub struct UiElement {
 	role: Role,
 	subrole: Option<Subrole>,
 	position: Point,

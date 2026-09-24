@@ -65,11 +65,6 @@ path = "src/bin/[daemon].rs"
 required-features = ["daemon"]
 
 [[bin]]
-name = "gestures"
-path = "src/bin/[gestures].rs"
-required-features = ["native"]
-
-[[bin]]
 name = "native"
 path = "src/bin/[native].rs"
 required-features = ["native"]

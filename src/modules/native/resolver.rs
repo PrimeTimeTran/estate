@@ -8,6 +8,9 @@ use std::{
 	path::{Path, PathBuf},
 };
 
+pub fn filesystem_root(path: &Path) -> PathBuf {
+	path.ancestors().last().unwrap().to_path_buf()
+}
 pub fn crate_root() -> PathBuf {
 	PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }

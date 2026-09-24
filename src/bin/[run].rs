@@ -7,10 +7,6 @@ use estate::prelude::*;
 #[path = "./crates/demand.rs"]
 mod demand_main;
 
-#[path = "[gestures].rs"]
-mod gestures;
-
 fn main() -> Result<()> {
-	gestures::main();
 	Ok(())
 }
