@@ -1,0 +1,16 @@
+{
+  "keys": {
+    "a": {
+      "macos": { "keycode": 0 },
+      "windows": { "virtual_key": "VK_A" }
+    },
+    "b": {
+      "macos": { "keycode": 11 },
+      "windows": { "virtual_key": "VK_B" }
+    },
+    "f1": {
+      "macos": { "keycode": 122 },
+      "windows": { "virtual_key": "VK_F1" }
+    }
+  }
+}

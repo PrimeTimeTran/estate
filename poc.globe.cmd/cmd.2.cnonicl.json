@@ -1,0 +1,19 @@
+{
+  "commands": {
+    "window.minimize": {
+      "name": "Minimize Window"
+    },
+    "window.maximize": {
+      "name": "Maximize Window"
+    },
+    "window.close": {
+      "name": "Close Window"
+    },
+    "display.brightness_up": {
+      "name": "Brightness Up"
+    },
+    "display.brightness_down": {
+      "name": "Brightness Down"
+    }
+  }
+}
