@@ -1,0 +1,28 @@
+system:
+  launcher:
+    shortcut: Win+Space
+    action: open_launcher
+
+window_management:
+  close_window:
+    shortcut: Ctrl+W
+    action: close_window
+
+  maximize:
+    shortcut: Win+Up
+    action: maximize
+
+applications:
+  browser:
+    new_tab:
+      shortcut: Ctrl+T
+
+    close_tab:
+      shortcut: Ctrl+W
+
+    reopen_tab:
+      shortcut: Ctrl+Shift+T
+
+navigation:
+  next_window:
+    shortcut: Alt+Tab

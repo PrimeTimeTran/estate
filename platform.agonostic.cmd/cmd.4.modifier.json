@@ -1,0 +1,20 @@
+{
+  "modifiers": {
+    "command": {
+      "macos": 1048576,
+      "windows": "VK_LWIN"
+    },
+    "control": {
+      "macos": 262144,
+      "windows": "VK_CONTROL"
+    },
+    "option": {
+      "macos": 524288,
+      "windows": "VK_MENU"
+    },
+    "shift": {
+      "macos": 131072,
+      "windows": "VK_SHIFT"
+    }
+  }
+}
