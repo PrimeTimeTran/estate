@@ -5,23 +5,9 @@ use crate::{
 	ui::{self, prelude as gui},
 };
 
-// use objc2_app_kit::{NSApplication, NSApplicationActivationPolicy};
-// use objc2_foundation::MainThreadMarker;
+use objc2_app_kit::{NSApplication, NSApplicationActivationPolicy};
+use objc2_foundation::MainThreadMarker;
 use tray_icon::menu::{MenuItem, Submenu};
-
-#[cfg(target_os = "macos")]
-fn configure_application_window() {
-	let mtm = objc2_foundation::MainThreadMarker::new().expect("must be on the main thread");
-
-	let app = objc2_app_kit::NSApplication::sharedApplication(mtm);
-
-	app.setActivationPolicy(objc2_app_kit::NSApplicationActivationPolicy::Regular);
-
-	app.activateIgnoringOtherApps(true);
-}
-
-#[cfg(not(target_os = "macos"))]
-fn configure_application_window() {}
 
 // WIP: Self Activating Select
 fn build_egui(event_loop: &ActiveEventLoop) -> (gui::Context, egui_winit::State) {
@@ -48,42 +34,49 @@ fn build_egui(event_loop: &ActiveEventLoop) -> (gui::Context, egui_winit::State)
 fn build_window(event_loop: &ActiveEventLoop) -> Result<Arc<winit::window::Window>> {
 	let width = 1920;
 	let height = 1280;
-
 	let icon_file = include_bytes!("../../../assets/icon.png");
-
 	let icon = {
 		let image = image::load_from_memory(icon_file)
 			.expect("failed to load icon")
 			.into_rgba8();
-
 		let (width, height) = image.dimensions();
-
 		winit::window::Icon::from_rgba(image.into_raw(), width, height)?
 	};
-
 	let mut attrs = winit::window::Window::default_attributes()
 		.with_title("Estate Dev")
 		.with_inner_size(PhysicalSize::new(width, height))
 		.with_window_icon(Some(icon));
-
+	// .with_window_level(WindowLevel::AlwaysOnTop);
+	// Calculate bottom-right screen coordinates if a monitor is available
 	if let Some(monitor) = event_loop
 		.primary_monitor()
 		.or_else(|| event_loop.available_monitors().next())
 	{
 		let screen_size = monitor.size();
-
-		let x = screen_size.width as i32 - width;
-		let y = screen_size.height as i32 - height;
-
+		let _scale_factor = monitor.scale_factor();
+		// Optional: leave a small margin (e.g., 40 pixels) away from the edge/dock
+		// let margin_x = (40.0 * scale_factor) as i32;
+		// let margin_y = (60.0 * scale_factor) as i32;
+		// let x = screen_size.width as i32 - width as i32 - margin_x;
+		// let y = screen_size.height as i32 - height as i32 - margin_y;
+		let x = (screen_size.width as i32) - (width as i32);
+		let y = (screen_size.height as i32) - (height as i32);
 		attrs = attrs.with_position(PhysicalPosition::new(x.max(0), y.max(0)));
 	} else {
+		// Fallback position if no monitor info is found
 		attrs = attrs.with_position(PhysicalPosition::new(100, 100));
 	}
-
 	let window = event_loop.create_window(attrs)?;
-
-	configure_application_window();
-
+	// Force macOS to show a Dock icon and participate in Cmd + Tab
+	#[cfg(target_os = "macos")]
+	{
+		{
+			let mtm = MainThreadMarker::new().expect("must be on the main thread");
+			let app = NSApplication::sharedApplication(mtm);
+			app.setActivationPolicy(NSApplicationActivationPolicy::Regular);
+			app.activateIgnoringOtherApps(true);
+		}
+	}
 	Ok(Arc::new(window))
 }
 fn build_renderer(

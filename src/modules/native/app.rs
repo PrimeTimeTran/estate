@@ -163,7 +163,7 @@ impl App<Context> {
 		self.init_services()?;
 		self.run_gui()?;
 		if self.mode == AppMode::Daemon {
-			self.init_daemon();
+			// self.init_daemon();
 		}
 		Ok(())
 	}
@@ -326,14 +326,14 @@ where
 	pub fn start_cursor_watcher_from_app(
 		&mut self,
 	) -> anyhow::Result<WorkHandle<C, tokio::task::JoinHandle<()>>> {
-		let sink = AppCursorSink {
-			tx: self.cursor_event_tx.clone(),
-		};
+		// let sink = AppCursorSink {
+		// 	tx: self.cursor_event_tx.clone(),
+		// };
 
 		Ok(self.worker().run_background_blocking(move |cancel| {
-			if let Err(error) = CursorDaemon::new(sink, cancel).run() {
-				tracing::error!("Cursor daemon failed: {error}");
-			}
+			// if let Err(error) = CursorDaemon::new(sink, cancel).run() {
+			// 	tracing::error!("Cursor daemon failed: {error}");
+			// }
 		}))
 	}
 }
@@ -600,32 +600,33 @@ where
 }
 
 impl Host<Context> {
-	pub fn init() -> anyhow::Result<Self> {
-		let parsed = cli::context::parse();
-
-		let mut config = LogConfig::load()?;
-		config.apply_cli(&parsed);
-		logger::init_logging(&config)?;
-
-		// Create the one runtime.
-		let tokio = tokio::runtime::Runtime::new()?;
-
-		// Context is still uniquely owned here.
-		let mut context = Context::default();
-
-		// Daemon may not need this
-		// This requires server access
-		#[cfg(not(feature = "daemon"))]
-		{
-			// Connect using the same runtime that Host will retain.
-			tokio.block_on(context.api_mut().connect())?;
-		}
-
-		// Only share Context after initialization.
-		let context = Arc::new(context);
-
-		Self::new(context, tokio)
-	}
+//   
+// 	pub fn init() -> anyhow::Result<Self> {
+// 		let parsed = cli::context::parse();
+// 
+// 		let mut config = LogConfig::load()?;
+// 		config.apply_cli(&parsed);
+// 		logger::init_logging(&config)?;
+// 
+// 		// Create the one runtime.
+// 		let tokio = tokio::runtime::Runtime::new()?;
+// 
+// 		// Context is st
+// ill uniquely owned here.
+// 		let mut context = Context::default();
+// 
+// 		// Daemon may not need this
+// 		// This requires server access
+// 		#[cfg(not(feature = "daemon"))]
+// 		{
+// 			// Connect using the same runtime that Host will retain.
+// 			tokio.block_on(context.api_mut().connect())?;
+// 		}
+// 
+// 		// Only share Context after initialization.
+// 		let context = Arc::new(context);
+// 		Self::new(context, tokio)
+// 	}
 	fn logging() {
 		// let count = 1;
 		// let host = "12";
@@ -809,7 +810,7 @@ pub struct App<C: Ctx> {
 	pub host: Host<C>,
 	pub state: C::AppState,
 	pub workers: Vec<WorkHandle<C, tokio::task::JoinHandle<()>>>,
-	mode: AppMode,
+	pub mode: AppMode,
 	pub settings: Settings,
 	pub cancel: CancellationToken,
 	pub menu_bar: Option<MenuBar>,

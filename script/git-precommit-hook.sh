@@ -1,60 +1,76 @@
+
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
-echo "🦀 Checking server..."
-cargo -q build --bin server --no-default-features --features native
-echo "✅ [Server] build passed"
+# CARGO_BIN="${CARGO_BIN:-cargo}"
+CARGO_BIN=/mnt/c/Users/seepd/.cargo/bin/cargo.exe \
 
-echo "🚀 Starting server..."
-../../target/debug/server &
-SERVER_PID=$!
+EXE="${EXE:-}"
 
-sleep 2
+SERVER_PID=""
+NATIVE_PID=""
 
-if ! kill -0 "$SERVER_PID" 2>/dev/null; then
-    echo "❌ [Server] failed to start"
-    exit 1
-fi
+cleanup() {
+    for pid in "$NATIVE_PID" "$SERVER_PID"; do
+        if [[ -n "$pid" ]]; then
+            kill "$pid" 2>/dev/null || true
+            wait "$pid" 2>/dev/null || true
+        fi
+    done
 
-echo "✅ [Server] startup passed"
+    SERVER_PID=""
+    NATIVE_PID=""
+}
 
+trap cleanup EXIT
 
-echo "🦀 Checking native..."
-cargo -q build --bin native --no-default-features --features native
-echo "✅ [Native] build passed"
+build() {
+    local bin="$1"
 
-echo "🚀 Starting native..."
-../../target/debug/native &
-NATIVE_PID=$!
+    echo "🦀 Building $bin..."
+    "$CARGO_BIN" "$bin"
+    echo "✅ [$bin] build passed"
+}
 
-sleep 2
+start() {
+    local bin="$1"
+    local path="../../target/debug/${bin}${EXE}"
+    local pid
 
-if ! kill -0 "$NATIVE_PID" 2>/dev/null; then
-    echo "❌ [Native] failed to start"
-    kill "$SERVER_PID" 2>/dev/null || true
-    exit 1
-fi
+    echo "🚀 Starting $bin..."
 
-echo "✅ [Native] startup passed"
+    "$path" &
+    pid=$!
 
-echo "🛑 Stopping native..."
-kill "$NATIVE_PID" 2>/dev/null || true
-wait "$NATIVE_PID" 2>/dev/null || true
+    if [[ "$bin" == "server" ]]; then
+        SERVER_PID="$pid"
+    else
+        NATIVE_PID="$pid"
+    fi
 
-echo "🛑 Stopping server..."
-kill "$SERVER_PID" 2>/dev/null || true
-wait "$SERVER_PID" 2>/dev/null || true
+    sleep 2
 
+    if ! kill -0 "$pid" 2>/dev/null; then
+        echo "❌ [$bin] failed to start"
+        exit 1
+    fi
 
-echo "🌐 Checking web..."
-cargo -q build \
-  --bin web \
-  --no-default-features \
-  --target wasm32-unknown-unknown \
-  --features web
+    echo "✅ [$bin] startup passed"
+}
 
-# cargo -q build --bin web --no-default-features --target wasm32-unknown-unknown --features web
+# Server
+build server
+start server
 
-echo "✅ [Web] build passed"
+# Native
+build native
+start native
+
+# Stop both processes
+echo "🛑 Stopping native and server..."
+cleanup
+
+# Web
+build web
 
 echo "🎉 All checks passed"

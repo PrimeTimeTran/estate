@@ -70,6 +70,10 @@ path = "src/bin/[native].rs"
 required-features = ["native"]
 
 [[bin]]
+name = "platform"
+path = "src/bin/[platform].rs"
+
+[[bin]]
 name = "run"
 path = "src/bin/[run].rs"
 
@@ -108,39 +112,33 @@ required-features = ["native"]
 
 # [PICK 1]
 # default = []
-default = ["web"]
-# default = ["native"]
+# default = ["web"]
+default = ["native"]
 # sdlc = ["native"]
 mobile = []
 daemon = []
+
+native = [
+  "dep:notify",
+  "dep:cli",
+  "dep:demand",
+  "dep:rmcp",
+  "dep:tower-lsp",
+  "dep:signal-hook",
+  "dep:comfy-table",
+  "dep:tray-icon",
+  "dep:egui_extras",
+  "dep:jsonc-parser",
+]
+
 web = [
   "dep:wasm-bindgen",
   "dep:web-sys",
   "dep:eframe",
   "dep:egui_extras",
   "dep:jsonc-parser",
-  "dep:tokio-util",
+  # "dep:tokio-util",
   "dep:js-sys",
-]
-native = [
-  "dep:notify",
-  "dep:axuielement",
-  "dep:cli",
-  "dep:demand",
-  "dep:rmcp",
-  "dep:tower-lsp",
-  "dep:tokio-util",
-  "dep:objc2-app-kit",
-  "dep:objc2-foundation",
-  "dep:objc2",
-  "dep:core-foundation",
-  "dep:core-graphics",
-  "dep:signal-hook",
-  "dep:comfy-table",
-  "dep:tray-icon",
-  "dep:macos-accessibility-client",
-  "dep:egui_extras",
-  "dep:jsonc-parser",
 ]
 
 [dependencies]
@@ -185,6 +183,7 @@ uuid.workspace = true
 wasm-bindgen-futures.workspace = true
 wasm-bridge.workspace = true
 wgpu.workspace = true
+tokio-util.workspace = true
 
 # Make all these optional so they can be toggled by the native feature
 cli = { workspace = true, optional = true }
@@ -197,7 +196,6 @@ jsonschema = { workspace = true, optional = true }
 macos-accessibility-client = { workspace = true, optional = true }
 notify = { workspace = true, optional = true }
 signal-hook = { workspace = true, optional = true }
-tokio-util = { workspace = true, optional = true }
 tray-icon = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 web-sys = { workspace = true, optional = true }
@@ -212,28 +210,63 @@ eframe = { workspace = true, optional = true }
 egui_commonmark = { workspace = true }
 egui_extras = { workspace = true, optional = true }
 
-# NATIVE/OS/SERVER
+# ============================================================
+# Platform dependencies
+# ============================================================
+
+# Native common
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-axuielement = { workspace = true, optional = true }
 jev-sdk = { version = "0.1.0", default-features = false }
 tokio = { workspace = true, features = ["rt", "macros", "time", "sync"] }
-inquire  = { workspace = true }
+inquire = { workspace = true }
 ratatui.workspace = true
 crossterm = { workspace = true }
+tonic = { workspace = true, features = ["transport"] }
+
+# Native optional capabilities
+rmcp = { workspace = true, optional = true }
+tower-lsp = { workspace = true, optional = true }
+
+
+# ============================================================
+# Web / WASM
+# ============================================================
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+tokio = { version = "1", default-features = false, features = [
+  "rt",
+  "macros",
+  "time",
+  "sync",
+] }
+getrandom = { version = "0.4.3", features = ["wasm_js"] }
+gloo-timers = { version = "0.4", features = ["futures"] }
+js-sys = { workspace = true, optional = true }
+wasm-bindgen-futures.workspace = true
+
+# ============================================================
+# Native / Windows
+# ============================================================
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = { version = "0.61", features = [
+  "Win32_Foundation",
+  "Win32_UI_Input_KeyboardAndMouse",
+  "Win32_UI_WindowsAndMessaging",
+] }
+
+# ============================================================
+# Native / macOS
+# ============================================================
+
+[target.'cfg(target_os = "macos")'.dependencies]
 objc2 = { workspace = true, optional = true }
 objc2-app-kit = { workspace = true, optional = true }
 objc2-foundation = { workspace = true, optional = true }
-rmcp = { workspace = true, optional = true }
-tonic = { workspace = true, features = ["transport"] }
-tower-lsp = { workspace = true, optional = true }
-
-# CLIENT/BROWSER/WEB
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-tokio = { version = "1", default-features = false, features = ["rt", "macros", "time", "sync"] }
-getrandom = { version = "0.4.3", features = ["wasm_js"] }
-gloo-timers = { version = "0.4", features = ["futures"] }
-js-sys  = { workspace = true, optional = true }
-wasm-bindgen-futures.workspace = true
+axuielement = { workspace = true, optional = true }
+core-foundation = { workspace = true, optional = true }
+core-graphics = { workspace = true, optional = true }
+macos-accessibility-client = { workspace = true, optional = true }
 
 [build-dependencies]
 prost-build = "0.14.4"
@@ -248,5 +281,6 @@ debug = "line-tables-only"
 # Compile dependencies with high optimization so your dev binary runs fast,
 # while keeping your own application code unoptimized for fast rebuilds
 opt-level = 3 #
+
 
 [lints]

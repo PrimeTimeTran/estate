@@ -257,23 +257,24 @@ impl Size {
 	}
 }
 
-pub fn move_cursor_to(pos: ScreenPosition) {
-	let bounds = CGDisplay::main().bounds();
-	let x = match pos {
-		ScreenPosition::Left => bounds.origin.x + bounds.size.width * 0.125,
-		ScreenPosition::Center => bounds.origin.x + bounds.size.width * 0.5,
-		ScreenPosition::Right => bounds.origin.x + bounds.size.width * 0.875,
-	};
-	let y = bounds.origin.y + bounds.size.height * 0.5;
-	let point = geometry::CGPoint { x, y };
-	if let Ok(source) = CGEventSource::new(CGEventSourceStateID::CombinedSessionState) {
-		if let Ok(event) =
-			CGEvent::new_mouse_event(source, CGEventType::MouseMoved, point, CGMouseButton::Left)
-		{
-			event.post(CGEventTapLocation::HID);
-		}
-	}
-}
+pub fn move_cursor_to(pos: ScreenPosition) {}
+// pub fn move_cursor_to(pos: ScreenPosition) {
+// 	let bounds = CGDisplay::main().bounds();
+// 	let x = match pos {
+// 		ScreenPosition::Left => bounds.origin.x + bounds.size.width * 0.125,
+// 		ScreenPosition::Center => bounds.origin.x + bounds.size.width * 0.5,
+// 		ScreenPosition::Right => bounds.origin.x + bounds.size.width * 0.875,
+// 	};
+// 	let y = bounds.origin.y + bounds.size.height * 0.5;
+// 	let point = geometry::CGPoint { x, y };
+// 	if let Ok(source) = CGEventSource::new(CGEventSourceStateID::CombinedSessionState) {
+// 		if let Ok(event) =
+// 			CGEvent::new_mouse_event(source, CGEventType::MouseMoved, point, CGMouseButton::Left)
+// 		{
+// 			event.post(CGEventTapLocation::HID);
+// 		}
+// 	}
+// }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum DevTopTab {

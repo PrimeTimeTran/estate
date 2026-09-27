@@ -89,3 +89,4 @@ unicode = true                   # whether cargo can render output using non-ASC
 progress.when = 'auto'           # whether cargo shows progress bar
 progress.width = 80              # width of progress bar
 progress.term-integration = true # whether cargo reports progress to terminal emulator
+

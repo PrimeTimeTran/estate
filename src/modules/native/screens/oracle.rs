@@ -4,6 +4,7 @@ pub struct OracleScreen {
 	active_focus: FocusedPane,
 	dirty: bool,
 	error: Option<String>,
+	#[cfg(target_os = "macos")]
 	gesture: GestureController,
 	last_direction: String,
 	last_loaded: Option<SystemTime>,
@@ -40,12 +41,14 @@ impl OracleScreen {
 			last_loaded: None,
 			scroll_x: 0.0,
 			scroll_y: 0.0,
+			#[cfg(target_os = "macos")]
 			gesture: GestureController::new(),
 		}
 	}
 	// -------------------------------------------------------------------------
 	// INPUT
 	// -------------------------------------------------------------------------
+	#[cfg(target_os = "macos")]
 	fn inspect_trackpad<C: Ctx, S>(
 		&mut self,
 		ui: &mut egui::Ui,
@@ -59,10 +62,11 @@ impl OracleScreen {
 	fn draw_ui<C: Ctx, S>(&mut self, ui: &mut egui::Ui, ctx: &AppContext<'_, C, S>) {
 		self.draw_header(ui);
 
-		let trackpad = self.inspect_trackpad(ui, ctx);
-
-		self.draw_telemetry(ui, &trackpad);
-		self.draw_trigger_preview(ui, &trackpad);
+		
+// 		let trackpad = self.inspect_trackpad(ui, ctx);
+// 
+// 		self.draw_telemetry(ui, &trackpad);
+// 		self.draw_trigger_preview(ui, &trackpad);
 		self.draw_controls(ui);
 	}
 	fn draw_header(&mut self, ui: &mut egui::Ui) {
@@ -77,6 +81,7 @@ impl OracleScreen {
 	// -------------------------------------------------------------------------
 	// TELEMETRY
 	// -------------------------------------------------------------------------
+	#[cfg(target_os = "macos")]
 	fn draw_telemetry(&mut self, ui: &mut egui::Ui, trackpad: &TrackpadState) {
 		ui.columns(2, |columns| {
 			// =================================================================
@@ -198,6 +203,7 @@ impl OracleScreen {
 	// -------------------------------------------------------------------------
 	// TRIGGER PREVIEW
 	// -------------------------------------------------------------------------
+	#[cfg(target_os = "macos")]
 	fn draw_trigger_preview(&mut self, ui: &mut egui::Ui, trackpad: &TrackpadState) {
 		ui.group(|ui| {
 			ui.heading("Target Action Trigger Preview");

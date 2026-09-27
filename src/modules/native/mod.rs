@@ -3,6 +3,7 @@ use crate::prelude::*;
 pub mod agent;
 pub mod app;
 pub mod backend;
+pub mod cursor;
 pub mod daemon;
 pub mod discovery;
 pub mod job;
@@ -22,16 +23,18 @@ pub mod util;
 pub mod window;
 
 pub use agent::*;
+pub use cursor::*;
 pub use prelude_native::*;
 pub use util::*;
 
 #[cfg(target_os = "linux")]
 pub mod linux;
 
-#[cfg(target_os = "windows")]
+// #[cfg(target_os = "windows")]
 pub mod windows;
 
 mod gestures;
+
 #[cfg(target_os = "macos")]
 pub mod macos;
 
