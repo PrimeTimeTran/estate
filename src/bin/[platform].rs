@@ -319,7 +319,7 @@ mod platform {
 		let _ = InputEvent::MouseButton { button, state };
 	}
 
-	pub fn create() -> Box<dyn InputAdapter> {
+	pub fn create() -> Box<dyn HDIInput> {
 		println!("PLATFORM: Windows create()");
 
 		let adapter = HDIWindows::new();
