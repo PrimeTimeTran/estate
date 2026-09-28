@@ -9,6 +9,14 @@ cat > "$DIR/main.swift" <<'SWIFT'
 import CoreGraphics
 import Foundation
 
+let watchedKeyCodes: Set<CGKeyCode> = [
+    0,  // A
+    12, // Q
+    13, // W
+    6,  // Z
+    18, // 1
+]
+
 // MARK: - Time
 
 let formatter = DateFormatter()
@@ -41,7 +49,6 @@ func modifierName(_ keyCode: Int64) -> String {
     // case 63, 105: return "FN"
     case 63: return "FN"
     case 57: return "CAPS" 
-    case 57: return "CAPS"
     default: return "UNKNOWN"
     }
 }
@@ -260,6 +267,7 @@ func heldModifiers(_ flags: CGEventFlags) -> String {
 } 
 
 func eventTypeName(_ type: CGEventType) -> String {
+
     switch type {
     case .keyDown:
         return "KEYDOWN"
@@ -534,6 +542,21 @@ let callback: CGEventTapCallBack = {
     let code =
         event.getIntegerValueField(.keyboardEventKeycode)
 
+    // 🚨 WATCH HERE
+    if watchedKeyCodes.contains(CGKeyCode(code)) {
+        print("")
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        print("!!! 🚨 WATCHED KEY DETECTED 🚨 !!!")
+        print("!!! type: \(eventTypeName(type))")
+        print("!!! code: \(code)")
+        print("!!! name: \(keyName(code))")
+        print("!!! flags: \(event.flags.rawValue)")
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        print("")
+
+        fflush(stdout)
+    }
+    
     switch type {
 
     case .flagsChanged:
