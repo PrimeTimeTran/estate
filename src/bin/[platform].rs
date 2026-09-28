@@ -119,7 +119,7 @@ mod platform {
 			unsafe {
 				if self.keyboard_hook != 0 {
 					UnhookWindowsHookEx(self.keyboard_hook);
-					self.keyboard_hook = 0;
+			 self.keyboard_hook = std::ptr::null_mut();
 				}
 
 				if self.mouse_hook != 0 {
@@ -200,7 +200,7 @@ mod platform {
 	// ═══════════════════════════════════════════════════════════════════════════
 
 	unsafe extern "system" fn keyboard_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-		if code == HC_ACTION {
+		if code == HC_ACTION as i32 {
 			let event = unsafe { &*(lparam as *const KBDLLHOOKSTRUCT) };
 
 			let state = match wparam as u32 {
@@ -233,7 +233,7 @@ mod platform {
 	// ═══════════════════════════════════════════════════════════════════════════
 
 	unsafe extern "system" fn mouse_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
-		if code == HC_ACTION {
+		if code == HC_ACTION as i32 {
 			let event = unsafe { &*(lparam as *const MSLLHOOKSTRUCT) };
 
 			match wparam as u32 {
