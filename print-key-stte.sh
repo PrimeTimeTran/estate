@@ -1,0 +1,1 @@
+swift -e 'import CoreGraphics; let f = CGEventSource.flagsState(.combinedSessionState); print("⌘", f.contains(.maskCommand), "⌥", f.contains(.maskAlternate), "⇧", f.contains(.maskShift), "⌃", f.contains(.maskControl), "Fn", f.contains(.maskSecondaryFn), "Caps", f.contains(.maskAlphaShift))'
