@@ -38,7 +38,11 @@ enum InputEvent {
 	},
 }
 
-trait InputAdapter {
+// Human Device Interaction Input
+// - Keyboard
+// - Mouse
+// - Trackpac
+trait HDIInput {
 	fn run(&mut self) -> io::Result<()>;
 }
 
@@ -63,12 +67,12 @@ mod platform {
 		},
 	};
 
-	pub struct WindowsInputAdapter {
+	pub struct HDIWindows {
 		keyboard_hook: HHOOK,
 		mouse_hook: HHOOK,
 	}
 
-	impl WindowsInputAdapter {
+	impl HDIWindows {
 		pub fn new() -> Self {
 			println!("WINDOWS: new()");
 
@@ -119,7 +123,7 @@ mod platform {
 			unsafe {
 				if self.keyboard_hook != 0 {
 					UnhookWindowsHookEx(self.keyboard_hook);
-			 self.keyboard_hook = std::ptr::null_mut();
+					self.keyboard_hook = std::ptr::null_mut();
 				}
 
 				if self.mouse_hook != 0 {
@@ -132,7 +136,7 @@ mod platform {
 		}
 	}
 
-	impl InputAdapter for WindowsInputAdapter {
+	impl HDIInput for HDIWindows {
 		fn run(&mut self) -> io::Result<()> {
 			println!("WINDOWS: starting");
 
@@ -181,7 +185,7 @@ mod platform {
 		}
 	}
 
-	impl Drop for WindowsInputAdapter {
+	impl Drop for HDIWindows {
 		fn drop(&mut self) {
 			unsafe {
 				if !self.keyboard_hook.is_null() {
@@ -274,7 +278,7 @@ mod platform {
 				}
 
 				WM_MOUSEMOVE => {
-					println!("MOUSE MOVE   x={} y={}", event.pt.x, event.pt.y,);
+					// println!("MOUSE MOVE   x={} y={}", event.pt.x, event.pt.y,);
 
 					let _ = InputEvent::MouseMove {
 						x: event.pt.x,
@@ -318,7 +322,7 @@ mod platform {
 	pub fn create() -> Box<dyn InputAdapter> {
 		println!("PLATFORM: Windows create()");
 
-		let adapter = WindowsInputAdapter::new();
+		let adapter = HDIWindows::new();
 
 		println!("PLATFORM: Windows adapter constructed");
 
@@ -336,7 +340,7 @@ mod platform {
 
 	struct UnsupportedInputAdapter;
 
-	impl InputAdapter for UnsupportedInputAdapter {
+	impl HDIInput for UnsupportedInputAdapter {
 		fn run(&mut self) -> io::Result<()> {
 			Err(io::Error::new(
 				io::ErrorKind::Unsupported,
@@ -345,7 +349,7 @@ mod platform {
 		}
 	}
 
-	pub fn create() -> Box<dyn InputAdapter> {
+	pub fn create() -> Box<dyn HDIInput> {
 		println!("PLATFORM: unsupported platform");
 
 		Box::new(UnsupportedInputAdapter)
