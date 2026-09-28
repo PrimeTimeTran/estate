@@ -24,6 +24,12 @@ pub mod wizard;
 pub mod native;
 
 #[cfg(not(target_arch = "wasm32"))]
+pub use native as platform;
+
+#[cfg(not(target_arch = "wasm32"))]
+pub use native::*;
+
+#[cfg(not(target_arch = "wasm32"))]
 pub mod server;
 
 #[cfg(target_arch = "wasm32")]

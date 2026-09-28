@@ -1,5 +1,8 @@
 use crate::prelude::*;
 
+pub mod hdi;
+pub use hdi::*;
+
 impl<C: Ctx> Host<C> {
 	pub fn new(context: Arc<C>, tokio: tokio::runtime::Runtime) -> anyhow::Result<Self> {
 		let handle = tokio.handle().clone();
@@ -76,8 +79,6 @@ impl Host<Context> {
 		Self::new(context, tokio)
 	}
 }
-
-
 
 impl App<Context> {
 	pub fn api(&self) -> &ApiService {

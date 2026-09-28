@@ -129,7 +129,7 @@ impl HDIWindows {
 }
 
 impl HDIInput for HDIWindows {
-	fn run(&mut self) -> io::Result<()> {
+	pub fn run(&mut self) -> io::Result<()> {
 		println!("WINDOWS: starting");
 
 		self.install_hooks()?;
@@ -311,7 +311,7 @@ fn print_mouse(button: MouseButton, state: KeyState) {
 	let _ = InputEvent::MouseButton { button, state };
 }
 
-pub fn create() -> Box<dyn HDIInput> {
+pub fn create_hdi_monitor() -> Box<dyn HDIInput> {
 	println!("PLATFORM: Windows create()");
 
 	let adapter = HDIWindows::new();

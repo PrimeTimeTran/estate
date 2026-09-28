@@ -79,6 +79,7 @@ pub use crate::{
 			*,
 		},
 		os::*,
+		platform,
 		sdlc::*,
 		server::{self, channel, event::*},
 	},

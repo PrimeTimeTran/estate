@@ -9,3 +9,4 @@ use crate::prelude::*;
 trait HDIInput {
 	fn run(&mut self) -> io::Result<()>;
 }
+
