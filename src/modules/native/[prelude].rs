@@ -50,13 +50,6 @@ pub use signal_hook::{consts::SIGINT, iterator::Signals};
 
 #[cfg(unix)]
 pub use tokio::net::{UnixListener, UnixStream};
-//
-// // ============================================================
-// // macOS
-// // ============================================================
-//
-// #[cfg(target_os = "macos")]
-// pub use crate::native::macos::*;
 
 /// # Description
 /// Centralized external dependency management for native platform targets like MacOS, Windows, Linux.
@@ -67,9 +60,6 @@ pub use tokio::net::{UnixListener, UnixStream};
 /// This is a central dependency management file for native platform targets like MacOS, Windows, Linux.
 /// The items here are necessary to bring dependencies into scope for the native platform targets. Removing items may
 /// cause compilation errors or runtime issues in the native platform targets.
-//
-// #[cfg(target_os = "windows")]
-// pub use crate::native::platform;
 pub use crate::{
 	native::{
 		app::*, daemon::*, job::*, monitor::*, resolver::*, screens::*, state, ui::*, window::*,
