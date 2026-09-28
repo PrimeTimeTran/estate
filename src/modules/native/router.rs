@@ -136,7 +136,7 @@ pub async fn execute<R: Runtime>(
 				std::process::exit(1);
 			}
 		},
-		Command::Status => StatusDaemon.run(&ctx).await,
+		// Command::Status => StatusDaemon.run(&ctx).await,
 		Command::Bookmarks => command::ViewList.run(&ctx).await,
 		// Command::Bookmark => command::ViewList.run(&ctx).await,
 		// Command::Explain => command::Explain.run(&ctx).await,
