@@ -54,17 +54,16 @@ mod platform {
 
 	use windows_sys::Win32::{
 		Foundation::{LPARAM, LRESULT, WPARAM},
-		UI::{
-			Input::KeyboardAndMouse::{KBDLLHOOKSTRUCT, MSLLHOOKSTRUCT},
-			WindowsAndMessaging::{
-				CallNextHookEx, DispatchMessageW, GetMessageW, HC_ACTION, HHOOK, KBDLLHOOKSTRUCT, MSG,
-				MSLLHOOKSTRUCT, SetWindowsHookExW, TranslateMessage, UnhookWindowsHookEx, WH_KEYBOARD_LL,
-				WH_MOUSE_LL, WM_KEYDOWN, WM_KEYUP, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN,
-				WM_MBUTTONUP, WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_RBUTTONDOWN, WM_RBUTTONUP, WM_XBUTTONDOWN,
-				WM_XBUTTONUP, XBUTTON1, XBUTTON2,
-			},
+		UI::WindowsAndMessaging::{
+			CallNextHookEx, DispatchMessageW, GetMessageW, HC_ACTION, HHOOK, KBDLLHOOKSTRUCT, MSG,
+			MSLLHOOKSTRUCT, SetWindowsHookExW, TranslateMessage, UnhookWindowsHookEx, WH_KEYBOARD_LL,
+			WH_MOUSE_LL, WM_KEYDOWN, WM_KEYUP, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN,
+			WM_MBUTTONUP, WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_RBUTTONDOWN, WM_RBUTTONUP, WM_XBUTTONDOWN,
+			WM_XBUTTONUP, XBUTTON1, XBUTTON2,
 		},
 	};
+
+	use windows_sys::Win32::UI::WindowsAndMessaging::{KBDLLHOOKSTRUCT, MSLLHOOKSTRUCT};
 
 	pub struct WindowsInputAdapter {
 		keyboard_hook: HHOOK,
@@ -98,7 +97,7 @@ mod platform {
 			println!("WINDOWS: installing mouse hook...");
 
 			unsafe {
-				self.mouse_hook = SetWindowsHookExW(WH_MOUSE_LL, Some(mouse_proc), 0, 0);
+				self.mouse_hook = SetWindowsHookExW(WH_MOUSE_LL, Some(mouse_proc), std::ptr::null_mut(), 0);
 			}
 
 			if self.mouse_hook == 0 {
@@ -303,13 +302,13 @@ mod platform {
 	}
 
 	fn xbutton(mouse_data: u32) -> MouseButton {
-  	let button = ((mouse_data >> 16) & 0xFFFF) as u16;
-  	
-  	match button {
-      XBUTTON1 => MouseButton::X1,
-      XBUTTON2 => MouseButton::X2,
-      other => MouseButton::Other(other as u32),
-  	}
+		let button = ((mouse_data >> 16) & 0xFFFF) as u16;
+
+		match button {
+			XBUTTON1 => MouseButton::X1,
+			XBUTTON2 => MouseButton::X2,
+			other => MouseButton::Other(other as u32),
+		}
 	}
 
 	fn print_mouse(button: MouseButton, state: KeyState) {
