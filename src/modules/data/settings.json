@@ -1,0 +1,385 @@
+{
+	// Styling
+	"theme": {
+		"mode": "system",
+		"light": "One Light",
+		"dark": "One Dark"
+	},
+	"agent_ui_font_size": 16.0,
+	"buffer_font_size": 16.0,
+	"diff_view_style": "split",
+	"document_symbols": "on",
+	"format_on_save": "on",
+	"hard_tabs": false,
+	"icon_theme": "VSCode Icons for Zed (Dark Official Icons)",
+	"relative_line_numbers": "enabled",
+	"show_wrap_guides": false,
+	"soft_wrap": "none",
+	"tab_size": 2,
+	"ui_font_size": 20,
+	"unnecessary_code_fade": 0.2,
+	"use_on_type_format": true,
+	"wrap_guides": [100],
+	"gutter": {
+		"breakpoints": false, // Show/hide show breakpoints in the gutter.
+		"folds": true, // Show/hide show fold buttons in the gutter.
+		"min_line_number_digits": 0,
+		"runnables": false // Show/hide runnables buttons in the gutter.
+		// "min_line_number_digits": 4,  // Reserve space for N digit line numbers
+		// "line_numbers": true,         // Show/hide line numbers in the gutter.
+	},
+
+	// Behavior
+	"enable_language_server": true,
+	"helix_mode": false,
+	"remove_trailing_whitespace_on_save": true,
+	"restore_on_startup": "last_session",
+	"show_edit_predictions": false,
+	"vim_mode": true,
+	"autosave": {
+  "after_delay": {
+   "milliseconds": 500
+  }
+ },
+	"languages": {
+		"Rust": {
+			"format_on_save": "on"
+		},
+		"TypeScript": {
+			"format_on_save": "on"
+		},
+		"JavaScript": {
+			"format_on_save": "on",
+			"formatter": {
+				"external": {
+					"command": "/Users/future/.nvm/versions/node/v22.22.2/bin/prettier",
+					"arguments": ["--parser", "babel"]
+				}
+			}
+		},
+		"JSON": {
+			"format_on_save": "on"
+		},
+		"JSONC": {
+			"language_servers": ["json-language-server"],
+			"formatter": {
+				"external": {
+					"command": "/Users/future/.nvm/versions/node/v22.22.2/bin/prettier",
+					"arguments": ["--parser", "jsonc", "--trailing-comma", "none"]
+				}
+			}
+		}
+	},
+	"lsp": {
+		"rust-analyzer": {
+			"initialization_options": {
+				"cargo": {
+					"target": "aarch64-apple-darwin",
+					// "target": "wasm32-unknown-unknown",
+					"features": ["native"]
+				}
+			}
+		},
+		"markdown-oxide": {
+			"initialization_options": {
+				"markdown.links.enabled": true
+			}
+		},
+		"zls": {
+			"binary": {
+				"path": "/Users/future/.zvm/bin/zls"
+			},
+			"settings": {
+				"zig_exe_path": "/Users/future/.zvm/bin/zig"
+			}
+		},
+		"json-language-server": {
+			"settings": {
+				"json": {
+					"format": {
+						"enable": true
+					},
+					"schemas": [
+						{
+							"fileMatch": ["keymap.json"],
+							"url": "~/.config/zed/schemas/keymap.schema.json"
+						},
+						{
+							"fileMatch": ["settings.json"],
+							"url": "~/.config/zed/schemas/settings.schema.json"
+						}
+					]
+				}
+			}
+		}
+	},
+	"language_models": {
+		"llama.cpp": {
+			"api_url": "http://localhost:11434"
+		}
+	},
+
+	"title_bar": {
+		"show_branch_name": true, // Show/hide branch name
+		"show_branch_status_icon": false, // Show git status on branch icon
+		"show_menus": false, // Show/hide menus
+		"show_project_items": true, // Show/hide project host and name
+		"show_sign_in": false, // Show/hide sign-in button
+		"show_user_menu": true, // Show/hide app user button
+		"show_user_picture": false // Show/hide user avatar
+		// "show_onboarding_banner": true, // Show/hide onboarding banners
+	},
+	"toolbar": {
+		// "breadcrumbs": false,
+		"quick_actions": false
+	},
+	"indent_guides": {
+		"enabled": true,
+		"line_width": 1, // Width of guides in pixels [1-10]
+		"active_line_width": 1, // Width of active guide in pixels [1-10]
+		"coloring": "indent_aware", // disabled, fixed, indent_aware
+		"background_coloring": "disabled" // disabled, indent_aware
+	},
+	"vim": {
+		"toggle_relative_line_numbers": true
+	},
+	"terminal": {
+		"toolbar": {
+			"breadcrumbs": false
+		},
+		"show_count_badge": true,
+		"font_size": 16.0
+	},
+
+	// "edit_predictions": {
+	//   "open_ai_compatible_api": {
+	//     "api_url": "",
+	//     "model": ""
+	//   },
+	//   "ollama": {
+	//     "prompt_format": "infer",
+	//     "model": "qwen2.5-coder:1.5b-base"
+	//   },
+	//   "provider": "ollama",
+	//   "mode": "subtle",
+	//   "allow_data_collection": "no",
+	//   "disabled_globs": [],
+	// },
+	"which_key": {
+		// "enabled": true,
+	},
+	"session": {
+		"trust_all_worktrees": true
+	},
+
+	"cli_default_open_behavior": "existing_window",
+	"auto_update_extensions": {
+		"chrome-devtools-mcp": false
+	},
+	"context_servers": {
+		"chrome-devtools": {
+			"env": {},
+			"enabled": true,
+			"remote": false,
+			"command": "npx",
+			"args": ["chrome-devtools-mcp"]
+		}
+	},
+	"agent_servers": {
+		"your_agent": {
+			"type": "custom",
+			"command": "path_to_executable"
+		}
+	},
+	"granted_extension_capabilities": [
+		{
+			"kind": "process:exec",
+			"command": "*",
+			"args": ["**"]
+		},
+		{
+			"kind": "download_file",
+			"host": "*",
+			"path": ["**"]
+		}
+	],
+	"outline_panel": {
+		"dock": "right",
+		"auto_fold_dirs": false
+	},
+	"project_panel": {
+		"hide_hidden": true,
+		"hide_root": true,
+		"dock": "left"
+	},
+	"collaboration_panel": {
+		"dock": "left"
+	},
+	"git_panel": {
+		"dock": "left",
+		"tree_view": false
+	},
+	"agent": {
+		"dock": "right",
+		"favorite_models": [
+			{
+				"provider": "ollama",
+				"model": "qwen3:8b",
+				"enable_thinking": true
+			},
+			{
+				"provider": "ollama",
+				"model": "deepseek-coder:latest",
+				"enable_thinking": false
+			},
+			{
+				"provider": "ollama",
+				"model": "qwen2.5-coder:1.5b-base",
+				"enable_thinking": false
+			},
+			{
+				"provider": "ollama",
+				"model": "qwen2.5-coder:7b",
+				"enable_thinking": false
+			},
+			{
+				"provider": "ollama",
+				"model": "llama3.1:8b",
+				"enable_thinking": false
+			}
+		],
+		"default_model": {
+			"enable_thinking": true,
+			"provider": "ollama",
+			"model": "qwen3:8b"
+		}
+	},
+
+	"journal": {
+		"path": "~/kb/journal",
+		"hour_format": "hour12"
+	},
+	"diagnostics": {
+		"inline": {
+			"enabled": true,
+			"max_severity": "hint"
+		}
+	},
+	"file_scan_exclusions": [
+		"**/.vscode",
+		"**/*.snap",
+		"**/*.snap.new",
+		"**/*.svg",
+		"**/.claude",
+		"**/.DS_Store",
+		"**/.eslintignore",
+		"**/.foam*",
+		"**/.git",
+		"**/.gitattributes",
+		"**/.github",
+		"**/.gitignore",
+		"**/.gitkeep",
+		"**/.gitmodules",
+		"**/.husky",
+		"**/.markdownlint.json",
+		"**/.markdownlint.jsonc",
+		"**/.markdownlint.yaml",
+		"**/.marksman.toml",
+		"**/.netlify",
+		"**/.next",
+		"**/.next-build",
+		"**/.npmrc",
+		"**/.nvmrc",
+		"**/.obsidian",
+		"**/.prettierignore",
+		"**/.prettierrc",
+		"**/.Projects",
+		"**/.server-controller-port.log",
+		"**/.turbo",
+		"**/.venv",
+		"**/.vercel",
+		"**/.vscode-*",
+		"**/.vscodei",
+		// "**/.zed",
+		"**/__init__*",
+		"**/__pycache__",
+		"**/assets*",
+		"**/Cargo.lock",
+		"**/corpus*",
+		"**/CS*",
+		// "**/data*",
+		"**/dist",
+		// "**/doc*",
+		"**/eslint.config.js",
+		"**/journal",
+		"**/jsconfig.json",
+		"**/LICENSE",
+		"**/LICENSE*",
+		"**/LICENSE.txt",
+		"**/loi-zed-lsp/app",
+		"**/meta*",
+		"**/next-env.d.ts",
+		"**/node_modules",
+		"**/omit*",
+		"**/package-lock.json",
+		"**/pnpm-lock.yaml",
+		"**/postcss.config.cjs",
+		"**/presenton",
+		"**/prettier.config.cjs",
+		"**/pyproject.toml",
+		"**/registry.generated.js",
+		"**/app/rust",
+		"**/rust/build*",
+		"**/rustc-*",
+		"**/rustdoc-*",
+		"**/target",
+		"**/tsconfig.build.json",
+		"**/tsconfig.dev.json",
+		"**/tsconfig.json",
+		"**/tsconfig.pnpm.json",
+		"**/tsconfig.tsbuildinfo",
+		"**/venv",
+		"**/vitest.config.ts",
+		".eslintignore",
+		".git",
+		".gitattributes",
+		".github",
+		".gitignore",
+		".gitmodules",
+		".husky",
+		".markdownlint.json",
+		".markdownlint.jsonc",
+		".marksman.toml",
+		".obsidian",
+		".prettierignore",
+		".Projects",
+		".vercel",
+		".zed",
+		"eslint.config.js",
+		"estate.toml",
+		"jsconfig.json",
+		"kb",
+		"LICENSE",
+		"next-env.d.ts",
+		"node_modules",
+		"oxfmt.config.ts",
+		"oxlint.config.ts",
+		"pkg",
+		"pkgs",
+		"pnpm-lock.yaml",
+		"pnpm-workspace.yaml",
+		"postcss.config.cjs",
+		"prettier.config.cjs",
+		"registry.generated.js",
+		"rustfmt.toml",
+		"tmp",
+		"tsconfig.build.json",
+		"tsconfig.dev.json",
+		"tsconfig.json",
+		"tsconfig.pnpm.json",
+		"tsconfig.tsbuildinfo",
+		"turbo.json",
+		"vitest.config.ts",
+		"xtask"
+	]
+}

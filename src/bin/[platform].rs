@@ -1,5 +1,6 @@
 use std::io;
 
+
 #[derive(Debug, Clone, Copy)]
 enum MouseButton {
 	Left,
@@ -361,19 +362,7 @@ mod platform {
 // ═════════════════════════════════════════════════════════════════════════════
 
 fn main() -> io::Result<()> {
-	println!("MAIN: entered");
-
-	println!("MAIN: creating adapter");
-
 	let mut input = platform::create();
-
-	println!("MAIN: adapter created");
-
-	println!("MAIN: calling run");
-
 	let result = input.run();
-
-	println!("MAIN: run returned: {result:?}");
-
 	result
 }

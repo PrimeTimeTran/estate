@@ -1,0 +1,320 @@
+[
+	{
+		"unbind": {
+			"cmd-,": "zed::OpenSettings",
+			"cmd-j": "workspace::ToggleBottomDock",
+			"cmd-m": "zed::Minimize",
+			"cmd-o": "workspace::Open",
+			"cmd-shift-c": "collab_panel::ToggleFocus",
+			"cmd-shift-w": "workspace::CloseWindow"
+		},
+		"bindings": {
+			"cmd-2": "project_panel::Toggle",
+			"cmd-3": "outline_panel::Toggle",
+			"cmd-4": "terminal_panel::Toggle",
+			"cmd-'": "terminal_panel::ToggleFocus",
+			"cmd-, k": "zed::OpenKeymap",
+			"cmd-, k f": "zed::OpenKeymapFile",
+			"cmd-, p f": "zed::OpenProjectSettingsFile",
+			"cmd-, s": "zed::OpenSettings",
+			"cmd-, s f": "zed::OpenSettingsFile",
+			"cmd-, t": "zed::OpenTasks",
+			// "cmd-0": "outline_panel::Toggle",
+			"cmd-0": "workspace::ActivateNextPane",
+			"cmd-9": "workspace::ActivatePaneLeft",
+			"cmd-\"": "workspace::ToggleZoom",
+			"cmd-b r": "outline_panel::ToggleFocus",
+			"cmd-b t": "editor::ToggleBookmark",
+			"cmd-b v": "editor::ViewBookmarks",
+			"cmd-d l": "workspace::ToggleLeftDock",
+			"cmd-j s": "editor::SortLinesCaseInsensitive",
+			"cmd-k j": "workspace::ToggleBottomDock",
+			"cmd-k k": "zed::OpenKeymapFile",
+			"cmd-k w": "multi_workspace::ToggleWorkspaceSidebar",
+			"cmd-s e": "editor::SelectEnclosingSymbol",
+			"cmd-s f": "workspace::Save",
+			"cmd-s l": "dev::OpenLanguageServerLogs",
+			"cmd-s r": "editor::RestartLanguageServer",
+			"cmd-k f b": "editor::FoldFunctionBodies",
+			"cmd-k s t": "git_panel::Toggle",
+			"cmd-z l": "zed::OpenLog",
+			"cmd-alt-'": "workspace::ToggleBottomDock",
+			"cmd-alt-ctrl-'": "workspace::ToggleBottomDock",
+			"cmd-alt-g": "workspace::ToggleLeftDock",
+			"cmd-ctrl-alt-shift-n": "multi_workspace::NextProject",
+			"cmd-ctrl-alt-shift-p": "multi_workspace::PreviousProject",
+			"cmd-shift-'": "workspace::ToggleZoom",
+			"cmd-shift-b": "workspace::ToggleRightDock",
+			"cmd-shift-e": "workspace::ToggleLeftDock",
+			"cmd-shift-g": "git_panel::ToggleFocus",
+			"cmd-shift-j": "workspace::ToggleBottomDock",
+			"cmd-shift-l": "markdown::OpenPreview",
+			"cmd-shift-o": "outline_panel::ToggleFocus",
+			"cmd-shift-w": "multi_workspace::ToggleWorkspaceSidebar",
+			"esc": "workspace::ClearAllNotifications",
+			// "f13 1": "workspace::ToggleVimMode",
+			"f13 1": "workspace::NewSearch",
+			"f13 o": "workspace::Open",
+			"cmd-d cmd-c": [
+				"action::Sequence",
+				[
+					["editor::ToggleFoldAll", 0],
+					["project_panel::CollapseAllEntries", 0],
+					["outline_panel::CollapseAllEntries", 0]
+				]
+			],
+			"cmd-d cmd-e": [
+				"action::Sequence",
+				[
+					["editor::ToggleFoldAll", 0],
+					["outline_panel::ExpandAllEntries", 0]
+				]
+			]
+		}
+	},
+	{
+		"context": "Editor",
+		"bindings": {
+			"cmd-.": "editor::OpenContextMenu",
+			"cmd-d 1": "project_panel::ToggleFocus",
+			"cmd-d 2": "editor::ToggleFocus",
+			"cmd-d a": "agent::ToggleFocus",
+			"cmd-d b": "workspace::ToggleBottomDock",
+			"cmd-d d": "debug_panel::ToggleFocus",
+			"cmd-d f": "vim::ToggleProjectPanelFocus",
+			"cmd-d l": "workspace::ToggleLeftDock",
+			"cmd-d r": "workspace::ToggleRightDock",
+			"cmd-d t": "terminal_panel::ToggleFocus",
+			"cmd-k d": "debug_panel::ToggleFocus",
+			"cmd-k n": "editor::CopyFileName",
+			"cmd-k p r": "workspace::CopyRelativePath",
+			"cmd-d cmd-o": "outline::Toggle",
+			"cmd-alt-j": "editor::GoToDefinition",
+			"cmd-alt-k": "pane::GoBack",
+			"cmd-shift-s": "editor::ToggleCodeActions",
+			"ctrl-cmd-.": "editor::ShowSignatureHelp",
+			"cmd-t 1": [
+				"task::Spawn",
+				{
+					"task_name": "FORMAT: Rust"
+				}
+			]
+		},
+		"unbind": {
+			"cmd-;": "editor::ToggleLineNumbers",
+			"cmd-\"": "editor::ExpandAllDiffHunks",
+			"cmd-i": "editor::ShowSignatureHelp",
+			"cmd-s": "workspace::Save",
+			"cmd-alt-;": "multi_workspace::FocusWorkspaceSidebar",
+			"cmd-alt-j": "multi_workspace::ToggleWorkspaceSidebar",
+			"cmd-shift-s": "workspace::SaveAs"
+		}
+	},
+	{
+		"context": "Center",
+		"unbind": {
+			"ctrl-1": ["pane::ActivateItem", 0],
+			"ctrl-2": ["pane::ActivateItem", 1],
+			"ctrl-3": ["pane::ActivateItem", 2],
+			"ctrl-4": ["pane::ActivateItem", 3],
+			"ctrl-5": ["pane::ActivateItem", 4]
+		}
+	},
+	{
+		"context": "Pane",
+		"unbind": {
+			"cmd-k up": "pane::SplitUp",
+			"cmd-k down": "pane::SplitDown",
+			"cmd-k right": "pane::SplitRight",
+			"cmd-k left": "pane::SplitLeft",
+			"cmd-k w": [
+				"pane::CloseAllItems",
+				{
+					"close_pinned": false
+				}
+			]
+		},
+		"bindings": {
+			"cmd-d up": "pane::SplitAndMoveUp",
+			"cmd-d down": "pane::SplitAndMoveDown",
+			"cmd-d left": "pane::SplitAndMoveLeft",
+			"cmd-d right": "pane::SplitAndMoveRight",
+			"cmd-shift-f": [
+				"action::Sequence",
+				[
+					[
+						"pane::DeploySearch",
+						{
+							// Options:
+							// replace_enabled, included_files, excluded_files, query, regex, case_sensitive, whole_word, include_ignored
+							"whole_word": true
+						}
+					],
+					["workspace::SendKeystrokes", "enter"]
+				]
+			]
+		}
+	},
+	{
+		// Two solutions
+		// - Vim search via "/{TERM}" then "n" to navigate results.
+		// - Zed search "cmd + e" then "n" to add to search panel and navigate.
+		"context": "Editor && vim_mode == normal",
+		"bindings": {
+			"space": "editor::PageDown",
+			"shift-space": "editor::PageUp",
+			"n": "search::SelectNextMatch",
+			"N": "search::SelectPreviousMatch"
+		}
+	},
+	{
+		"context": "Editor && vim_mode",
+		"bindings": {
+			"cmd-ctrl-alt-shift-h": "project_panel::ToggleFocus",
+			"cmd-ctrl-alt-shift-l": "outline_panel::ToggleFocus"
+		}
+	},
+	{
+		"context": "Editor && mode == full",
+		"bindings": {
+			"cmd-k e": "editor::SelectEnclosingSymbol"
+		}
+	},
+	{
+		"context": "ProjectPanel",
+		"bindings": {
+			"enter": "project_panel::Rename",
+			"cmd-ctrl-alt-shift-p": [
+				"action::Sequence",
+				[["project_panel::ToggleFocus", 0]]
+			]
+		},
+		"unbind": {
+			"f2": "project_panel::Rename"
+		}
+	},
+	{
+		"context": "ProjectPanel && !editing",
+		"bindings": {
+			"r": "project_panel::Rename"
+		}
+	},
+	{
+		"context": "Terminal",
+		"bindings": {
+			"cmd-9": "tab_switcher::Toggle",
+			"cmd-n": "workspace::NewTerminal",
+			"escape": "editor::ToggleFocus"
+		}
+	},
+	{
+		"context": "VimControl && !menu",
+		"bindings": {
+			"cmd-:": "editor::FoldSelectedRanges"
+		}
+	},
+	{
+		"context": "extension == md",
+		"bindings": {
+			"cmd-ctrl-alt-shift-m": [
+				"action::Sequence",
+				[
+					["markdown::OpenPreview", 0]
+					// ["workspace::SendKeystrokes", "cmd-alt-left"],
+					// ["workspace::SendKeystrokes", "cmd-w"]
+				]
+			]
+		}
+	},
+	{
+		"context": "MarkdownPreview",
+		"bindings": {
+			"cmd-ctrl-alt-shift-m": [
+				"action::Sequence",
+				[
+					["markdown::OpenPreview", 1]
+					// ["workspace::SendKeystrokes", "cmd-alt-left"],
+					// ["workspace::SendKeystrokes", "cmd-w"]
+				]
+			]
+		}
+	},
+	{
+		"context": "SkillCreator",
+		"unbind": {
+			"cmd-w": "workspace::CloseWindow"
+		}
+	},
+	{
+		"context": "SkillCreator > Editor",
+		"unbind": {
+			"cmd-w": "workspace::CloseWindow"
+		}
+	},
+	{
+		"context": "OutlinePanel",
+		"bindings": {
+			"cmd-shift-c": ["outline_panel::CollapseAllEntries", null],
+			"cmd-shift-v": "outline_panel::ExpandAllEntries"
+		}
+	},
+	{
+		"context": "OutlinePanel && editing",
+		"bindings": {
+			"shift-j": ["workspace::SendKeystrokes", "down"]
+		}
+	},
+	{
+		"context": "OutlinePanel && not_editing",
+		"bindings": {
+			"e": "outline_panel::ExpandSelectedEntry",
+			"c": "outline_panel::CollapseSelectedEntry",
+			"f": [
+				"action::Sequence",
+				[
+					["editor::ToggleFocus", 0],
+					["workspace::SendKeystrokes", "z"],
+					["workspace::SendKeystrokes", "c"]
+				]
+			],
+			"u": [
+				"action::Sequence",
+				[
+					["editor::ToggleFocus", 0],
+					["workspace::SendKeystrokes", "z"],
+					["workspace::SendKeystrokes", "o"]
+				]
+			],
+			"space": "outline_panel::ScrollDown",
+			"shift-space": "outline_panel::ScrollUp",
+			"d c": "outline_panel::CollapseAllEntries",
+			"d e": "outline_panel::ScrollUp",
+			"cmd-shift-c": ["outline_panel::CollapseAllEntries", null],
+			"cmd-shift-v": "outline_panel::ExpandAllEntries",
+			"cmd-ctrl-alt-shift-j": ["workspace::SendKeystrokes", "down"]
+		}
+	},
+	{
+		"context": "GitPanel",
+		"bindings": {
+			"r": "git::RestoreFile",
+			"y": "git::RestoreTrackedFiles"
+		}
+	},
+	{
+		"context": "ProjectSearchView",
+		"bindings": {
+			"esc": "buffer_search::Dismiss",
+			"1": "command_palette::Toggle"
+		}
+	},
+	{
+		"bindings": {}
+	},
+	{
+		"context": "!AcpThread > Editor && mode == full",
+		"bindings": {
+			"cmd-j f": "pane::RevealInProjectPanel"
+		}
+	}
+]

@@ -22,19 +22,21 @@ pub mod ui;
 pub mod util;
 pub mod window;
 
+#[path = "./[trait].rs"]
+pub mod native_traits;
+
 pub use agent::*;
 pub use cursor::*;
 pub use prelude_native::*;
 pub use util::*;
 
-
+pub use native_traits::*;
 
 #[cfg(unix)]
 pub mod unix;
 
 #[cfg(unix)]
 pub use unix::*;
-
 
 #[cfg(target_os = "linux")]
 pub mod linux;
