@@ -63,7 +63,7 @@ mod platform {
 		},
 	};
 
-	use windows_sys::Win32::UI::WindowsAndMessaging::{KBDLLHOOKSTRUCT, MSLLHOOKSTRUCT};
+	use windows_sys::Win32::UI::WindowsAndMessaging::MSLLHOOKSTRUCT;
 
 	pub struct WindowsInputAdapter {
 		keyboard_hook: HHOOK,
