@@ -90,11 +90,11 @@ mod platform {
 					SetWindowsHookExW(WH_KEYBOARD_LL, Some(keyboard_proc), std::ptr::null_mut(), 0)
 			}
 
-			if self.keyboard_hook == 0 {
+			if self.keyboard_hook.is_null() {
 				return Err(io::Error::last_os_error());
 			}
 
-			println!("WINDOWS: keyboard hook installed: {}", self.keyboard_hook);
+			println!("WINDOWS: keyboard hook installed: {:?}", self.keyboard_hook);
 
 			println!("WINDOWS: installing mouse hook...");
 
@@ -102,33 +102,33 @@ mod platform {
 				self.mouse_hook = SetWindowsHookExW(WH_MOUSE_LL, Some(mouse_proc), std::ptr::null_mut(), 0);
 			}
 
-			if self.mouse_hook == 0 {
+			if self.mouse_hook.is_null() {
 				let error = io::Error::last_os_error();
 
 				unsafe {
 					UnhookWindowsHookEx(self.keyboard_hook);
 				}
 
-				self.keyboard_hook = 0;
+				self.keyboard_hook = std::ptr::null_mut();
 
 				return Err(error);
 			}
 
-			println!("WINDOWS: mouse hook installed: {}", self.mouse_hook);
+			println!("WINDOWS: mouse hook installed: {:?}", self.mouse_hook);
 
 			Ok(())
 		}
 
 		fn uninstall_hooks(&mut self) {
 			unsafe {
-				if self.keyboard_hook != 0 {
+				if !self.keyboard_hook.is_null() {
 					UnhookWindowsHookEx(self.keyboard_hook);
 					self.keyboard_hook = std::ptr::null_mut();
 				}
 
-				if self.mouse_hook != 0 {
+				if !self.mouse_hook.is_null() {
 					UnhookWindowsHookEx(self.mouse_hook);
-					self.mouse_hook = 0;
+					self.mouse_hook = std::ptr::null_mut();
 				}
 			}
 
