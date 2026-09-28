@@ -38,14 +38,6 @@ enum InputEvent {
 	},
 }
 
-// Human Device Interaction Input
-// - Keyboard
-// - Mouse
-// - Trackpad
-trait HDIInput {
-	fn run(&mut self) -> io::Result<()>;
-}
-
 use std::ptr::null_mut;
 
 use windows_sys::Win32::{
@@ -129,7 +121,7 @@ impl HDIWindows {
 }
 
 impl HDIInput for HDIWindows {
-	pub fn run(&mut self) -> io::Result<()> {
+	fn run(&mut self) -> io::Result<()> {
 		println!("WINDOWS: starting");
 
 		self.install_hooks()?;

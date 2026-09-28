@@ -7,14 +7,6 @@ pub use server::*;
 pub mod client;
 pub use client::*;
 
-// Human Device Interaction Input
-// - Keyboard
-// - Mouse
-// - Trackpad
-pub trait HDIInput {
-	fn run(&mut self) -> io::Result<()>;
-}
-
 pub fn create_hdi_monitor() -> Box<dyn HDIInput> {
 	todo!("")
 }
