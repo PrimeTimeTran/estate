@@ -21,7 +21,7 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 		.context("loading SDLC")?
 		.ok_or_else(|| anyhow!("no SDLC instance"))?;
 	if sdlc.stage().is_none() {
-		sdlc.start(agent_prompts::for_intent()?).await?;
+		sdlc.start(agent_prompts::for_intent("Do the work required to build this CLI")).await?;
 	}
 	let mut events = sdlc.subscribe();
 	let mut view = SdlcView::new(sdlc.stage().unwrap_or(Stage::Intent));

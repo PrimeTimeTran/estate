@@ -1,0 +1,9 @@
+prime in estate (main●)
+$ sudo lsof -nP -iTCP:11434 -sTCP:LISTEN
+Alias tip: _ lsof -nP -iTCP:11434 -sTCP:LISTEN
+COMMAND    PID   USER FD   TYPE DEVICE SIZE/OFF NODE NAME
+ollama  594977 ollama 3u  IPv4 913257      0t0  TCP 127.0.0.1:11434 (LISTEN)
+
+prime in estate (main●)
+$ sudo kill 594977
+Alias tip: _ kill 594977

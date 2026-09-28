@@ -311,10 +311,10 @@ impl Evaluator {
 
 		let state = format!(
 			"## User Intent\n\n{intent}\n\n\
-		 ## Specification\n\n{spec}\n\n\
-		 ## Implementation Plan\n\n{plan}\n\n\
-		 ## Test Plan\n\n{tests}\n\n\
-		 ## Repository Artifacts\n\n{implementation}"
+  		 ## Specification\n\n{spec}\n\n\
+  		 ## Implementation Plan\n\n{plan}\n\n\
+  		 ## Test Plan\n\n{tests}\n\n\
+  		 ## Repository Artifacts\n\n{implementation}"
 		);
 
 		let response = self
@@ -716,7 +716,6 @@ impl Sdlc {
 			session,
 		}))
 	}
-
 	pub async fn run(
 		&mut self,
 		mut input_rx: tokio::sync::mpsc::UnboundedReceiver<SdlcInput>,
@@ -730,6 +729,14 @@ impl Sdlc {
 				Some(stage) => stage,
 				None => return self.exit_no_stage(),
 			};
+			// 			let stage = self
+			// 				.stage()
+			// 				.ok_or_else(|| anyhow!("No active SDLC stage"))?;
+			//
+			// 			if stage == Stage::Complete {
+			// 				self.emit(SdlcEvent::RunCompleted);
+			// 				return Ok(());
+			// 			}
 			attempt = self.next_attempt(stage, &mut last_stage, &mut attempt);
 			self.emit(SdlcEvent::StageStarted { stage, attempt });
 			self.emit(SdlcEvent::PhaseChanged {
@@ -2461,11 +2468,24 @@ mod ui {
 }
 pub mod prompt {
 	use super::*;
-	pub fn for_intent() -> Result<String> {
+	pub fn initial_prompt() -> Result<String> {
 		Ok(String::from(
-			"Create a file named hello-world.js in the repository root. It should accept a command-line argument and write that value to hello-world.md. The user should be able to run node hello-world.js \"hi\". Add tests covering both the JavaScript logic and the CLI behavior.",
+			"I need to build a CLI tool. I wnat to use NodeJS.
+			Create a file named hello-world.js in the repository root from where I ran this command.
+			This file will be the CLI entrypoint. The CLI tool should accept an
+			argument and write that value to hello-world.md.
+			The user should be able to run node hello-world.js \"hi\".
+
+			- Add tests covering both the JavaScript logic and the CLI behavior.",
 		))
 	}
+	const INTENT_PROMPT: &str = include_str!("../../../ai/template/intent.md");
+	const USER_REQUEST: &str = include_str!("../../../ai/template/prompt.md");
+
+	pub fn for_intent(user_request: &str) -> String {
+		INTENT_PROMPT.replace("{{USER_REQUEST}}", user_request)
+	}
+
 	pub fn tests_gen(intent: &str, spec: &str, plan: &str) -> String {
 		format!(
 			r#"
@@ -2576,6 +2596,7 @@ mod enums {
 	}
 	#[derive(Debug, Clone)]
 	pub enum SdlcEvent {
+		// RunCompleted,
 		Completed,
 		Failed {
 			stage: Option<Stage>,
