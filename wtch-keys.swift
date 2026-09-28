@@ -1,11 +1,3 @@
-#!/bin/bash
-
-set -e
-
-DIR="${TMPDIR:-/tmp}/key-state-watcher"
-mkdir -p "$DIR"
-
-cat > "$DIR/main.swift" <<'SWIFT'
 import CoreGraphics
 import Foundation
 
@@ -704,11 +696,3 @@ let initialTimer = Timer.scheduledTimer(withTimeInterval: initialDelay, repeats:
 
 CFRunLoopRun()
 SWIFT
-
-swiftc "$DIR/main.swift" -o "$DIR/watcher"
-
-#  Hide characters typed into this terminal.
-stty -echo
-trap 'stty echo' EXIT
-
-"$DIR/watcher"
