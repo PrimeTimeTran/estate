@@ -63,8 +63,6 @@ mod platform {
 		},
 	};
 
-	use windows_sys::Win32::UI::WindowsAndMessaging::MSLLHOOKSTRUCT;
-
 	pub struct WindowsInputAdapter {
 		keyboard_hook: HHOOK,
 		mouse_hook: HHOOK,
