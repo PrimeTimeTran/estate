@@ -55,42 +55,20 @@ mod platform {
 	use windows_sys::Win32::{
 		Foundation::{LPARAM, LRESULT, WPARAM},
 		UI::{
-			Input::KeyboardAndMouse::{
-				KBDLLHOOKSTRUCT,
-				MSLLHOOKSTRUCT,
-			},
+			Input::KeyboardAndMouse::{KBDLLHOOKSTRUCT, MSLLHOOKSTRUCT},
 			WindowsAndMessaging::{
-				CallNextHookEx,
-				DispatchMessageW,
-				GetMessageW,
-				HC_ACTION,
-				MSG,
-				SetWindowsHookExW,
-				TranslateMessage,
-				UnhookWindowsHookEx,
-				WH_KEYBOARD_LL,
-				WH_MOUSE_LL,
-				WM_KEYDOWN,
-				WM_KEYUP,
-				WM_LBUTTONDOWN,
-				WM_LBUTTONUP,
-				WM_MBUTTONDOWN,
-				WM_MBUTTONUP,
-				WM_MOUSEMOVE,
-				WM_MOUSEWHEEL,
-				WM_RBUTTONDOWN,
-				WM_RBUTTONUP,
-				WM_XBUTTONDOWN,
-				WM_XBUTTONUP,
-				XBUTTON1,
-				XBUTTON2,
+				CallNextHookEx, DispatchMessageW, GetMessageW, HC_ACTION, HHOOK, KBDLLHOOKSTRUCT, MSG,
+				MSLLHOOKSTRUCT, SetWindowsHookExW, TranslateMessage, UnhookWindowsHookEx, WH_KEYBOARD_LL,
+				WH_MOUSE_LL, WM_KEYDOWN, WM_KEYUP, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN,
+				WM_MBUTTONUP, WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_RBUTTONDOWN, WM_RBUTTONUP, WM_XBUTTONDOWN,
+				WM_XBUTTONUP, XBUTTON1, XBUTTON2,
 			},
 		},
 	};
 
 	pub struct WindowsInputAdapter {
-		keyboard_hook: isize,
-		mouse_hook: isize,
+		keyboard_hook: HHOOK,
+		mouse_hook: HHOOK,
 	}
 
 	impl WindowsInputAdapter {
@@ -98,8 +76,8 @@ mod platform {
 			println!("WINDOWS: new()");
 
 			Self {
-				keyboard_hook: 0,
-				mouse_hook: 0,
+				keyboard_hook: std::ptr::null_mut(),
+				mouse_hook: std::ptr::null_mut(),
 			}
 		}
 
@@ -108,33 +86,19 @@ mod platform {
 
 			unsafe {
 				self.keyboard_hook =
-					SetWindowsHookExW(
-						WH_KEYBOARD_LL,
-						Some(keyboard_proc),
-						0,
-						0,
-					);
+					SetWindowsHookExW(WH_KEYBOARD_LL, Some(keyboard_proc), std::ptr::null_mut(), 0)
 			}
 
 			if self.keyboard_hook == 0 {
 				return Err(io::Error::last_os_error());
 			}
 
-			println!(
-				"WINDOWS: keyboard hook installed: {}",
-				self.keyboard_hook
-			);
+			println!("WINDOWS: keyboard hook installed: {}", self.keyboard_hook);
 
 			println!("WINDOWS: installing mouse hook...");
 
 			unsafe {
-				self.mouse_hook =
-					SetWindowsHookExW(
-						WH_MOUSE_LL,
-						Some(mouse_proc),
-						0,
-						0,
-					);
+				self.mouse_hook = SetWindowsHookExW(WH_MOUSE_LL, Some(mouse_proc), 0, 0);
 			}
 
 			if self.mouse_hook == 0 {
@@ -149,10 +113,7 @@ mod platform {
 				return Err(error);
 			}
 
-			println!(
-				"WINDOWS: mouse hook installed: {}",
-				self.mouse_hook
-			);
+			println!("WINDOWS: mouse hook installed: {}", self.mouse_hook);
 
 			Ok(())
 		}
@@ -197,13 +158,7 @@ mod platform {
 				let mut msg = std::mem::zeroed::<MSG>();
 
 				loop {
-					let result =
-						GetMessageW(
-							&mut msg,
-							null_mut(),
-							0,
-							0,
-						);
+					let result = GetMessageW(&mut msg, null_mut(), 0, 0);
 
 					if result == -1 {
 						let error = io::Error::last_os_error();
@@ -230,47 +185,33 @@ mod platform {
 	}
 
 	impl Drop for WindowsInputAdapter {
-    fn drop(&mut self) {
-        unsafe {
-            if !self.keyboard_hook.is_null() {
-                UnhookWindowsHookEx(self.keyboard_hook);
-            }
-	
-            if !self.mouse_hook.is_null() {
-                UnhookWindowsHookEx(self.mouse_hook);
-            }
-        }
-    }
+		fn drop(&mut self) {
+			unsafe {
+				if !self.keyboard_hook.is_null() {
+					UnhookWindowsHookEx(self.keyboard_hook);
+				}
+
+				if !self.mouse_hook.is_null() {
+					UnhookWindowsHookEx(self.mouse_hook);
+				}
+			}
+		}
 	}
 
 	// ═══════════════════════════════════════════════════════════════════════════
 	// Keyboard hook
 	// ═══════════════════════════════════════════════════════════════════════════
 
-	unsafe extern "system" fn keyboard_proc(
-		code: i32,
-		wparam: WPARAM,
-		lparam: LPARAM,
-	) -> LRESULT {
+	unsafe extern "system" fn keyboard_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
 		if code == HC_ACTION {
-			let event =
-				unsafe {
-					&*(lparam as *const KBDLLHOOKSTRUCT)
-				};
+			let event = unsafe { &*(lparam as *const KBDLLHOOKSTRUCT) };
 
 			let state = match wparam as u32 {
 				WM_KEYDOWN => KeyState::Down,
 				WM_KEYUP => KeyState::Up,
 
 				_ => {
-					return unsafe {
-						CallNextHookEx(
-							0,
-							code,
-							wparam,
-							lparam,
-						)
-					};
+					return unsafe { CallNextHookEx(std::ptr::null_mut(), code, wparam, lparam) };
 				}
 			};
 
@@ -281,108 +222,62 @@ mod platform {
 
 			println!(
 				"KEY          {:?}  vk=0x{:02X}  scan=0x{:02X}",
-				state,
-				event.vkCode,
-				event.scanCode,
+				state, event.vkCode, event.scanCode,
 			);
 
 			let _ = input;
 		}
 
-		unsafe {
-			CallNextHookEx(
-				0,
-				code,
-				wparam,
-				lparam,
-			)
-		}
+		unsafe { CallNextHookEx(std::ptr::null_mut(), code, wparam, lparam) }
 	}
 
 	// ═══════════════════════════════════════════════════════════════════════════
 	// Mouse hook
 	// ═══════════════════════════════════════════════════════════════════════════
 
-	unsafe extern "system" fn mouse_proc(
-		code: i32,
-		wparam: WPARAM,
-		lparam: LPARAM,
-	) -> LRESULT {
+	unsafe extern "system" fn mouse_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
 		if code == HC_ACTION {
-			let event =
-				unsafe {
-					&*(lparam as *const MSLLHOOKSTRUCT)
-				};
+			let event = unsafe { &*(lparam as *const MSLLHOOKSTRUCT) };
 
 			match wparam as u32 {
 				WM_LBUTTONDOWN => {
-					print_mouse(
-						MouseButton::Left,
-						KeyState::Down,
-					);
+					print_mouse(MouseButton::Left, KeyState::Down);
 				}
 
 				WM_LBUTTONUP => {
-					print_mouse(
-						MouseButton::Left,
-						KeyState::Up,
-					);
+					print_mouse(MouseButton::Left, KeyState::Up);
 				}
 
 				WM_RBUTTONDOWN => {
-					print_mouse(
-						MouseButton::Right,
-						KeyState::Down,
-					);
+					print_mouse(MouseButton::Right, KeyState::Down);
 				}
 
 				WM_RBUTTONUP => {
-					print_mouse(
-						MouseButton::Right,
-						KeyState::Up,
-					);
+					print_mouse(MouseButton::Right, KeyState::Up);
 				}
 
 				WM_MBUTTONDOWN => {
-					print_mouse(
-						MouseButton::Middle,
-						KeyState::Down,
-					);
+					print_mouse(MouseButton::Middle, KeyState::Down);
 				}
 
 				WM_MBUTTONUP => {
-					print_mouse(
-						MouseButton::Middle,
-						KeyState::Up,
-					);
+					print_mouse(MouseButton::Middle, KeyState::Up);
 				}
 
 				WM_XBUTTONDOWN => {
-					let button =
-						xbutton(event.mouseData);
+					let button = xbutton(event.mouseData);
 
-					print_mouse(
-						button,
-						KeyState::Down,
-					);
+					print_mouse(button, KeyState::Down);
 				}
 
 				WM_XBUTTONUP => {
-					let button =
-						xbutton(event.mouseData);
+					let button = xbutton(event.mouseData);
 
-					print_mouse(
-						button,
-						KeyState::Up,
-					);
+					print_mouse(button, KeyState::Up);
 				}
 
 				WM_MOUSEMOVE => {
-					println!(
-						"MOUSE MOVE   x={} y={}",
-						event.pt.x,
-						event.pt.y,
-					);
+					println!("MOUSE MOVE   x={} y={}", event.pt.x, event.pt.y,);
 
 					let _ = InputEvent::MouseMove {
 						x: event.pt.x,
@@ -391,14 +286,9 @@ mod platform {
 				}
 
 				WM_MOUSEWHEEL => {
-					let delta =
-						((event.mouseData >> 16) & 0xffff)
-							as i16;
+					let delta = ((event.mouseData >> 16) & 0xffff) as i16;
 
-					println!(
-						"MOUSE WHEEL  delta={}",
-						delta,
-					);
+					println!("MOUSE WHEEL  delta={}", delta,);
 
 					let _ = InputEvent::MouseWheel {
 						delta: delta as i32,
@@ -409,51 +299,31 @@ mod platform {
 			}
 		}
 
-		unsafe {
-			CallNextHookEx(
-				0,
-				code,
-				wparam,
-				lparam,
-			)
-		}
+		unsafe { CallNextHookEx(std::ptr::null_mut(), code, wparam, lparam) }
 	}
 
 	fn xbutton(mouse_data: u32) -> MouseButton {
-		let button = (mouse_data >> 16) & 0xffff;
-
-		match button {
-			XBUTTON1 => MouseButton::X1,
-			XBUTTON2 => MouseButton::X2,
-			other => MouseButton::Other(other),
-		}
+  	let button = ((mouse_data >> 16) & 0xFFFF) as u16;
+  	
+  	match button {
+      XBUTTON1 => MouseButton::X1,
+      XBUTTON2 => MouseButton::X2,
+      other => MouseButton::Other(other as u32),
+  	}
 	}
 
-	fn print_mouse(
-		button: MouseButton,
-		state: KeyState,
-	) {
-		println!(
-			"MOUSE BUTTON {:?} {:?}",
-			button,
-			state,
-		);
+	fn print_mouse(button: MouseButton, state: KeyState) {
+		println!("MOUSE BUTTON {:?} {:?}", button, state,);
 
-		let _ = InputEvent::MouseButton {
-			button,
-			state,
-		};
+		let _ = InputEvent::MouseButton { button, state };
 	}
 
 	pub fn create() -> Box<dyn InputAdapter> {
 		println!("PLATFORM: Windows create()");
 
-		let adapter =
-			WindowsInputAdapter::new();
+		let adapter = WindowsInputAdapter::new();
 
-		println!(
-			"PLATFORM: Windows adapter constructed"
-		);
+		println!("PLATFORM: Windows adapter constructed");
 
 		Box::new(adapter)
 	}
@@ -494,19 +364,15 @@ fn main() -> io::Result<()> {
 
 	println!("MAIN: creating adapter");
 
-	let mut input =
-		platform::create();
+	let mut input = platform::create();
 
 	println!("MAIN: adapter created");
 
 	println!("MAIN: calling run");
 
-	let result =
-		input.run();
+	let result = input.run();
 
-	println!(
-		"MAIN: run returned: {result:?}"
-	);
+	println!("MAIN: run returned: {result:?}");
 
 	result
 }
