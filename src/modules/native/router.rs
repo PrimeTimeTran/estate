@@ -69,61 +69,61 @@ pub async fn execute<R: Runtime>(
 			let workspace = AnalyzeDaemon.run(&ctx, &args).await?;
 			AnalyzeLoop::run_cli(workspace).await;
 		}
-		Command::Analyze(args) => {
-			doc!(
-				r#"
-				          ┌──────────────────┐
-				          │      Estate      │
-				          │  core services   │
-				          └────────┬─────────┘
-				                  │
-				    ┌─────────────┼─────────────┐
-				    │             │             │
-				    ▼             ▼             ▼
-				CLI command     Daemon         LSP
-				(short-lived)   (long-lived)   (long-lived)
-				                  │
-				                  │
-				            ┌─────┴─────┐
-				            │           │
-				            ▼           ▼
-				          Headless     Menu Bar
-				          process      application
-			"#
-			);
-			let mut stream = match UnixStream::connect(PATH_SOCKET).await {
-				Ok(s) => s,
-				Err(e) => {
-					return Err(anyhow::anyhow!(
-						"Daemon is not running. Start it first: {e}"
-					));
-				}
-			};
-			for path in &args.paths {
-				let clean_path = path.canonicalize().unwrap_or_else(|_| path.clone());
-				let request = serde_json::json!({
-						"path": clean_path,
-						"line": args.line,
-						"column": &args.column,
-						"mode": args.mode
-				});
-				let payload = format!("{}\n", request);
-				if let Err(e) = stream.write_all(payload.as_bytes()).await {
-					eprintln!("Failed to send request: {}", e);
-					break;
-				}
-				let mut buf = Vec::new();
-				match stream.read_to_end(&mut buf).await {
-					Ok(_) => {
-						let response = String::from_utf8_lossy(&buf);
-						print!("{}", response);
-					}
-					Err(e) => {
-						eprintln!("Failed to read response: {}", e);
-					}
-				}
-			}
-		}
+		// Command::Analyze(args) => {
+		// 	doc!(
+		// 		r#"
+		// 		          ┌──────────────────┐
+		// 		          │      Estate      │
+		// 		          │  core services   │
+		// 		          └────────┬─────────┘
+		// 		                  │
+		// 		    ┌─────────────┼─────────────┐
+		// 		    │             │             │
+		// 		    ▼             ▼             ▼
+		// 		CLI command     Daemon         LSP
+		// 		(short-lived)   (long-lived)   (long-lived)
+		// 		                  │
+		// 		                  │
+		// 		            ┌─────┴─────┐
+		// 		            │           │
+		// 		            ▼           ▼
+		// 		          Headless     Menu Bar
+		// 		          process      application
+		// 	"#
+		// 	);
+		// 	let mut stream = match UnixStream::connect(PATH_SOCKET).await {
+		// 		Ok(s) => s,
+		// 		Err(e) => {
+		// 			return Err(anyhow::anyhow!(
+		// 				"Daemon is not running. Start it first: {e}"
+		// 			));
+		// 		}
+		// 	};
+		// 	for path in &args.paths {
+		// 		let clean_path = path.canonicalize().unwrap_or_else(|_| path.clone());
+		// 		let request = serde_json::json!({
+		// 				"path": clean_path,
+		// 				"line": args.line,
+		// 				"column": &args.column,
+		// 				"mode": args.mode
+		// 		});
+		// 		let payload = format!("{}\n", request);
+		// 		if let Err(e) = stream.write_all(payload.as_bytes()).await {
+		// 			eprintln!("Failed to send request: {}", e);
+		// 			break;
+		// 		}
+		// 		let mut buf = Vec::new();
+		// 		match stream.read_to_end(&mut buf).await {
+		// 			Ok(_) => {
+		// 				let response = String::from_utf8_lossy(&buf);
+		// 				print!("{}", response);
+		// 			}
+		// 			Err(e) => {
+		// 				eprintln!("Failed to read response: {}", e);
+		// 			}
+		// 		}
+		// 	}
+		// }
 		// Command::DaemonServer => {
 		// 	native::daemon::DaemonServer::run().await;
 		// }
