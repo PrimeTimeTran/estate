@@ -62,11 +62,10 @@ impl OracleScreen {
 	fn draw_ui<C: Ctx, S>(&mut self, ui: &mut egui::Ui, ctx: &AppContext<'_, C, S>) {
 		self.draw_header(ui);
 
-		
-// 		let trackpad = self.inspect_trackpad(ui, ctx);
-// 
-// 		self.draw_telemetry(ui, &trackpad);
-// 		self.draw_trigger_preview(ui, &trackpad);
+		// 		let trackpad = self.inspect_trackpad(ui, ctx);
+		//
+		// 		self.draw_telemetry(ui, &trackpad);
+		// 		self.draw_trigger_preview(ui, &trackpad);
 		self.draw_controls(ui);
 	}
 	fn draw_header(&mut self, ui: &mut egui::Ui) {

@@ -86,10 +86,11 @@ impl FsWalker {
 	}
 }
 
-
 #[cfg(test)]
 mod tests {
 	use super::*;
+	use crate::native::resolver::resolve_settings;
+	use crate::prelude::*;
 	use ::macros::vow;
 	use serde_json::{Value, json};
 	use std::{
@@ -97,8 +98,6 @@ mod tests {
 		path::{Path, PathBuf},
 		sync::atomic::{AtomicU64, Ordering},
 	};
-	use crate::prelude::*;
-	use crate::native::resolver::resolve_settings;
 
 	const SETTINGS_FILENAME: &str = "settings.json";
 
@@ -125,10 +124,7 @@ mod tests {
 		fn new() -> std::io::Result<Self> {
 			let id = NEXT_FIXTURE_ID.fetch_add(1, Ordering::Relaxed);
 
-			let root = std::env::temp_dir().join(format!(
-				"estate-settings-{}-{id}",
-				std::process::id()
-			));
+			let root = std::env::temp_dir().join(format!("estate-settings-{}-{id}", std::process::id()));
 
 			let target = root.join("future/kb/project/crates/estate");
 			fs::create_dir_all(&target)?;
@@ -169,9 +165,7 @@ mod tests {
 			self.target.join(SETTINGS_FILENAME)
 		}
 		fn workspace_path(&self) -> PathBuf {
-			self.root
-				.join("future/kb/project")
-				.join(SETTINGS_FILENAME)
+			self.root.join("future/kb/project").join(SETTINGS_FILENAME)
 		}
 		fn write(path: &Path, value: Value) -> std::io::Result<()> {
 			fs::write(path, serde_json::to_string_pretty(&value)?)
@@ -190,8 +184,7 @@ mod tests {
 		}
 
 		fn resolve(&self) -> anyhow::Result<Value> {
-			let settings =
-				resolve_settings(&self.target, SETTINGS_FILENAME)?;
+			let settings = resolve_settings(&self.target, SETTINGS_FILENAME)?;
 			Ok(serde_json::to_value(settings)?)
 		}
 	}
@@ -283,16 +276,20 @@ mod tests {
 		let fixture = SettingsFixture::new().unwrap();
 
 		// Deliberately swap the types without moving the files.
-		fixture.write_project(json!({
-			"type": "workspace",
-			"is_tray_app": true,
-			"is_tray_visible": true
-		})).unwrap();
+		fixture
+			.write_project(json!({
+				"type": "workspace",
+				"is_tray_app": true,
+				"is_tray_visible": true
+			}))
+			.unwrap();
 
-		fixture.write_workspace(json!({
-			"type": "project",
-			"is_tray_visible": false
-		})).unwrap();
+		fixture
+			.write_workspace(json!({
+				"type": "project",
+				"is_tray_visible": false
+			}))
+			.unwrap();
 
 		let resolved = fixture.resolve().unwrap();
 
@@ -303,10 +300,12 @@ mod tests {
 	vow!(settings_resolver_rejects_unknown_type, {
 		let fixture = SettingsFixture::new().unwrap();
 
-		fixture.write_workspace(json!({
-			"type": "unrecognized",
-			"is_tray_visible": true
-		})).unwrap();
+		fixture
+			.write_workspace(json!({
+				"type": "unrecognized",
+				"is_tray_visible": true
+			}))
+			.unwrap();
 
 		assert!(fixture.resolve().is_err());
 	});
@@ -314,9 +313,11 @@ mod tests {
 	vow!(settings_resolver_rejects_missing_type, {
 		let fixture = SettingsFixture::new().unwrap();
 
-		fixture.write_workspace(json!({
-			"is_tray_visible": true
-		})).unwrap();
+		fixture
+			.write_workspace(json!({
+				"is_tray_visible": true
+			}))
+			.unwrap();
 
 		assert!(fixture.resolve().is_err());
 	});
@@ -327,7 +328,8 @@ mod tests {
 		fs::write(
 			fixture.workspace_path(),
 			r#"{"type":"workspace","log_path":}"#,
-		).unwrap();
+		)
+		.unwrap();
 
 		assert!(fixture.resolve().is_err());
 	});
@@ -337,8 +339,7 @@ mod tests {
 
 		// Serialize the typed Settings directly.
 		// Converting to Value first can reorder map keys.
-		let settings =
-			resolve_settings(&fixture.target, SETTINGS_FILENAME).unwrap();
+		let settings = resolve_settings(&fixture.target, SETTINGS_FILENAME).unwrap();
 
 		let output = serde_json::to_string_pretty(&settings).unwrap();
 

@@ -169,8 +169,6 @@ where
 					last_revision: 0,
 				};
 
-
-
 				#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 				tracing::info!("windows: {}", self.windows.len());
 				#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
@@ -187,7 +185,7 @@ where
 			}
 		}
 	}
-	
+
 	pub fn sync_views(&mut self) {
 		tracing::info!("sync_views");
 		#[cfg(all(feature = "native", not(target_arch = "wasm32")))]

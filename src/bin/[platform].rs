@@ -1,7 +1,7 @@
 use std::io;
 
-use estate::prelude::{ *};
-// 
+use estate::prelude::*;
+//
 // #[derive(Debug, Clone, Copy)]
 // enum MouseButton {
 // 	Left,
@@ -11,30 +11,30 @@ use estate::prelude::{ *};
 // 	X2,
 // 	Other(u32),
 // }
-// 
+//
 // #[derive(Debug, Clone, Copy)]
 // enum KeyState {
 // 	Down,
 // 	Up,
 // }
-// 
+//
 // #[derive(Debug)]
 // enum InputEvent {
 // 	Key {
 // 		vk: u32,
 // 		state: KeyState,
 // 	},
-// 
+//
 // 	MouseButton {
 // 		button: MouseButton,
 // 		state: KeyState,
 // 	},
-// 
+//
 // 	MouseMove {
 // 		x: i32,
 // 		y: i32,
 // 	},
-// 
+//
 // 	MouseWheel {
 // 		delta: i32,
 // 	},

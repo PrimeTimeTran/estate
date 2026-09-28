@@ -23,7 +23,6 @@ where
 		}
 	}
 }
-aaxxxcedw	sxx
 impl App<Context> {
 	pub fn run(&mut self) -> Result<()> {
 		tracing::debug!("App run");

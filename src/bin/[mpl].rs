@@ -1,7 +1,7 @@
 use std::{
+	env,
 	path::{Path, PathBuf},
 	process::Command,
-	env,
 };
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
@@ -26,7 +26,7 @@ type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 /// 	-> ~/.cargo/bin/mpl
 
 fn main() -> Result<()> {
-  let mut failed = vec![];
+	let mut failed = vec![];
 	let mut args = env::args().skip(1);
 	let input_name = args.next().ok_or("usage: mpl <name> <url>")?;
 	let url = args.next().ok_or("usage: mpl <name> <url>")?;
@@ -43,7 +43,7 @@ fn main() -> Result<()> {
 	} else if try3(&url, &output)? {
 		println!("Download succeeded with strategy 3");
 	} else {
-	  failed.push(url);
+		failed.push(url);
 		return Err("all download strategies failed".into());
 	}
 	post_process(&output)?;

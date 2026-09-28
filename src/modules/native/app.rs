@@ -600,33 +600,33 @@ where
 }
 
 impl Host<Context> {
-//   
-// 	pub fn init() -> anyhow::Result<Self> {
-// 		let parsed = cli::context::parse();
-// 
-// 		let mut config = LogConfig::load()?;
-// 		config.apply_cli(&parsed);
-// 		logger::init_logging(&config)?;
-// 
-// 		// Create the one runtime.
-// 		let tokio = tokio::runtime::Runtime::new()?;
-// 
-// 		// Context is st
-// ill uniquely owned here.
-// 		let mut context = Context::default();
-// 
-// 		// Daemon may not need this
-// 		// This requires server access
-// 		#[cfg(not(feature = "daemon"))]
-// 		{
-// 			// Connect using the same runtime that Host will retain.
-// 			tokio.block_on(context.api_mut().connect())?;
-// 		}
-// 
-// 		// Only share Context after initialization.
-// 		let context = Arc::new(context);
-// 		Self::new(context, tokio)
-// 	}
+	//
+	// 	pub fn init() -> anyhow::Result<Self> {
+	// 		let parsed = cli::context::parse();
+	//
+	// 		let mut config = LogConfig::load()?;
+	// 		config.apply_cli(&parsed);
+	// 		logger::init_logging(&config)?;
+	//
+	// 		// Create the one runtime.
+	// 		let tokio = tokio::runtime::Runtime::new()?;
+	//
+	// 		// Context is st
+	// ill uniquely owned here.
+	// 		let mut context = Context::default();
+	//
+	// 		// Daemon may not need this
+	// 		// This requires server access
+	// 		#[cfg(not(feature = "daemon"))]
+	// 		{
+	// 			// Connect using the same runtime that Host will retain.
+	// 			tokio.block_on(context.api_mut().connect())?;
+	// 		}
+	//
+	// 		// Only share Context after initialization.
+	// 		let context = Arc::new(context);
+	// 		Self::new(context, tokio)
+	// 	}
 	fn logging() {
 		// let count = 1;
 		// let host = "12";

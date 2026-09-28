@@ -2468,7 +2468,7 @@ mod ui {
 }
 pub mod prompt {
 	use super::*;
-	pub fn initial_prompt () -> Result<String> {
+	pub fn initial_prompt() -> Result<String> {
 		Ok(String::from(
 			"I need to build a CLI tool. I wnat to use NodeJS.
 			Create a file named hello-world.js in the repository root from where I ran this command.

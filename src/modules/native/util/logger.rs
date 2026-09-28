@@ -1,7 +1,4 @@
-use crate::{
-	model::resolver::{workspace_cargo_path},
-	prelude::*,
-};
+use crate::{model::resolver::workspace_cargo_path, prelude::*};
 use anyhow::Result;
 use tracing_subscriber::{
 	EnvFilter, Layer, filter::LevelFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt,
