@@ -27,6 +27,15 @@ pub use cursor::*;
 pub use prelude_native::*;
 pub use util::*;
 
+
+
+#[cfg(unix)]
+pub mod unix;
+
+#[cfg(unix)]
+pub use unix::*;
+
+
 #[cfg(target_os = "linux")]
 pub mod linux;
 
