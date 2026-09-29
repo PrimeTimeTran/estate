@@ -13,18 +13,20 @@ use std::{
 };
 
 use windows_sys::Win32::{
-	Foundation::{HWINEVENTHOOK, HWND, LPARAM, LRESULT, WPARAM},
+	Foundation::{HWND, LPARAM, LRESULT, WPARAM},
 	UI::{
 		Accessibility::{
-			EVENT_SYSTEM_FOREGROUND, SetWinEventHook, UnhookWinEvent, WINEVENT_OUTOFCONTEXT,
+			SetWinEventHook, UnhookWinEvent, HWINEVENTHOOK, WINEVENTPROC,
 		},
 		WindowsAndMessaging::{
-			DispatchMessageW, GetForegroundWindow, GetMessageW, GetWindowTextLengthW, GetWindowTextW,
-			GetWindowThreadProcessId, MSG, TranslateMessage,
+			DispatchMessageW, GetForegroundWindow, GetMessageW, GetWindowTextLengthW,
+			GetWindowTextW, GetWindowThreadProcessId, MSG, TranslateMessage,
 		},
 	},
 };
 
+const EVENT_SYSTEM_FOREGROUND: u32 = 0x0003;
+const WINEVENT_OUTOFCONTEXT: u32 = 0x0000;  
 /// Platform-neutral description of the currently focused/foreground window.
 #[derive(Debug, Clone)]
 pub struct FocusWindow {
@@ -32,19 +34,18 @@ pub struct FocusWindow {
 	pub process_id: u32,
 	pub title: String,
 }
-
-/// Receives notifications whenever the foreground window changes.
-pub trait Focus {
-	fn start(&mut self) -> io::Result<()>;
-	fn stop(&mut self);
-}
+// 
+// /// Receives notifications whenever the foreground window changes.
+// pub trait Focus {
+// 	fn start(&mut self) -> io::Result<()>;
+// 	fn stop(&mut self);
+// }
 
 /// Windows implementation using WinEvent foreground notifications.
 pub struct FocusWindows {
 	running: Arc<AtomicBool>,
 	thread: Option<JoinHandle<()>>,
 }
-
 impl FocusWindows {
 	pub fn new() -> Self {
 		Self {
@@ -61,14 +62,14 @@ impl FocusWindows {
 				let hook = SetWinEventHook(
 					EVENT_SYSTEM_FOREGROUND,
 					EVENT_SYSTEM_FOREGROUND,
-					0,
+					null_mut(),
 					Some(foreground_event),
 					0,
 					0,
 					WINEVENT_OUTOFCONTEXT,
 				);
 
-				if hook == 0 {
+				if hook.is_null() {
 					eprintln!("FocusWindows: SetWinEventHook failed");
 					return;
 				}
@@ -99,7 +100,6 @@ impl FocusWindows {
 		}));
 	}
 }
-
 impl Focus for FocusWindows {
 	fn start(&mut self) -> io::Result<()> {
 		if self.running.swap(true, Ordering::AcqRel) {
@@ -125,7 +125,6 @@ impl Focus for FocusWindows {
 		 */
 	}
 }
-
 /// Called by Windows whenever the foreground window changes.
 unsafe extern "system" fn foreground_event(
 	_hook: HWINEVENTHOOK,
@@ -140,7 +139,7 @@ unsafe extern "system" fn foreground_event(
 		return;
 	}
 
-	if hwnd == 0 {
+	if hwnd.is_null() {
 		return;
 	}
 
@@ -152,13 +151,12 @@ unsafe extern "system" fn foreground_event(
 unsafe fn current_foreground_window() -> Option<FocusWindow> {
 	let hwnd = GetForegroundWindow();
 
-	if hwnd == 0 {
+	if hwnd.is_null() {
 		return None;
 	}
 
 	window_info(hwnd)
 }
-
 unsafe fn window_info(hwnd: HWND) -> Option<FocusWindow> {
 	let mut process_id = 0u32;
 
