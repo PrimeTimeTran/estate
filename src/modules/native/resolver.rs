@@ -1,10 +1,6 @@
 use crate::prelude::*;
 
 use anyhow::{Context, Result, anyhow};
-// use std::{
-// 	fs,
-// 	path::{Path, PathBuf},
-// };
 
 pub fn crate_root() -> PathBuf {
 	PathBuf::from(env!("CARGO_MANIFEST_DIR"))

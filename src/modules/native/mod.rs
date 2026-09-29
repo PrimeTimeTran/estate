@@ -43,10 +43,11 @@ pub mod linux;
 
 mod gestures;
 
-#[cfg(target_os = "windows")]
+// This compiles the module only if the "windows" feature is enabled AND the OS is Windows
+#[cfg(all(feature = "windows", target_os = "windows"))]
 pub mod windows;
 
-#[cfg(target_os = "windows")]
+#[cfg(all(feature = "windows", target_os = "windows"))]
 pub use windows::*;
 
 #[cfg(target_os = "macos")]

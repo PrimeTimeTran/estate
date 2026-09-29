@@ -124,10 +124,11 @@ required-features = ["native"]
 # [PICK 1]
 # default = []
 # default = ["web"]
-default = ["native"]
+default = ["native","windows"]
 # sdlc = ["native"]
 mobile = []
 daemon = []
+windows = []
 
 native = [
   "dep:notify",

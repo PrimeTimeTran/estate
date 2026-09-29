@@ -54,7 +54,6 @@ impl EstateState {
 		let raw = fs::read_to_string(&path)?;
 		Ok(serde_json::from_str(&raw)?)
 	}
-
 	pub fn save_to_disk(&self) -> Result<()> {
 		let path = Self::path()?;
 		tracing::debug!("💾 EstateState saving: {:?}", path);

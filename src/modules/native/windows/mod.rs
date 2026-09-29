@@ -3,6 +3,9 @@ use crate::prelude::*;
 pub mod hdi;
 pub use hdi::*;
 
+pub mod focus;
+pub use focus::*;
+
 impl<C: Ctx> Host<C> {
 	pub fn new(context: Arc<C>, tokio: tokio::runtime::Runtime) -> anyhow::Result<Self> {
 		let handle = tokio.handle().clone();
@@ -19,7 +22,6 @@ impl<C: Ctx> Host<C> {
 		})
 	}
 }
-
 impl Ctx for Context {
 	fn api(&self) -> &Self::Api {
 		&self.api
@@ -34,25 +36,25 @@ impl Ctx for Context {
 			view: ViewType::MarkdownScreen,
 		}
 	}
+
 	type Api = ApiService;
 	type AppState = structs::S<Context>;
 	type EventReceiver = structs::BroadcastReceiver<e::Event>;
 	type EventSender = structs::BroadcastSender<e::Event>;
 	type GuiState = NativeGuiState;
 }
-
 impl Context {
 	fn new(state: NativeState, api: ApiService) -> Self {
 		Self { state, api }
 	}
 }
+
 impl Default for Context {
 	fn default() -> Self {
 		Self::new(NativeState::default(), ApiService::default())
 	}
 }
-
-impl Host<Context> {
+  impl Host<Context> {
 	pub fn init() -> anyhow::Result<Self> {
 		let parsed = cli::context::parse();
 
