@@ -36,7 +36,12 @@ pub static PIPELINE_ESTATE_WORKSPACE: &str = concat!(
 );
 pub static ROOT_DIR: &str = env!("CARGO_MANIFEST_DIR");
 pub static SERVER_URL: &str = "http://localhost:50051";
+
+#[cfg(unix)]
 pub static STATE_PATH: &str = "/Users/future/Library/Application Support/estate/state.json";
+#[cfg(windows)]
+pub static STATE_PATH: &str = r"C:\Users\seepd\AppData\Roaming\estate\state.json";
+
 pub static TEMPLATE_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/template");
 pub static WORKSPACE_SETTINGS: &str = ".estate/settings.json";
 

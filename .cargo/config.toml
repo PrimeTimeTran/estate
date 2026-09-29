@@ -12,7 +12,18 @@
 # trunk-run = "trunk serve src/web/public/index.html --features web"
 
 
+
+
+# Run full suite
+# cargo +stable-x86_64-pc-windows-gnu run --bin server --features=native
+# cargo run --bin native --features=native
+# cargo run --bin sdlc --features=daemon
+
 [alias]
+  # Windows
+set-trace-windows = '$env:RUST_BACKTRACE = "1"'
+run-windows = 'cargo +stable-x86_64-pc-windows-gnu run --bin native --features=native'
+
 # ─────────────────────────────────────────────
 # Lints
 # Fix lint issues

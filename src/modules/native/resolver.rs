@@ -107,9 +107,11 @@ pub fn global_project_dir() -> Result<PathBuf> {
 	Ok(home_dir()?.join(".leviticus"))
 }
 pub fn engine_data_dir() -> Result<PathBuf> {
-	dirs::data_dir()
-		.map(|dir| dir.join("estate"))
-		.ok_or_else(|| anyhow!("Could not determine application data directory"))
+    let path = dirs::data_dir()
+        .map(|dir| dir.join("estate"))
+        .ok_or_else(|| anyhow!("Could not determine application data directory"))?;
+    std::fs::create_dir_all(&path)?;
+    Ok(path)
 }
 pub fn engine_cache_dir() -> Result<PathBuf> {
 	dirs::cache_dir()

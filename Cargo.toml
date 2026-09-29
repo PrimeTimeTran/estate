@@ -32,11 +32,9 @@ short_description = "Estate development environment"
 long_description = "Estate development environment"
 icon = ["assets/icon.icns"]
 
-
 [[bin]]
 name = "plugin"
 path = "src/bin/demo/plugin.rs"
-
 
 # Internal bins for document/testing/observing
 # abstractions like nightly rust should be prefixed with _ in the bin dir.
@@ -53,7 +51,6 @@ path = "src/bin/_base.rs"
 # hopefully enable unified cmd palette, shortcuts, outline, etc.
 name = "core"
 path = "src/bin/[core].rs"
-
 
 [[bin]]
 name = "focus"
@@ -80,9 +77,6 @@ name = "native"
 path = "src/bin/[native].rs"
 required-features = ["native"]
 
-[[bin]]
-name = "platform"
-path = "src/bin/[platform].rs"
 
 [[bin]]
 name = "run"
@@ -98,20 +92,28 @@ name = "sdlc"
 path = "src/bin/[sdlc].rs"
 
 [[bin]]
-name = "server"
-path = "src/bin/[server].rs"
-required-features = ["native"]
-
-[[bin]]
-name = "web"
-path = "src/bin/[web].rs"
-required-features = ["web"]
-target = "wasm32-unknown-unknown"
-
-[[bin]]
 name = "settings"
 path = "src/bin/settings.rs"
 required-features = ["native"]
+
+
+[[bin]]
+name = "server"
+path = "src/bin/type.server.rs"
+required-features = ["native"]
+
+[[bin]]
+name = "unix"
+path = "src/bin/platform.unix.rs"
+
+[[bin]]
+name = "web"
+path = "src/bin/platform.web.rs"
+
+[[bin]]
+name = "win"
+path = "src/bin/platform.win.rs"
+
 
 # Cargo Features
 ## https://doc.rust-lang.org/cargo/reference/features.html

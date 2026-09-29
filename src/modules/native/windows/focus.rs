@@ -15,18 +15,16 @@ use std::{
 use windows_sys::Win32::{
 	Foundation::{HWND, LPARAM, LRESULT, WPARAM},
 	UI::{
-		Accessibility::{
-			SetWinEventHook, UnhookWinEvent, HWINEVENTHOOK, WINEVENTPROC,
-		},
+		Accessibility::{HWINEVENTHOOK, SetWinEventHook, UnhookWinEvent, WINEVENTPROC},
 		WindowsAndMessaging::{
-			DispatchMessageW, GetForegroundWindow, GetMessageW, GetWindowTextLengthW,
-			GetWindowTextW, GetWindowThreadProcessId, MSG, TranslateMessage,
+			DispatchMessageW, GetForegroundWindow, GetMessageW, GetWindowTextLengthW, GetWindowTextW,
+			GetWindowThreadProcessId, MSG, TranslateMessage,
 		},
 	},
 };
 
 const EVENT_SYSTEM_FOREGROUND: u32 = 0x0003;
-const WINEVENT_OUTOFCONTEXT: u32 = 0x0000;  
+const WINEVENT_OUTOFCONTEXT: u32 = 0x0000;
 /// Platform-neutral description of the currently focused/foreground window.
 #[derive(Debug, Clone)]
 pub struct FocusWindow {
@@ -34,7 +32,7 @@ pub struct FocusWindow {
 	pub process_id: u32,
 	pub title: String,
 }
-// 
+//
 // /// Receives notifications whenever the foreground window changes.
 // pub trait Focus {
 // 	fn start(&mut self) -> io::Result<()>;

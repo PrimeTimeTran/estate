@@ -44,10 +44,7 @@ pub mod linux;
 mod gestures;
 
 // This compiles the module only if the "windows" feature is enabled AND the OS is Windows
-#[cfg(all(feature = "windows", target_os = "windows"))]
 pub mod windows;
-
-#[cfg(all(feature = "windows", target_os = "windows"))]
 pub use windows::*;
 
 #[cfg(target_os = "macos")]
@@ -55,12 +52,6 @@ pub mod macos;
 
 #[cfg(target_os = "macos")]
 pub use macos::*;
-
-// #[cfg(target_os = "windows")]
-// pub use windows as platform;
-//
-// #[cfg(target_os = "macos")]
-// pub use macos as platform;
 
 impl NativeHost {
 	fn new() -> Self {
