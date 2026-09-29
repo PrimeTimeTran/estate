@@ -22,23 +22,23 @@ let now = Date().timeIntervalSince1970
 let nextAlignedTime = ceil(now / interval) * interval
 let initialDelay = nextAlignedTime - now
 
-// 2. Start a one-time timer that fires precisely at the next aligned second 
+// 2. Start a one-time timer that fires precisely at the next aligned second
 let initialTimer = Timer.scheduledTimer(withTimeInterval: initialDelay, repeats: false) { _ in
-    
+
     // 3. Define the actual recurring logic
     let checkState = {
         let status = isControlKeyPressed() ? "DOWN" : "UP"
         print("[\(getCurrentTimestamp())] Control key is \(status).")
     }
-    
+
     // Run the very first check right on the synced mark
     checkState()
-    
+
     // 4. Start the permanent repeating timer exactly synchronized with the wall clock
     let repeatingTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { _ in
         checkState()
     }
-    
+
     // Add the new repeating timer to the active run loop
     RunLoop.current.add(repeatingTimer, forMode: .default)
 }

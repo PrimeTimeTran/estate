@@ -6,13 +6,13 @@ Yep — the command is correct. macOS is refusing to run it because **System Int
 
  If you still have Karabiner-Elements installed, try:
 
-```
+```sh
 /Library/Application\ Support/org.pqrs/Karabiner-Elements/uninstall_core.sh
 ```
 
  Then reboot and check:
 
-```
+```sh
 systemextensionsctl list | grep -i karabiner
 ```
 
@@ -22,30 +22,30 @@ systemextensionsctl list | grep -i karabiner
 
  On a modern Mac:
 
- 1. Restart into **macOS Recovery**.
+1. Restart into **macOS Recovery**.
 2. Open **Terminal** from the Recovery menu.
 3. Run:
 
-```
+```sh
 csrutil disable
 ```
 
  4. Restart normally.
 5. Run:
 
-```
+```sh
 sudo systemextensionsctl uninstall G43BCU2T37 org.pqrs.Karabiner-DriverKit-VirtualHIDDevice
 ```
 
  6. Restart into Recovery again and run:
 
-```
+```sh
 csrutil enable
 ```
 
  7. Restart normally and verify:
 
-```
+```sh
 systemextensionsctl list | grep -i karabiner
 ```
 
