@@ -20,9 +20,11 @@ use estate::prelude::*;
 /// ## [Native Entry]
 ///
 // #[cfg(feature = "native")]
-#[cfg(all(feature = "windows", target_os = "windows"))]
 fn main() -> Result<()> {
-	let host = Host::init().expect("Host should start successfully.");
+	let host = Host::init().unwrap_or_else(|err| {
+    eprintln!("Host::init() failed: {err:#?}");
+    panic!("Host should start successfully.");
+	});
 	let mut app = App::new(host)?;
 	app.run()?;
 	Ok(())

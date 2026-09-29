@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::prelude::{*, logger};
 
 pub mod hdi;
 pub use hdi::*;
