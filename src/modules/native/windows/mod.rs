@@ -1,4 +1,4 @@
-use crate::prelude::{*, logger};
+use crate::prelude::{logger, *};
 
 pub mod hdi;
 pub use hdi::*;
@@ -54,29 +54,27 @@ impl Default for Context {
 		Self::new(NativeState::default(), ApiService::default())
 	}
 }
-  impl Host<Context> {
+impl Host<Context> {
 	pub fn init() -> anyhow::Result<Self> {
 		let parsed = cli::context::parse();
 
-		let mut config = LogConfig::load()?;
+		let mut config = LogConfig::load().context("LogConfig::load failed")?;
+
 		config.apply_cli(&parsed);
-		logger::init_logging(&config)?;
 
-		// Create the one runtime.
-		let tokio = tokio::runtime::Runtime::new()?;
+		logger::init_logging(&config).context("logger::init_logging failed")?;
 
-		// Context is still uniquely owned here.
+		let tokio = tokio::runtime::Runtime::new().context("tokio runtime creation failed")?;
+
 		let mut context = Context::default();
 
-		// Daemon may not need this
-		// This requires server access
 		#[cfg(not(feature = "daemon"))]
 		{
-			// Connect using the same runtime that Host will retain.
-			tokio.block_on(context.api_mut().connect())?;
+			tokio
+				.block_on(context.api_mut().connect())
+				.context("API connect failed")?;
 		}
 
-		// Only share Context after initialization.
 		let context = Arc::new(context);
 		Self::new(context, tokio)
 	}
