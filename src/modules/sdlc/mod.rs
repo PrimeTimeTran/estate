@@ -1,3 +1,4 @@
+
 use crate::{
 	model::{
 		AgentTask,
@@ -925,11 +926,11 @@ mod enums {
 	}
 	#[derive(Debug)]
 	pub enum SdlcInput {
-		Abort,
-		ProvideContext(String),
-		Retry,
-		Reviewed,
-		Human(String),
+    Abort,
+    ProvideContext(String),
+    Retry,
+    Reviewed,
+    Human(String),
 	}
 	#[derive(Debug, Clone, Copy, PartialEq)]
 	pub enum SdlcPhase {
@@ -1062,11 +1063,13 @@ mod enums {
 	}
 	#[derive(Debug, Clone, Serialize, Deserialize)]
 	pub enum StageResult {
-		Intent,
-		Spec,
-		Plan,
-		Build,
-		Verification(Verification),
+    Intent,
+    Spec,
+    Plan,
+    Build,
+    Verification(Verification),
+    Complete,
+    SprintCompleted,
 	}
 	// pub struct RunResult {
 	// 	pub run_id: Uuid,
@@ -1109,7 +1112,6 @@ mod traits {
 	use tokio::time::{Duration, sleep};
 
 	struct Context {}
-	struct StageResult {}
 
 	// Steps to complete the pipeline
 	pub trait Pipeline {
@@ -1653,8 +1655,8 @@ impl SprintPipeline {
 				session.stage
 			));
 		}
-		let evaluation = self.evaluate_stage(Stage::Intent).await?;
-		self.record_evaluation(evaluation)?;
+		// let evaluation = self.evaluate_stage(Stage::Intent).await?;
+		// self.record_evaluation(evaluation)?;
 		self.update_progress("Intent stage completed")?;
 		self.transition(Stage::Spec)?;
 		Ok(())
@@ -1688,8 +1690,8 @@ impl SprintPipeline {
 			intent.trim()
 		);
 		Self::write(session_dir.join("spec.md"), spec);
-		let evaluation = self.evaluate_stage(Stage::Spec).await?;
-		self.record_evaluation(evaluation)?;
+		// let evaluation = self.evaluate_stage(Stage::Spec).await?;
+		// self.record_evaluation(evaluation)?;
 		self.update_progress("Spec stage completed")?;
 		self.transition(Stage::Plan)?;
 		Ok(())
@@ -1714,8 +1716,8 @@ impl SprintPipeline {
 		Self::write(session_dir.join("plan.md"), plan.clone())?;
 		let tests = self.generate_tests(&intent, &spec, &plan).await?;
 		Self::write(session_dir.join("tests.md"), tests)?;
-		let evaluation = self.evaluate_stage(Stage::Plan).await?;
-		self.record_evaluation(evaluation)?;
+		// let evaluation = self.evaluate_stage(Stage::Plan).await?;
+		// self.record_evaluation(evaluation)?;
 		self.update_progress("Plan and test plan generated")?;
 		self.transition(Stage::Build)?;
 		Ok(())
@@ -1723,7 +1725,7 @@ impl SprintPipeline {
 	async fn stage_build(&mut self) -> Result<()> {
 		let session = self
 			.session
-			.as_ref()?
+			.as_ref()
 			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
 		let context = AgentContext::from_session(session)?;
 		self.update_progress("Build started")?;
@@ -2579,7 +2581,7 @@ impl Step {
 	];
 }
 #[async_trait::async_trait]
-impl traits::Runner for SprintRunnerr<'_> {
+impl traits::Runner for SprintRunner<'_> {
 	type Context = UnboundedReceiver<SdlcInput>;
 	type Output = ();
 
@@ -2622,7 +2624,7 @@ impl traits::Runner for SprintRunnerr<'_> {
 		// self.pipeline.is_running()
 	}
 }
-impl SprintRunnerr<'_> {
+impl SprintRunner<'_> {
 	fn begin_attempt(&mut self, stage: enums::Stage) -> u32 {
 		self
 			.pipeline
@@ -2697,66 +2699,75 @@ impl SprintRunnerr<'_> {
 	}
 
 	async fn apply(
-		&mut self,
-		outcome: StageOutcome,
-		decision: StageDecision,
-		input_rx: &mut UnboundedReceiver<SdlcInput>,
-		pending_input: &mut Option<SdlcInput>,
+    &mut self,
+    outcome: StageOutcome,
+    decision: StageDecision,
+    input_rx: &mut UnboundedReceiver<SdlcInput>,
+    pending_input: &mut Option<SdlcInput>,
 	) -> Result<RunControl> {
-		let stage = outcome.stage();
-		let attempt = outcome.attempt();
-
-		match decision {
-			StageDecision::Continue => {
-				let next = stage
-					.next()
-					.ok_or_else(|| anyhow!("Stage {stage:?} has no next stage"))?;
-
-				self.transition(next)?;
-
-				self.emit(SdlcEvent::StageTransitioned {
-					from: stage,
-					to: next,
-				});
-
-				Ok(RunControl::Continue)
-			}
-
-			StageDecision::Retry => {
-				self.handle_retry(stage, attempt).await?;
-				Ok(RunControl::Continue)
-			}
-
-			StageDecision::Revise => {
-				self
-					.handle_revision(stage, attempt, outcome, input_rx, pending_input)
-					.await?;
-
-				Ok(RunControl::Continue)
-			}
-
-			StageDecision::AwaitHuman => {
-				self
-					.handle_human_intervention(stage, attempt, input_rx, pending_input)
-					.await?;
-
-				Ok(RunControl::Continue)
-			}
-
-			StageDecision::Complete => {
-				self.pipeline.stage_complete()?;
-				Ok(RunControl::Exit)
-			}
-
-			StageDecision::Fail => {
-				self.emit(SdlcEvent::Failed {
-					stage: Some(stage),
-					error: "stage failed".into(),
-				});
-
-				Ok(RunControl::Exit)
-			}
-		}
+    let stage = outcome.stage();
+    let attempt = outcome.attempt();
+	
+    match decision {
+        StageDecision::Continue => {
+            let next = stage
+                .next()
+                .ok_or_else(|| anyhow!("Stage {stage:?} has no next stage"))?;
+	
+            self.transition(next)?;
+	
+            self.emit(SdlcEvent::StageTransitioned {
+                from: stage,
+                to: next,
+            });
+	
+            Ok(RunControl::Continue)
+        }
+	
+        StageDecision::Retry => {
+            self.handle_retry(stage, attempt).await?;
+            Ok(RunControl::Continue)
+        }
+	
+        StageDecision::Revise => {
+            self.handle_revision(
+                stage,
+                attempt,
+                outcome,
+                input_rx,
+                pending_input,
+            )
+            .await?;
+	
+            Ok(RunControl::Continue)
+        }
+	
+        StageDecision::AwaitHuman => {
+            self.handle_human_intervention(
+                stage,
+                attempt,
+                input_rx,
+                pending_input,
+            )
+            .await?;
+	
+            Ok(RunControl::Continue)
+        }
+	
+        StageDecision::Complete => {
+            self.pipeline.stage_complete().await?;
+            Ok(RunControl::Exit)
+        }
+	
+        StageDecision::Fail => {
+            self.emit(SdlcEvent::Failed {
+                stage: Some(stage),
+                error: "stage failed".into(),
+            });
+	
+            Ok(RunControl::Exit)
+        }
+    }
 	}
 	async fn handle_human_intervention(
 		&mut self,
@@ -2779,7 +2790,7 @@ impl SprintRunnerr<'_> {
 			.await?
 		{
 			Intervention::Human(input) => {
-				*pending_input = Some(SdlcInput(input));
+				*pending_input = Some(SdlcInput::Human(input));
 				self.pipeline.retry(stage)?;
 			}
 
@@ -2852,7 +2863,7 @@ impl SprintRunnerr<'_> {
 			.await?
 		{
 			Intervention::Human(input) => {
-				*pending_input = Some(SdlcInput(input));
+				*pending_input = Some(SdlcInput::Human(input));
 				self.pipeline.retry(stage)?;
 			}
 
@@ -2901,21 +2912,17 @@ impl SprintRunnerr<'_> {
 			attempt,
 			error: error.to_string(),
 		});
-
 		if attempt < MAX_STAGE_ATTEMPTS {
 			self.emit(SdlcEvent::StageRetrying {
 				stage,
 				attempt: attempt + 1,
 			});
-
 			self.emit(SdlcEvent::PhaseChanged {
 				phase: SdlcPhase::Retrying,
 			});
-
 			self.pipeline.retry(stage)?;
 			return Ok(RunControl::Continue);
 		}
-
 		self.emit(SdlcEvent::PhaseChanged {
 			phase: SdlcPhase::AwaitingHuman,
 		});
