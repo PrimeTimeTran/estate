@@ -11,6 +11,7 @@
 # trunk = "trunk build -q --release"
 # trunk-run = "trunk serve src/web/public/index.html --features web"
 
+
 [alias]
 # ─────────────────────────────────────────────
 # Lints
@@ -89,4 +90,3 @@ unicode = true                   # whether cargo can render output using non-ASC
 progress.when = 'auto'           # whether cargo shows progress bar
 progress.width = 80              # width of progress bar
 progress.term-integration = true # whether cargo reports progress to terminal emulator
-

@@ -30,6 +30,7 @@ use tokio::time::{Duration, sleep};
 // fn from_session(session: &SdlcSession) -> String {
 // 	session.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?
 // }
+
 fn format_elapsed(duration: Duration) -> String {
 	let total_seconds = duration.as_secs();
 	let hours = total_seconds / 3600;
@@ -701,6 +702,7 @@ impl Sdlc {
 
 	pub fn init() -> Result<Option<Self>> {
 		dotenvy::dotenv().ok();
+
 		let jev = TypeSafeClient::from_env().context("creating TypeSafe client")?;
 		let evaluator = Evaluator { jev };
 		let (event_tx, _) = broadcast::channel(256);
@@ -876,9 +878,14 @@ impl Sdlc {
 		}
 	}
 	pub async fn start(&mut self, intent: String) -> Result<()> {
+		eprintln!("[SDLC] Starting session");
+		eprintln!("[SDLC] cwd: {:?}", std::env::current_dir());
+		eprintln!("[SDLC] intent: {:?}", intent);
+
 		if self.session.is_some() {
 			return Err(anyhow::anyhow!("an SDLC session is already active"));
 		}
+
 		let id = uuid::Uuid::new_v4().to_string();
 		let title = intent
 			.split_whitespace()
@@ -886,8 +893,19 @@ impl Sdlc {
 			.collect::<Vec<_>>()
 			.join("-")
 			.to_lowercase();
-		let dir = self.create_dir(&title)?;
+
+		eprintln!("[SDLC] title: {:?}", title);
+		eprintln!("[SDLC] creating directory...");
+
+		let dir = self
+			.create_dir(&title)
+			.context("creating SDLC session directory")?;
+
+		eprintln!("[SDLC] directory: {:?}", dir);
+		eprintln!("[SDLC] exists: {}", dir.exists());
+
 		let now = Utc::now();
+
 		let session = SdlcSession {
 			id,
 			title,
@@ -897,22 +915,39 @@ impl Sdlc {
 			created_at: now,
 			updated_at: now,
 		};
+
 		self.session = Some(session);
-		self.init_templates(
-			self
-				.session()?
-				.ok_or_else(|| anyhow::anyhow!("failed to create session"))?
-				.dir
-				.as_path(),
-		)?;
-		let intent_path = self
+
+		let dir = self
 			.session()?
-			.ok_or_else(|| anyhow::anyhow!("no active session"))?
+			.ok_or_else(|| anyhow::anyhow!("failed to create session"))?
 			.dir
-			.join("intent.md");
-		Self::write(intent_path, format!("# Intent\n\n{}\n", intent));
-		self.update_progress("SDLC session started")?;
-		self.persist()?;
+			.clone();
+
+		eprintln!("[SDLC] initializing templates in {:?}", dir);
+
+		self
+			.init_templates(&dir)
+			.with_context(|| format!("initializing templates in {:?}", dir))?;
+
+		let intent_path = dir.join("intent.md");
+
+		eprintln!("[SDLC] writing intent to {:?}", intent_path);
+
+		Self::write(intent_path.clone(), format!("# Intent\n\n{}\n", intent));
+
+		eprintln!("[SDLC] updating progress");
+
+		self
+			.update_progress("SDLC session started")
+			.context("updating SDLC progress")?;
+
+		eprintln!("[SDLC] persisting session");
+
+		self.persist().context("persisting SDLC session")?;
+
+		eprintln!("[SDLC] session started successfully");
+
 		Ok(())
 	}
 
@@ -989,6 +1024,10 @@ impl Sdlc {
 		Ok(())
 	}
 	fn create_dir(&self, title: &str) -> Result<PathBuf> {
+		eprintln!("CREATE DIR");
+		eprintln!("  title = {title:?}");
+		// eprintln!("  dir   = {dir:?}");
+		eprintln!("  cwd   = {:?}", std::env::current_dir()?);
 		let sessions_dir = FS::ensure_dir(SpecialFile::SessionsDir.path()?)?;
 		let date = Local::now().format("%Y-%m-%d");
 		let dir = sessions_dir.join(format!("{date}.{title}"));

@@ -124,11 +124,15 @@ impl FS {
 		Ok(path)
 	}
 	pub fn ensure_dir(path: impl AsRef<Path>) -> Result<PathBuf> {
-		let path = path.as_ref();
-
-		fs::create_dir_all(path)?;
-
-		Ok(path.to_path_buf())
+    let path = path.as_ref();
+	
+    eprintln!("ensure_dir:");
+    eprintln!("  path = {path:?}");
+    eprintln!("  cwd  = {:?}", std::env::current_dir()?);
+	
+    fs::create_dir_all(path)?;
+	
+    Ok(path.to_path_buf())
 	}
 	pub fn exists(path: impl AsRef<Path>) -> bool {
 		path.as_ref().exists()
