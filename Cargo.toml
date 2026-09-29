@@ -32,6 +32,12 @@ short_description = "Estate development environment"
 long_description = "Estate development environment"
 icon = ["assets/icon.icns"]
 
+
+[[bin]]
+name = "plugin"
+path = "src/bin/demo/plugin.rs"
+
+
 # Internal bins for document/testing/observing
 # abstractions like nightly rust should be prefixed with _ in the bin dir.
 #
@@ -47,6 +53,11 @@ path = "src/bin/_base.rs"
 # hopefully enable unified cmd palette, shortcuts, outline, etc.
 name = "core"
 path = "src/bin/[core].rs"
+
+
+[[bin]]
+name = "focus"
+path = "src/bin/[focus].rs"
 
 [[bin]]
 name = "mpl"
