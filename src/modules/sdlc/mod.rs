@@ -5,6 +5,7 @@ use crate::{
 		resolver::*,
 		task::TaskResult,
 	},
+	prelude::structs as ext_structs,
 	prelude::*,
 };
 use anyhow::{Context, anyhow};
@@ -104,7 +105,7 @@ fn slugify(input: &str) -> String {
 }
 
 mod ui {
-	use crate::sdlc::{SdlcEvent, SdlcPhase, SdlcView, Stage, format_elapsed};
+	use super::*;
 	use ratatui::{
 		Frame,
 		layout::{Constraint, Direction, Layout as RatatuiLayout, Position, Rect},
@@ -839,7 +840,33 @@ pub mod prompt {
 	}
 }
 mod enums {
+	use super::in_structs::*;
 	use super::*;
+	#[derive(Debug)]
+	pub enum ExecutionResult {
+		Completed(TaskResult),
+		Failed(StageError),
+	}
+	#[derive(Debug)]
+	pub enum StageOutcome {
+		Complete {
+			execution: StageExecution,
+			evaluation: StageEvaluation,
+		},
+		NeedsRevision {
+			execution: StageExecution,
+			evaluation: StageEvaluation,
+		},
+		ExecutionFailed {
+			stage: enums::Stage,
+			attempt: Attempt,
+			error: anyhow::Error,
+		},
+		EvaluationFailed {
+			execution: StageExecution,
+			error: anyhow::Error,
+		},
+	}
 	#[derive(Debug, Clone)]
 	pub enum Intervention {
 		Human(String),
@@ -1004,33 +1031,6 @@ mod enums {
 
 		Complete,
 	}
-	pub enum StageOutcome {
-		FailExecution,
-		// Agent couldn't perform the stage.
-		FailEvaluation,
-		// Evaluator couldn't evaluate the stage.
-		FailQuality,
-		// Evaluator worked and said "not good enough."
-		FailInfrastructure,
-		// Something outside the stage broke.
-		/// Stage executed and the resulting artifact passed evaluation.
-		Complete {
-			result: TaskResult,
-			evaluation: StageEvaluation,
-		},
-
-		/// Stage executed successfully, but the artifact needs revision.
-		NeedsRevision {
-			result: TaskResult,
-			evaluation: StageEvaluation,
-		},
-
-		/// The stage itself could not execute successfully.
-		ExecutionFailed(anyhow::Error),
-
-		/// The stage executed, but evaluation could not be completed.
-		EvaluationFailed(anyhow::Error),
-	}
 	pub enum StageOutcomeEvaluation {
 		Passed(Evaluation),
 		FailedQuality(Evaluation),
@@ -1188,217 +1188,194 @@ mod traits {
 		async fn generate(&self, prompt: &str) -> Result<String>;
 	}
 }
+pub mod in_structs {
+	use super::*;
+	#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+	pub struct Attempt {
+		pub stage: Stage,
+		pub number: u32,
+	}
+	pub struct SprintPipeline {
+		pub evaluator: Evaluator,
+		pub generator: Box<dyn ArtifactGenerator>,
+		pub session: Option<SdlcSession>,
+		pub state_path: PathBuf,
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct Attempt {
-	pub stage: Stage,
-	pub number: u32,
-}
-pub struct SprintPipeline {
-	evaluator: Evaluator,
-	generator: Box<dyn ArtifactGenerator>,
-	session: Option<SdlcSession>,
-	state_path: PathBuf,
+		pub event_tx: broadcast::Sender<SdlcEvent>,
 
-	event_tx: broadcast::Sender<SdlcEvent>,
+		pub last_stage: Option<Stage>,
+		pub stage_attempt: u32,
+	}
+	pub struct SprintRunner<'a> {
+		pub pipeline: &'a mut SprintPipeline,
+	}
+	#[derive(Debug, Clone)]
+	pub struct PipelineRuntime {
+		pub activity: Vec<String>,
+		pub attempt: u32,
+		pub stage: enums::Stage,
 
-	last_stage: Option<Stage>,
-	stage_attempt: u32,
-}
-pub struct SprintRunner<'a> {
-	pipeline: &'a mut SprintPipeline,
-}
-#[derive(Debug, Clone)]
-pub struct PipelineRuntime {
-	pub activity: Vec<String>,
-	pub attempt: u32,
-	pub stage: enums::Stage,
+		pub started_at: Instant,
+		pub stage_started_at: Instant,
 
-	pub started_at: Instant,
-	pub stage_started_at: Instant,
+		pub phase: SdlcPhase,
 
-	pub phase: SdlcPhase,
+		pub score: Option<f32>,
+		pub confidence: Option<f32>,
+		pub passed: Option<bool>,
 
-	pub score: Option<f32>,
-	pub confidence: Option<f32>,
-	pub passed: Option<bool>,
+		pub message: Option<String>,
 
-	pub message: Option<String>,
+		pub total_tokens: u64,
+		pub total_agent_calls: u32,
 
-	pub total_tokens: u64,
-	pub total_agent_calls: u32,
+		pub history: Vec<SdlcEvent>,
+	}
 
-	pub history: Vec<SdlcEvent>,
-}
+	#[derive(Debug)]
+	pub struct StageExecution {
+		pub stage: enums::Stage,
+		pub attempt: Attempt,
+		pub started_at: DateTime<Utc>,
+		pub completed_at: DateTime<Utc>,
+		pub result: StageResult,
+	}
 
-#[derive(Debug)]
-pub struct StageExecution {
-	pub stage: enums::Stage,
-	pub attempt: Attempt,
-	pub started_at: DateTime<Utc>,
-	pub completed_at: DateTime<Utc>,
-	pub result: StageResult,
-}
-#[derive(Debug)]
-pub enum ExecutionResult {
-	Completed(TaskResult),
-	Failed(StageError),
-}
-#[derive(Debug)]
-pub enum StageOutcome {
-	Complete {
-		execution: StageExecution,
-		evaluation: StageEvaluation,
-	},
-	NeedsRevision {
-		execution: StageExecution,
-		evaluation: StageEvaluation,
-	},
-	ExecutionFailed {
-		stage: enums::Stage,
-		attempt: Attempt,
-		error: anyhow::Error,
-	},
-	EvaluationFailed {
-		execution: StageExecution,
-		error: anyhow::Error,
-	},
-}
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StageRecord {
-	pub attempt: Attempt,
-	pub stage: enums::Stage,
-	pub status: StageStatus,
+	#[derive(Debug, Clone, Serialize, Deserialize)]
+	pub struct StageRecord {
+		pub attempt: Attempt,
+		pub stage: enums::Stage,
+		pub status: StageStatus,
 
-	/// What actually performed the work.
-	pub actor: StageActor,
+		/// What actually performed the work.
+		pub actor: StageActor,
 
-	pub started_at: DateTime<Utc>,
-	pub completed_at: Option<DateTime<Utc>>,
+		pub started_at: DateTime<Utc>,
+		pub completed_at: Option<DateTime<Utc>>,
 
-	/// Semantic evaluation of the resulting artifact/work.
-	pub evaluation: Option<StageEvaluation>,
-}
-#[derive(Debug)]
-pub struct StageError;
+		/// Semantic evaluation of the resulting artifact/work.
+		pub evaluation: Option<StageEvaluation>,
+	}
+	#[derive(Debug)]
+	pub struct StageError;
 
-pub struct RetryPolicy {
-	max_attempts: u32,
-	retry_execution: bool,
-	retry_evaluation: bool,
-	retry_quality: bool,
-	allow_human_intervention: bool,
-}
+	pub struct RetryPolicy {
+		pub max_attempts: u32,
+		pub retry_execution: bool,
+		pub retry_evaluation: bool,
+		pub retry_quality: bool,
+		pub allow_human_intervention: bool,
+	}
 
-pub struct Evaluator {
-	jev: TypeSafeClient,
-}
-#[derive(Debug, Clone)]
-pub struct Evaluation {
-	pub score: f64,
-	pub confidence: f64,
-	pub meets_bar: bool,
-	pub feedback: String,
-	pub criteria: Vec<CriterionResult>,
-}
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EvaluationResult {
-	pub name: String,
-	pub passed: bool,
-	pub score: f64,
-	pub confidence: f64,
-	pub explanation: String,
-}
+	pub struct Evaluator {
+		pub jev: TypeSafeClient,
+	}
+	#[derive(Debug, Clone)]
+	pub struct Evaluation {
+		pub score: f64,
+		pub confidence: f64,
+		pub meets_bar: bool,
+		pub feedback: String,
+		pub criteria: Vec<CriterionResult>,
+	}
+	#[derive(Debug, Clone, Serialize, Deserialize)]
+	pub struct EvaluationResult {
+		pub name: String,
+		pub passed: bool,
+		pub score: f64,
+		pub confidence: f64,
+		pub explanation: String,
+	}
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StageEvaluation {
-	pub stage: enums::Stage,
-	pub actor: StageActor,
+	#[derive(Debug, Clone, Serialize, Deserialize)]
+	pub struct StageEvaluation {
+		pub stage: enums::Stage,
+		pub actor: StageActor,
 
-	pub started_at: DateTime<Utc>,
-	pub completed_at: DateTime<Utc>,
+		pub started_at: DateTime<Utc>,
+		pub completed_at: DateTime<Utc>,
 
-	pub score: f64,
-	pub confidence: f64,
-	pub passed: bool,
+		pub score: f64,
+		pub confidence: f64,
+		pub passed: bool,
 
-	pub evaluations: Vec<EvaluationResult>,
-}
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EvaluationRecord {
-	pub score: f64,
-	pub confidence: f64,
-	pub meets_bar: bool,
-	pub feedback: String,
-}
+		pub evaluations: Vec<EvaluationResult>,
+	}
+	#[derive(Debug, Clone, Serialize, Deserialize)]
+	pub struct EvaluationRecord {
+		pub score: f64,
+		pub confidence: f64,
+		pub meets_bar: bool,
+		pub feedback: String,
+	}
 
-pub struct Check {
-	pub name: String,
-	pub command: String,
-}
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CheckResult {
-	pub name: String,
-	pub passed: bool,
-	pub output: Option<String>,
-}
+	pub struct Check {
+		pub name: String,
+		pub command: String,
+	}
+	#[derive(Debug, Clone, Serialize, Deserialize)]
+	pub struct CheckResult {
+		pub name: String,
+		pub passed: bool,
+		pub output: Option<String>,
+	}
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Verification {
-	pub passed: bool,
-	// pub score: u32,
-	pub checks: Vec<CheckResult>,
-	pub evaluations: Vec<EvaluationResult>,
-}
+	#[derive(Debug, Clone, Serialize, Deserialize)]
+	pub struct Verification {
+		pub passed: bool,
+		// pub score: u32,
+		pub checks: Vec<CheckResult>,
+		pub evaluations: Vec<EvaluationResult>,
+	}
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CriterionResult;
+	#[derive(Debug, Clone, Serialize, Deserialize)]
+	pub struct CriterionResult;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SdlcSession {
-	pub id: String,
-	pub title: String,
-	pub stage: enums::Stage,
-	pub stages: Vec<StageRecord>,
-	pub dir: PathBuf,
-	pub created_at: DateTime<Utc>,
-	pub updated_at: DateTime<Utc>,
-}
-impl SdlcSession {
-	pub fn new(title: impl Into<String>, dir: PathBuf) -> Self {
-		let now = Utc::now();
+	#[derive(Debug, Clone, Serialize, Deserialize)]
+	pub struct SdlcSession {
+		pub id: String,
+		pub title: String,
+		pub stage: enums::Stage,
+		pub stages: Vec<StageRecord>,
+		pub dir: PathBuf,
+		pub created_at: DateTime<Utc>,
+		pub updated_at: DateTime<Utc>,
+	}
+	impl SdlcSession {
+		pub fn new(title: impl Into<String>, dir: PathBuf) -> Self {
+			let now = Utc::now();
 
-		Self {
-			id: uuid::Uuid::new_v4().to_string(),
-			title: title.into(),
-			stage: Stage::Intent,
-			stages: Vec::new(),
-			dir,
-			created_at: now,
-			updated_at: now,
+			Self {
+				id: uuid::Uuid::new_v4().to_string(),
+				title: title.into(),
+				stage: Stage::Intent,
+				stages: Vec::new(),
+				dir,
+				created_at: now,
+				updated_at: now,
+			}
 		}
 	}
+	pub struct SdlcView {
+		pub runtime: PipelineRuntime,
+		pub paused: bool,
+		pub show_logs: bool,
+		pub input: String,
+		pub input_active: bool,
+	}
+	pub struct ApiGenerator {
+		// whatever API client you decide to use
+	}
+	pub struct LocalGenerator {
+		pub agent: Agent,
+	}
+	pub struct TerminalGuard;
 }
-pub struct SdlcView {
-	pub runtime: PipelineRuntime,
-	pub paused: bool,
-	pub show_logs: bool,
-	pub input: String,
-	pub input_active: bool,
-}
-pub struct ApiGenerator {
-	// whatever API client you decide to use
-}
-pub struct LocalGenerator {
-	agent: Agent,
-}
-pub struct TerminalGuard;
-
 use enums as e;
 pub use enums::*;
+pub use in_structs::*;
 pub use prompt as agent_prompts;
 use prompt::*;
-use structs as s;
 use traits as t;
 
 use traits::*;
@@ -1871,18 +1848,18 @@ impl SprintPipeline {
 	pub async fn start(&mut self, intent: impl Into<String>) -> Result<()> {
 		let intent = intent.into();
 		let title = self.summarize_title(&intent).await?;
-	
+
 		let dir = self.create_dir(&title)?;
 		self.init_templates(&dir)?;
-	
+
 		let session = SdlcSession::new(title, dir);
-	
+
 		self.session = Some(session);
 		self.last_stage = Some(Stage::Intent);
 		self.stage_attempt = 0;
-	
+
 		self.commit()?;
-	
+
 		Ok(())
 	}
 	async fn summarize_title(&self, intent: &str) -> Result<String> {
@@ -2107,7 +2084,7 @@ impl SprintPipeline {
 	async fn execute(&mut self, stage: enums::Stage) -> Result<StageExecution> {
 		todo!()
 	}
-	
+
 	async fn apply(
 		&mut self,
 		stage: enums::Stage,
