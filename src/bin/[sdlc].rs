@@ -17,7 +17,7 @@ use estate::prelude::*;
 // cargo -q run --bin sdlc --features sdlc
 #[tokio::main]
 pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
-	let mut sdlc = AIPRPipeline::init()
+	let mut sdlc = SprintPipeline::init()
 		.context("loading SDLC")?
 		.ok_or_else(|| anyhow!("no SDLC instance"))?;
 	if sdlc.stage().is_none() {
