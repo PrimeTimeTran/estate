@@ -161,7 +161,6 @@ web = [
   "dep:eframe",
   "dep:egui_extras",
   "dep:jsonc-parser",
-  # "dep:tokio-util",
   "dep:js-sys",
 ]
 

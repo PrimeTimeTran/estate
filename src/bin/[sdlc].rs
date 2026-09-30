@@ -1,11 +1,7 @@
 use anyhow::Context;
-use crossterm::{
-	event::{self, Event, KeyCode, KeyEventKind, KeyModifiers},
-	execute,
-	terminal::{EnterAlternateScreen, enable_raw_mode},
-};
+use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use estate::prelude::*;
-
+use std::io::IsTerminal;
 // 1. Normal run
 // cargo -q run --bin sdlc --features sdlc
 //
@@ -17,97 +13,124 @@ use estate::prelude::*;
 // cargo -q run --bin sdlc --features sdlc
 #[tokio::main]
 pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
-	let mut sdlc = SprintPipeline::init().context("loading SDLC")?;
-
+	let mut sdlc = SprintPipeline::new().context("loading SDLC")?;
 	if sdlc.stage().is_none() {
-		sdlc.start("Do the work required to build this CLI").await?;
+		sdlc.init("Do the work required to build this CLI").await?;
 	}
 	let mut events = sdlc.subscribe();
 	let mut view = SdlcView::new(sdlc.stage().unwrap_or(Stage::Intent));
-
-	enable_raw_mode()?;
-	let mut stdout = stdout();
-	execute!(stdout, EnterAlternateScreen)?;
-
-	let backend = CrosstermBackend::new(stdout);
-	let mut terminal = Terminal::new(backend)?;
-
-	terminal.clear()?;
-	terminal.hide_cursor()?;
-
-	let _terminal_guard = TerminalGuard;
-
 	let (input_tx, mut input_rx) = tokio::sync::mpsc::unbounded_channel::<SdlcInput>();
-	let is_not_dry_run = !std::env::var_os("DRY_RUN").is_some();
+	let is_real_run = std::env::var_os("DRY_RUN").is_none();
 	let run = async {
-		if is_not_dry_run {
+		if is_real_run {
 			sdlc.run(&mut input_rx).await
 		} else {
 			sdlc.run_simulated(&mut input_rx).await
 		}
 	};
 	tokio::pin!(run);
+	if !std::io::stdout().is_terminal() {
+		return Ok(());
+	}
+	let mut terminal =
+		ratatui::Terminal::new(ratatui::backend::CrosstermBackend::new(std::io::stdout()))?;
+	crossterm::terminal::enable_raw_mode()?;
+	let mut stdout = std::io::stdout();
+	stdout.flush()?;
+	crossterm::terminal::disable_raw_mode()?;
+	crossterm::terminal::enable_raw_mode()?;
+	terminal.clear()?;
+
+	let _guard = Guard;
+
+	terminal.draw(|frame| {
+		SdlcView::render(frame, &view);
+	})?;
+
 	let mut ticker = tokio::time::interval(Duration::from_millis(100));
+
 	let result = loop {
 		tokio::select! {
 			result = &mut run => {
 				break result;
 			}
+
 			event = events.recv() => {
 				match event {
 					Ok(event) => {
 						view.apply(event);
+						terminal.draw(|frame| {
+							SdlcView::render(frame, &view);
+						})?;
 					}
 					Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
 						view.apply(SdlcEvent::Failed {
 							stage: Some(view.runtime.stage),
-							error: format!(
-								"TUI event receiver lagged by {n} events"
-							),
+							error: format!("TUI event receiver lagged by {n} events"),
 						});
+						terminal.draw(|frame| {
+							SdlcView::render(frame, &view);
+						})?;
 					}
 					Err(tokio::sync::broadcast::error::RecvError::Closed) => {
 						break Ok(());
 					}
 				}
 			}
+
 			_ = ticker.tick() => {
 				if event::poll(Duration::from_millis(0))? {
 					if let Event::Key(key) = event::read()? {
-					if key.kind == KeyEventKind::Press {
-						if key.code == KeyCode::Char('c')
-							&& key.modifiers.contains(KeyModifiers::CONTROL)
-						{
-							break Ok(());
-						}
-						if view.is_input_active() {
-							view.handle_input_key(key, &input_tx)?;
-						} else {
-							match key.code {
-								KeyCode::Char('p') => {
-									view.toggle_pause();
+						if key.kind == KeyEventKind::Press {
+							if key.code == KeyCode::Char('c')
+								&& key.modifiers.contains(KeyModifiers::CONTROL)
+							{
+								break Ok(());
+							}
+
+							if view.is_input_active() {
+								view.handle_input_key(key, &input_tx)?;
+							} else {
+								match key.code {
+									KeyCode::Char('p') => view.toggle_pause(),
+									KeyCode::Char('l') => view.toggle_logs(),
+									KeyCode::Char('r') => {
+											eprintln!("INPUT: sending Retry");
+											match input_tx.send(SdlcInput::Retry) {
+													Ok(()) => eprintln!("INPUT: Retry sent"),
+													Err(error) => eprintln!("INPUT: Retry failed: {error:?}"),
+											}
+									}
+									KeyCode::Char('v') => {
+											eprintln!("INPUT: sending Reviewed");
+											match input_tx.send(SdlcInput::Reviewed) {
+													Ok(()) => eprintln!("INPUT: Reviewed sent"),
+													Err(error) => eprintln!("INPUT: Reviewed failed: {error:?}"),
+											}
+									}
+									_ => {}
 								}
-								KeyCode::Char('l') => {
-									view.toggle_logs();
-								}
-								KeyCode::Char('r') => {
-									let _ = input_tx.send(SdlcInput::Retry);
-								}
-								KeyCode::Char('v') => {
-									let _ = input_tx.send(SdlcInput::Reviewed);
-								}
-								_ => {}
 							}
 						}
 					}
-					}
 				}
+
 				terminal.draw(|frame| {
 					SdlcView::render(frame, &view);
 				})?;
 			}
 		}
 	};
+
 	result?;
 	Ok(())
+}
+
+struct Guard;
+impl Drop for Guard {
+	fn drop(&mut self) {
+		eprintln!("GUARD: restoring terminal");
+		ratatui::restore();
+		eprintln!("GUARD: restored terminal");
+	}
 }

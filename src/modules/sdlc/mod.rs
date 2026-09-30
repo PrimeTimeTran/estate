@@ -32,14 +32,6 @@ use tokio::time::{Duration, sleep};
 // cmd+f
 // - Search in file
 
-// fn from_session(session: &SdlcSession) -> String {
-// 	session.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?
-// }
-
-// for step in Step::ALL {
-//     println!("{step:?}");
-// }
-
 fn format_elapsed(duration: Duration) -> String {
 	let total_seconds = duration.as_secs();
 	let hours = total_seconds / 3600;
@@ -674,6 +666,14 @@ mod ui {
 					Span::styled(message, Style::default().fg(Color::Red)),
 				])
 			}
+			SdlcEvent::Activity {
+				stage,
+				attempt,
+				message,
+			} => Line::from(Span::styled(
+				format!("↳ {message}"),
+				Style::default().fg(Color::Gray),
+			)),
 		}
 	}
 	pub fn stage_style(stage: Stage, current: Stage) -> Style {
@@ -840,7 +840,7 @@ pub mod prompt {
 	}
 }
 mod enums {
-	use super::in_structs::*;
+	use super::structs::*;
 	use super::*;
 	#[derive(Debug)]
 	pub enum ExecutionResult {
@@ -882,7 +882,11 @@ mod enums {
 	}
 	#[derive(Debug, Clone)]
 	pub enum SdlcEvent {
-		// RunCompleted,
+		Activity {
+			stage: Stage,
+			attempt: Attempt,
+			message: String,
+		},
 		Completed,
 		Failed {
 			stage: Option<Stage>,
@@ -1016,6 +1020,7 @@ mod enums {
 		Sdlc,
 		Evaluator,
 		Agent,
+		System,
 	}
 	#[derive(Debug)]
 	pub enum StageDecision {
@@ -1049,7 +1054,7 @@ mod enums {
 		Human { buffer: String },
 		AwaitingHuman { prompt: String },
 	}
-
+	#[derive(Debug)]
 	pub enum RunControl {
 		Continue,
 		Exit,
@@ -1112,7 +1117,7 @@ mod traits {
 	use std::{io::Stdout, process::Command};
 	use tokio::time::{Duration, sleep};
 
-	struct Context {}
+	pub struct Context {}
 
 	// Steps to complete the pipeline
 	pub trait Pipeline {
@@ -1188,12 +1193,17 @@ mod traits {
 		async fn generate(&self, prompt: &str) -> Result<String>;
 	}
 }
-pub mod in_structs {
+pub mod structs {
 	use super::*;
 	#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 	pub struct Attempt {
 		pub stage: Stage,
 		pub number: u32,
+	}
+	impl std::fmt::Display for Attempt {
+		fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+			write!(f, "{} attempt {}", self.stage, self.number)
+		}
 	}
 	pub struct SprintPipeline {
 		pub evaluator: Evaluator,
@@ -1373,9 +1383,9 @@ pub mod in_structs {
 }
 use enums as e;
 pub use enums::*;
-pub use in_structs::*;
 pub use prompt as agent_prompts;
 use prompt::*;
+pub use structs::*;
 use traits as t;
 
 use traits::*;
@@ -1417,11 +1427,7 @@ impl Attempt {
 		}
 	}
 }
-impl std::fmt::Display for Attempt {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "{} attempt {}", self.stage, self.number)
-	}
-}
+
 impl Evaluator {
 	async fn evaluate_intent(&self, intent: &str) -> Result<StageEvaluation> {
 		let started_at = Utc::now();
@@ -1835,37 +1841,7 @@ impl Evaluator {
 	}
 }
 impl SprintPipeline {
-	pub async fn run(&mut self, input_rx: &mut UnboundedReceiver<SdlcInput>) -> Result<()> {
-		let mut runner = SprintRunner { pipeline: self };
-		runner.run(input_rx).await
-	}
-	pub async fn run_simulated(&mut self, input_rx: &mut UnboundedReceiver<SdlcInput>) -> Result<()> {
-		todo!("run simulated")
-	}
-	pub fn subscribe(&self) -> broadcast::Receiver<SdlcEvent> {
-		self.event_tx.subscribe()
-	}
-	pub async fn start(&mut self, intent: impl Into<String>) -> Result<()> {
-		let intent = intent.into();
-		let title = self.summarize_title(&intent).await?;
-
-		let dir = self.create_dir(&title)?;
-		self.init_templates(&dir)?;
-
-		let session = SdlcSession::new(title, dir);
-
-		self.session = Some(session);
-		self.last_stage = Some(Stage::Intent);
-		self.stage_attempt = 0;
-
-		self.commit()?;
-
-		Ok(())
-	}
-	async fn summarize_title(&self, intent: &str) -> Result<String> {
-		Ok(String::from("Create-sdlc-pipeline"))
-	}
-	pub fn init() -> anyhow::Result<Self> {
+	pub fn new() -> anyhow::Result<Self> {
 		dotenvy::dotenv().ok();
 		let session = SpecialFile::SdlcCurrent
 			.load::<SdlcSession>()
@@ -1895,8 +1871,107 @@ impl SprintPipeline {
 			stage_attempt: 0,
 		})
 	}
-}
-impl SprintPipeline {
+	pub async fn init(&mut self, intent: impl Into<String>) -> Result<()> {
+		let intent = intent.into();
+		let title = self.summarize_title(&intent).await?;
+		let dir: PathBuf = self.create_dir(&title)?;
+		Self::init_templates(&dir)?;
+
+		let session = SdlcSession::new(title, dir);
+
+		self.session = Some(session);
+		self.last_stage = Some(Stage::Intent);
+		self.stage_attempt = 0;
+
+		self.commit()?;
+
+		Ok(())
+	}
+	pub async fn run(&mut self, input_rx: &mut UnboundedReceiver<SdlcInput>) -> Result<()> {
+		eprintln!("PIPELINE: run()");
+		SprintRunner { pipeline: self }.run(input_rx).await
+	}
+
+	pub async fn run_simulated(
+		&mut self,
+		_input_rx: &mut UnboundedReceiver<SdlcInput>,
+	) -> Result<()> {
+		loop {
+			self.emit(SdlcEvent::RunStarted);
+			for stage in [
+				Stage::Intent,
+				Stage::Spec,
+				Stage::Plan,
+				Stage::Build,
+				Stage::Verify,
+			] {
+				// let attempt = if stage == Stage::Plan { 2 } else { 1 };
+				let attempt = Attempt::new();
+				self.emit(SdlcEvent::StageStarted {
+					stage,
+					attempt: attempt,
+				});
+				self.emit(SdlcEvent::PhaseChanged {
+					phase: SdlcPhase::Executing,
+				});
+				sleep(DEMO_EXECUTION_TIME).await;
+				if stage == Stage::Plan {
+					self.emit(SdlcEvent::ExecutionFailed {
+						stage,
+						attempt,
+						error: "Simulated execution failure".into(),
+					});
+					self.emit(SdlcEvent::StageRetrying {
+						stage,
+						number: attempt.number,
+					});
+					self.emit(SdlcEvent::PhaseChanged {
+						phase: SdlcPhase::Retrying,
+					});
+					sleep(DEMO_RETRY_DELAY).await;
+					self.emit(SdlcEvent::StageStarted { stage, attempt });
+					self.emit(SdlcEvent::PhaseChanged {
+						phase: SdlcPhase::Executing,
+					});
+					sleep(DEMO_EXECUTION_TIME).await;
+				}
+				self.emit(SdlcEvent::ExecutionComplete { stage });
+				self.emit(SdlcEvent::PhaseChanged {
+					phase: SdlcPhase::Evaluating,
+				});
+				self.emit(SdlcEvent::EvaluationStarted { stage });
+				sleep(DEMO_EVALUATION_TIME).await;
+				self.emit(SdlcEvent::Evaluated {
+					stage,
+					score: 0.91,
+					confidence: 0.94,
+					passed: true,
+				});
+				let next = stage.next().ok_or_else(|| anyhow!("no next stage"))?;
+				self.emit(SdlcEvent::StageTransitioned {
+					from: stage,
+					to: next,
+				});
+			}
+			let attempt = Attempt::new();
+			self.emit(SdlcEvent::StageStarted {
+				stage: Stage::Complete,
+				attempt: attempt,
+			});
+			self.emit(SdlcEvent::PhaseChanged {
+				phase: SdlcPhase::Completed,
+			});
+			self.emit(SdlcEvent::Completed);
+			sleep(DEMO_COMPLETE_DELAY).await;
+		}
+	}
+	pub fn subscribe(&self) -> broadcast::Receiver<SdlcEvent> {
+		self.event_tx.subscribe()
+	}
+	async fn summarize_title(&self, intent: &str) -> Result<String> {
+		Ok(String::from("Create-sdlc-pipeline"))
+	}
+
 	async fn stage_intent(&mut self) -> Result<()> {
 		let session = self
 			.session
@@ -2231,9 +2306,7 @@ impl SprintPipeline {
 	pub fn stage_attempt(&self) -> u32 {
 		self.stage_attempt
 	}
-}
 
-impl SprintPipeline {
 	fn commit(&mut self) -> Result<()> {
 		let session = self
 			.session
@@ -2262,7 +2335,7 @@ impl SprintPipeline {
 			.map(|session| session.dir.as_path())
 			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))
 	}
-	fn init_templates(&self, dir: &Path) -> Result<()> {
+	fn init_templates(dir: &Path) -> Result<()> {
 		let template_dir = SpecialFile::AiTemplateDir.path()?;
 		for file in [
 			SessionFile::Intent,
@@ -2499,6 +2572,7 @@ impl SprintPipeline {
 			.session
 			.as_mut()
 			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
+
 		let valid = matches!(
 			(&session.stage, &next),
 			(Stage::Intent, Stage::Spec)
@@ -2516,10 +2590,13 @@ impl SprintPipeline {
 				next
 			));
 		}
+
 		session.stage = next;
 		session.updated_at = Utc::now();
+
 		self.persist()?;
 		self.record_session()?;
+
 		Ok(())
 	}
 	fn update_progress(&self, message: &str) -> Result<()> {
@@ -2577,7 +2654,6 @@ impl SdlcView {
 			runtime: PipelineRuntime::new(stage),
 		}
 	}
-
 	pub fn begin_input(&mut self) {
 		self.input_active = true;
 		self.input.clear();
@@ -2643,8 +2719,7 @@ impl SdlcView {
 		ui::right_activity_panel(frame, view, body[2]);
 		ui::footer(frame, view, chunks[3]);
 	}
-}
-impl SdlcView {
+
 	pub fn apply(&mut self, event: SdlcEvent) {
 		// 		match event {
 		// 			SdlcEvent::RunStarted {
@@ -2832,37 +2907,55 @@ impl Step {
 impl traits::Runner for SprintRunner<'_> {
 	type Context = UnboundedReceiver<SdlcInput>;
 	type Output = ();
-
 	async fn run(&mut self, input_rx: &mut Self::Context) -> Result<Self::Output> {
 		let mut pending_input = None;
 
+		eprintln!("RUNNER: before RunStarted");
 		self.emit(SdlcEvent::RunStarted);
+		eprintln!("RUNNER: after RunStarted");
 
 		loop {
+			eprintln!("RUNNER: before load_state");
 			let stage = self.load_state()?;
-			// let stage = state.latest_incomplete_stage()?;
+			eprintln!("RUNNER: after load_state: {stage:?}");
+
+			eprintln!("RUNNER: before begin_attempt");
 			let attempt = self.begin_attempt(stage);
+			eprintln!("RUNNER: after begin_attempt: {attempt:?}");
+
+			eprintln!("RUNNER: before run_stage");
 			let outcome = self.run_stage(stage, attempt, &mut pending_input).await?;
+			eprintln!("RUNNER: after run_stage");
+
+			eprintln!("RUNNER: before persist_outcome");
 			self.persist_outcome(&outcome)?;
+			eprintln!("RUNNER: after persist_outcome");
+
+			eprintln!("RUNNER: before decide");
 			let decision = self.decide(&outcome).await?;
+			eprintln!("RUNNER: after decide: {decision:?}");
+
+			eprintln!("RUNNER: before apply");
 			let control = self
 				.apply(outcome, decision, input_rx, &mut pending_input)
 				.await?;
+			eprintln!("RUNNER: after apply: {control:?}");
 
 			match control {
 				RunControl::Continue => {
-					// Intentionally loop back through persistence.
+					eprintln!("RUNNER: Continue");
 					continue;
 				}
-				RunControl::Exit => return Ok(()),
+				RunControl::Exit => {
+					eprintln!("RUNNER: Exit");
+					return Ok(());
+				}
 			}
 		}
 	}
-
 	fn cancel(&mut self) {
 		self.pipeline.cancel();
 	}
-
 	fn is_running(&self) -> bool {
 		true
 		// self.pipeline.is_running()
@@ -2870,18 +2963,44 @@ impl traits::Runner for SprintRunner<'_> {
 }
 impl SprintRunner<'_> {
 	fn load_state(&mut self) -> Result<enums::Stage> {
-		todo!("load_state")
+		// TODO: actually restore the persisted session from sdlc.current.json.
+		Ok(self.pipeline.stage().unwrap_or(enums::Stage::Intent))
 	}
 
 	fn persist_outcome(&mut self, _outcome: &StageOutcome) -> Result<()> {
+		// TODO: persist outcome.
 		Ok(())
 	}
 
-	async fn resolve_execution(&mut self, _execution: StageExecution) -> Result<StageOutcome> {
-		todo!("resolve_execution")
+	async fn resolve_execution(&mut self, execution: StageExecution) -> Result<StageOutcome> {
+		let passed = match &execution.result {
+			StageResult::Verification(verification) => verification.passed,
+			_ => true,
+		};
+
+		let evaluation = StageEvaluation {
+			stage: execution.stage,
+			actor: StageActor::System,
+			started_at: execution.started_at,
+			completed_at: execution.completed_at,
+			score: if passed { 1.0 } else { 0.0 },
+			confidence: 1.0,
+			passed,
+			evaluations: Vec::new(),
+		};
+
+		if passed {
+			Ok(StageOutcome::Complete {
+				execution,
+				evaluation,
+			})
+		} else {
+			Ok(StageOutcome::NeedsRevision {
+				execution,
+				evaluation,
+			})
+		}
 	}
-}
-impl SprintRunner<'_> {
 	fn begin_attempt(&mut self, stage: Stage) -> Attempt {
 		self.pipeline.next_attempt(stage)
 	}
@@ -2994,10 +3113,8 @@ impl SprintRunner<'_> {
 
 			StageDecision::AwaitHuman => {
 				self
-					.handle_human_intervention(stage, attempt, input_rx, pending_input)
-					.await?;
-
-				Ok(RunControl::Continue)
+					.await_human(stage, attempt, input_rx, pending_input)
+					.await
 			}
 
 			StageDecision::Complete => {
@@ -3015,41 +3132,32 @@ impl SprintRunner<'_> {
 			}
 		}
 	}
-	async fn handle_human_intervention(
+	async fn await_human(
 		&mut self,
-		stage: enums::Stage,
+		stage: Stage,
 		attempt: Attempt,
 		input_rx: &mut UnboundedReceiver<SdlcInput>,
 		pending_input: &mut Option<SdlcInput>,
-	) -> Result<()> {
+	) -> Result<RunControl> {
 		self.emit(SdlcEvent::PhaseChanged {
 			phase: SdlcPhase::AwaitingHuman,
 		});
 
-		match self
-			.wait_for_intervention(
-				stage,
-				attempt,
-				String::from("Human intervention required"),
-				input_rx,
-			)
-			.await?
-		{
-			Intervention::Human(input) => {
-				*pending_input = Some(SdlcInput::Human(input));
+		self.emit(SdlcEvent::Activity {
+			stage,
+			attempt,
+			message: "Waiting for human input".into(),
+		});
+
+		let input = input_rx.recv().await.context("SDLC input channel closed")?;
+
+		match input {
+			SdlcInput::Retry => {
 				self.pipeline.retry(stage)?;
+				Ok(RunControl::Continue)
 			}
 
-			Intervention::Retry => {
-				self.pipeline.retry(stage)?;
-			}
-
-			Intervention::ProvideContext(context) => {
-				*pending_input = Some(SdlcInput::ProvideContext(context));
-				self.pipeline.retry(stage)?;
-			}
-
-			Intervention::Reviewed => {
+			SdlcInput::Reviewed => {
 				let next = stage
 					.next()
 					.ok_or_else(|| anyhow!("Stage {stage:?} has no next stage"))?;
@@ -3060,17 +3168,33 @@ impl SprintRunner<'_> {
 					from: stage,
 					to: next,
 				});
+
+				Ok(RunControl::Continue)
 			}
 
-			Intervention::Abort => {
+			SdlcInput::Human(input) => {
+				*pending_input = Some(SdlcInput::Human(input));
+				self.pipeline.retry(stage)?;
+
+				Ok(RunControl::Continue)
+			}
+
+			SdlcInput::ProvideContext(context) => {
+				*pending_input = Some(SdlcInput::ProvideContext(context));
+				self.pipeline.retry(stage)?;
+
+				Ok(RunControl::Continue)
+			}
+
+			SdlcInput::Abort => {
 				self.emit(SdlcEvent::Failed {
 					stage: Some(stage),
 					error: "aborted by user".into(),
 				});
+
+				Ok(RunControl::Exit)
 			}
 		}
-
-		Ok(())
 	}
 	async fn handle_retry(&mut self, stage: enums::Stage, attempt: Attempt) -> Result<()> {
 		let next_attempt = Attempt {
@@ -3405,6 +3529,10 @@ impl Drop for TerminalGuard {
 }
 
 mod constants {
+	const TODO: &'static str = r#"
+		- Question prompt
+		- Add progressive disclosure
+	"#;
 	use super::*;
 	pub const DEMO_COMPLETE_DELAY: Duration = Duration::from_secs(3);
 	pub const DEMO_EVALUATION_TIME: Duration = Duration::from_secs(2);
@@ -3415,7 +3543,3 @@ mod constants {
 	pub const STATUS_INTERVAL: Duration = Duration::from_secs(30);
 }
 pub use constants::*;
-const TODO: &'static str = r#"
-  - Question prompt
-  - Add progressive disclosure
-"#;
