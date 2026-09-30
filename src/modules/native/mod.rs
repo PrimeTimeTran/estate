@@ -32,6 +32,13 @@ pub use util::*;
 
 pub use native_traits::*;
 
+
+mod gestures;
+
+// This compiles the module only if the "windows" feature is enabled AND the OS is Windows
+pub mod windows;
+pub use windows::*;
+
 #[cfg(unix)]
 pub mod unix;
 
@@ -41,14 +48,14 @@ pub use unix::*;
 #[cfg(target_os = "linux")]
 pub mod linux;
 
-mod gestures;
-
-// This compiles the module only if the "windows" feature is enabled AND the OS is Windows
-pub mod windows;
-pub use windows::*;
+#[cfg(target_os = "linux")]
+pub mod linux;
 
 #[cfg(target_os = "macos")]
 pub mod macos;
+
+#[cfg(target_os = "linux")]
+pub use linux::*;
 
 #[cfg(target_os = "macos")]
 pub use macos::*;

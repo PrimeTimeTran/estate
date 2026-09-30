@@ -90,6 +90,7 @@ required-features = ["native"]
 [[bin]]
 name = "sdlc"
 path = "src/bin/[sdlc].rs"
+required-features = ["native"]
 
 [[bin]]
 name = "settings"
@@ -124,10 +125,10 @@ path = "src/bin/platform.win.rs"
 # It picks up downloaded crates when analyzing
 
 # [PICK 1]
-# default = []
+default = ["native", "macos"]
 # default = ["web"]
-default = ["native","windows"]
-# sdlc = ["native"]
+# default = ["native","windows"]
+sdlc = ["native"]
 mobile = []
 daemon = []
 windows = []
@@ -143,6 +144,13 @@ native = [
   "dep:tray-icon",
   "dep:egui_extras",
   "dep:jsonc-parser",
+]
+
+macos = [
+  "dep:core-foundation",
+  "dep:core-graphics",
+  "dep:objc2-foundation",
+  "dep:objc2-app-kit",
 ]
 
 web = [

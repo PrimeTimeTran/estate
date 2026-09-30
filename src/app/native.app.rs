@@ -875,7 +875,9 @@ use crate::prelude::*;
 // 		Ok(())
 // 	}
 // }
-struct DesktopApp() {
+struct DesktopApp
+{
+  
 }
 impl DesktopApp {
 	fn bootstrap() -> Result<(TrayMenu, TrayIcon)> {

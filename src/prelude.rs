@@ -79,7 +79,8 @@ pub use crate::{
 			*,
 		},
 		os::*,
-		platform, platform::*,
+		platform,
+		platform::*,
 		sdlc::*,
 		server::{self, channel, event::*},
 	},
@@ -88,13 +89,10 @@ pub use crate::{
 #[cfg(target_os = "windows")]
 pub use crate::modules::{
 	native::windows as os,
-	// platform::*,
-	// native::windows as platform
-
 };
 
 #[cfg(target_os = "macos")]
-pub use crate::modules::{native::macos as platform, platform::*};
+pub use crate::modules::native::macos as os;
 
 /// A Wasm32 build target
 /// is code that runs client side (in browser) so we want this mod.

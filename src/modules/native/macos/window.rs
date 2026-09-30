@@ -344,7 +344,7 @@ where
 			&screen_descriptor,
 		);
 
-		self.render_pass(&mut encoder, &view, &clipped_primitives, &screen_descriptor);
+		// self.render_pass(&mut encoder, &view, &clipped_primitives, &screen_descriptor);
 
 		self.queue.submit(Some(encoder.finish()));
 
@@ -356,41 +356,41 @@ where
 		Ok(())
 	}
 
-	fn render_pass(
-		&mut self,
-		encoder: &mut wgpu::CommandEncoder,
-		view: &wgpu::TextureView,
-		primitives: &[gui::ClippedPrimitive],
-		screen_descriptor: &egui_wgpu::ScreenDescriptor,
-	) {
-		let render_pass = encoder.begin_render_pass(
-			&(wgpu::RenderPassDescriptor {
-				label: Some("egui-render-pass"),
-				color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-					view,
-					depth_slice: None,
-					resolve_target: None,
-					ops: wgpu::Operations {
-						load: wgpu::LoadOp::Clear(wgpu::Color {
-							r: 0.08,
-							g: 0.08,
-							b: 0.08,
-							a: 1.0,
-						}),
-						store: wgpu::StoreOp::Store,
-					},
-				})],
-				depth_stencil_attachment: None,
-				timestamp_writes: None,
-				occlusion_query_set: None,
-				multiview_mask: None,
-			}),
-		);
-		let mut render_pass = render_pass.forget_lifetime();
-		self
-			.renderer
-			.render(&mut render_pass, primitives, screen_descriptor);
-	}
+	// fn render_pass(
+	// 	&mut self,
+	// 	encoder: &mut wgpu::CommandEncoder,
+	// 	view: &wgpu::TextureView,
+	// 	primitives: &[gui::ClippedPrimitive],
+	// 	screen_descriptor: &egui_wgpu::ScreenDescriptor,
+	// ) {
+	// 	let render_pass = encoder.begin_render_pass(
+	// 		&(wgpu::RenderPassDescriptor {
+	// 			label: Some("egui-render-pass"),
+	// 			color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+	// 				view,
+	// 				depth_slice: None,
+	// 				resolve_target: None,
+	// 				ops: wgpu::Operations {
+	// 					load: wgpu::LoadOp::Clear(wgpu::Color {
+	// 						r: 0.08,
+	// 						g: 0.08,
+	// 						b: 0.08,
+	// 						a: 1.0,
+	// 					}),
+	// 					store: wgpu::StoreOp::Store,
+	// 				},
+	// 			})],
+	// 			depth_stencil_attachment: None,
+	// 			timestamp_writes: None,
+	// 			occlusion_query_set: None,
+	// 			multiview_mask: None,
+	// 		}),
+	// 	);
+	// 	let mut render_pass = render_pass.forget_lifetime();
+	// 	self
+	// 		.renderer
+	// 		.render(&mut render_pass, primitives, screen_descriptor);
+	// }
 	fn egui_view(&mut self, _ctx: &egui::Context) {
 		doc!(
 			r#"
@@ -464,12 +464,12 @@ where
 	C: Ctx + 'static,
 	S: 'static,
 {
-	pub fn sync_view(&mut self, view: ViewType) {
-		if self.screen.kind != view {
-			tracing::debug!("🖼️ Window view change: {:?} → {:?}", self.screen.kind, view);
-			self.screen = ui::ScreenInstance::new(view);
-		}
-	}
+	// pub fn sync_view(&mut self, view: ViewType) {
+	// 	if self.screen.kind != view {
+	// 		tracing::debug!("🖼️ Window view change: {:?} → {:?}", self.screen.kind, view);
+	// 		self.screen = ui::ScreenInstance::new(view);
+	// 	}
+	// }
 	pub fn resize(&mut self, size: PhysicalSize<u32>) {
 		if size.width == 0 || size.height == 0 {
 			return;
