@@ -1867,28 +1867,38 @@ impl SprintPipeline {
 	}
 }
 impl SprintPipeline {
-  pub async fn start(&mut self, intent: impl Into<String>) -> Result<()> {
-	let session = SdlcSession::new(intent, self.state_path.clone());
-  
-	self.session = Some(session);
-	self.last_stage = Some(Stage::Intent);
-	self.stage_attempt = 0;
-  
-	self.record_session()?;
-  
-	Ok(())
-  }
+	//  pub async fn start(&mut self, intent: impl Into<String>) -> Result<()> {
+	// let session = SdlcSession::new(intent, self.state_path.clone());
+	//
+	// self.session = Some(session);
+	// self.last_stage = Some(Stage::Intent);
+	// self.stage_attempt = 0;
+	//
+	// self.record_session()?;
+	//
+	// Ok(())
+	//  }
+	pub async fn start(&mut self, intent: impl Into<String>) -> Result<()> {
+		let title = intent.into();
 
-	pub fn init() -> anyhow::Result<Option<Self>> {
-		// No active SDLC session means there is nothing for the
-		// pipeline to resume.
-		let session = SpecialFile::SdlcCurrent.load::<SdlcSession>()?;
+		let dir = self.create_dir(&title)?;
+		self.init_templates(&dir)?;
 
-		let Some(session) = session else {
-			return Ok(None);
-		};
+		let session = SdlcSession::new(title, dir);
 
-		let state_path = SpecialFile::SdlcCurrent.path()?;
+		self.session = Some(session);
+		self.last_stage = Some(Stage::Intent);
+		self.stage_attempt = 0;
+
+		self.commit()?;
+
+		Ok(())
+	}
+	pub fn init() -> anyhow::Result<Self> {
+	dotenvy::dotenv().ok();
+		let session = SpecialFile::SdlcCurrent
+			.load::<SdlcSession>()
+			.context("loading current SdlcSession")?;
 
 		let evaluator = Evaluator {
 			jev: TypeSafeClient::from_env()?,
@@ -1900,17 +1910,19 @@ impl SprintPipeline {
 
 		let (event_tx, _) = broadcast::channel(256);
 
-		let last_stage = Some(session.stage);
+		let last_stage = session.as_ref().map(|session| session.stage);
 
-		Ok(Some(Self {
+		let state_path = SpecialFile::SdlcCurrent.path()?;
+
+		Ok(Self {
 			evaluator,
 			generator,
-			session: Some(session),
+			session,
 			state_path,
 			event_tx,
 			last_stage,
 			stage_attempt: 0,
-		}))
+		})
 	}
 }
 impl SprintPipeline {
@@ -2273,6 +2285,13 @@ impl std::fmt::Display for Attempt {
 }
 impl SprintPipeline {
 	fn commit(&mut self) -> Result<()> {
+		let session = self
+			.session
+			.as_ref()
+			.ok_or_else(|| anyhow!("no active SDLC session"))?;
+
+		FS::save(SpecialFile::SdlcCurrent.path()?, session)?;
+
 		Ok(())
 	}
 	fn create_dir(&self, title: &str) -> Result<PathBuf> {

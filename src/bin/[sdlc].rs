@@ -17,9 +17,8 @@ use estate::prelude::*;
 // cargo -q run --bin sdlc --features sdlc
 #[tokio::main]
 pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
-	let mut sdlc = SprintPipeline::init()
-		.context("loading SDLC")?
-		.ok_or_else(|| anyhow!("no SDLC instance"))?;
+	let mut sdlc = SprintPipeline::init().context("loading SDLC")?;
+
 	if sdlc.stage().is_none() {
 		sdlc
 			.start(agent_prompts::for_intent(
@@ -42,7 +41,7 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 	let _terminal_guard = TerminalGuard;
 
-	let ( input_tx, mut input_rx) = tokio::sync::mpsc::unbounded_channel::<SdlcInput>();
+	let (input_tx, mut input_rx) = tokio::sync::mpsc::unbounded_channel::<SdlcInput>();
 	let is_not_dry_run = !std::env::var_os("DRY_RUN").is_some();
 	let run = async {
 		if is_not_dry_run {
