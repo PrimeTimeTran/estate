@@ -82,38 +82,26 @@ fn slugify(input: &str) -> String {
 		.chars()
 		.map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
 		.collect::<String>();
-
 	let slug = slug
 		.split('-')
 		.filter(|s| !s.is_empty())
 		.take(8)
 		.collect::<Vec<_>>()
 		.join("-");
-
 	if slug.is_empty() {
 		return "untitled".into();
 	}
-
 	// Windows reserved device names.
 	let reserved = [
 		"con", "prn", "aux", "nul", "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8",
 		"com9", "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9",
 	];
-
 	if reserved.contains(&slug.as_str()) {
 		format!("session-{slug}")
 	} else {
 		slug
 	}
 }
-
-const DEMO_COMPLETE_DELAY: Duration = Duration::from_secs(3);
-const DEMO_EVALUATION_TIME: Duration = Duration::from_secs(2);
-const DEMO_EXECUTION_TIME: Duration = Duration::from_secs(5);
-const DEMO_RETRY_DELAY: Duration = Duration::from_secs(1);
-const FMT_HUMAN_READABLE: &'static str = "%B %-d, %Y at %-I:%M:%S %p UTC";
-const MAX_STAGE_ATTEMPTS: u32 = 3;
-const STATUS_INTERVAL: Duration = Duration::from_secs(30);
 
 mod ui {
 	use crate::sdlc::{SdlcEvent, SdlcPhase, SdlcView, Stage, format_elapsed};
@@ -1201,8 +1189,10 @@ mod traits {
 	}
 }
 
-pub struct SprintRunner<'a> {
-	pipeline: &'a mut SprintPipeline,
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct Attempt {
+	pub stage: Stage,
+	pub number: u32,
 }
 pub struct SprintPipeline {
 	evaluator: Evaluator,
@@ -1214,6 +1204,9 @@ pub struct SprintPipeline {
 
 	last_stage: Option<Stage>,
 	stage_attempt: u32,
+}
+pub struct SprintRunner<'a> {
+	pipeline: &'a mut SprintPipeline,
 }
 #[derive(Debug, Clone)]
 pub struct PipelineRuntime {
@@ -1252,8 +1245,6 @@ pub enum ExecutionResult {
 	Failed(StageError),
 }
 #[derive(Debug)]
-pub struct StageError;
-#[derive(Debug)]
 pub enum StageOutcome {
 	Complete {
 		execution: StageExecution,
@@ -1288,6 +1279,8 @@ pub struct StageRecord {
 	/// Semantic evaluation of the resulting artifact/work.
 	pub evaluation: Option<StageEvaluation>,
 }
+#[derive(Debug)]
+pub struct StageError;
 
 pub struct RetryPolicy {
 	max_attempts: u32,
@@ -1399,7 +1392,8 @@ pub struct ApiGenerator {
 pub struct LocalGenerator {
 	agent: Agent,
 }
-// }
+pub struct TerminalGuard;
+
 use enums as e;
 pub use enums::*;
 pub use prompt as agent_prompts;
@@ -1436,6 +1430,19 @@ impl ArtifactGenerator for LocalGenerator {
 impl ArtifactGenerator for ApiGenerator {
 	async fn generate(&self, prompt: &str) -> Result<String> {
 		todo!("apigenerator generate")
+	}
+}
+impl Attempt {
+	pub fn new() -> Self {
+		Self {
+			stage: Stage::Intent,
+			number: 0,
+		}
+	}
+}
+impl std::fmt::Display for Attempt {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{} attempt {}", self.stage, self.number)
 	}
 }
 impl Evaluator {
@@ -1851,51 +1858,38 @@ impl Evaluator {
 	}
 }
 impl SprintPipeline {
-	pub fn subscribe(&self) -> broadcast::Receiver<SdlcEvent> {
-		self.event_tx.subscribe()
-	}
-}
-impl SprintPipeline {
 	pub async fn run(&mut self, input_rx: &mut UnboundedReceiver<SdlcInput>) -> Result<()> {
 		let mut runner = SprintRunner { pipeline: self };
-
 		runner.run(input_rx).await
 	}
-
 	pub async fn run_simulated(&mut self, input_rx: &mut UnboundedReceiver<SdlcInput>) -> Result<()> {
 		todo!("run simulated")
 	}
-}
-impl SprintPipeline {
-	//  pub async fn start(&mut self, intent: impl Into<String>) -> Result<()> {
-	// let session = SdlcSession::new(intent, self.state_path.clone());
-	//
-	// self.session = Some(session);
-	// self.last_stage = Some(Stage::Intent);
-	// self.stage_attempt = 0;
-	//
-	// self.record_session()?;
-	//
-	// Ok(())
-	//  }
+	pub fn subscribe(&self) -> broadcast::Receiver<SdlcEvent> {
+		self.event_tx.subscribe()
+	}
 	pub async fn start(&mut self, intent: impl Into<String>) -> Result<()> {
-		let title = intent.into();
-
+		let intent = intent.into();
+		let title = self.summarize_title(&intent).await?;
+	
 		let dir = self.create_dir(&title)?;
 		self.init_templates(&dir)?;
-
+	
 		let session = SdlcSession::new(title, dir);
-
+	
 		self.session = Some(session);
 		self.last_stage = Some(Stage::Intent);
 		self.stage_attempt = 0;
-
+	
 		self.commit()?;
-
+	
 		Ok(())
 	}
+	async fn summarize_title(&self, intent: &str) -> Result<String> {
+		Ok(String::from("Create-sdlc-pipeline"))
+	}
 	pub fn init() -> anyhow::Result<Self> {
-	dotenvy::dotenv().ok();
+		dotenvy::dotenv().ok();
 		let session = SpecialFile::SdlcCurrent
 			.load::<SdlcSession>()
 			.context("loading current SdlcSession")?;
@@ -2034,11 +2028,9 @@ impl SprintPipeline {
 	async fn stage_deploy(&mut self) -> Result<()> {
 		todo!("sdlc deploy")
 	}
-
 	async fn stage_maintain(&mut self) -> Result<()> {
 		todo!("sdlc maintain")
 	}
-
 	async fn stage_complete(&mut self) -> Result<RunControl> {
 		todo!("WOW DONE!")
 	}
@@ -2046,7 +2038,6 @@ impl SprintPipeline {
 	pub fn cancel(&mut self) {
 		todo!("cancel")
 	}
-
 	pub fn fail(&mut self, _outcome: StageOutcome) -> Result<()> {
 		todo!("fail")
 	}
@@ -2096,9 +2087,6 @@ impl SprintPipeline {
 			result,
 		})
 	}
-	async fn execute(&mut self, stage: enums::Stage) -> Result<StageExecution> {
-		todo!()
-	}
 	pub fn decide(&self, outcome: &StageOutcome) -> Result<StageDecision> {
 		let decision = match outcome {
 			StageOutcome::Complete { execution, .. } => {
@@ -2116,6 +2104,10 @@ impl SprintPipeline {
 
 		Ok(decision)
 	}
+	async fn execute(&mut self, stage: enums::Stage) -> Result<StageExecution> {
+		todo!()
+	}
+	
 	async fn apply(
 		&mut self,
 		stage: enums::Stage,
@@ -2242,8 +2234,6 @@ impl SprintPipeline {
 			}
 		}
 	}
-}
-impl SprintPipeline {
 	fn next_attempt(&mut self, stage: Stage) -> Attempt {
 		if self.last_stage != Some(stage) {
 			self.last_stage = Some(stage);
@@ -2265,24 +2255,7 @@ impl SprintPipeline {
 		self.stage_attempt
 	}
 }
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct Attempt {
-	pub stage: Stage,
-	pub number: u32,
-}
-impl Attempt {
-	pub fn new() -> Self {
-		Self {
-			stage: Stage::Intent,
-			number: 0,
-		}
-	}
-}
-impl std::fmt::Display for Attempt {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "{} attempt {}", self.stage, self.number)
-	}
-}
+
 impl SprintPipeline {
 	fn commit(&mut self) -> Result<()> {
 		let session = self
@@ -3445,8 +3418,6 @@ impl StageOutcome {
 	}
 }
 
-pub struct TerminalGuard;
-
 impl Drop for TerminalGuard {
 	fn drop(&mut self) {
 		let _ = disable_raw_mode();
@@ -3456,6 +3427,17 @@ impl Drop for TerminalGuard {
 	}
 }
 
+mod constants {
+	use super::*;
+	pub const DEMO_COMPLETE_DELAY: Duration = Duration::from_secs(3);
+	pub const DEMO_EVALUATION_TIME: Duration = Duration::from_secs(2);
+	pub const DEMO_EXECUTION_TIME: Duration = Duration::from_secs(5);
+	pub const DEMO_RETRY_DELAY: Duration = Duration::from_secs(1);
+	pub const FMT_HUMAN_READABLE: &'static str = "%B %-d, %Y at %-I:%M:%S %p UTC";
+	pub const MAX_STAGE_ATTEMPTS: u32 = 3;
+	pub const STATUS_INTERVAL: Duration = Duration::from_secs(30);
+}
+pub use constants::*;
 const TODO: &'static str = r#"
   - Question prompt
   - Add progressive disclosure

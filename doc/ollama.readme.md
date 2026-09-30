@@ -35,7 +35,7 @@ ollama pull <model>
 Example:
 
 ```bash
-ollama pull llama3.2
+ollama pulllama3.2
 ```
 
 **Run a model**

@@ -1,4 +1,4 @@
-use anyhow::{Context, anyhow};
+use anyhow::Context;
 use crossterm::{
 	event::{self, Event, KeyCode, KeyEventKind, KeyModifiers},
 	execute,
@@ -20,11 +20,7 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let mut sdlc = SprintPipeline::init().context("loading SDLC")?;
 
 	if sdlc.stage().is_none() {
-		sdlc
-			.start(agent_prompts::for_intent(
-				"Do the work required to build this CLI",
-			))
-			.await?;
+		sdlc.start("Do the work required to build this CLI").await?;
 	}
 	let mut events = sdlc.subscribe();
 	let mut view = SdlcView::new(sdlc.stage().unwrap_or(Stage::Intent));
