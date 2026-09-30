@@ -386,7 +386,6 @@ impl Default for DaemonResponse {
 		}
 	}
 }
-pub struct DaemonServer;
 
 #[derive(Debug, Clone)]
 pub struct DaemonMetrics {

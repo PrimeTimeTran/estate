@@ -151,6 +151,8 @@ macos = [
   "dep:core-graphics",
   "dep:objc2-foundation",
   "dep:objc2-app-kit",
+  "dep:axuielement",
+  "dep:macos-accessibility-client",
 ]
 
 web = [

@@ -640,10 +640,10 @@ mod ui {
 				),
 			]),
 
-			SdlcEvent::StageRetrying { stage, attempt } => Line::from(vec![
+			SdlcEvent::StageRetrying { stage, number } => Line::from(vec![
 				Span::styled("↻ ", Style::default().fg(Color::Yellow)),
 				Span::styled(
-					format!("{stage:?} · retry #{attempt}"),
+					format!("{stage:?} · retry #{number}"),
 					Style::default()
 						.fg(Color::Yellow)
 						.add_modifier(Modifier::BOLD),
@@ -875,7 +875,7 @@ mod enums {
 		},
 		InterventionRequired {
 			stage: Stage,
-			attempt: u32,
+			attempt: Attempt,
 			reason: String,
 		},
 		InterventionResolved {
@@ -900,7 +900,7 @@ mod enums {
 		},
 		ExecutionFailed {
 			stage: Stage,
-			attempt: u32,
+			attempt: Attempt,
 			error: String,
 		},
 		Exited {
@@ -912,11 +912,11 @@ mod enums {
 		RunStarted,
 		StageRetrying {
 			stage: Stage,
-			attempt: u32,
+			number: u32,
 		},
 		StageStarted {
 			stage: Stage,
-			attempt: u32,
+			attempt: Attempt,
 		},
 		StageTransitioned {
 			from: Stage,
@@ -970,6 +970,23 @@ mod enums {
 		Maintain,
 		Complete,
 		SprintCompleted,
+	}
+	impl std::fmt::Display for Stage {
+		fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+			let name = match self {
+				Self::Intent => "Intent",
+				Self::Spec => "Spec",
+				Self::Plan => "Plan",
+				Self::Build => "Build",
+				Self::Verify => "Verify",
+				Self::Deploy => "Deploy",
+				Self::Maintain => "Maintain",
+				Self::Complete => "Complete",
+				Self::SprintCompleted => "Sprint Completed",
+			};
+
+			f.write_str(name)
+		}
 	}
 	#[derive(Debug, Clone, Copy)]
 	pub enum StageAction {
@@ -1183,21 +1200,19 @@ mod traits {
 		async fn generate(&self, prompt: &str) -> Result<String>;
 	}
 }
-// mod structs {
-// 	use super::*;
+
 pub struct SprintRunner<'a> {
-	pipeline: SprintPipeline,
-	stage_attempt: u32,
-	last_stage: &'a mut Option<enums::Stage>,
-	// runtime state
+	pipeline: &'a mut SprintPipeline,
 }
 pub struct SprintPipeline {
 	evaluator: Evaluator,
 	generator: Box<dyn ArtifactGenerator>,
 	session: Option<SdlcSession>,
 	state_path: PathBuf,
+
 	event_tx: broadcast::Sender<SdlcEvent>,
-	last_stage: Stage,
+
+	last_stage: Option<Stage>,
 	stage_attempt: u32,
 }
 #[derive(Debug, Clone)]
@@ -1226,7 +1241,7 @@ pub struct PipelineRuntime {
 #[derive(Debug)]
 pub struct StageExecution {
 	pub stage: enums::Stage,
-	pub attempt: u32,
+	pub attempt: Attempt,
 	pub started_at: DateTime<Utc>,
 	pub completed_at: DateTime<Utc>,
 	pub result: StageResult,
@@ -1250,7 +1265,7 @@ pub enum StageOutcome {
 	},
 	ExecutionFailed {
 		stage: enums::Stage,
-		attempt: u32,
+		attempt: Attempt,
 		error: anyhow::Error,
 	},
 	EvaluationFailed {
@@ -1260,7 +1275,7 @@ pub enum StageOutcome {
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StageRecord {
-	pub attempt: u32,
+	pub attempt: Attempt,
 	pub stage: enums::Stage,
 	pub status: StageStatus,
 
@@ -1356,7 +1371,21 @@ pub struct SdlcSession {
 	pub created_at: DateTime<Utc>,
 	pub updated_at: DateTime<Utc>,
 }
+impl SdlcSession {
+	pub fn new(title: impl Into<String>, dir: PathBuf) -> Self {
+		let now = Utc::now();
 
+		Self {
+			id: uuid::Uuid::new_v4().to_string(),
+			title: title.into(),
+			stage: Stage::Intent,
+			stages: Vec::new(),
+			dir,
+			created_at: now,
+			updated_at: now,
+		}
+	}
+}
 pub struct SdlcView {
 	pub runtime: PipelineRuntime,
 	pub paused: bool,
@@ -1821,7 +1850,69 @@ impl Evaluator {
 		))
 	}
 }
+impl SprintPipeline {
+	pub fn subscribe(&self) -> broadcast::Receiver<SdlcEvent> {
+		self.event_tx.subscribe()
+	}
+}
+impl SprintPipeline {
+	pub async fn run(&mut self, input_rx: &mut UnboundedReceiver<SdlcInput>) -> Result<()> {
+		let mut runner = SprintRunner { pipeline: self };
 
+		runner.run(input_rx).await
+	}
+
+	pub async fn run_simulated(&mut self, input_rx: &mut UnboundedReceiver<SdlcInput>) -> Result<()> {
+		todo!("run simulated")
+	}
+}
+impl SprintPipeline {
+  pub async fn start(&mut self, intent: impl Into<String>) -> Result<()> {
+	let session = SdlcSession::new(intent, self.state_path.clone());
+  
+	self.session = Some(session);
+	self.last_stage = Some(Stage::Intent);
+	self.stage_attempt = 0;
+  
+	self.record_session()?;
+  
+	Ok(())
+  }
+
+	pub fn init() -> anyhow::Result<Option<Self>> {
+		// No active SDLC session means there is nothing for the
+		// pipeline to resume.
+		let session = SpecialFile::SdlcCurrent.load::<SdlcSession>()?;
+
+		let Some(session) = session else {
+			return Ok(None);
+		};
+
+		let state_path = SpecialFile::SdlcCurrent.path()?;
+
+		let evaluator = Evaluator {
+			jev: TypeSafeClient::from_env()?,
+		};
+
+		let generator = Box::new(LocalGenerator {
+			agent: Agent::new(),
+		});
+
+		let (event_tx, _) = broadcast::channel(256);
+
+		let last_stage = Some(session.stage);
+
+		Ok(Some(Self {
+			evaluator,
+			generator,
+			session: Some(session),
+			state_path,
+			event_tx,
+			last_stage,
+			stage_attempt: 0,
+		}))
+	}
+}
 impl SprintPipeline {
 	async fn stage_intent(&mut self) -> Result<()> {
 		let session = self
@@ -1945,12 +2036,12 @@ impl SprintPipeline {
 	}
 
 	pub fn fail(&mut self, _outcome: StageOutcome) -> Result<()> {
-    todo!("fail")
+		todo!("fail")
 	}
 	async fn stage_execute(
 		&mut self,
 		stage: enums::Stage,
-		attempt: u32,
+		attempt: Attempt,
 		pending_input: &mut Option<SdlcInput>,
 	) -> Result<StageExecution> {
 		let started_at = Utc::now();
@@ -2016,7 +2107,7 @@ impl SprintPipeline {
 	async fn apply(
 		&mut self,
 		stage: enums::Stage,
-		attempt: u32,
+		attempt: Attempt,
 		outcome: StageOutcome,
 		decision: StageDecision,
 		input_rx: &mut tokio::sync::mpsc::UnboundedReceiver<SdlcInput>,
@@ -2074,7 +2165,7 @@ impl SprintPipeline {
 	async fn wait_for_intervention(
 		&mut self,
 		stage: enums::Stage,
-		attempt: u32,
+		attempt: Attempt,
 		reason: String,
 		input_rx: &mut tokio::sync::mpsc::UnboundedReceiver<SdlcInput>,
 	) -> Result<Intervention> {
@@ -2140,7 +2231,46 @@ impl SprintPipeline {
 		}
 	}
 }
+impl SprintPipeline {
+	fn next_attempt(&mut self, stage: Stage) -> Attempt {
+		if self.last_stage != Some(stage) {
+			self.last_stage = Some(stage);
+			self.stage_attempt = 1;
+		} else {
+			self.stage_attempt += 1;
+		}
 
+		Attempt {
+			stage,
+			number: self.stage_attempt,
+		}
+	}
+	pub fn stage(&self) -> Option<Stage> {
+		self.last_stage
+	}
+
+	pub fn stage_attempt(&self) -> u32 {
+		self.stage_attempt
+	}
+}
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct Attempt {
+	pub stage: Stage,
+	pub number: u32,
+}
+impl Attempt {
+	pub fn new() -> Self {
+		Self {
+			stage: Stage::Intent,
+			number: 0,
+		}
+	}
+}
+impl std::fmt::Display for Attempt {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{} attempt {}", self.stage, self.number)
+	}
+}
 impl SprintPipeline {
 	fn commit(&mut self) -> Result<()> {
 		Ok(())
@@ -2208,20 +2338,7 @@ impl SprintPipeline {
 		let progress = self.read_session("progress.md");
 		Ok(vec![])
 	}
-	fn next_attempt(
-		&mut self,
-		stage: enums::Stage,
-		last_stage: &mut Option<enums::Stage>,
-		attempt: &mut u32,
-	) -> u32 {
-		if *last_stage == Some(stage) {
-			*attempt += 1;
-		} else {
-			*last_stage = Some(stage);
-			*attempt = 1;
-		}
-		*attempt
-	}
+
 	fn persist(&self) -> Result<()> {
 		FS::save(&self.state_path, &self.session)
 	}
@@ -2340,7 +2457,7 @@ impl SprintPipeline {
 		};
 		let record = StageRecord {
 			actor: evaluation.actor.clone(),
-			attempt: 0,
+			attempt: Attempt::new(),
 			completed_at: Some(Utc::now()),
 			evaluation: Some(evaluation.clone()),
 			stage: evaluation.stage.clone(),
@@ -2500,18 +2617,15 @@ impl SdlcView {
 		self.input_active = false;
 		self.input.clear();
 	}
-
 	pub fn is_input_active(&self) -> bool {
 		self.input_active
 	}
-
 	pub fn toggle_pause(&mut self) {
 		self.paused = !self.paused;
 	}
 	pub fn toggle_logs(&mut self) {
 		self.show_logs = !self.show_logs;
 	}
-
 	pub fn handle_input_key(
 		&mut self,
 		key: KeyEvent,
@@ -2559,6 +2673,117 @@ impl SdlcView {
 		ui::left_stage_panel(frame, view, body[0]);
 		ui::right_activity_panel(frame, view, body[2]);
 		ui::footer(frame, view, chunks[3]);
+	}
+}
+impl SdlcView {
+	pub fn apply(&mut self, event: SdlcEvent) {
+		// 		match event {
+		// 			SdlcEvent::RunStarted {
+		// 				run_id,
+		// 				stage,
+		// 				..
+		// 			} => {
+		// 				self.runtime.run_id = run_id;
+		// 				self.runtime.stage = stage;
+		// 				self.runtime.attempt = 0;
+		// 				self.runtime.phase = PipelinePhase::Running;
+		// 				self.runtime.started_at = Some(Instant::now());
+		// 				self.runtime.stage_started_at = Some(Instant::now());
+		// 				self.runtime.message = "Run started".into();
+		// 			}
+		//
+		// 			SdlcEvent::StageStarted {
+		// 				stage,
+		// 				attempt,
+		// 				..
+		// 			} => {
+		// 				self.runtime.stage = stage;
+		// 				self.runtime.attempt = attempt;
+		// 				self.runtime.phase = PipelinePhase::Running;
+		// 				self.runtime.stage_started_at = Some(Instant::now());
+		// 				self.runtime.message =
+		// 					format!("Running {stage:?}");
+		// 			}
+		//
+		// 			SdlcEvent::ExecutionStarted { .. } => {
+		// 				self.runtime.phase = PipelinePhase::Executing;
+		// 				self.runtime.message = "Executing".into();
+		// 			}
+		//
+		// 			SdlcEvent::ExecutionCompleted { .. } => {
+		// 				self.runtime.phase = PipelinePhase::Evaluating;
+		// 				self.runtime.message = "Evaluating".into();
+		// 			}
+		//
+		// 			SdlcEvent::Evaluated {
+		// 				score,
+		// 				confidence,
+		// 				..
+		// 			} => {
+		// 				self.runtime.score = Some(score);
+		// 				self.runtime.confidence = Some(confidence);
+		// 				self.runtime.phase = PipelinePhase::Evaluating;
+		// 				self.runtime.message = format!(
+		// 					"Evaluation: {:.2} (confidence {:.2})",
+		// 					score,
+		// 					confidence,
+		// 				);
+		// 			}
+		//
+		// 			SdlcEvent::AwaitingHuman { .. } => {
+		// 				self.runtime.phase = PipelinePhase::AwaitingHuman;
+		// 				self.runtime.message = "Awaiting human input".into();
+		// 			}
+		//
+		// 			SdlcEvent::Retrying {
+		// 				stage,
+		// 				attempt,
+		// 				..
+		// 			} => {
+		// 				self.runtime.stage = stage;
+		// 				self.runtime.attempt = attempt;
+		// 				self.runtime.phase = PipelinePhase::Retrying;
+		// 				self.runtime.message =
+		// 					format!("Retrying {stage:?} (attempt {attempt})");
+		// 			}
+		//
+		// 			SdlcEvent::StageCompleted {
+		// 				stage,
+		// 				..
+		// 			} => {
+		// 				self.runtime.stage = stage;
+		// 				self.runtime.phase = PipelinePhase::Completed;
+		// 				self.runtime.message =
+		// 					format!("{stage:?} complete");
+		// 			}
+		//
+		// 			SdlcEvent::RunCompleted { .. } => {
+		// 				self.runtime.phase = PipelinePhase::Completed;
+		// 				self.runtime.message = "SDLC complete".into();
+		// 			}
+		//
+		// 			SdlcEvent::Failed {
+		// 				stage,
+		// 				error,
+		// 				..
+		// 			} => {
+		// 				if let Some(stage) = stage {
+		// 					self.runtime.stage = stage;
+		// 				}
+		//
+		// 				self.runtime.phase = PipelinePhase::Failed;
+		// 				self.runtime.message = error.clone();
+		//
+		// 				self.runtime.error = Some(error);
+		// 			}
+		//
+		// 			// Anything that is purely informational should generally
+		// 			// go into the log/history rather than mutate the primary
+		// 			// runtime state.
+		// 			event => {
+		// 				self.runtime.events.push(event);
+		// 			}
+		// 		}
 	}
 }
 
@@ -2682,25 +2907,19 @@ impl SprintRunner<'_> {
 	fn persist_outcome(&mut self, _outcome: &StageOutcome) -> Result<()> {
 		Ok(())
 	}
-	
-	async fn resolve_execution(
-    &mut self,
-    _execution: StageExecution,
-	) -> Result<StageOutcome> {
-    todo!("resolve_execution")
-	}
 
+	async fn resolve_execution(&mut self, _execution: StageExecution) -> Result<StageOutcome> {
+		todo!("resolve_execution")
+	}
 }
 impl SprintRunner<'_> {
-	fn begin_attempt(&mut self, stage: enums::Stage) -> u32 {
-		self
-			.pipeline
-			.next_attempt(stage, &mut self.last_stage, &mut self.stage_attempt)
+	fn begin_attempt(&mut self, stage: Stage) -> Attempt {
+		self.pipeline.next_attempt(stage)
 	}
 	async fn run_stage(
 		&mut self,
 		stage: enums::Stage,
-		attempt: u32,
+		attempt: Attempt,
 		pending_input: &mut Option<SdlcInput>,
 	) -> Result<StageOutcome> {
 		self.emit(SdlcEvent::PhaseChanged {
@@ -2755,7 +2974,7 @@ impl SprintRunner<'_> {
 	async fn wait_for_intervention(
 		&mut self,
 		stage: enums::Stage,
-		attempt: u32,
+		attempt: Attempt,
 		reason: String,
 		input_rx: &mut UnboundedReceiver<SdlcInput>,
 	) -> Result<Intervention> {
@@ -2830,7 +3049,7 @@ impl SprintRunner<'_> {
 	async fn handle_human_intervention(
 		&mut self,
 		stage: enums::Stage,
-		attempt: u32,
+		attempt: Attempt,
 		input_rx: &mut UnboundedReceiver<SdlcInput>,
 		pending_input: &mut Option<SdlcInput>,
 	) -> Result<()> {
@@ -2884,25 +3103,26 @@ impl SprintRunner<'_> {
 
 		Ok(())
 	}
-	async fn handle_retry(&mut self, stage: enums::Stage, attempt: u32) -> Result<()> {
+	async fn handle_retry(&mut self, stage: enums::Stage, attempt: Attempt) -> Result<()> {
+		let next_attempt = Attempt {
+			stage: attempt.stage,
+			number: attempt.number + 1,
+		};
 		self.emit(SdlcEvent::StageRetrying {
-			stage,
-			attempt: attempt + 1,
+			stage: next_attempt.stage,
+			number: next_attempt.number,
 		});
-
 		self.emit(SdlcEvent::PhaseChanged {
 			phase: SdlcPhase::Retrying,
 		});
-
 		self.pipeline.retry(stage)?;
-
 		Ok(())
 	}
 
 	async fn handle_revision(
 		&mut self,
 		stage: enums::Stage,
-		attempt: u32,
+		attempt: Attempt,
 		_outcome: StageOutcome,
 		input_rx: &mut UnboundedReceiver<SdlcInput>,
 		pending_input: &mut Option<SdlcInput>,
@@ -2960,7 +3180,7 @@ impl SprintRunner<'_> {
 	async fn handle_failure_execution(
 		&mut self,
 		stage: enums::Stage,
-		attempt: u32,
+		attempt: Attempt,
 		error: anyhow::Error,
 		input_rx: &mut tokio::sync::mpsc::UnboundedReceiver<SdlcInput>,
 		pending_input: &mut Option<SdlcInput>,
@@ -2970,10 +3190,10 @@ impl SprintRunner<'_> {
 			attempt,
 			error: error.to_string(),
 		});
-		if attempt < MAX_STAGE_ATTEMPTS {
+		if attempt.number < MAX_STAGE_ATTEMPTS {
 			self.emit(SdlcEvent::StageRetrying {
 				stage,
-				attempt: attempt + 1,
+				number: attempt.number + 1,
 			});
 			self.emit(SdlcEvent::PhaseChanged {
 				phase: SdlcPhase::Retrying,
@@ -3029,7 +3249,7 @@ impl SprintRunner<'_> {
 	async fn handle_failure_evaluation(
 		&mut self,
 		stage: enums::Stage,
-		attempt: u32,
+		attempt: Attempt,
 		error: anyhow::Error,
 		input_rx: &mut tokio::sync::mpsc::UnboundedReceiver<SdlcInput>,
 		pending_input: &mut Option<SdlcInput>,
@@ -3039,10 +3259,10 @@ impl SprintRunner<'_> {
 			error: error.to_string(),
 		});
 
-		if attempt < MAX_STAGE_ATTEMPTS {
+		if attempt.number < MAX_STAGE_ATTEMPTS {
 			self.emit(SdlcEvent::StageRetrying {
 				stage,
-				attempt: attempt + 1,
+				number: attempt.number + 1,
 			});
 
 			self.emit(SdlcEvent::PhaseChanged {
@@ -3103,14 +3323,14 @@ impl SprintRunner<'_> {
 	async fn handle_failure_of_quality(
 		&mut self,
 		stage: enums::Stage,
-		attempt: u32,
+		attempt: Attempt,
 		input_rx: &mut tokio::sync::mpsc::UnboundedReceiver<SdlcInput>,
 		pending_input: &mut Option<SdlcInput>,
 	) -> Result<RunControl> {
-		if attempt < MAX_STAGE_ATTEMPTS {
+		if attempt.number < MAX_STAGE_ATTEMPTS {
 			self.emit(SdlcEvent::StageRetrying {
 				stage,
-				attempt: attempt + 1,
+				number: attempt.number + 1,
 			});
 
 			self.emit(SdlcEvent::PhaseChanged {
@@ -3195,7 +3415,7 @@ impl StageOutcome {
 		}
 	}
 
-	fn attempt(&self) -> u32 {
+	fn attempt(&self) -> Attempt {
 		match self {
 			Self::Complete { execution, .. }
 			| Self::NeedsRevision { execution, .. }

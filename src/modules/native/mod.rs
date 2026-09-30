@@ -36,7 +36,9 @@ pub use native_traits::*;
 mod gestures;
 
 // This compiles the module only if the "windows" feature is enabled AND the OS is Windows
+#[cfg(target_os = "windows")]
 pub mod windows;
+#[cfg(target_os = "windows")]
 pub use windows::*;
 
 #[cfg(unix)]

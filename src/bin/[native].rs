@@ -25,7 +25,7 @@ fn main() -> Result<()> {
   //     eprintln!("Host::init() failed:\n{err:#}");
   //     std::process::exit(1);
   // });
-  let host = Host::init().expect("Host should start successfully.");
+    let host = Host::init().expect("Host should start successfully.");
 	let mut app = App::new(host)?;
 	app.run()?;
 	Ok(())

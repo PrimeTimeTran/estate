@@ -530,16 +530,16 @@ where
 		Ok(())
 	}
 }
-impl Context {
-	fn new(state: NativeState, api: ApiService) -> Self {
-		Self { state, api }
-	}
-}
-impl Default for Context {
-	fn default() -> Self {
-		Self::new(NativeState::default(), ApiService::default())
-	}
-}
+// impl Context {
+// 	fn new(state: NativeState, api: ApiService) -> Self {
+// 		Self { state, api }
+// 	}
+// }
+// impl Default for Context {
+// 	fn default() -> Self {
+// 		Self::new(NativeState::default(), ApiService::default())
+// 	}
+// }
 
 impl Ctx for Context {
 	fn api(&self) -> &Self::Api {
@@ -599,58 +599,56 @@ where
 	}
 }
 
-impl Host<Context> {
-	//
-	// 	pub fn init() -> anyhow::Result<Self> {
-	// 		let parsed = cli::context::parse();
-	//
-	// 		let mut config = LogConfig::load()?;
-	// 		config.apply_cli(&parsed);
-	// 		logger::init_logging(&config)?;
-	//
-	// 		// Create the one runtime.
-	// 		let tokio = tokio::runtime::Runtime::new()?;
-	//
-	// 		// Context is st
-	// ill uniquely owned here.
-	// 		let mut context = Context::default();
-	//
-	// 		// Daemon may not need this
-	// 		// This requires server access
-	// 		#[cfg(not(feature = "daemon"))]
-	// 		{
-	// 			// Connect using the same runtime that Host will retain.
-	// 			tokio.block_on(context.api_mut().connect())?;
-	// 		}
-	//
-	// 		// Only share Context after initialization.
-	// 		let context = Arc::new(context);
-	// 		Self::new(context, tokio)
-	// 	}
-	fn logging() {
-		// let count = 1;
-		// let host = "12";
-		// let error = EventKind::DaemonStarted;o
-		// let state = ViewType::DashboardScreen;
-		// awe!("Runtime f");
-		// awe!(Info, "Runtime initialized");
-		// awe!(Success, "Runtime started");
-		// awe!(Warn, "No config found");
-		// awe!(Error, "Failed to start runtime");
-		// awe!(Info, "Loaded {} count", count);
-		// awe!(Success, "Connected to {}", host);
-		// awe!(Debug, "State = {:#?}", state);
-		// awe!(Debug, "Error = {:#?}", error);
-		// let nums = vec![1, 2, 3];
-		// let chars = vec!["1", "2", "3"];
-		// awe!(Info, "Loaded {:#?} nums", nums);
-		// awe!(Info, "Loaded {:#?} chars", chars);
-		// panic!("hi");
-		// awe!(Debug, "Runtime = {:?}", runtime);
-		// crate::macros::awe!(Trace, "Dispatching event: {:?}", event);
-		// panic!(" Hi ");
-	}
-}
+// impl Host<Context> {
+// 	pub fn init() -> anyhow::Result<Self> {
+// 		let parsed = cli::context::parse();
+// 
+// 		let mut config = LogConfig::load()?;
+// 		config.apply_cli(&parsed);
+// 		logger::init_logging(&config)?;
+// 
+// 		// Create the one runtime.
+// 		let tokio = tokio::runtime::Runtime::new()?;
+// 
+// 		// Context is still uniquely owned here.
+// 		let mut context = Context::default();
+// 
+// 		// Daemon may not need this
+// 		// This requires server access
+// 		#[cfg(not(feature = "daemon"))]
+// 		{
+// 			// Connect using the same runtime that Host will retain.
+// 			tokio.block_on(context.api_mut().connect())?;
+// 		}
+// 
+// 		// Only share Context after initialization.
+// 		let context = Arc::new(context);
+// 		Self::new(context, tokio)
+// 	}
+// 	fn logging() {
+// 		// let count = 1;
+// 		// let host = "12";
+// 		// let error = EventKind::DaemonStarted;o
+// 		// let state = ViewType::DashboardScreen;
+// 		// awe!("Runtime f");
+// 		// awe!(Info, "Runtime initialized");
+// 		// awe!(Success, "Runtime started");
+// 		// awe!(Warn, "No config found");
+// 		// awe!(Error, "Failed to start runtime");
+// 		// awe!(Info, "Loaded {} count", count);
+// 		// awe!(Success, "Connected to {}", host);
+// 		// awe!(Debug, "State = {:#?}", state);
+// 		// awe!(Debug, "Error = {:#?}", error);
+// 		// let nums = vec![1, 2, 3];
+// 		// let chars = vec!["1", "2", "3"];
+// 		// awe!(Info, "Loaded {:#?} nums", nums);
+// 		// awe!(Info, "Loaded {:#?} chars", chars);
+// 		// panic!("hi");
+// 		// awe!(Debug, "Runtime = {:?}", runtime);
+// 		// crate::macros::awe!(Trace, "Dispatching event: {:?}", event);
+// 		// panic!(" Hi ");
+// 	}
+// }
 
 impl HostClock {
 	pub fn new(handle: tokio::runtime::Handle) -> Self {

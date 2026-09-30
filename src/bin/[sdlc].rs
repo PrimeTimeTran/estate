@@ -42,13 +42,13 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 	let _terminal_guard = TerminalGuard;
 
-	let (input_tx, input_rx) = tokio::sync::mpsc::unbounded_channel::<SdlcInput>();
+	let ( input_tx, mut input_rx) = tokio::sync::mpsc::unbounded_channel::<SdlcInput>();
 	let is_not_dry_run = !std::env::var_os("DRY_RUN").is_some();
 	let run = async {
 		if is_not_dry_run {
-			sdlc.run(input_rx).await
+			sdlc.run(&mut input_rx).await
 		} else {
-			sdlc.run_simulated(input_rx).await
+			sdlc.run_simulated(&mut input_rx).await
 		}
 	};
 	tokio::pin!(run);
