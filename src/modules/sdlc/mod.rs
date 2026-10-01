@@ -1327,21 +1327,7 @@ pub mod structs {
 		pub created_at: DateTime<Utc>,
 		pub updated_at: DateTime<Utc>,
 	}
-	impl SdlcSession {
-		pub fn new(title: impl Into<String>, dir: PathBuf) -> Self {
-			let now = Utc::now();
 
-			Self {
-				id: uuid::Uuid::new_v4().to_string(),
-				title: title.into(),
-				stage: Stage::Intent,
-				stages: Vec::new(),
-				dir,
-				created_at: now,
-				updated_at: now,
-			}
-		}
-	}
 	pub struct SdlcView {
 		pub runtime: PipelineRuntime,
 		pub paused: bool,
@@ -1953,6 +1939,9 @@ impl SprintPipeline {
 		Ok(String::from("Create-sdlc-pipeline"))
 	}
 
+	pub fn stage(&self) -> Option<Stage> {
+		self.session.as_ref().map(|session| session.stage)
+	}
 	async fn stage_intent(&mut self) -> Result<()> {
 		let session = self
 			.session
@@ -2068,12 +2057,10 @@ impl SprintPipeline {
 		todo!("WOW DONE!")
 	}
 
-	pub fn cancel(&mut self) {
-		todo!("cancel")
+	fn stage_attempt(&self) -> u32 {
+		self.stage_attempt
 	}
-	pub fn fail(&mut self, _outcome: StageOutcome) -> Result<()> {
-		todo!("fail")
-	}
+
 	async fn stage_execute(
 		&mut self,
 		stage: enums::Stage,
@@ -2120,6 +2107,14 @@ impl SprintPipeline {
 			result,
 		})
 	}
+
+	pub fn cancel(&mut self) {
+		todo!("cancel")
+	}
+	pub fn fail(&mut self, _outcome: StageOutcome) -> Result<()> {
+		todo!("fail")
+	}
+
 	pub fn decide(&self, outcome: &StageOutcome) -> Result<StageDecision> {
 		let decision = match outcome {
 			StageOutcome::Complete { execution, .. } => {
@@ -2275,13 +2270,6 @@ impl SprintPipeline {
 		}
 	}
 
-	pub fn stage(&self) -> Option<Stage> {
-		self.session.as_ref().map(|session| session.stage)
-	}
-	fn stage_attempt(&self) -> u32 {
-		self.stage_attempt
-	}
-
 	fn commit(&mut self) -> Result<()> {
 		let session = self
 			.session
@@ -2293,7 +2281,6 @@ impl SprintPipeline {
 		Ok(())
 	}
 	fn create_dir(&self, title: &str) -> Result<PathBuf> {
-		// eprintln!("  dir   = {dir:?}");
 		let sessions_dir = FS::ensure_dir(SpecialFile::SessionsDir.path()?)?;
 		let date = Local::now().format("%Y-%m-%d");
 		let dir = sessions_dir.join(format!("{date}.{title}"));
@@ -2618,6 +2605,19 @@ impl PipelineRuntime {
 	}
 }
 impl SdlcSession {
+	pub fn new(title: impl Into<String>, dir: PathBuf) -> Self {
+		let now = Utc::now();
+
+		Self {
+			id: uuid::Uuid::new_v4().to_string(),
+			title: title.into(),
+			stage: Stage::Intent,
+			stages: Vec::new(),
+			dir,
+			created_at: now,
+			updated_at: now,
+		}
+	}
 	fn created_at_readable(&self) -> String {
 		self.created_at.format(FMT_HUMAN_READABLE).to_string()
 	}
@@ -3550,7 +3550,6 @@ impl StageOutcome {
 			Self::ExecutionFailed { stage, .. } => *stage,
 		}
 	}
-
 	fn attempt(&self) -> Attempt {
 		match self {
 			Self::Complete { execution, .. }
