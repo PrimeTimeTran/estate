@@ -1,47 +1,3 @@
-// MARK: - Modifier state tracking
-// CGEvent flags are aggregate:
-//   maskCommand = "some Command is down"
-// They do NOT directly tell us:
-//   "left Command is down"
-// We therefore reconstruct left/right state from flagsChanged
-// keycodes. This is useful diagnostic state, but it is NOT raw HID
-// truth.
-// Return the state of the *specific modifier key* represented by keyCode.
-// IMPORTANT:
-// Do NOT infer this from whether the aggregate Shift/Option/etc. flag
-// changed. Another physical modifier of the same family may already
-// be holding that aggregate flag.
-//
-// Instead, compare the event's aggregate flag against the previous
-// per-key state we have recorded.
-
-// let initialTimer = Timer.scheduledTimer(withTimeInterval: initialDelay, repeats: false) { _ in
-//   let checkState = {
-//     let status = isControlKeyPressed() ? "DOWN" : "UP"
-//     print("[\(getCurrentTimestamp())] Control key is \(status).")
-//     fflush(stdout)
-//   }
-//
-//   // Execute the initial synchronized check immediately
-//   checkState()
-//
-//   // Establish the permanent recurring timer
-//   let repeatingTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { _ in
-//     checkState()
-//   }
-//
-//   // Attach the repeating timer to the CoreFoundation RunLoop
-//   RunLoop.current.add(repeatingTimer, forMode: .default)
-// }
-
-// func isControlKeyPressed() -> Bool {
-//   let leftCtrlDown = CGEventSource.keyState(.combinedSessionState, key: 59)
-//   let rightCtrlDown = CGEventSource.keyState(.combinedSessionState, key: 62)
-//   return leftCtrlDown || rightCtrlDown
-// }
-
-//
-
 import CoreGraphics
 import Foundation
 
@@ -170,6 +126,11 @@ struct NativeEvent: Codable {
   let name: String
   let modifiers: ModifierSnapshot?
   let direction: KeyDirection?
+
+  let mouseButton: Int64?
+  let clickCount: Int64?
+  let locationX: Double?
+  let locationY: Double?
 }
 struct EventEnvelope: Codable {
   let version: UInt
@@ -480,62 +441,153 @@ func makeEvent(
 ) -> NativeEvent {
 
   let flags = event.flags
-  let session = CGEventSource.flagsState(.combinedSessionState)
+  let session =
+    CGEventSource.flagsState(.combinedSessionState)
 
   let keyCode =
-    event.getIntegerValueField(.keyboardEventKeycode)
+    event.getIntegerValueField(
+      .keyboardEventKeycode
+    )
 
   let sourcePID =
-    event.getIntegerValueField(.eventSourceUnixProcessID)
+    event.getIntegerValueField(
+      .eventSourceUnixProcessID
+    )
 
   let sourceUserData =
-    event.getIntegerValueField(.eventSourceUserData)
-
-  let kind: NativeEvent.Kind
+    event.getIntegerValueField(
+      .eventSourceUserData
+    )
 
   switch type {
+
   case .keyDown:
-    kind = .keyDown
+    return NativeEvent(
+      kind: .keyDown,
+      source: .cgEvent,
+      timestamp: DispatchTime.now().uptimeNanoseconds,
+      event: CGEventInfo(
+        type: type.rawValue,
+        keyCode: keyCode,
+        flags: flags.rawValue,
+        sessionFlags: session.rawValue,
+        sourcePID: sourcePID,
+        sourceUserData: sourceUserData
+      ),
+      name: keyName(keyCode),
+      modifiers: ModifierSnapshot(from: state),
+      direction: .down,
+      mouseButton: nil,
+      clickCount: nil,
+      locationX: nil,
+      locationY: nil
+    )
 
   case .keyUp:
-    kind = .keyUp
+    return NativeEvent(
+      kind: .keyUp,
+      source: .cgEvent,
+      timestamp: DispatchTime.now().uptimeNanoseconds,
+      event: CGEventInfo(
+        type: type.rawValue,
+        keyCode: keyCode,
+        flags: flags.rawValue,
+        sessionFlags: session.rawValue,
+        sourcePID: sourcePID,
+        sourceUserData: sourceUserData
+      ),
+      name: keyName(keyCode),
+      modifiers: ModifierSnapshot(from: state),
+      direction: .up,
+      mouseButton: nil,
+      clickCount: nil,
+      locationX: nil,
+      locationY: nil
+    )
 
   case .flagsChanged:
-    kind = .flagsChanged
+    return NativeEvent(
+      kind: .flagsChanged,
+      source: .cgEvent,
+      timestamp: DispatchTime.now().uptimeNanoseconds,
+      event: CGEventInfo(
+        type: type.rawValue,
+        keyCode: keyCode,
+        flags: flags.rawValue,
+        sessionFlags: session.rawValue,
+        sourcePID: sourcePID,
+        sourceUserData: sourceUserData
+      ),
+      name: description,
+      modifiers: ModifierSnapshot(from: state),
+      direction: modifierDirection,
+      mouseButton: nil,
+      clickCount: nil,
+      locationX: nil,
+      locationY: nil
+    )
+
+  case .leftMouseDown,
+    .leftMouseUp,
+    .rightMouseDown,
+    .rightMouseUp,
+    .otherMouseDown,
+    .otherMouseUp:
+
+    let buttonNumber =
+      event.getIntegerValueField(
+        .mouseEventButtonNumber
+      )
+
+    let direction: KeyDirection =
+      switch type {
+      case .leftMouseDown,
+        .rightMouseDown,
+        .otherMouseDown:
+        .down
+
+      case .leftMouseUp,
+        .rightMouseUp,
+        .otherMouseUp:
+        .up
+
+      default:
+        fatalError("Unexpected mouse event type")
+      }
+
+    let clickCount =
+      event.getIntegerValueField(
+        .mouseEventClickState
+      )
+
+    let location = event.location
+
+    return NativeEvent(
+      kind: .mouse,
+      source: .cgEvent,
+      timestamp: DispatchTime.now().uptimeNanoseconds,
+      event: CGEventInfo(
+        type: type.rawValue,
+        keyCode: nil,
+        flags: flags.rawValue,
+        sessionFlags: session.rawValue,
+        sourcePID: sourcePID,
+        sourceUserData: sourceUserData
+      ),
+      name: "button \(buttonNumber)",
+      modifiers: ModifierSnapshot(from: state),
+      direction: direction,
+      mouseButton: buttonNumber,
+      clickCount: clickCount,
+      locationX: location.x,
+      locationY: location.y
+    )
 
   default:
-    kind = .mouse
+    fatalError(
+      "Unsupported CGEventType: \(type.rawValue)"
+    )
   }
-
-  let name: String
-
-  switch type {
-  case .keyDown, .keyUp:
-    name = displayKeyName(keyCode)
-  default:
-    name = description
-  }
-
-  let cgEventInfo = CGEventInfo(
-    type: type.rawValue,
-    keyCode: keyCode,
-    flags: flags.rawValue,
-    sessionFlags: session.rawValue,
-    sourcePID: sourcePID,
-    sourceUserData: sourceUserData
-  )
-
-  let modifierSnapshot = ModifierSnapshot(from: state)
-
-  return NativeEvent(
-    kind: kind,
-    source: .cgEvent,
-    timestamp: DispatchTime.now().uptimeNanoseconds,
-    event: cgEventInfo,
-    name: name,
-    modifiers: modifierSnapshot,
-    direction: modifierDirection
-  )
 }
 func printEvent(_ nativeEvent: NativeEvent) {
   guard let info = nativeEvent.event else {
@@ -640,11 +692,99 @@ func printEvent(_ nativeEvent: NativeEvent) {
   fflush(stdout)
 }
 let mask =
-  CGEventMask(1 << CGEventType.keyDown.rawValue) | CGEventMask(1 << CGEventType.keyUp.rawValue)
+  CGEventMask(1 << CGEventType.keyDown.rawValue)
+  | CGEventMask(1 << CGEventType.keyUp.rawValue)
   | CGEventMask(1 << CGEventType.flagsChanged.rawValue)
-let callback: CGEventTapCallBack = {
-  _, type, event, _ in
+  | CGEventMask(1 << CGEventType.leftMouseDown.rawValue)
+  | CGEventMask(1 << CGEventType.leftMouseUp.rawValue)
+  | CGEventMask(1 << CGEventType.rightMouseDown.rawValue)
+  | CGEventMask(1 << CGEventType.rightMouseUp.rawValue)
+  | CGEventMask(1 << CGEventType.otherMouseDown.rawValue)
+  | CGEventMask(1 << CGEventType.otherMouseUp.rawValue)
+  | CGEventMask(1 << CGEventType.scrollWheel.rawValue)
 
+let callback: CGEventTapCallBack = {
+  proxy,
+  type,
+  event,
+  userInfo in
+
+  let rawKeyCode =
+    event.getIntegerValueField(
+      .keyboardEventKeycode
+    )
+
+  let mouseButton =
+    event.getIntegerValueField(
+      .mouseEventButtonNumber
+    )
+
+  let rawLabel: String
+
+  switch type {
+
+  case .keyDown:
+    rawLabel = "KEY ↓"
+
+  case .keyUp:
+    rawLabel = "KEY ↑"
+
+  case .flagsChanged:
+    rawLabel = "FLAGS"
+
+  case .leftMouseDown:
+    let location = event.location
+    rawLabel =
+      "MOUSE ↓ button=\(mouseButton) " + "x=\(Int(location.x)) y=\(Int(location.y))"
+
+  case .leftMouseUp:
+    let location = event.location
+    rawLabel =
+      "MOUSE ↑ button=\(mouseButton) " + "x=\(Int(location.x)) y=\(Int(location.y))"
+
+  case .rightMouseDown:
+    let location = event.location
+    rawLabel =
+      "MOUSE ↓ button=\(mouseButton) " + "x=\(Int(location.x)) y=\(Int(location.y))"
+
+  case .rightMouseUp:
+    let location = event.location
+    rawLabel =
+      "MOUSE ↑ button=\(mouseButton) " + "x=\(Int(location.x)) y=\(Int(location.y))"
+
+  case .otherMouseDown:
+    let location = event.location
+    rawLabel =
+      "MOUSE ↓ button=\(mouseButton) " + "x=\(Int(location.x)) y=\(Int(location.y))"
+
+  case .otherMouseUp:
+    let location = event.location
+    rawLabel =
+      "MOUSE ↑ button=\(mouseButton) " + "x=\(Int(location.x)) y=\(Int(location.y))"
+  case .scrollWheel:
+
+    let vertical =
+      event.getIntegerValueField(
+        .scrollWheelEventDeltaAxis1
+      )
+
+    let horizontal =
+      event.getIntegerValueField(
+        .scrollWheelEventDeltaAxis2
+      )
+
+    rawLabel =
+      "SCROLL vertical=\(vertical) horizontal=\(horizontal)"
+  default:
+    rawLabel = "EVENT"
+  }
+
+  print(
+    "RAW \(rawLabel) " + "type=\(type.rawValue) " + "button=\(mouseButton) "
+      + "keyCode=\(rawKeyCode)"
+  )
+
+  fflush(stdout)
   // ------------------------------------------------------------
   // Event tap status
   // ------------------------------------------------------------
@@ -793,50 +933,45 @@ guard
     userInfo: nil
   )
 else {
-
   fputs(
     "Cannot create event tap. Check Input Monitoring permissions.\n",
     stderr
   )
-
   exit(1)
 }
+
 let source = CFMachPortCreateRunLoopSource(
   kCFAllocatorDefault,
   tap,
   0
 )
+
 CFRunLoopAddSource(
   CFRunLoopGetCurrent(),
   source,
   .commonModes
 )
+
 CGEvent.tapEnable(
   tap: tap,
   enable: true
 )
+
 printHeader()
+
 print(
   "Columns: LS LC LO LM = left modifiers, " + "RS RC RO RM = right modifiers, " + "FN CP = Fn/Caps"
 )
+
 print(
   "Event flags are aggregate CoreGraphics state; "
     + "left/right state is reconstructed from keycodes."
 )
-print("")
-fflush(stdout)
-func getCurrentTimestamp() -> String {
-  let formatter = DateFormatter()
-  formatter.dateFormat = "HH:mm:ss.SSS"
-  return formatter.string(from: Date())
-}
-print(
-  "Columns: LS LC LO LM = left modifiers, " + "RS RC RO RM = right modifiers, " + "FN CP = Fn/Caps"
-)
-print(
-  "Event flags are aggregate CoreGraphics state; "
-    + "left/right state is reconstructed from keycodes."
-)
+
 print("")
 fflush(stdout)
 CFRunLoopRun()
+
+struct MouseButton: Codable {
+  let number: Int64
+}
