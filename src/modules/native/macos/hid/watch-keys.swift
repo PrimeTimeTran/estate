@@ -1,6 +1,23 @@
 import CoreGraphics
 import Foundation
 
+final class EventSender {
+    private let handle: FileHandle
+
+    init(path: String) throws {
+        // Unix socket connection goes here.
+        //
+        // In production I'd wrap the POSIX socket APIs rather
+        // than repeatedly opening files.
+        fatalError("socket implementation")
+    }
+
+    func send(_ event: String) throws {
+        let data = (event + "\n").data(using: .utf8)!
+        try handle.write(contentsOf: data)
+    }
+}
+
 let watchedKeyCodes: Set<CGKeyCode> = [
     58, // Left Option
     61, // Right Option
