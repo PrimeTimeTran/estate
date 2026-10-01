@@ -50,80 +50,80 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let mut ticker = tokio::time::interval(Duration::from_millis(100));
 
 	let result = loop {
-    tokio::select! {
-        result = &mut run => {
-            break result;
-        }
-	
-        event = events.recv() => {
-            match event {
-                Ok(event) => {
-                    view.apply(event);
-	
-                    terminal.draw(|frame| {
-                        SdlcView::render(frame, &view);
-                    })?;
-                }
-	
-                Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
-                    view.apply(SdlcEvent::Failed {
-                        stage: Some(view.runtime.stage),
-                        error: format!("TUI event receiver lagged by {n} events"),
-                    });
-	
-                    terminal.draw(|frame| {
-                        SdlcView::render(frame, &view);
-                    })?;
-                }
-	
-                Err(tokio::sync::broadcast::error::RecvError::Closed) => {
-                    break Ok(());
-                }
-            }
-        }
-	
-        _ = ticker.tick() => {
-            if event::poll(Duration::from_millis(0))? {
-                if let Event::Key(key) = event::read()? {
-                    if key.kind == KeyEventKind::Press {
-                        if key.code == KeyCode::Char('c')
-                            && key.modifiers.contains(KeyModifiers::CONTROL)
-                        {
-                            break Ok(());
-                        }
-	
-                        if view.is_input_active() {
-                            view.handle_input_key(key, &input_tx)?;
-                        } else {
-                            match key.code {
-                                KeyCode::Char('p') => view.toggle_pause(),
-                                KeyCode::Char('l') => view.toggle_logs(),
-	
-                                KeyCode::Char('r') => {
-                                    input_tx.send(SdlcInput::Retry)?;
-                                }
-	
-                                KeyCode::Char('v') => {
-                                    input_tx.send(SdlcInput::Reviewed)?;
-                                }
-	
-                                _ => {}
-                            }
-                        }
-                    }
-                }
-            }
-	
-            terminal.draw(|frame| {
-                SdlcView::render(frame, &view);
-            })?;
-        }
-    }
+		tokio::select! {
+				result = &mut run => {
+						break result;
+				}
+
+				event = events.recv() => {
+						match event {
+								Ok(event) => {
+										view.apply(event);
+
+										terminal.draw(|frame| {
+												SdlcView::render(frame, &view);
+										})?;
+								}
+
+								Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+										view.apply(SdlcEvent::Failed {
+												stage: Some(view.runtime.stage),
+												error: format!("TUI event receiver lagged by {n} events"),
+										});
+
+										terminal.draw(|frame| {
+												SdlcView::render(frame, &view);
+										})?;
+								}
+
+								Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+										break Ok(());
+								}
+						}
+				}
+
+				_ = ticker.tick() => {
+						if event::poll(Duration::from_millis(0))? {
+								if let Event::Key(key) = event::read()? {
+										if key.kind == KeyEventKind::Press {
+												if key.code == KeyCode::Char('c')
+														&& key.modifiers.contains(KeyModifiers::CONTROL)
+												{
+														break Ok(());
+												}
+
+												if view.is_input_active() {
+														view.handle_input_key(key, &input_tx)?;
+												} else {
+														match key.code {
+																KeyCode::Char('p') => view.toggle_pause(),
+																KeyCode::Char('l') => view.toggle_logs(),
+
+																KeyCode::Char('r') => {
+																		input_tx.send(SdlcInput::Retry)?;
+																}
+
+																KeyCode::Char('v') => {
+																		input_tx.send(SdlcInput::Reviewed)?;
+																}
+
+																_ => {}
+														}
+												}
+										}
+								}
+						}
+
+						terminal.draw(|frame| {
+								SdlcView::render(frame, &view);
+						})?;
+				}
+		}
 	};
 	result?;
-	
+
 	drop(_guard);
-	
+
 	println!();
 	println!("✓ SDLC complete");
 	println!();

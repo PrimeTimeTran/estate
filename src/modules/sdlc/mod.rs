@@ -747,11 +747,14 @@ pub mod prompt {
 			- Add tests covering both the JavaScript logic and the CLI behavior.",
 		))
 	}
-	const INTENT_PROMPT: &str = include_str!("../../../ai/template/intent.md");
-	const USER_REQUEST: &str = include_str!("../../../ai/template/prompt.md");
+	const INTENT_PROMPT: &str = include_str!("../../../ai/template/INITIAL_PROMPT.md");
+	const PROMPT_FROM_USER: &str = include_str!("../../../ai/template/user.goal.md");
 
 	pub fn for_intent(user_request: &str) -> String {
-		INTENT_PROMPT.replace("{{USER_REQUEST}}", user_request)
+		INTENT_PROMPT.replace("{{PROMPT_FROM_USER}}", user_request)
+	}
+	pub fn gen_intent(prompt: &str) -> Result<String> {
+		Ok(String::from(""))
 	}
 
 	pub fn tests_gen(intent: &str, spec: &str, plan: &str) -> String {
@@ -1079,6 +1082,13 @@ mod enums {
 		Failed,
 		Cancelled,
 	}
+	pub type PipelineId = uuid::Uuid;
+	pub struct PipelineState<S> {
+		stage: S,
+		attempt: u32,
+		status: PipelineStatus,
+	}
+	pub struct PipelineStatus;
 	#[derive(Debug, Clone, Serialize, Deserialize)]
 	pub enum StageResult {
 		Intent,
@@ -1127,6 +1137,8 @@ mod traits {
 	// Steps to complete the pipeline
 	pub trait Pipeline {
 		type Stage: Stage;
+		fn id(&self) -> &PipelineId;
+		fn state(&self) -> &PipelineState<Self::Stage>;
 		fn name(&self) -> &'static str;
 		fn description(&self) -> &'static str {
 			""
@@ -1195,10 +1207,7 @@ pub mod structs {
 		pub generator: Box<dyn ArtifactGenerator>,
 		pub session: Option<SdlcSession>,
 		pub state_path: PathBuf,
-
 		pub event_tx: broadcast::Sender<SdlcEvent>,
-
-		// pub last_stage: Option<Stage>,
 		pub stage_attempt: u32,
 	}
 	pub struct SprintRunner<'a> {
@@ -1332,6 +1341,7 @@ pub mod structs {
 	pub struct SdlcSession {
 		pub id: String,
 		pub title: String,
+		pub goal: String,
 		pub stage: enums::Stage,
 		pub stages: Vec<StageRecord>,
 		pub dir: PathBuf,
@@ -1845,14 +1855,13 @@ impl SprintPipeline {
 		let title = self.summarize_title(&intent).await?;
 		let dir = self.create_dir(&title)?;
 		Self::init_templates(&dir)?;
-		let session = SdlcSession::new(title, dir);
+		let session = SdlcSession::new(title, dir)?;
 		self.session = Some(session);
 		self.stage_attempt = 0;
 		self.commit()?;
 		Ok(())
 	}
 	pub async fn run(&mut self, input_rx: &mut UnboundedReceiver<SdlcInput>) -> Result<()> {
-		eprintln!("PIPELINE: run()");
 		SprintRunner { pipeline: self }.run(input_rx).await
 	}
 	pub async fn run_simulated(
@@ -1956,23 +1965,32 @@ impl SprintPipeline {
 	pub fn stage(&self) -> Option<Stage> {
 		self.session.as_ref().map(|session| session.stage)
 	}
-	async fn stage_intent(&mut self) -> Result<()> {
+	async fn stage_intent(&mut self) -> Result<StageResult> {
+		let (stage, session_dir) = {
+			let session = self
+				.session
+				.as_ref()
+				.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
+			(session.stage.clone(), session.dir.clone())
+		};
 		let session = self
 			.session
 			.as_ref()
-			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
+			.ok_or_else(|| anyhow!("no active SDLC session"))?;
 
 		if session.stage != Stage::Intent {
-			return Err(anyhow::anyhow!(
+			return Err(anyhow!(
 				"cannot execute Intent stage while at {:?}",
 				session.stage
 			));
 		}
+		let prompt = prompt::gen_intent(&session.goal)?;
+		let generated = self.generator.generate(&prompt).await?;
+		Self::write(session_dir.join("intent.md"), generated)?;
 		self.update_progress("Intent stage completed")?;
-		// self.transition(Stage::Spec)?;
-		Ok(())
+		Ok(StageResult::Intent)
 	}
-	async fn stage_spec(&mut self) -> Result<()> {
+	async fn stage_spec(&mut self) -> Result<StageResult> {
 		let (stage, session_dir) = {
 			let session = self
 				.session
@@ -2005,9 +2023,9 @@ impl SprintPipeline {
 		// self.record_evaluation(evaluation)?;
 		self.update_progress("Spec stage completed")?;
 		// self.transition(Stage::Plan)?;
-		Ok(())
+		Ok(StageResult::Spec)
 	}
-	async fn stage_plan(&mut self, human_input: Option<&str>) -> Result<()> {
+	async fn stage_plan(&mut self) -> Result<StageResult> {
 		let (stage, session_dir) = {
 			let session = self
 				.session
@@ -2027,13 +2045,10 @@ impl SprintPipeline {
 		Self::write(session_dir.join("plan.md"), plan.clone())?;
 		let tests = self.generate_tests(&intent, &spec, &plan).await?;
 		Self::write(session_dir.join("tests.md"), tests)?;
-		// let evaluation = self.evaluate_stage(Stage::Plan).await?;
-		// self.record_evaluation(evaluation)?;
 		self.update_progress("Plan and test plan generated")?;
-		// self.transition(Stage::Build)?;
-		Ok(())
+		Ok(StageResult::Plan)
 	}
-	async fn stage_build(&mut self) -> Result<()> {
+	async fn stage_build(&mut self) -> Result<StageResult> {
 		let session = self
 			.session
 			.as_ref()
@@ -2041,10 +2056,9 @@ impl SprintPipeline {
 		let context = AgentContext::from_session(session)?;
 		self.update_progress("Build started")?;
 		let task = context.task.clone();
-		// self.transition(Stage::Verify)?;
-		Ok(())
+		Ok(StageResult::Build)
 	}
-	async fn stage_verify(&mut self) -> Result<Verification> {
+	async fn stage_verify(&mut self) -> Result<StageResult> {
 		self.update_progress("Verification started")?;
 		let checks = self.run_checks().await?;
 		let evaluations = self.evaluate(&checks).await?;
@@ -2058,7 +2072,7 @@ impl SprintPipeline {
 			verification.passed
 		))?;
 
-		Ok(verification)
+		Ok(StageResult::Verification(verification))
 	}
 
 	async fn stage_deploy(&mut self) -> Result<()> {
@@ -2074,7 +2088,6 @@ impl SprintPipeline {
 	fn stage_attempt(&self) -> u32 {
 		self.stage_attempt
 	}
-
 	async fn stage_execute(
 		&mut self,
 		stage: enums::Stage,
@@ -2084,35 +2097,24 @@ impl SprintPipeline {
 		let started_at = Utc::now();
 
 		let result = match stage {
-			Stage::Intent => {
-				self.stage_intent().await?;
-				StageResult::Intent
-			}
-			Stage::Spec => {
-				self.stage_spec().await?;
-				StageResult::Spec
-			}
-			Stage::Plan => {
-				let input = pending_input.take();
-				self
-					.stage_plan(input.as_ref().and_then(SdlcInput::text))
-					.await?;
-				StageResult::Plan
-			}
-			Stage::Build => {
-				self.stage_build().await?;
-				StageResult::Build
-			}
-			Stage::Verify => {
-				let verification = self.stage_verify().await?;
-				StageResult::Verification(verification)
-			}
+			Stage::Intent => self.stage_intent().await?,
+
+			Stage::Spec => self.stage_spec().await?,
+
+			Stage::Plan => self.stage_plan().await?,
+			Stage::Build => self.stage_build().await?,
+
+			Stage::Verify => self.stage_verify().await?,
+
 			Stage::Complete => StageResult::Complete,
+
 			Stage::SprintCompleted => StageResult::SprintCompleted,
+
 			Stage::Deploy | Stage::Maintain => {
 				return Err(anyhow!("stage {stage:?} not implemented"));
 			}
 		};
+
 		Ok(StageExecution {
 			stage,
 			attempt,
@@ -2334,6 +2336,10 @@ impl SprintPipeline {
 	fn emit(&self, event: SdlcEvent) {
 		let _ = self.event_tx.send(event);
 	}
+	async fn genetate_intent(&self, intent: &str, spec: &str) -> Result<String> {
+		let prompt = prompt::plan_gen(intent, spec);
+		self.generator.generate(&prompt).await
+	}
 	async fn generate_plan(&self, intent: &str, spec: &str) -> Result<String> {
 		let prompt = prompt::plan_gen(intent, spec);
 		self.generator.generate(&prompt).await
@@ -2353,7 +2359,6 @@ impl SprintPipeline {
 		let progress = self.session_read("progress.md");
 		Ok(vec![])
 	}
-
 	fn persist(&self) -> Result<()> {
 		FS::save(&self.state_path, &self.session)
 	}
@@ -2621,10 +2626,12 @@ impl PipelineRuntime {
 	}
 }
 impl SdlcSession {
-	pub fn new(title: impl Into<String>, dir: PathBuf) -> Self {
+	pub fn new(title: impl Into<String>, dir: PathBuf) -> Result<Self> {
 		let now = Utc::now();
+		let goal = include_str!("../../../ai/template/user.goal.md").to_string();
 
-		Self {
+		Ok(Self {
+			goal,
 			id: uuid::Uuid::new_v4().to_string(),
 			title: title.into(),
 			stage: Stage::Intent,
@@ -2632,7 +2639,7 @@ impl SdlcSession {
 			dir,
 			created_at: now,
 			updated_at: now,
-		}
+		})
 	}
 	fn created_at_readable(&self) -> String {
 		self.created_at.format(FMT_HUMAN_READABLE).to_string()
