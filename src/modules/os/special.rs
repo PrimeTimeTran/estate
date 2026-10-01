@@ -124,15 +124,15 @@ impl FS {
 		Ok(path)
 	}
 	pub fn ensure_dir(path: impl AsRef<Path>) -> Result<PathBuf> {
-    let path = path.as_ref();
-	
-    eprintln!("ensure_dir:");
-    eprintln!("  path = {path:?}");
-    eprintln!("  cwd  = {:?}", std::env::current_dir()?);
-	
-    fs::create_dir_all(path)?;
-	
-    Ok(path.to_path_buf())
+		let path = path.as_ref();
+
+		eprintln!("ensure_dir:");
+		eprintln!("  path = {path:?}");
+		eprintln!("  cwd  = {:?}", std::env::current_dir()?);
+
+		fs::create_dir_all(path)?;
+
+		Ok(path.to_path_buf())
 	}
 	pub fn exists(path: impl AsRef<Path>) -> bool {
 		path.as_ref().exists()
@@ -199,10 +199,10 @@ impl SpecialFile {
 		Ok(match self {
 			Self::AiTemplateDir => root.join("ai/template"),
 			Self::LogDir => root.join("log"),
-			Self::TmpDir => root.join("log/tmp"),
-			Self::SdlcCurrent => root.join("log/tmp/sdlc.current.json"),
-			Self::SessionsDir => root.join("log/session"),
-			Self::SessionsIndex => root.join("log/sdlc.session.index.json"),
+			Self::TmpDir => root.join("crates/estate/log/tmp"),
+			Self::SdlcCurrent => root.join("crates/estate/log/sdlc.current.json"),
+			Self::SessionsDir => root.join("crates/estate/log/session"),
+			Self::SessionsIndex => root.join("crates/estate/log/sdlc.session.index.json"),
 			Self::EstateManifest => root.join("estate.toml"),
 			Self::HostContext => crate_root().join("host.env.context.json"),
 		})
