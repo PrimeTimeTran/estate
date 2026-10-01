@@ -19,6 +19,8 @@ impl ActionOptions {
 		self.0.insert(key.into(), value);
 	}
 }
+
+#[derive(Clone, Debug)]
 pub struct Action {
 	pub id: String,
 	pub title: String,
@@ -37,6 +39,7 @@ impl Action {
 		}
 	}
 }
+#[derive(Clone, Debug)]
 pub enum ActionCategory {
 	Setup,
 	Analysis,

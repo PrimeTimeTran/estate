@@ -13,6 +13,7 @@ pub fn source_file(file: &str) -> PathBuf {
 pub fn filesystem_root(path: &Path) -> PathBuf {
 	path.ancestors().last().unwrap().to_path_buf()
 }
+
 const PRECEDENCE: &[&str] = &["default", "profile", "project", "workspace"];
 
 pub fn resolve_settings(file: impl AsRef<Path>, filename: &str) -> Result<Settings> {
@@ -107,11 +108,11 @@ pub fn global_project_dir() -> Result<PathBuf> {
 	Ok(home_dir()?.join(".leviticus"))
 }
 pub fn engine_data_dir() -> Result<PathBuf> {
-    let path = dirs::data_dir()
-        .map(|dir| dir.join("estate"))
-        .ok_or_else(|| anyhow!("Could not determine application data directory"))?;
-    std::fs::create_dir_all(&path)?;
-    Ok(path)
+	let path = dirs::data_dir()
+		.map(|dir| dir.join("estate"))
+		.ok_or_else(|| anyhow!("Could not determine application data directory"))?;
+	std::fs::create_dir_all(&path)?;
+	Ok(path)
 }
 pub fn engine_cache_dir() -> Result<PathBuf> {
 	dirs::cache_dir()

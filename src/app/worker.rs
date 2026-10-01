@@ -15,8 +15,12 @@ impl<C> WorkHandle<C, tokio::task::JoinHandle<()>>
 where
 	C: Ctx,
 {
-	pub async fn join(self) -> Result<JoinHandle<()>> {
-		Ok(self.join)
+	// pub async fn join(self) -> Result<JoinHandle<()>> {
+	// Ok(self.join)
+	// }
+	pub async fn join(self) -> Result<()> {
+		self.join.await?;
+		Ok(())
 	}
 }
 impl<C, J> WorkHandle<C, J>
@@ -43,6 +47,70 @@ where
 
 	pub fn stop(&self) {
 		self.cancel.cancel();
+	}
+}
+
+pub struct WorkerSupervisor<C, S>
+where
+	C: Ctx,
+{
+	workers: HashMap<WorkerId, Worker<C, S>>,
+}
+// pub enum WorkerId {
+// MacosHid,
+// CargoWatcher,
+// ActiveApp,
+// Cursor,
+// Lsp,
+// Daemon,
+// }
+pub struct WorkerId(pub &'static str);
+pub struct Worker<C, S>
+where
+	C: Ctx,
+{
+	pub name: String,
+	pub handle: WorkHandle<C, S>,
+	pub status: WorkerStatus,
+}
+pub enum WorkerStatus {
+	Starting,
+	Running,
+	Stopping,
+	Stopped,
+	Failed(String),
+}
+pub struct WorkerInfo {
+	pub id: WorkerId,
+	pub name: String,
+	pub status: WorkerStatus,
+	pub started_at: Option<Instant>,
+}
+impl<C, S> WorkerSupervisor<C, S>
+where
+	C: Ctx,
+{
+	pub fn new() -> Self {
+		Self {
+			workers: HashMap::new(),
+		}
+	}
+
+	pub fn spawn<F>(&mut self, worker: F)
+	where
+		F: Future<Output = ()> + Send + 'static,
+	{
+		// register worker
+	}
+
+	pub async fn shutdown(self) {
+		// self.cancel.cancel();
+		// for worker in self.workers.values() {
+		// worker.stop();
+		// }
+		// for worker in self.workers {
+		// let _ = worker.join().await;
+		// }
 	}
 }
 

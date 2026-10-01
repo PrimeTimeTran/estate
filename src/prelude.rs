@@ -87,9 +87,7 @@ pub use crate::{
 };
 
 #[cfg(target_os = "windows")]
-pub use crate::modules::{
-	native::windows as os,
-};
+pub use crate::modules::native::windows as os;
 
 #[cfg(target_os = "macos")]
 pub use crate::modules::native::macos as os;

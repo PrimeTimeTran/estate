@@ -1,3 +1,3 @@
-fn main(){
-  println!("focused")
+fn main() {
+	println!("focused")
 }

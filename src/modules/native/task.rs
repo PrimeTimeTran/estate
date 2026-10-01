@@ -127,12 +127,12 @@ impl TaskManagerRuntime {
 		)?;
 
 		if let Some(parent) = path.parent() {
-    println!("WATCH PATH  = {:?}", path);
-    println!("WATCH PARENT = {:?}", parent);
-    println!("PARENT EXISTS = {}", parent.exists());
-    println!("PARENT IS_DIR = {}", parent.is_dir());
-		
-    watcher.watch(parent, RecursiveMode::NonRecursive)?;
+			println!("WATCH PATH  = {:?}", path);
+			println!("WATCH PARENT = {:?}", parent);
+			println!("PARENT EXISTS = {}", parent.exists());
+			println!("PARENT IS_DIR = {}", parent.is_dir());
+
+			watcher.watch(parent, RecursiveMode::NonRecursive)?;
 		}
 
 		Ok(Self { watcher, rx })

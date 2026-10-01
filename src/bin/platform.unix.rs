@@ -6,14 +6,12 @@ use estate::prelude::*;
 // Main
 // ═════════════════════════════════════════════════════════════════════════════
 
-
 #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 fn main() -> io::Result<()> {
 	let mut input = platform::create_hdi_monitor();
 	let result = input.run();
 	result
 }
-
 
 //
 // #[derive(Debug, Clone, Copy)]
@@ -53,4 +51,3 @@ fn main() -> io::Result<()> {
 // 		delta: i32,
 // 	},
 // }
-

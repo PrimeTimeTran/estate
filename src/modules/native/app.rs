@@ -129,7 +129,7 @@ where
 		let (cursor_event_tx, cursor_events) = std::sync::mpsc::channel();
 		let cancel = CancellationToken::new();
 
-		let settings = Self::init()?;
+		let settings = Self::init_settings()?;
 
 		Ok(Self {
 			cancel,
@@ -146,8 +146,8 @@ where
 		})
 	}
 
-	fn init() -> Result<Settings> {
-		tracing::info!("init");
+	fn init_settings() -> Result<Settings> {
+		tracing::info!("init_settings");
 		let settings = resolver::resolve_settings(resolver::source_file(file!()), "settings.json")?;
 		println!("{}", serde_json::to_string_pretty(&settings)?);
 		Ok(settings)
@@ -161,15 +161,17 @@ impl App<Context> {
 	pub fn run(&mut self) -> Result<()> {
 		tracing::debug!("App run");
 		self.init_services()?;
-
+		self.run_gui()?;
 		if self.mode == AppMode::Daemon {
 			self.host.start()?;
-			// self.init_daemon();
+			self.init_daemon();
 		}
-		self.run_gui()?;
+
 		Ok(())
 	}
 	pub fn run_gui(&mut self) -> Result<()> {
+		tracing::info!("run_gui");
+
 		let cancel = CancellationToken::new();
 
 		let event_loop = EventLoop::<AppEvent>::with_user_event()
@@ -210,7 +212,7 @@ where
 		proxy: EventLoopProxy<AppEvent>,
 	) -> Result<WorkHandle<C, tokio::task::JoinHandle<()>>> {
 		let handle = self.host.worker().run_background(move |cancel| async move {
-			tracing::debug!("🔥 APP EVENTS TASK STARTED");
+			// tracing::debug!("🔥 APP EVENTS TASK STARTED");
 
 			let mut view_idx = 0;
 			let mut current_time = 3;
@@ -229,10 +231,10 @@ where
 
 							let view = TICK_ITEMS[view_idx];
 
-							tracing::info!(
-								"🔥 APP EVENTS TICK {:?}",
-								view,
-							);
+									// tracing::info!(
+										// "🔥 APP EVENTS TICK {:?}",
+										// view,
+									// );
 
 							// match proxy.send_event(AppEvent::Navigate(view)) {
 							// 	Ok(()) => {
@@ -257,7 +259,7 @@ where
 		Ok(handle)
 	}
 	pub fn start_cargo_watcher(&mut self) -> Result<WorkHandle<C, tokio::task::JoinHandle<()>>> {
-		tracing::debug!("cargo: entered");
+		tracing::info!("cargo: entered");
 		let watcher = CargoWatcher::new().map_err(|error| {
 			tracing::error!("Failed to create Cargo watcher: {error}");
 			error
@@ -297,11 +299,9 @@ where
 							}
 						}
 					}
-
 					Ok(Err(error)) => {
 						tracing::error!("Cargo watcher error: {error}");
 					}
-
 					Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
 						// Allows us to check cancellation.
 					}
@@ -331,6 +331,7 @@ where
 		// let sink = AppCursorSink {
 		// 	tx: self.cursor_event_tx.clone(),
 		// };
+		tracing::info!("start_cursor_watcher_from_app");
 
 		Ok(self.worker().run_background_blocking(move |cancel| {
 			// if let Err(error) = CursorDaemon::new(sink, cancel).run() {
@@ -724,7 +725,7 @@ where
 	// }
 }
 
-impl<C> Worker<C> for HostWorker<C>
+impl<C> traits::Worker<C> for HostWorker<C>
 where
 	C: Ctx,
 {

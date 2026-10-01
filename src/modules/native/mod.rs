@@ -32,7 +32,6 @@ pub use util::*;
 
 pub use native_traits::*;
 
-
 mod gestures;
 
 // This compiles the module only if the "windows" feature is enabled AND the OS is Windows

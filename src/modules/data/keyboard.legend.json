@@ -1,0 +1,410 @@
+{
+	"version": 1,
+	"kind": "keyboard",
+	"identity": "physical",
+	"description": "Estate canonical physical keyboard identifiers. Platform-specific native codes map into these identifiers.",
+	"keys": {
+		"Escape": {
+			"code": "Escape",
+			"macos": {
+				"cg_key_code": 53
+			}
+		},
+		"Digit1": {
+			"code": "Digit1",
+			"macos": {
+				"cg_key_code": 18
+			}
+		},
+		"Digit2": {
+			"code": "Digit2",
+			"macos": {
+				"cg_key_code": 19
+			}
+		},
+		"Digit3": {
+			"code": "Digit3",
+			"macos": {
+				"cg_key_code": 20
+			}
+		},
+		"Digit4": {
+			"code": "Digit4",
+			"macos": {
+				"cg_key_code": 21
+			}
+		},
+		"Digit5": {
+			"code": "Digit5",
+			"macos": {
+				"cg_key_code": 23
+			}
+		},
+		"Digit6": {
+			"code": "Digit6",
+			"macos": {
+				"cg_key_code": 22
+			}
+		},
+		"Digit7": {
+			"code": "Digit7",
+			"macos": {
+				"cg_key_code": 26
+			}
+		},
+		"Digit8": {
+			"code": "Digit8",
+			"macos": {
+				"cg_key_code": 28
+			}
+		},
+		"Digit9": {
+			"code": "Digit9",
+			"macos": {
+				"cg_key_code": 25
+			}
+		},
+		"Digit0": {
+			"code": "Digit0",
+			"macos": {
+				"cg_key_code": 29
+			}
+		},
+		"KeyQ": {
+			"code": "KeyQ",
+			"macos": {
+				"cg_key_code": 12
+			}
+		},
+		"KeyW": {
+			"code": "KeyW",
+			"macos": {
+				"cg_key_code": 13
+			}
+		},
+		"KeyE": {
+			"code": "KeyE",
+			"macos": {
+				"cg_key_code": 14
+			}
+		},
+		"KeyR": {
+			"code": "KeyR",
+			"macos": {
+				"cg_key_code": 15
+			}
+		},
+		"KeyT": {
+			"code": "KeyT",
+			"macos": {
+				"cg_key_code": 17
+			}
+		},
+		"KeyY": {
+			"code": "KeyY",
+			"macos": {
+				"cg_key_code": 16
+			}
+		},
+		"KeyU": {
+			"code": "KeyU",
+			"macos": {
+				"cg_key_code": 32
+			}
+		},
+		"KeyI": {
+			"code": "KeyI",
+			"macos": {
+				"cg_key_code": 34
+			}
+		},
+		"KeyO": {
+			"code": "KeyO",
+			"macos": {
+				"cg_key_code": 31
+			}
+		},
+		"KeyP": {
+			"code": "KeyP",
+			"macos": {
+				"cg_key_code": 35
+			}
+		},
+		"KeyA": {
+			"code": "KeyA",
+			"macos": {
+				"cg_key_code": 0
+			}
+		},
+		"KeyS": {
+			"code": "KeyS",
+			"macos": {
+				"cg_key_code": 1
+			}
+		},
+		"KeyD": {
+			"code": "KeyD",
+			"macos": {
+				"cg_key_code": 2
+			}
+		},
+		"KeyF": {
+			"code": "KeyF",
+			"macos": {
+				"cg_key_code": 3
+			}
+		},
+		"KeyG": {
+			"code": "KeyG",
+			"macos": {
+				"cg_key_code": 5
+			}
+		},
+		"KeyH": {
+			"code": "KeyH",
+			"macos": {
+				"cg_key_code": 4
+			}
+		},
+		"KeyJ": {
+			"code": "KeyJ",
+			"macos": {
+				"cg_key_code": 38
+			}
+		},
+		"KeyK": {
+			"code": "KeyK",
+			"macos": {
+				"cg_key_code": 40
+			}
+		},
+		"KeyL": {
+			"code": "KeyL",
+			"macos": {
+				"cg_key_code": 37
+			}
+		},
+		"KeyZ": {
+			"code": "KeyZ",
+			"macos": {
+				"cg_key_code": 6
+			}
+		},
+		"KeyX": {
+			"code": "KeyX",
+			"macos": {
+				"cg_key_code": 7
+			}
+		},
+		"KeyC": {
+			"code": "KeyC",
+			"macos": {
+				"cg_key_code": 8
+			}
+		},
+		"KeyV": {
+			"code": "KeyV",
+			"macos": {
+				"cg_key_code": 9
+			}
+		},
+		"KeyB": {
+			"code": "KeyB",
+			"macos": {
+				"cg_key_code": 11
+			}
+		},
+		"KeyN": {
+			"code": "KeyN",
+			"macos": {
+				"cg_key_code": 45
+			}
+		},
+		"KeyM": {
+			"code": "KeyM",
+			"macos": {
+				"cg_key_code": 46
+			}
+		},
+		"Tab": {
+			"code": "Tab",
+			"macos": {
+				"cg_key_code": 48
+			}
+		},
+		"Space": {
+			"code": "Space",
+			"macos": {
+				"cg_key_code": 49
+			}
+		},
+		"Enter": {
+			"code": "Enter",
+			"macos": {
+				"cg_key_code": 36
+			}
+		},
+		"Backspace": {
+			"code": "Backspace",
+			"macos": {
+				"cg_key_code": 51
+			}
+		},
+		"Delete": {
+			"code": "Delete",
+			"macos": {
+				"cg_key_code": 117
+			}
+		},
+		"ArrowLeft": {
+			"code": "ArrowLeft",
+			"macos": {
+				"cg_key_code": 123
+			}
+		},
+		"ArrowRight": {
+			"code": "ArrowRight",
+			"macos": {
+				"cg_key_code": 124
+			}
+		},
+		"ArrowDown": {
+			"code": "ArrowDown",
+			"macos": {
+				"cg_key_code": 125
+			}
+		},
+		"ArrowUp": {
+			"code": "ArrowUp",
+			"macos": {
+				"cg_key_code": 126
+			}
+		},
+		"ShiftLeft": {
+			"code": "ShiftLeft",
+			"macos": {
+				"cg_key_code": 56
+			}
+		},
+		"ShiftRight": {
+			"code": "ShiftRight",
+			"macos": {
+				"cg_key_code": 60
+			}
+		},
+		"ControlLeft": {
+			"code": "ControlLeft",
+			"macos": {
+				"cg_key_code": 59
+			}
+		},
+		"ControlRight": {
+			"code": "ControlRight",
+			"macos": {
+				"cg_key_code": 62
+			}
+		},
+		"AltLeft": {
+			"code": "AltLeft",
+			"macos": {
+				"cg_key_code": 58
+			}
+		},
+		"AltRight": {
+			"code": "AltRight",
+			"macos": {
+				"cg_key_code": 61
+			}
+		},
+		"MetaLeft": {
+			"code": "MetaLeft",
+			"macos": {
+				"cg_key_code": 55
+			}
+		},
+		"MetaRight": {
+			"code": "MetaRight",
+			"macos": {
+				"cg_key_code": 54
+			}
+		},
+		"CapsLock": {
+			"code": "CapsLock",
+			"macos": {
+				"cg_key_code": 57
+			}
+		},
+		"F1": {
+			"code": "F1",
+			"macos": {
+				"cg_key_code": 122
+			}
+		},
+		"F2": {
+			"code": "F2",
+			"macos": {
+				"cg_key_code": 120
+			}
+		},
+		"F3": {
+			"code": "F3",
+			"macos": {
+				"cg_key_code": 99
+			}
+		},
+		"F4": {
+			"code": "F4",
+			"macos": {
+				"cg_key_code": 118
+			}
+		},
+		"F5": {
+			"code": "F5",
+			"macos": {
+				"cg_key_code": 96
+			}
+		},
+		"F6": {
+			"code": "F6",
+			"macos": {
+				"cg_key_code": 97
+			}
+		},
+		"F7": {
+			"code": "F7",
+			"macos": {
+				"cg_key_code": 98
+			}
+		},
+		"F8": {
+			"code": "F8",
+			"macos": {
+				"cg_key_code": 100
+			}
+		},
+		"F9": {
+			"code": "F9",
+			"macos": {
+				"cg_key_code": 101
+			}
+		},
+		"F10": {
+			"code": "F10",
+			"macos": {
+				"cg_key_code": 109
+			}
+		},
+		"F11": {
+			"code": "F11",
+			"macos": {
+				"cg_key_code": 103
+			}
+		},
+		"F12": {
+			"code": "F12",
+			"macos": {
+				"cg_key_code": 111
+			}
+		}
+	}
+}

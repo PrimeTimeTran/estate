@@ -12,7 +12,7 @@
 //!
 //! Core business logic for resolving links, workspace indexing, namespace resolution, package management.
 
-use crate::prelude::*;
+use crate::prelude::{shared::Binding, *};
 
 /// Estate Constructors
 ///

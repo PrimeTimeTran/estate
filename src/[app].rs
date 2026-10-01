@@ -13,7 +13,7 @@ where
 	}
 
 	pub fn init_services(&mut self) -> Result<()> {
-		tracing::debug!("App init services");
+		tracing::info!("App init services");
 		self.init_api()?;
 
 		self.host.start_hid();
@@ -27,7 +27,7 @@ where
 			let handle = self.start_cursor_watcher_from_app()?;
 			self.workers.push(handle);
 		}
-		tracing::debug!("App init services complete");
+		tracing::info!("App init services complete");
 		Ok(())
 	}
 	pub fn init_api(&mut self) -> Result<()> {

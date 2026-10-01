@@ -246,3 +246,14 @@ pub struct HostWorker<C: Ctx> {
 	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 	pub runtime: Arc<tokio::runtime::Runtime>,
 }
+
+// #[tauri::command]
+// fn workers() -> Vec<WorkerInfo> {
+// host.workers().snapshot()
+// }
+//
+// #[tauri::command]
+// async fn stop_worker(id: WorkerId) -> Result<()> {
+// host.workers().stop(id).await
+// }
+//

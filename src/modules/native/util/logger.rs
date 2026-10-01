@@ -48,34 +48,31 @@ pub fn init_logging(config: &LogConfig) -> anyhow::Result<()> {
 	// 	.with_target(true)
 	// 	.with_thread_ids(false)
 	let file = if config.file.enabled {
-    let dir = crate::native::resolver::engine_data_dir()?;
-    eprintln!("engine_data_dir = {}", dir.display());
-	
-    let path = dir.join("estate.log");
-    eprintln!("log path = {}", path.display());
-	
-    let writer = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&path)
-        .map_err(|e| anyhow::anyhow!(
-            "failed to open log path {}: {e}",
-            path.display()
-        ))?;
-	
-    Some(
-        fmt::layer()
-            .with_writer(writer)
-            .with_target(true)
-            .with_thread_ids(true)
-            .with_thread_names(true)
-            .with_file(true)
-            .with_line_number(true)
-            .with_ansi(false)
-            .with_filter(LevelFilter::TRACE),
-    )
+		let dir = crate::native::resolver::engine_data_dir()?;
+		eprintln!("engine_data_dir = {}", dir.display());
+
+		let path = dir.join("estate.log");
+		eprintln!("log path = {}", path.display());
+
+		let writer = OpenOptions::new()
+			.create(true)
+			.append(true)
+			.open(&path)
+			.map_err(|e| anyhow::anyhow!("failed to open log path {}: {e}", path.display()))?;
+
+		Some(
+			fmt::layer()
+				.with_writer(writer)
+				.with_target(true)
+				.with_thread_ids(true)
+				.with_thread_names(true)
+				.with_file(true)
+				.with_line_number(true)
+				.with_ansi(false)
+				.with_filter(LevelFilter::TRACE),
+		)
 	} else {
-    None
+		None
 	};
 	// let subscriber = tracing_subscriber::registry().with(terminal);
 	// if let Some(file) = file {

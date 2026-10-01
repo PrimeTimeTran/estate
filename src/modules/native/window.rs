@@ -4,25 +4,25 @@
 // 	prelude::*,
 // 	ui::{self, prelude as gui},
 // };
-// 
+//
 // // use objc2_app_kit::{NSApplication, NSApplicationActivationPolicy};
 // // use objc2_foundation::MainThreadMarker;
 // use tray_icon::menu::{MenuItem, Submenu};
-// 
+//
 // #[cfg(target_os = "macos")]
 // fn configure_application_window() {
 // 	let mtm = objc2_foundation::MainThreadMarker::new().expect("must be on the main thread");
-// 
+//
 // 	let app = objc2_app_kit::NSApplication::sharedApplication(mtm);
-// 
+//
 // 	app.setActivationPolicy(objc2_app_kit::NSApplicationActivationPolicy::Regular);
-// 
+//
 // 	app.activateIgnoringOtherApps(true);
 // }
-// 
+//
 // #[cfg(not(target_os = "macos"))]
 // fn configure_application_window() {}
-// 
+//
 // // WIP: Self Activating Select
 // fn build_egui(event_loop: &ActiveEventLoop) -> (gui::Context, egui_winit::State) {
 // 	let ctx = gui::Context::default();
@@ -48,42 +48,42 @@
 // fn build_window(event_loop: &ActiveEventLoop) -> Result<Arc<winit::window::Window>> {
 // 	let width = 1920;
 // 	let height = 1280;
-// 
+//
 // 	let icon_file = include_bytes!("../../../assets/icon.png");
-// 
+//
 // 	let icon = {
 // 		let image = image::load_from_memory(icon_file)
 // 			.expect("failed to load icon")
 // 			.into_rgba8();
-// 
+//
 // 		let (width, height) = image.dimensions();
-// 
+//
 // 		winit::window::Icon::from_rgba(image.into_raw(), width, height)?
 // 	};
-// 
+//
 // 	let mut attrs = winit::window::Window::default_attributes()
 // 		.with_title("Estate Dev")
 // 		.with_inner_size(PhysicalSize::new(width, height))
 // 		.with_window_icon(Some(icon));
-// 
+//
 // 	if let Some(monitor) = event_loop
 // 		.primary_monitor()
 // 		.or_else(|| event_loop.available_monitors().next())
 // 	{
 // 		let screen_size = monitor.size();
-// 
+//
 // 		let x = screen_size.width as i32 - width;
 // 		let y = screen_size.height as i32 - height;
-// 
+//
 // 		attrs = attrs.with_position(PhysicalPosition::new(x.max(0), y.max(0)));
 // 	} else {
 // 		attrs = attrs.with_position(PhysicalPosition::new(100, 100));
 // 	}
-// 
+//
 // 	let window = event_loop.create_window(attrs)?;
-// 
+//
 // 	configure_application_window();
-// 
+//
 // 	Ok(Arc::new(window))
 // }
 // fn build_renderer(
@@ -174,7 +174,7 @@
 // 	))?;
 // 	Ok((adapter, device, queue))
 // }
-// 
+//
 // impl GlobalHotkeys {
 // 	pub fn new() -> Result<Self> {
 // 		let manager = GlobalHotKeyManager::new()?;
@@ -232,28 +232,28 @@
 // 			screen: ui::ScreenInstance::new(view),
 // 		})
 // 	}
-// 
+//
 // 	pub fn set_view(&mut self, kind: WindowType)
 // 	// V: Veable<NativeRuntime> + 'static,
 // 	{
 // 		self.kind = kind;
 // 		// self.view = Ve::new(view);
 // 	}
-// 
+//
 // 	pub fn draw(&mut self, ctx: &mut AppContext<'_, C, S>) -> Result<()> {
 // 		tracing::debug!("Window draw before begin_egui");
-// 
+//
 // 		let Some(surface_texture) = self.acquire_surface()? else {
 // 			tracing::debug!("NO SURFACE");
 // 			return Ok(());
 // 		};
-// 
+//
 // 		self.begin_egui();
-// 
+//
 // 		let output = self.build_ui(ctx);
-// 
+//
 // 		self.render_egui(surface_texture, output)?;
-// 
+//
 // 		Ok(())
 // 	}
 // 	fn build_ui(&mut self, ctx: &mut AppContext<'_, C, S>) -> gui::FullOutput {
@@ -263,12 +263,12 @@
 // 			gui::Id::new("window_root"),
 // 			gui::UiBuilder::new(),
 // 		);
-// 
+//
 // 		gui::Frame::NONE.show(&mut ui, |ui| {
 // 			tracing::debug!("Window → ScreenInstance::draw");
 // 			self.screen.draw(ui, ctx);
 // 		});
-// 
+//
 // 		self.gui_ctx.end_pass()
 // 	}
 // 	fn begin_egui(&mut self) {
@@ -313,13 +313,13 @@
 // 			viewport_output: _,
 // 			..
 // 		} = output;
-// 
+//
 // 		let view = surface_texture
 // 			.texture
 // 			.create_view(&wgpu::TextureViewDescriptor::default());
-// 
+//
 // 		let clipped_primitives = self.gui_ctx.tessellate(shapes, pixels_per_point);
-// 
+//
 // 		let screen_descriptor = egui_wgpu::ScreenDescriptor {
 // 			size_in_pixels: [
 // 				self.instance.inner_size().width,
@@ -327,13 +327,13 @@
 // 			],
 // 			pixels_per_point,
 // 		};
-// 
+//
 // 		let mut encoder = self
 // 			.device
 // 			.create_command_encoder(&wgpu::CommandEncoderDescriptor {
 // 				label: Some("egui-render"),
 // 			});
-// 
+//
 // 		// Apply each texture update individually.
 // 		for (id, deltas) in &textures_delta.set {
 // 			for delta in deltas {
@@ -342,7 +342,7 @@
 // 					.update_texture(&self.device, &self.queue, *id, delta);
 // 			}
 // 		}
-// 
+//
 // 		self.renderer.update_buffers(
 // 			&self.device,
 // 			&self.queue,
@@ -350,11 +350,11 @@
 // 			&clipped_primitives,
 // 			&screen_descriptor,
 // 		);
-// 
+//
 // 		self.render_pass(&mut encoder, &view, &clipped_primitives, &screen_descriptor);
-// 
+//
 // 		self.queue.submit(Some(encoder.finish()));
-// 
+//
 // 		for id in &textures_delta.free {
 // 			self.renderer.free_texture(id);
 // 		}
@@ -362,7 +362,7 @@
 // 		textures_delta.clear();
 // 		Ok(())
 // 	}
-// 
+//
 // 	fn render_pass(
 // 		&mut self,
 // 		encoder: &mut wgpu::CommandEncoder,
@@ -452,7 +452,7 @@
 //      	Depth / Stencil / Blending
 //       	   ↓
 //      	Color attachment
-// 
+//
 //      	1. input assembler
 //      	2.vertex shader
 //      	3.hull shader
@@ -481,10 +481,10 @@
 // 		if size.width == 0 || size.height == 0 {
 // 			return;
 // 		}
-// 
+//
 // 		self.config.width = size.width;
 // 		self.config.height = size.height;
-// 
+//
 // 		self.surface.configure(&self.device, &self.config);
 // 	}
 // }
@@ -776,7 +776,7 @@
 // 			});
 // 	}
 // }
-// 
+//
 // // pub struct AppWindow<C, S>
 // // where
 // // 	C: Ctx,

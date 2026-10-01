@@ -1,6 +1,160 @@
+import AppKit
 import CoreGraphics
 import Darwin
 import Foundation
+
+struct FrontmostApp: Codable {  
+  let bundleID: String?
+  let name: String?
+  let pid: Int32?
+}
+struct EventEnvelope: Codable {
+  let type: String
+  let version: UInt
+  let event: NativeEvent
+}
+func emitForegroundApp(_ app: FrontmostApp) {
+  let event = NativeEvent(
+    kind: .frontmostApp,
+    source: .workspace,
+    timestamp: mach_absolute_time(),
+    event: nil,
+    name: app.name ?? "",
+    modifiers: nil,
+    direction: nil,
+    mouseButton: nil,
+    clickCount: nil,
+    locationX: nil,
+    locationY: nil,
+    frontmostApp: app
+  )
+
+  let envelope = EventEnvelope(
+    type: "native_event",
+    version: 1,
+    event: event
+  )
+
+  do {
+    let data = try JSONEncoder().encode(envelope)
+
+    if let json = String(data: data, encoding: .utf8) {
+      print("🍎 \(json)")
+    }
+  } catch {
+    print("❌ failed to encode event: \(error)")
+  }
+}
+
+func frontmostApplication() -> FrontmostApp {
+  let app = NSWorkspace.shared.frontmostApplication
+  return FrontmostApp(
+    bundleID: app?.bundleIdentifier,
+    name: app?.localizedName,
+    pid: app?.processIdentifier
+  )
+}
+
+func emitFrontmostApp(_ app: FrontmostApp) {
+  let nativeEvent = NativeEvent(
+    kind: .frontmostApp,
+    source: .workspace,
+    timestamp: mach_absolute_time(),
+
+    event: nil,
+    name: app.name ?? "",
+    modifiers: nil,
+    direction: nil,
+
+    mouseButton: nil,
+    clickCount: nil,
+    locationX: nil,
+    locationY: nil,
+
+    frontmostApp: app
+  )
+
+  let envelope = EventEnvelope(
+    type: "native_event",
+    version: 1,
+    event: nativeEvent
+  )
+
+  do {
+    let data = try JSONEncoder().encode(envelope)
+
+    guard
+      let message = String(
+        data: data,
+        encoding: .utf8
+      )
+    else {
+      return
+    }
+
+    guard estateClientFD >= 0 else {
+      return
+    }
+
+    sendEstate(
+      message,
+      on: estateClientFD
+    )
+  } catch {
+    print(
+      "❌ failed to encode frontmost app: \(error)"
+    )
+  }
+}
+
+// MARK: - Initial state
+
+let initialApp = frontmostApplication()
+
+print("🚀 Initial frontmost app:")
+print("   name: \(initialApp.name ?? "nil")")
+print("   bundle: \(initialApp.bundleID ?? "nil")")
+print("   pid: \(initialApp.pid.map(String.init) ?? "nil")")
+
+
+// MARK: - App activation events
+
+NSWorkspace.shared.notificationCenter.addObserver(
+  forName: NSWorkspace.didActivateApplicationNotification,
+  object: nil,
+  queue: .main
+) { notification in
+  guard
+    let app =
+      notification.userInfo?[
+        NSWorkspace.applicationUserInfoKey
+      ] as? NSRunningApplication
+  else {
+    print("⚠️ activation notification without app")
+    return
+  }
+
+  let frontmost = FrontmostApp(
+    bundleID: app.bundleIdentifier,
+    name: app.localizedName,
+    pid: app.processIdentifier
+  )
+
+  print("")
+  print("🔥 FOREGROUND APP CHANGED")
+  print("   name: \(frontmost.name ?? "nil")")
+  print("   bundle: \(frontmost.bundleID ?? "nil")")
+  print("   pid: \(frontmost.pid.map(String.init) ?? "nil")")
+
+  emitForegroundApp(frontmost)
+}
+
+// MARK: - Run loop
+
+print("")
+print("👀 Watching for foreground application changes...")
+print("   Try ⌘Tab between applications.")
+print("")
 
 var estateClientFD: Int32 = -1
 struct KeyboardModifierState: Codable {
@@ -119,6 +273,7 @@ struct NativeEvent: Codable {
   let kind: Kind
   let source: EventSource
   let timestamp: UInt64
+
   let event: CGEventInfo?
   let name: String
   let modifiers: ModifierSnapshot?
@@ -128,11 +283,10 @@ struct NativeEvent: Codable {
   let clickCount: Int64?
   let locationX: Double?
   let locationY: Double?
+
+  let frontmostApp: FrontmostApp?
 }
-struct EventEnvelope: Codable {
-  let version: UInt
-  let event: NativeEvent
-}
+
 var state = ModifierState()
 func modifierName(_ keyCode: Int64) -> String {
   switch keyCode {
@@ -477,7 +631,8 @@ func makeEvent(
       mouseButton: nil,
       clickCount: nil,
       locationX: nil,
-      locationY: nil
+      locationY: nil,
+      frontmostApp: nil
     )
 
   case .keyUp:
@@ -499,7 +654,8 @@ func makeEvent(
       mouseButton: nil,
       clickCount: nil,
       locationX: nil,
-      locationY: nil
+      locationY: nil,
+      frontmostApp: nil
     )
 
   case .flagsChanged:
@@ -521,7 +677,8 @@ func makeEvent(
       mouseButton: nil,
       clickCount: nil,
       locationX: nil,
-      locationY: nil
+      locationY: nil,
+      frontmostApp: nil
     )
 
   case .leftMouseDown,
@@ -577,7 +734,8 @@ func makeEvent(
       mouseButton: buttonNumber,
       clickCount: clickCount,
       locationX: location.x,
-      locationY: location.y
+      locationY: location.y,
+      frontmostApp: nil
     )
 
   default:
@@ -1029,7 +1187,7 @@ func sendEstate(
       )
     } else {
       print(
-        "💜 SWIFT → RUST " + "fd=\(clientFD) " + "bytes=\(result) " + "write=\(elapsed / 1_000)µs"
+        " 💜 SWIFT → RUST " + "fd=\(clientFD) " + "bytes=\(result) " + "write=\(elapsed / 1_000)µs"
       )
     }
   }
@@ -1115,7 +1273,7 @@ func handleEstateConnection(
       }
 
       print(
-        "💎💎 SWIFT → RUST: PONG"
+        " SWIFT → RUST: PONG"
       )
     }
   }
@@ -1327,7 +1485,8 @@ while true {
         strlen(ptr)
       )
     }
-
     print("SWIFT → RUST: PONG")
   }
 }
+
+emitForegroundApp(initialApp)
