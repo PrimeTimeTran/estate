@@ -67,16 +67,15 @@ path = "src/bin/[mpl].rs"
 # Each bin is not only entry point but should be the start of
 # documentation of APIs, cli commands, etc.
 [[bin]]
-# cargo run --bin native --no-default-features --features "native,daemon"
+# cargo run --bin native --no-default-features --features "native,daemon,macos"
 name = "daemon"
 path = "src/bin/[hid-daemon].rs"
-required-features = ["daemon"]
+required-features = ["native","daemon"]
 
 [[bin]]
 name = "native"
 path = "src/bin/[native].rs"
 required-features = ["native"]
-
 
 [[bin]]
 name = "run"
@@ -232,6 +231,7 @@ egui-winit.workspace = true
 eframe = { workspace = true, optional = true }
 egui_commonmark = { workspace = true }
 egui_extras = { workspace = true, optional = true }
+mach2 = "0.7.0"
 
 # ============================================================
 # Platform dependencies

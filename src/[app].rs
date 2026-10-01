@@ -16,6 +16,8 @@ where
 		tracing::debug!("App init services");
 		self.init_api()?;
 
+		self.host.start_hid();
+
 		let handle = self.start_clock()?;
 		self.workers.push(handle);
 		#[cfg(all(feature = "native", not(target_arch = "wasm32")))]

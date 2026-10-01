@@ -1436,6 +1436,30 @@ use traits as t;
 use tracing::debug;
 use traits::*;
 
+impl LocalGenerator {
+	async fn generate_stuff(&self, prompt: &str) -> Result<String> {
+		let task = AgentTask::new(prompt.to_string());
+
+		let (event_tx, mut event_rx) = tokio::sync::mpsc::unbounded_channel();
+
+		let result = self.agent.run_agent_loop(task, event_tx).await?;
+
+		println!("=== GENERATOR RESULT ===");
+		println!("status: {:?}", result.status);
+		println!("chat: {:?}", result.chat);
+		println!("summary: {:?}", result.summary);
+		println!("logs: {:?}", result.logs);
+		println!("========================");
+
+		Ok(
+			result
+				.chat
+				.or(result.summary)
+				.unwrap_or_else(|| "Agent completed".to_string()),
+		)
+	}
+}
+
 #[async_trait]
 impl ArtifactGenerator for LocalGenerator {
 	async fn generate(&self, prompt: &str) -> Result<String> {
@@ -2455,6 +2479,8 @@ impl SprintPipeline {
 			- adding appropriate tests,
 			- running relevant formatting, compilation, linting, and test commands,
 			- fixing errors discovered during implementation.
+			- respond with CODE ONLY. Do not response with markdown wrapping code blocks like literal ```
+			- write directly to the files. Do not
 
 			Do not merely describe an implementation. Perform the work in the
 			workspace.

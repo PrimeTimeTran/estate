@@ -1,11 +1,8 @@
 import CoreGraphics
+import Darwin
 import Foundation
 
-let pid = ProcessInfo.processInfo.processIdentifier
-
-print("Estate native PID: \(pid)")
-let sourcePID = ProcessInfo.processInfo.processIdentifier
-
+var estateClientFD: Int32 = -1
 struct KeyboardModifierState: Codable {
   var shift: Bool = false
   var ctrl: Bool = false
@@ -688,7 +685,29 @@ func printEvent(_ nativeEvent: NativeEvent) {
       info.sourceUserData
     )
   )
+  let sentAt = mach_absolute_time()
 
+  let message =
+    "{\"type\":\"native_event\"," + "\"event\":{" + "\"sent_at\":\(sentAt),"
+    + "\"kind\":\"key_down\"," + "\"key_code\":\(displayName)" + "}}"
+
+  // sendEstate(
+  //   message,
+  //   on: clientFD
+  // )
+  // sendEstate(
+  //   message,
+  //   on: estateClientFD
+  // )
+
+  guard estateClientFD >= 0 else {
+    return
+  }
+
+  sendEstate(
+    message,
+    on: estateClientFD
+  )
   fflush(stdout)
 }
 let mask =
@@ -719,48 +738,74 @@ let callback: CGEventTapCallBack = {
       .mouseEventButtonNumber
     )
 
+  let location = event.location
+
   let rawLabel: String
 
+  let sentAt = mach_absolute_time()
+
   switch type {
-
   case .keyDown:
-    rawLabel = "KEY ↓"
+    let message =
+      "{\"type\":\"native_event\"," + "\"event\":{" + "\"sent_at\":\(sentAt),"
+      + "\"kind\":\"key_down\"," + "\"key_code\":\(rawKeyCode)" + "}}"
 
+    guard estateClientFD >= 0 else {
+      return Unmanaged.passUnretained(event)
+    }
+
+    sendEstate(
+      message,
+      on: estateClientFD
+    )
   case .keyUp:
-    rawLabel = "KEY ↑"
+    let message =
+      "{\"type\":\"native_event\"," + "\"event\":{" + "\"sent_at\":\(sentAt),"
+      + "\"kind\":\"key_up\"," + "\"key_code\":\(rawKeyCode)" + "}}"
 
-  case .flagsChanged:
-    rawLabel = "FLAGS"
+    guard estateClientFD >= 0 else {
+      return Unmanaged.passUnretained(event)
+    }
 
-  case .leftMouseDown:
-    let location = event.location
-    rawLabel =
-      "MOUSE ↓ button=\(mouseButton) " + "x=\(Int(location.x)) y=\(Int(location.y))"
+    sendEstate(
+      message,
+      on: estateClientFD
+    )
+  case .leftMouseDown,
+    .rightMouseDown,
+    .otherMouseDown:
 
-  case .leftMouseUp:
-    let location = event.location
-    rawLabel =
-      "MOUSE ↑ button=\(mouseButton) " + "x=\(Int(location.x)) y=\(Int(location.y))"
+    let message =
+      "{\"type\":\"native_event\"," + "\"event\":{" + "\"sent_at\":\(sentAt),"
+      + "\"kind\":\"mouse_down\"," + "\"button\":\(mouseButton)," + "\"x\":\(location.x),"
+      + "\"y\":\(location.y)" + "}}"
 
-  case .rightMouseDown:
-    let location = event.location
-    rawLabel =
-      "MOUSE ↓ button=\(mouseButton) " + "x=\(Int(location.x)) y=\(Int(location.y))"
+    guard estateClientFD >= 0 else {
+      return Unmanaged.passUnretained(event)
+    }
 
-  case .rightMouseUp:
-    let location = event.location
-    rawLabel =
-      "MOUSE ↑ button=\(mouseButton) " + "x=\(Int(location.x)) y=\(Int(location.y))"
+    sendEstate(
+      message,
+      on: estateClientFD
+    )
 
-  case .otherMouseDown:
-    let location = event.location
-    rawLabel =
-      "MOUSE ↓ button=\(mouseButton) " + "x=\(Int(location.x)) y=\(Int(location.y))"
+  case .leftMouseUp,
+    .rightMouseUp,
+    .otherMouseUp:
 
-  case .otherMouseUp:
-    let location = event.location
-    rawLabel =
-      "MOUSE ↑ button=\(mouseButton) " + "x=\(Int(location.x)) y=\(Int(location.y))"
+    let message =
+      "{\"type\":\"native_event\"," + "\"event\":{" + "\"sent_at\":\(sentAt),"
+      + "\"kind\":\"mouse_up\"," + "\"button\":\(mouseButton)," + "\"x\":\(location.x),"
+      + "\"y\":\(location.y)" + "}}"
+
+    guard estateClientFD >= 0 else {
+      return Unmanaged.passUnretained(event)
+    }
+
+    sendEstate(
+      message,
+      on: estateClientFD
+    )
   case .scrollWheel:
 
     let vertical =
@@ -773,16 +818,30 @@ let callback: CGEventTapCallBack = {
         .scrollWheelEventDeltaAxis2
       )
 
-    rawLabel =
-      "SCROLL vertical=\(vertical) horizontal=\(horizontal)"
-  default:
-    rawLabel = "EVENT"
-  }
+    let message =
+      "{\"type\":\"native_event\"," + "\"event\":{" + "\"sent_at\":\(sentAt),"
+      + "\"kind\":\"scroll\"," + "\"vertical\":\(vertical)," + "\"horizontal\":\(horizontal)" + "}}"
 
-  print(
-    "RAW \(rawLabel) " + "type=\(type.rawValue) " + "button=\(mouseButton) "
-      + "keyCode=\(rawKeyCode)"
-  )
+    guard estateClientFD >= 0 else {
+      return Unmanaged.passUnretained(event)
+    }
+
+    sendEstate(
+      message,
+      on: estateClientFD
+    )
+
+  case .flagsChanged:
+    break
+  // Don't send yet.
+
+  default:
+    break
+  }
+  // print(
+  //   "RAW \(rawLabel) " + "type=\(type.rawValue) " + "button=\(mouseButton) "
+  //     + "keyCode=\(rawKeyCode)"
+  // )
 
   fflush(stdout)
   // ------------------------------------------------------------
@@ -923,6 +982,7 @@ let callback: CGEventTapCallBack = {
 
   return Unmanaged.passUnretained(event)
 }
+
 guard
   let tap = CGEvent.tapCreate(
     tap: .cgSessionEventTap,
@@ -939,7 +999,217 @@ else {
   )
   exit(1)
 }
+func machNow() -> UInt64 {
+  mach_absolute_time()
+}
+func sendEstate(
+  _ message: String,
+  on clientFD: Int32
+) {
+  let started = DispatchTime.now().uptimeNanoseconds
 
+  let payload = message + "\n"
+
+  payload.withCString { ptr in
+    let length = strlen(ptr)
+
+    let result = write(
+      clientFD,
+      ptr,
+      length
+    )
+
+    let elapsed =
+      DispatchTime.now().uptimeNanoseconds
+      - started
+
+    if result < 0 {
+      print(
+        "❌ SWIFT → RUST write failed: " + "\(String(cString: strerror(errno)))"
+      )
+    } else {
+      print(
+        "💜 SWIFT → RUST " + "fd=\(clientFD) " + "bytes=\(result) " + "write=\(elapsed / 1_000)µs"
+      )
+    }
+  }
+}
+func startSwiftPingLoop(
+  _ clientFD: Int32
+) {
+  Thread {
+    var id: UInt64 = 0
+
+    while true {
+      sleep(10)
+
+      id += 1
+
+      let message =
+        #"{"type":"ping","id":"#
+        + "\(id)"
+        + "}"
+
+      guard estateClientFD >= 0 else {
+        continue
+      }
+
+      sendEstate(
+        message,
+        on: estateClientFD
+      )
+    }
+  }.start()
+}
+func handleEstateConnection(
+  _ clientFD: Int32
+) {
+  while true {
+    var buffer = [UInt8](
+      repeating: 0,
+      count: 4096
+    )
+
+    let count = read(
+      clientFD,
+      &buffer,
+      buffer.count
+    )
+
+    if count <= 0 {
+      print(
+        "Rust disconnected fd=\(clientFD)"
+      )
+
+      if estateClientFD == clientFD {
+        estateClientFD = -1
+      }
+
+      close(clientFD)
+      return
+    }
+
+    let message =
+      String(
+        bytes: buffer[..<count],
+        encoding: .utf8
+      ) ?? ""
+
+    print(
+      "RUST → SWIFT: "
+        + message.trimmingCharacters(
+          in: .whitespacesAndNewlines
+        )
+    )
+
+    if message.contains("\"ping\"") {
+      let response =
+        #"{"type":"pong","id":1}"# + "\n"
+
+      response.withCString { ptr in
+        _ = write(
+          clientFD,
+          ptr,
+          strlen(ptr)
+        )
+      }
+
+      print(
+        "💎💎 SWIFT → RUST: PONG"
+      )
+    }
+  }
+}
+func startEstateSocket() {
+  let socketPath = "/tmp/estate-hid.sock"
+
+  try? FileManager.default.removeItem(
+    atPath: socketPath
+  )
+
+  let serverFD = socket(
+    AF_UNIX,
+    SOCK_STREAM,
+    0
+  )
+
+  guard serverFD >= 0 else {
+    fatalError("failed to create socket")
+  }
+
+  var address = sockaddr_un()
+  address.sun_family = sa_family_t(AF_UNIX)
+
+  withUnsafeMutableBytes(
+    of: &address.sun_path
+  ) { buffer in
+    let bytes =
+      socketPath.utf8CString.map {
+        UInt8(bitPattern: $0)
+      }
+
+    buffer.copyBytes(from: bytes)
+  }
+
+  let bindResult =
+    withUnsafePointer(to: &address) {
+      $0.withMemoryRebound(
+        to: sockaddr.self,
+        capacity: 1
+      ) {
+        bind(
+          serverFD,
+          $0,
+          socklen_t(
+            MemoryLayout<sockaddr_un>.size
+          )
+        )
+      }
+    }
+
+  guard bindResult == 0 else {
+    fatalError(
+      "failed to bind \(socketPath): " + "\(String(cString: strerror(errno)))"
+    )
+  }
+
+  guard listen(serverFD, 1) == 0 else {
+    fatalError(
+      "failed to listen: " + "\(String(cString: strerror(errno)))"
+    )
+  }
+
+  print(
+    "ESTATE HID listening: \(socketPath)"
+  )
+
+  while true {
+    let clientFD = accept(
+      serverFD,
+      nil,
+      nil
+    )
+
+    guard clientFD >= 0 else {
+      print(
+        "accept failed: " + "\(String(cString: strerror(errno)))"
+      )
+      continue
+    }
+
+    estateClientFD = clientFD
+
+    print(
+      "ESTATE RUST connected fd=\(estateClientFD)"
+    )
+
+    // startSwiftPingLoop(clientFD)
+
+    handleEstateConnection(
+      estateClientFD
+    )
+  }
+}
 let source = CFMachPortCreateRunLoopSource(
   kCFAllocatorDefault,
   tap,
@@ -970,8 +1240,94 @@ print(
 
 print("")
 fflush(stdout)
+Thread {
+  startEstateSocket()
+}.start()
 CFRunLoopRun()
 
 struct MouseButton: Codable {
   let number: Int64
+}
+
+let pid = ProcessInfo.processInfo.processIdentifier
+
+print("Estate native PID: \(pid)")
+let sourcePID = ProcessInfo.processInfo.processIdentifier
+
+let socketPath = "/tmp/estate-hid.sock"
+
+try? FileManager.default.removeItem(atPath: socketPath)
+
+let serverFD = socket(AF_UNIX, SOCK_STREAM, 0)
+
+guard serverFD >= 0 else {
+  fatalError("failed to create socket")
+}
+
+var address = sockaddr_un()
+address.sun_family = sa_family_t(AF_UNIX)
+
+withUnsafeMutableBytes(of: &address.sun_path) { buffer in
+  let bytes = socketPath.utf8CString.map { UInt8(bitPattern: $0) }
+  buffer.copyBytes(from: bytes)
+}
+let bindResult = withUnsafePointer(to: &address) {
+  $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+    bind(serverFD, $0, socklen_t(MemoryLayout<sockaddr_un>.size))
+  }
+}
+
+guard bindResult == 0 else {
+  fatalError("failed to bind \(socketPath)")
+}
+
+guard listen(serverFD, 1) == 0 else {
+  fatalError("failed to listen")
+}
+
+print("ESTATE HID listening: \(socketPath)")
+
+let clientFD = accept(serverFD, nil, nil)
+
+guard clientFD >= 0 else {
+  fatalError("failed to accept Rust connection")
+}
+
+print("ESTATE RUST connected")
+
+while true {
+  var buffer = [UInt8](repeating: 0, count: 4096)
+
+  let count = read(
+    clientFD,
+    &buffer,
+    buffer.count
+  )
+
+  if count <= 0 {
+    print("Rust disconnected")
+    break
+  }
+
+  let message =
+    String(
+      bytes: buffer[..<count],
+      encoding: .utf8
+    ) ?? ""
+
+  print("RUST → SWIFT: \(message.trimmingCharacters(in: .whitespacesAndNewlines))")
+
+  if message.contains("PING") {
+    let response = "PONG\n"
+
+    response.withCString { ptr in
+      _ = write(
+        clientFD,
+        ptr,
+        strlen(ptr)
+      )
+    }
+
+    print("SWIFT → RUST: PONG")
+  }
 }

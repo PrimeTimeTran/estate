@@ -205,7 +205,7 @@ pub enum AppEvent {
 /// model the lifecycle of events from creation until completion and everything in between
 /// and subsequent
 ///
-#[derive(Debug, Clone, Hash, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum EventKind {
 	ApiError(String),
 	CacheInvalidated { reason: String },
@@ -241,6 +241,12 @@ pub enum EventKind {
 	TaskStarted { task_id: TaskId },
 	TaskStopped { task_id: TaskId },
 	WorkspaceIndexed { duration: u64 },
+
+	KeyDown { key_code: u16 },
+	KeyUp { key_code: u16 },
+	MouseDown { button: i64, x: f64, y: f64 },
+	MouseUp { button: i64, x: f64, y: f64 },
+	Scroll { vertical: i64, horizontal: i64 },
 }
 
 /// ## [EventSource]
@@ -299,7 +305,7 @@ impl From<ProtoProblem> for ProblemLoaded {
 
 /// ## [Event]
 ///
-#[derive(Debug, Clone, Deserialize, Hash, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Event {
 	pub id: u64,
 	pub kind: EventKind,

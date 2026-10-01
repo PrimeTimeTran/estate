@@ -161,10 +161,12 @@ impl App<Context> {
 	pub fn run(&mut self) -> Result<()> {
 		tracing::debug!("App run");
 		self.init_services()?;
-		self.run_gui()?;
+
 		if self.mode == AppMode::Daemon {
+			self.host.start()?;
 			// self.init_daemon();
 		}
+		self.run_gui()?;
 		Ok(())
 	}
 	pub fn run_gui(&mut self) -> Result<()> {
@@ -602,17 +604,17 @@ where
 // impl Host<Context> {
 // 	pub fn init() -> anyhow::Result<Self> {
 // 		let parsed = cli::context::parse();
-// 
+//
 // 		let mut config = LogConfig::load()?;
 // 		config.apply_cli(&parsed);
 // 		logger::init_logging(&config)?;
-// 
+//
 // 		// Create the one runtime.
 // 		let tokio = tokio::runtime::Runtime::new()?;
-// 
+//
 // 		// Context is still uniquely owned here.
 // 		let mut context = Context::default();
-// 
+//
 // 		// Daemon may not need this
 // 		// This requires server access
 // 		#[cfg(not(feature = "daemon"))]
@@ -620,7 +622,7 @@ where
 // 			// Connect using the same runtime that Host will retain.
 // 			tokio.block_on(context.api_mut().connect())?;
 // 		}
-// 
+//
 // 		// Only share Context after initialization.
 // 		let context = Arc::new(context);
 // 		Self::new(context, tokio)

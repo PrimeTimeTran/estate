@@ -3,13 +3,44 @@ use objc2_app_kit::{NSRunningApplication, NSWorkspace};
 use objc2_foundation::NSString;
 
 use crate::{model::resolver::crate_root, prelude::*};
+use std::process::Command;
+
+#[cfg(target_os = "macos")]
+use axuielement::prelude::*;
+
+fn print_focused_app() -> Result<(), Box<dyn std::error::Error>> {
+	let Some(system) = system_wide() else {
+		eprintln!("no system-wide accessibility object");
+		return Ok(());
+	};
+
+	println!("api_enabled = {}", api_enabled());
+	println!("is_trusted  = {}", is_process_trusted());
+
+	if let Some(app) = system.focused_application()? {
+		println!("focused pid   = {}", app.pid()?);
+		println!("focused attrs = {:?}", app.attribute_names()?);
+	}
+
+	if let Some(focused) = system.focused_ui_element()? {
+		println!(
+			"role  = {:?}",
+			focused.string_attribute(axuielement::ax_attribute::AX_ROLE_ATTRIBUTE)?
+		);
+		println!(
+			"title = {:?}",
+			focused.string_attribute(axuielement::ax_attribute::AX_TITLE_ATTRIBUTE)?
+		);
+		println!("actions = {:?}", focused.action_names()?);
+	}
+
+	Ok(())
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum ContextSource {
 	Macos,
 }
-
-use std::process::Command;
 
 // https://github.com/openclaw/AXorcist
 // brew install openclaw/tap/axorc
@@ -287,6 +318,7 @@ fn frontmost_app(workspace: &NSWorkspace) -> serde_json::Value {
 
 impl<C: Ctx> Host<C> {
 	pub fn new(context: Arc<C>, tokio: tokio::runtime::Runtime) -> anyhow::Result<Self> {
+		tracing::info!("🍏 Host loi");
 		let handle = tokio.handle().clone();
 		let event_bus = EventBus::new();
 		let runtime = NativeRuntime::new(Arc::clone(&context), handle.clone(), event_bus.clone())?;
@@ -299,6 +331,33 @@ impl<C: Ctx> Host<C> {
 			clock: HostClock::new(handle),
 			tokio,
 		})
+	}
+	pub fn start(&mut self) -> Result<()> {
+		tracing::info!("🍏 start_context_watcher");
+
+		self.start_context_watcher()?;
+		self.start_hid_bridge()?;
+		Ok(())
+	}
+	pub fn start_context_watcher(&mut self) -> Result<()> {
+		tracing::info!("🍏 start_context_watcher");
+		Ok(())
+	}
+	pub fn start_hid_bridge(&mut self) -> Result<()> {
+		tracing::info!("🍏 start_hid_bridge");
+		Ok(())
+	}
+	pub fn start_hid(&self) -> Result<WorkHandle<C, tokio::task::JoinHandle<()>>> {
+		tracing::info!("🍏 start_hid loi");
+		let hid = MacosHid::new()?;
+		let events = self.event_bus.clone();
+		let handle = self.worker.run_background(move |cancel| async move {
+			if let Err(error) = hid.run(events, cancel).await {
+				tracing::error!(%error, "macOS HID stopped");
+			}
+		});
+
+		Ok(handle)
 	}
 }
 impl<P> HostContextWatcher<P>
@@ -366,9 +425,6 @@ impl InstalledApp {
 		}
 	}
 }
-
-#[cfg(target_os = "macos")]
-use axuielement::prelude::*;
 
 impl MacosHostContextProvider {
 	fn focused(&self) -> Result<serde_json::Value> {
@@ -511,14 +567,15 @@ pub struct MacosHostContextProvider {
 pub struct MacosAccessibilityContext;
 
 pub struct FocusedContext {
-	// pub application: Application,
 	pub role: Option<String>,
 	pub title: Option<String>,
 	pub value: Option<String>,
 	pub url: Option<String>,
 	pub attributes: HashMap<String, serde_json::Value>,
 }
-
+// pub struct MacosInput;
+// pub struct MacosApplications;
+// pub struct MacosAccessibility;
 // estate context watch --key foo --launch-app "zed terminal"
 // estate context watch --key bar --launch-app "vscode terminal"
 
