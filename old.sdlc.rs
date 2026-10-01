@@ -1181,7 +1181,7 @@ impl Sdlc {
 
 		self.record_outcome(stage, attempt, outcome)
 	}
-	fn record_session(&self) -> Result<()> {
+	fn session_record(&self) -> Result<()> {
 		let session = self
 			.session
 			.as_ref()
@@ -1411,7 +1411,7 @@ impl Sdlc {
 		session.stage = next;
 		session.updated_at = Utc::now();
 		self.persist()?;
-		self.record_session()?;
+		self.session_record()?;
 		Ok(())
 	}
 	async fn verify(&mut self) -> Result<Verification> {

@@ -1985,7 +1985,7 @@ impl SprintPipeline {
 			));
 		}
 
-		let intent = self.read_session("intent.md")?;
+		let intent = self.session_read("intent.md")?;
 
 		let spec = format!(
 			"# Specification\n\n\
@@ -2018,8 +2018,8 @@ impl SprintPipeline {
 				stage
 			));
 		}
-		let intent = self.read_session("intent.md")?;
-		let spec = self.read_session("spec.md")?;
+		let intent = self.session_read("intent.md")?;
+		let spec = self.session_read("spec.md")?;
 		let plan = self.generate_plan(&intent, &spec).await?;
 		Self::write(session_dir.join("plan.md"), plan.clone())?;
 		let tests = self.generate_tests(&intent, &spec, &plan).await?;
@@ -2278,7 +2278,7 @@ impl SprintPipeline {
 	pub fn stage(&self) -> Option<Stage> {
 		self.session.as_ref().map(|session| session.stage)
 	}
-	pub fn stage_attempt(&self) -> u32 {
+	fn stage_attempt(&self) -> u32 {
 		self.stage_attempt
 	}
 
@@ -2346,22 +2346,39 @@ impl SprintPipeline {
 			.session
 			.as_ref()
 			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
-		let intent = self.read_session("intent.md")?;
-		let spec = self.read_session("spec.md");
-		let plan = self.read_session("plan.md");
-		let progress = self.read_session("progress.md");
+		let intent = self.session_read("intent.md")?;
+		let spec = self.session_read("spec.md");
+		let plan = self.session_read("plan.md");
+		let progress = self.session_read("progress.md");
 		Ok(vec![])
 	}
 
 	fn persist(&self) -> Result<()> {
 		FS::save(&self.state_path, &self.session)
 	}
-	fn read_session(&self, name: &str) -> Result<String> {
+	fn session_read(&self, name: &str) -> Result<String> {
 		let session = self
 			.session
 			.as_ref()
 			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
 		read_from_session(name, session)
+	}
+	fn session_record(&self) -> Result<()> {
+		let session = self
+			.session
+			.as_ref()
+			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
+
+		let index_path = SpecialFile::SessionsIndex.path()?;
+
+		let mut sessions: Vec<SdlcSession> = FS::load(&index_path)?.unwrap_or_default();
+
+		sessions.retain(|existing| existing.id != session.id);
+		sessions.push(session.clone());
+
+		FS::save(index_path, &sessions)?;
+
+		Ok(())
 	}
 	fn record_outcome(&mut self, outcome: &StageOutcome) -> Result<()> {
 		let session = self
@@ -2442,23 +2459,7 @@ impl SprintPipeline {
 	fn record_stage_outcome(&mut self, outcome: &StageOutcome) -> Result<()> {
 		self.record_outcome(outcome)
 	}
-	fn record_session(&self) -> Result<()> {
-		let session = self
-			.session
-			.as_ref()
-			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
 
-		let index_path = SpecialFile::SessionsIndex.path()?;
-
-		let mut sessions: Vec<SdlcSession> = FS::load(&index_path)?.unwrap_or_default();
-
-		sessions.retain(|existing| existing.id != session.id);
-		sessions.push(session.clone());
-
-		FS::save(index_path, &sessions)?;
-
-		Ok(())
-	}
 	fn record_evaluation(&mut self, evaluation: StageEvaluation) -> Result<()> {
 		let session = self
 			.session
@@ -2567,7 +2568,7 @@ impl SprintPipeline {
 		session.updated_at = Utc::now();
 
 		self.persist()?;
-		self.record_session()?;
+		self.session_record()?;
 
 		Ok(())
 	}

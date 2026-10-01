@@ -1,5 +1,6 @@
 dist/
 fixtures/
+log/
 omit/
 private/
 target/
