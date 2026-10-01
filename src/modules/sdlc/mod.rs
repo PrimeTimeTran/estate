@@ -95,7 +95,15 @@ fn slugify(input: &str) -> String {
 		slug
 	}
 }
+fn log_step_transition(from: Stage, to: Stage) -> Result<()> {
+	let path: PathBuf = env::current_dir()?.join("current_step.txt");
 
+	let mut file = OpenOptions::new().create(true).append(true).open(path)?;
+
+	writeln!(file, "{:?} -> {:?}", from, to)?;
+
+	Ok(())
+}
 mod ui {
 	use super::*;
 	use ratatui::{
@@ -968,6 +976,7 @@ mod enums {
 
 	#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 	pub enum Step {
+		Boot,
 		Init,
 		Intent,
 		Spec,
@@ -1211,11 +1220,13 @@ pub mod structs {
 		pub passed: Option<bool>,
 
 		pub message: Option<String>,
+		pub error: Option<String>,
 
 		pub total_tokens: u64,
 		pub total_agent_calls: u32,
 
 		pub history: Vec<SdlcEvent>,
+		pub events: Vec<SdlcEvent>,
 	}
 
 	#[derive(Debug)]
@@ -1334,6 +1345,7 @@ pub mod structs {
 		pub show_logs: bool,
 		pub input: String,
 		pub input_active: bool,
+		pub events: Vec<Event>,
 	}
 	pub struct ApiGenerator {
 		// whatever API client you decide to use
@@ -1912,6 +1924,8 @@ impl SprintPipeline {
 
 			self.transition(next)?;
 
+			log_step_transition(stage, next)?;
+
 			self.emit(SdlcEvent::StageTransitioned {
 				from: stage,
 				to: next,
@@ -2133,7 +2147,7 @@ impl SprintPipeline {
 		Ok(decision)
 	}
 	async fn execute(&mut self, stage: enums::Stage) -> Result<StageExecution> {
-		todo!()
+		todo!("execute")
 	}
 
 	async fn apply(
@@ -2581,7 +2595,7 @@ impl Step {
 			Self::Plan => Some(Stage::Plan),
 			Self::Build => Some(Stage::Build),
 			Self::Verify => Some(Stage::Verify),
-			Self::Init | Self::Deploy | Self::Maintain | Self::Complete => None,
+			Self::Boot | Self::Init | Self::Deploy | Self::Maintain | Self::Complete => None,
 		}
 	}
 }
@@ -2601,6 +2615,8 @@ impl PipelineRuntime {
 			started_at: Instant::now(),
 			total_agent_calls: 0,
 			total_tokens: 0,
+			error: None,
+			events: vec![],
 		}
 	}
 }
@@ -2636,6 +2652,7 @@ impl SdlcView {
 			input: String::new(),
 			paused: false,
 			show_logs: false,
+			events: vec![],
 			runtime: PipelineRuntime::new(stage),
 		}
 	}
@@ -2704,115 +2721,109 @@ impl SdlcView {
 		ui::right_activity_panel(frame, view, body[2]);
 		ui::footer(frame, view, chunks[3]);
 	}
-
 	pub fn apply(&mut self, event: SdlcEvent) {
-		// 		match event {
-		// 			SdlcEvent::RunStarted {
-		// 				run_id,
-		// 				stage,
-		// 				..
-		// 			} => {
-		// 				self.runtime.run_id = run_id;
-		// 				self.runtime.stage = stage;
-		// 				self.runtime.attempt = 0;
-		// 				self.runtime.phase = PipelinePhase::Running;
-		// 				self.runtime.started_at = Some(Instant::now());
-		// 				self.runtime.stage_started_at = Some(Instant::now());
-		// 				self.runtime.message = "Run started".into();
-		// 			}
-		//
-		// 			SdlcEvent::StageStarted {
-		// 				stage,
-		// 				attempt,
-		// 				..
-		// 			} => {
-		// 				self.runtime.stage = stage;
-		// 				self.runtime.attempt = attempt;
-		// 				self.runtime.phase = PipelinePhase::Running;
-		// 				self.runtime.stage_started_at = Some(Instant::now());
-		// 				self.runtime.message =
-		// 					format!("Running {stage:?}");
-		// 			}
-		//
-		// 			SdlcEvent::ExecutionStarted { .. } => {
-		// 				self.runtime.phase = PipelinePhase::Executing;
-		// 				self.runtime.message = "Executing".into();
-		// 			}
-		//
-		// 			SdlcEvent::ExecutionCompleted { .. } => {
-		// 				self.runtime.phase = PipelinePhase::Evaluating;
-		// 				self.runtime.message = "Evaluating".into();
-		// 			}
-		//
-		// 			SdlcEvent::Evaluated {
-		// 				score,
-		// 				confidence,
-		// 				..
-		// 			} => {
-		// 				self.runtime.score = Some(score);
-		// 				self.runtime.confidence = Some(confidence);
-		// 				self.runtime.phase = PipelinePhase::Evaluating;
-		// 				self.runtime.message = format!(
-		// 					"Evaluation: {:.2} (confidence {:.2})",
-		// 					score,
-		// 					confidence,
-		// 				);
-		// 			}
-		//
-		// 			SdlcEvent::AwaitingHuman { .. } => {
-		// 				self.runtime.phase = PipelinePhase::AwaitingHuman;
-		// 				self.runtime.message = "Awaiting human input".into();
-		// 			}
-		//
-		// 			SdlcEvent::Retrying {
-		// 				stage,
-		// 				attempt,
-		// 				..
-		// 			} => {
-		// 				self.runtime.stage = stage;
-		// 				self.runtime.attempt = attempt;
-		// 				self.runtime.phase = PipelinePhase::Retrying;
-		// 				self.runtime.message =
-		// 					format!("Retrying {stage:?} (attempt {attempt})");
-		// 			}
-		//
-		// 			SdlcEvent::StageCompleted {
-		// 				stage,
-		// 				..
-		// 			} => {
-		// 				self.runtime.stage = stage;
-		// 				self.runtime.phase = PipelinePhase::Completed;
-		// 				self.runtime.message =
-		// 					format!("{stage:?} complete");
-		// 			}
-		//
-		// 			SdlcEvent::RunCompleted { .. } => {
-		// 				self.runtime.phase = PipelinePhase::Completed;
-		// 				self.runtime.message = "SDLC complete".into();
-		// 			}
-		//
-		// 			SdlcEvent::Failed {
-		// 				stage,
-		// 				error,
-		// 				..
-		// 			} => {
-		// 				if let Some(stage) = stage {
-		// 					self.runtime.stage = stage;
-		// 				}
-		//
-		// 				self.runtime.phase = PipelinePhase::Failed;
-		// 				self.runtime.message = error.clone();
-		//
-		// 				self.runtime.error = Some(error);
-		// 			}
-		//
-		// 			// Anything that is purely informational should generally
-		// 			// go into the log/history rather than mutate the primary
-		// 			// runtime state.
-		// 			event => {
-		// 				self.runtime.events.push(event);
-		// 			}
-		// 		}
+		match event {
+			SdlcEvent::RunStarted => {
+				self.runtime.phase = SdlcPhase::Starting;
+				self.runtime.started_at = Instant::now();
+				self.runtime.stage_started_at = Instant::now();
+				self.runtime.message = Some(String::from("Run started"));
+			}
+
+			SdlcEvent::StageStarted { stage, attempt } => {
+				self.runtime.stage = stage;
+				self.runtime.attempt = attempt.number;
+				self.runtime.phase = SdlcPhase::Starting;
+				self.runtime.stage_started_at = Instant::now();
+				self.runtime.score = None;
+				self.runtime.confidence = None;
+				self.runtime.error = None;
+				self.runtime.message = Some(format!("{stage:?}"));
+			}
+
+			SdlcEvent::Activity {
+				stage,
+				attempt,
+				message,
+			} => {
+				self.runtime.stage = stage;
+				self.runtime.attempt = attempt.number;
+				self.runtime.message = Some(message);
+			}
+
+			SdlcEvent::PhaseChanged { phase } => {
+				self.runtime.phase = match phase {
+					SdlcPhase::Executing => SdlcPhase::Executing,
+					SdlcPhase::Evaluating => SdlcPhase::Evaluating,
+					SdlcPhase::Completed => SdlcPhase::Completed,
+
+					// Add the remaining mappings for your actual
+					// SdlcPhase variants.
+					_ => self.runtime.phase,
+				};
+
+				self.runtime.message = Some(format!("{phase:?}"));
+			}
+
+			SdlcEvent::ExecutionComplete { stage } => {
+				self.runtime.stage = stage;
+				self.runtime.phase = SdlcPhase::Evaluating;
+				self.runtime.message = Some(String::from("Execution complete"));
+			}
+
+			SdlcEvent::EvaluationStarted { stage } => {
+				self.runtime.stage = stage;
+				self.runtime.phase = SdlcPhase::Evaluating;
+				self.runtime.message = Some(String::from("Evaluating"));
+			}
+
+			SdlcEvent::Evaluated {
+				stage,
+				score,
+				confidence,
+				passed,
+			} => {
+				self.runtime.stage = stage;
+				self.runtime.score = Some(score);
+				self.runtime.confidence = Some(confidence);
+
+				self.runtime.message = Some(format!(
+					"Evaluation: {:.2} (confidence {:.2})",
+					score, confidence
+				));
+
+				if !passed {
+					self.runtime.phase = SdlcPhase::Failed;
+				}
+			}
+
+			SdlcEvent::StageTransitioned { from: _, to } => {
+				self.runtime.stage = to;
+				self.runtime.stage_started_at = Instant::now();
+				self.runtime.score = None;
+				self.runtime.confidence = None;
+				self.runtime.message = Some(format!("Starting {to:?}"));
+			}
+
+			SdlcEvent::Completed => {
+				self.runtime.phase = SdlcPhase::Completed;
+				self.runtime.message = Some(String::from("SDLC complete"));
+			}
+
+			SdlcEvent::Failed { stage, error } => {
+				if let Some(stage) = stage {
+					self.runtime.stage = stage;
+				}
+
+				self.runtime.phase = SdlcPhase::Failed;
+				self.runtime.message = Some(error.clone());
+				self.runtime.error = Some(error);
+			}
+
+			event => {
+				self.runtime.events.push(event);
+			}
+		}
 	}
 }
 
@@ -2877,6 +2888,7 @@ impl StageEvaluation {
 }
 impl Step {
 	pub const ALL: &'static [Self] = &[
+		Self::Boot,
 		Self::Init,
 		Self::Intent,
 		Self::Spec,
@@ -3576,12 +3588,12 @@ mod constants {
 		- Add progressive disclosure
 	"#;
 	use super::*;
-	pub const DEMO_COMPLETE_DELAY: Duration = Duration::from_secs(3);
-	pub const DEMO_EVALUATION_TIME: Duration = Duration::from_secs(2);
-	pub const DEMO_EXECUTION_TIME: Duration = Duration::from_secs(5);
+	pub const DEMO_COMPLETE_DELAY: Duration = Duration::from_secs(1);
+	pub const DEMO_EVALUATION_TIME: Duration = Duration::from_secs(1);
+	pub const DEMO_EXECUTION_TIME: Duration = Duration::from_secs(1);
 	pub const DEMO_RETRY_DELAY: Duration = Duration::from_secs(1);
 	pub const FMT_HUMAN_READABLE: &'static str = "%B %-d, %Y at %-I:%M:%S %p UTC";
-	pub const MAX_STAGE_ATTEMPTS: u32 = 3;
+	pub const MAX_STAGE_ATTEMPTS: u32 = 1;
 	pub const STATUS_INTERVAL: Duration = Duration::from_secs(30);
 }
 pub use constants::*;
