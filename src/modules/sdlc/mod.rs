@@ -1398,6 +1398,7 @@ pub mod structs {
 		pub dir: PathBuf,
 		pub created_at: DateTime<Utc>,
 		pub updated_at: DateTime<Utc>,
+		pub workspace: PathBuf,
 	}
 
 	pub struct SdlcView {
@@ -1435,7 +1436,6 @@ use traits as t;
 use tracing::debug;
 use traits::*;
 
-#[async_trait]
 #[async_trait]
 impl ArtifactGenerator for LocalGenerator {
 	async fn generate(&self, prompt: &str) -> Result<String> {
@@ -1751,6 +1751,7 @@ impl Evaluator {
 			evaluations,
 		))
 	}
+
 	async fn evaluate(
 		&self,
 		session: &SdlcSession,
@@ -1837,7 +1838,6 @@ impl Evaluator {
 			],
 		))
 	}
-
 	async fn evaluate_spec(&self, ctx: &EvaluationContext) -> Result<StageEvaluation> {
 		let started_at = Utc::now();
 
@@ -1914,7 +1914,6 @@ impl Evaluator {
 			],
 		))
 	}
-
 	async fn evaluate_plan(&self, ctx: &EvaluationContext) -> Result<StageEvaluation> {
 		let started_at = Utc::now();
 
@@ -2241,19 +2240,13 @@ impl SprintPipeline {
 		self.emit(SdlcEvent::RunStarted);
 
 		for (index, step) in Step::ALL.iter().enumerate() {
-			// Complete is the terminal lifecycle step.
 			if *step == Step::Complete {
 				break;
 			}
-
-			// Some Step variants are lifecycle-only and don't execute a Stage.
 			let Some(stage) = step.stage() else {
 				continue;
 			};
-
 			let attempt = self.next_attempt(stage)?;
-
-			// Tell the UI which stage/attempt is beginning.
 			self.emit(SdlcEvent::StageStarted { stage, attempt });
 
 			self.emit(SdlcEvent::Activity {
@@ -2424,13 +2417,66 @@ impl SprintPipeline {
 		Ok(StageResult::Plan)
 	}
 	async fn stage_build(&mut self) -> Result<StageResult> {
-		let session = self
+		let (stage, session_dir) = {
+			let session = self
+				.session
+				.as_ref()
+				.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
+
+			(session.stage.clone(), session.dir.clone())
+		};
+		if stage != Stage::Build {
+			return Err(anyhow::anyhow!(
+				"cannot execute Build stage while at {:?}",
+				stage
+			));
+		}
+		self.update_progress("Build started")?;
+		let workspace = self
 			.session
 			.as_ref()
-			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
-		let context = AgentContext::from_session(session)?;
-		self.update_progress("Build started")?;
-		let task: AgentTask = context.task.clone();
+			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?
+			.workspace()
+			.to_path_buf();
+		let workspace_before = WorkspaceSnapshot::capture(&workspace)?;
+
+		let task = AgentTask::new(
+			"Implement the software described by the SDLC intent, specification,
+			and plan.
+
+			You are in the BUILD stage.
+
+			Inspect the workspace using the available tools before making changes.
+
+			Implement the planned functionality by:
+			- creating required files,
+			- modifying existing source files,
+			- modifying configuration when required,
+			- adding appropriate tests,
+			- running relevant formatting, compilation, linting, and test commands,
+			- fixing errors discovered during implementation.
+
+			Do not merely describe an implementation. Perform the work in the
+			workspace.
+
+			Use the existing project structure and conventions whenever possible.
+
+			When implementation is complete, verify the result using the most
+			relevant available commands."
+				.into(),
+		);
+
+		let result = self.generator.generate(&task.prompt).await?;
+		let workspace_after = WorkspaceSnapshot::capture(&workspace)?;
+		let changes = workspace_before.diff(&workspace_after);
+
+		Self::write(session_dir.join("build.md"), changes.to_markdown(&result))?;
+
+		self.update_progress(&format!(
+			"Build completed: {} file(s) changed",
+			changes.file_count()
+		))?;
+
 		Ok(StageResult::Build)
 	}
 	// async fn stage_verify(&mut self) -> Result<StageResult> {
@@ -2698,7 +2744,6 @@ impl SprintPipeline {
 		FS::save(SpecialFile::SdlcCurrent.path()?, session)?;
 		Ok(())
 	}
-
 	fn commit(&mut self) -> Result<()> {
 		let session = self
 			.session
@@ -3065,6 +3110,7 @@ impl SdlcSession {
 		let goal = include_str!("../../../ai/template/user.goal.md").to_string();
 
 		Ok(Self {
+			workspace: dir.clone(),
 			goal,
 			id: uuid::Uuid::new_v4().to_string(),
 			title: title.into(),
@@ -3084,6 +3130,9 @@ impl SdlcSession {
 	fn create_readable(&self) -> String {
 		let current = Utc::now();
 		current.format(FMT_HUMAN_READABLE).to_string()
+	}
+	pub fn workspace(&self) -> &Path {
+		&self.workspace
 	}
 }
 impl SdlcView {
@@ -4073,7 +4122,34 @@ impl StageOutcome {
 		}
 	}
 }
+impl WorkspaceChanges {
+	pub fn file_count(&self) -> usize {
+		self
+			.git_status
+			.lines()
+			.filter(|line| !line.trim().is_empty())
+			.count()
+	}
+	pub fn to_markdown(&self, agent_result: &str) -> String {
+		let mut markdown = String::from("# Build\n\n");
 
+		markdown.push_str("## Workspace Changes\n\n");
+
+		if self.git_status.trim().is_empty() {
+			markdown.push_str("No Git changes detected.\n");
+		} else {
+			markdown.push_str("```text\n");
+			markdown.push_str(&self.git_status);
+			markdown.push_str("```\n");
+		}
+
+		markdown.push_str("\n## Agent Result\n\n");
+		markdown.push_str(agent_result);
+		markdown.push('\n');
+
+		markdown
+	}
+}
 impl Drop for TerminalGuard {
 	fn drop(&mut self) {
 		let _ = disable_raw_mode();
@@ -4098,3 +4174,66 @@ mod constants {
 	pub const STATUS_INTERVAL: Duration = Duration::from_secs(30);
 }
 pub use constants::*;
+
+pub struct WorkspaceSnapshot {
+	git_status: String,
+}
+#[derive(Debug, Clone)]
+pub struct WorkspaceChanges {
+	pub git_status: String,
+}
+impl WorkspaceSnapshot {
+	pub fn capture(workspace: impl AsRef<Path>) -> Result<Self> {
+		let workspace = workspace.as_ref();
+
+		let output = Command::new("git")
+			.args(["status", "--short", "--porcelain=v1"])
+			.current_dir(workspace)
+			.output()
+			.with_context(|| format!("failed to capture git status in {}", workspace.display()))?;
+
+		if !output.status.success() {
+			return Err(anyhow::anyhow!(
+				"git status failed: {}",
+				String::from_utf8_lossy(&output.stderr).trim()
+			));
+		}
+
+		Ok(Self {
+			git_status: String::from_utf8(output.stdout)
+				.context("git status output was not valid UTF-8")?,
+		})
+	}
+
+	pub fn diff(&self, after: &Self) -> WorkspaceChanges {
+		WorkspaceChanges {
+			git_status: after.git_status.clone(),
+		}
+	}
+}
+
+fn git_status() -> Result<String> {
+	let output = std::process::Command::new("git")
+		.args(["status", "--short"])
+		.output()?;
+
+	if !output.status.success() {
+		return Err(anyhow::anyhow!(
+			"git status failed: {}",
+			String::from_utf8_lossy(&output.stderr)
+		));
+	}
+
+	Ok(String::from_utf8(output.stdout)?)
+}
+
+pub struct BuildResult {
+	pub changed_files: Vec<PathBuf>,
+	pub created_files: Vec<PathBuf>,
+	pub modified_files: Vec<PathBuf>,
+	pub deleted_files: Vec<PathBuf>,
+	pub commands: Vec<CommandResult>,
+	pub agent_summary: Option<String>,
+}
+
+pub struct CommandResult {}
