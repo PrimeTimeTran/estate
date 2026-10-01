@@ -13,7 +13,7 @@ use std::io::IsTerminal;
 // cargo -q run --bin sdlc --features sdlc
 #[tokio::main]
 pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
-	let mut sdlc = SprintPipeline::new().context("loading SDLC")?;
+	let mut sdlc = SprintPipeline::new().await.context("loading SDLC")?;
 	if sdlc.stage().is_none() {
 		sdlc.init("Do the work required to build this CLI").await?;
 	}

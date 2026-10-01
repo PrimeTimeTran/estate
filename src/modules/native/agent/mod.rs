@@ -41,7 +41,14 @@ pub struct AgentTask {
 	pub id: Uuid,
 	pub prompt: String,
 }
-
+impl AgentTask {
+	pub fn from_session(session: &SdlcSession) -> Result<Self> {
+		Ok(Self {
+			id: Uuid::new_v4(),
+			prompt: session.goal.clone(),
+		})
+	}
+}
 impl AgentTask {
 	pub fn new(prompt: String) -> Self {
 		Self {

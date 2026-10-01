@@ -153,43 +153,38 @@ impl AgentContext {
 		Self {
 			prompt: user_prompt.clone(),
 			task: AgentTask::new(user_prompt),
-
-			intent: String::new(),
-			spec: String::new(),
-			plan: String::new(),
-			progress: String::new(),
-
+			intent: PathBuf::new(),
+			spec: PathBuf::new(),
+			plan: PathBuf::new(),
+			tests: PathBuf::new(),
+			progress: PathBuf::new(),
 			workspace: WorkspaceContext::default(),
 			history: vec![],
-
 			artifacts: vec![],
 			logs: vec![],
 			spawned_tasks: vec![],
-
 			verification: None,
 		}
 	}
 	pub fn from_session(session: &SdlcSession) -> Result<Self> {
-		let intent = read_from_session("intent.md", session)?;
-		let spec = read_from_session("spec.md", session)?;
-		let plan = read_from_session("plan.md", session)?;
-		let progress = read_from_session("progress.md", session)?;
-		let prompt = structured_prompt_execute(&intent, &spec, &plan, &progress);
+		let dir = &session.dir;
+
 		Ok(Self {
-			prompt: prompt.clone(),
-			task: AgentTask::new(prompt),
+			prompt: session.goal.clone(),
 
-			intent,
-			spec,
-			plan,
-			progress,
-			artifacts: vec![],
-			logs: vec![],
-			spawned_tasks: vec![],
+			task: AgentTask::from_session(session)?,
 
-			workspace: WorkspaceContext::default(),
-			history: vec![],
+			intent: dir.join("intent.md"),
+			spec: dir.join("spec.md"),
+			plan: dir.join("plan.md"),
+			tests: dir.join("tests.md"),
+			progress: dir.join("progress.md"),
 
+			workspace: WorkspaceContext::from_session(session)?,
+			history: Vec::new(),
+			artifacts: Vec::new(),
+			logs: Vec::new(),
+			spawned_tasks: Vec::new(),
 			verification: None,
 		})
 	}
@@ -358,10 +353,11 @@ pub struct AgentContext {
 	// ───── SDLC input ─────
 	pub task: AgentTask,
 
-	pub intent: String,
-	pub spec: String,
-	pub plan: String,
-	pub progress: String,
+	pub intent: PathBuf,
+	pub spec: PathBuf,
+	pub plan: PathBuf,
+	pub tests: PathBuf,
+	pub progress: PathBuf,
 
 	// ───── Agent execution state ─────
 	pub workspace: WorkspaceContext,
