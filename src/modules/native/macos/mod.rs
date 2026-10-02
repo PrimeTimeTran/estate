@@ -181,7 +181,6 @@ impl From<NativeEventKind> for e::EventKind {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NativeEvent {
 	pub sent_at: u64,
-
 	#[serde(flatten)]
 	pub kind: NativeEventKind,
 }

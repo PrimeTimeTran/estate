@@ -4,4 +4,4 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-exec swift "$SCRIPT_DIR/watch-key-state.swift"
+exec swift "$SCRIPT_DIR/os-observer.swift"

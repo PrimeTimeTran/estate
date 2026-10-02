@@ -30,159 +30,65 @@ pub enum HidMessage {
 impl MacosHid {
 	pub fn new() -> Result<Self> {
 		tracing::info!("MacosHid new");
+		Self::init_hid_smoke_log();
 
 		let enabled = true;
 
 		Ok(Self {
 			socket: PathBuf::from("/tmp/estate-hid.sock"),
 			child: None,
-
-			bindings: vec![
-				// Chord: Cmd + P
-				Binding {
-					trigger: Trigger::Chord {
-						keys: vec![Key::MetaLeft, Key::Key("p".into())],
-					},
-					action: Action {
-						name: "OpenCommandPalette".into(),
-						description: "Open command palette".into(),
-						code: "open_command_palette".into(),
-					},
-					when: Context::default(),
-					consume: Consume::Always,
-					enabled,
-				},
-				// Tap: Caps Lock
-				Binding {
-					trigger: Trigger::Tap { key: Key::CapsLock },
-					action: Action {
-						name: "OpenEstate".into(),
-						description: "Open Estate".into(),
-						code: "open_estate".into(),
-					},
-					when: Context::default(),
-					consume: Consume::Always,
-					enabled,
-				},
-				// Repeat: Shift twice
-				Binding {
-					trigger: Trigger::Repeat {
-						key: Key::ShiftLeft,
-						count: 2,
-						max_interval_ms: Some(300),
-					},
-					action: Action {
-						name: "QuickSwitcher".into(),
-						description: "Open quick switcher".into(),
-						code: "quick_switcher".into(),
-					},
-					when: Context::default(),
-					consume: Consume::Always,
-					enabled,
-				},
-				// Sequence: K then S
-				Binding {
-					trigger: Trigger::Sequence {
-						steps: vec![
-							Trigger::Tap {
-								key: Key::Key("k".into()),
-							},
-							Trigger::Tap {
-								key: Key::Key("s".into()),
-							},
-						],
-						timeout_ms: Some(1000),
-					},
-					action: Action {
-						name: "SaveAll".into(),
-						description: "Save all".into(),
-						code: "save_all".into(),
-					},
-					when: Context::default(),
-					consume: Consume::Always,
-					enabled,
-				},
-				// HoldThen: hold Shift, then tap P
-				Binding {
-					trigger: Trigger::HoldThen {
-						held: Key::ShiftLeft,
-						then: Box::new(Trigger::Tap {
-							key: Key::Key("p".into()),
-						}),
-					},
-					action: Action {
-						name: "ShiftPalette".into(),
-						description: "Open palette while holding Shift".into(),
-						code: "shift_palette".into(),
-					},
-					when: Context::default(),
-					consume: Consume::Always,
-					enabled,
-				},
-				// WhileHeld: Shift + scroll up
-				Binding {
-					trigger: Trigger::WhileHeld {
-						key: Key::ShiftLeft,
-						trigger: Box::new(Trigger::Pointer {
-							trigger: PointerTrigger::Scroll {
-								axis: ScrollAxis::Vertical,
-								direction: Some(keymap::ScrollDirection::Positive),
-							},
-						}),
-					},
-					action: Action {
-						name: "NavigateUp".into(),
-						description: "Navigate up while holding Shift".into(),
-						code: "navigate_up".into(),
-					},
-					when: Context::default(),
-					consume: Consume::Always,
-					enabled,
-				},
-				// Ordered: Shift↓ A↓ A↑ Shift↑
-				Binding {
-					trigger: Trigger::Ordered {
-						events: vec![
-							GestureEvent::Down(Key::ShiftLeft),
-							GestureEvent::Down(Key::Key("a".into())),
-							GestureEvent::Up(Key::Key("a".into())),
-							GestureEvent::Up(Key::ShiftLeft),
-						],
-					},
-					action: Action {
-						name: "OrderedTest".into(),
-						description: "Test ordered gesture".into(),
-						code: "ordered_test".into(),
-					},
-					when: Context::default(),
-					consume: Consume::Always,
-					enabled,
-				},
-				// Pointer: double click
-				Binding {
-					trigger: Trigger::Pointer {
-						trigger: PointerTrigger::DoubleClick {
-							button: MouseButton::Primary,
-						},
-					},
-					action: Action {
-						name: "Open".into(),
-						description: "Open on double click".into(),
-						code: "open".into(),
-					},
-					when: Context::default(),
-					consume: Consume::Always,
-					enabled,
-				},
-			],
-
+			bindings: default_bindings(),
 			pressed: HashSet::new(),
 			sequence: Vec::new(),
 			last_tap: HashMap::new(),
 		})
 	}
 	pub fn start(&mut self) -> Result<()> {
-		todo!("strt ")
+		if self.child.is_some() {
+			tracing::debug!("🍎 macOS OS observer already running");
+			return Ok(());
+		}
+
+		let source_dir = "/Users/future/kb/project/crates/estate/src/modules/native/macos/native";
+
+		let source = format!("{source_dir}/os-observer.swift");
+		let shim = format!("{source_dir}/hid-event-shim.o");
+		let output = "/tmp/estate-os-observer";
+
+		tracing::info!("🍎 building macOS OS observer");
+
+		let build = std::process::Command::new("swiftc")
+			.current_dir(source_dir)
+			.args([&source, &shim, "-o", output])
+			.output()
+			.context("failed to invoke swiftc")?;
+
+		if !build.status.success() {
+			anyhow::bail!(
+				"failed to build macOS OS observer:\n{}{}",
+				String::from_utf8_lossy(&build.stdout),
+				String::from_utf8_lossy(&build.stderr),
+			);
+		}
+
+		tracing::info!("🍎 macOS OS observer built: {output}");
+
+		let child = std::process::Command::new(output)
+			.stdin(std::process::Stdio::null())
+			.stdout(std::process::Stdio::inherit())
+			.stderr(std::process::Stdio::inherit())
+			.spawn()
+			.context("failed to start /tmp/estate-os-observer")?;
+
+		tracing::info!(
+			pid = child.id(),
+			socket = %self.socket.display(),
+			"🍎 macOS OS observer started"
+		);
+
+		self.child = Some(child);
+
+		Ok(())
 	}
 	pub fn stop(&mut self) -> Result<()> {
 		if let Some(mut child) = self.child.take() {
@@ -193,314 +99,537 @@ impl MacosHid {
 		Ok(())
 	}
 	pub async fn run(mut self, events: EventBus, cancel: CancellationToken) -> Result<()> {
-		tracing::info!(
-				socket = %self.socket.display(),
-				"connecting to Swift HID"
-		);
-
 		let stream = UnixStream::connect(&self.socket).await.with_context(|| {
 			format!(
 				"failed to connect to Swift HID socket {}",
 				self.socket.display()
 			)
 		})?;
-
-		tracing::info!("connected to Swift HID");
-
 		let (reader, mut writer) = stream.into_split();
 		let mut reader = BufReader::new(reader);
-
 		let mut ping_interval = tokio::time::interval(std::time::Duration::from_secs(10));
-
 		let mut ping_id = 0u64;
 		let mut line = String::new();
-
 		loop {
 			tokio::select! {
-							_ = cancel.cancelled() => {
-								tracing::info!(
-									"macOS HID cancelled"
-								);
-
-								return Ok(());
-							}
-							_ = ping_interval.tick() => {
-								ping_id += 1;
-
-								let ping = HidMessage::Ping {
-									id: ping_id,
-								};
-
-								let json =
-									serde_json::to_string(&ping)?;
-
-								writer
-									.write_all(json.as_bytes())
-									.await?;
-
-								writer
-									.write_all(b"\n")
-									.await?;
-
-								tracing::info!(
-									id = ping_id,
-									"🍏 Rust → Swift: PING"
-								);
-							}
-							result = reader.read_line(&mut line) => {
-							tracing::info!("🔥 RUST READ WAKE UP");
-							let received_at = mach_now();
-							let bytes = result?;
-							tracing::info!(
-								bytes,
-								"🔥 RUST READ COMPLETE"
-							);
-							if bytes == 0 {
-								tracing::warn!("Swift HID disconnected");
-								return Ok(());
-							}
-
-							let raw = line.trim_end();
-
-							tracing::info!(
-								raw,
-								"🍎 Swift → Rust"
-							);
-							let message =
-								match serde_json::from_str::<HidMessage>(
-									raw
-								) {
-									Ok(message) => message,
-
-									Err(error) => {
-										tracing::error!(
-											%error,
-											raw,
-											"invalid HID message from Swift"
-										);
-
-										line.clear();
-										continue;
-									}
-								};
-
-							match message {
-								HidMessage::Ping { id } => {
-									tracing::info!(
-										id,
-										"🍎 Swift → Rust: PING"
-									);
-
-									let pong =
-										HidMessage::Pong { id };
-
-									let json =
-										serde_json::to_string(&pong)?;
-
-									writer
-										.write_all(json.as_bytes())
-										.await?;
-
-									writer
-										.write_all(b"\n")
-										.await?;
-
-									tracing::info!(
-										id,
-										"🍏 Rust → Swift: PONG"
-									);
-								}
-								HidMessage::Pong { id } => {
-									tracing::info!(
-										id,
-										"🍎 Swift → Rust: PONG"
-									);
-								}
-								HidMessage::NativeEvent { event } => {
-									let latency = received_at.saturating_sub(event.sent_at);
-
-									tracing::info!(
-										latency,
-										"🔥 RUST EVENT"
-									);
-
-									for action in self.observe_event(&event) {
+									_ = cancel.cancelled() => {
 										tracing::info!(
-											action = %action.name,
-											code = %action.code,
-											"🔥 ACTION"
+											"macOS HID cancelled"
 										);
 
-										// events.emi (/* action event */);
+										return Ok(());
+									}
+									_ = ping_interval.tick() => {
+										ping_id += 1;
+
+										let ping = HidMessage::Ping {
+											id: ping_id,
+										};
+
+										let json =
+											serde_json::to_string(&ping)?;
+
+										writer
+											.write_all(json.as_bytes())
+											.await?;
+
+										writer
+											.write_all(b"\n")
+											.await?;
+
+										tracing::info!(
+											id = ping_id,
+											"🍏 Rust → Swift: PING"
+										);
+									}
+									result = reader.read_line(&mut line) => {
+									tracing::info!("🔥 RUST READ WAKE UP");
+									let received_at = mach_now();
+									let bytes = result?;
+									tracing::info!(
+										bytes,
+										"🔥 RUST READ COMPLETE"
+									);
+									if bytes == 0 {
+										tracing::warn!("Swift HID disconnected");
+										return Ok(());
 									}
 
-									events.emit(event.into());
-								}
-			// 					HidMessage::NativeEvent { event } => {
-			// 						let latency =
-			// 							received_at
-			// 								.saturating_sub(event.sent_at);
-			//
-			// 						tracing::info!(
-			// 							latency,
-			// 							"🔥 RUST EVENT"
-			// 						);
-			//
-			// 						events.emit(event.into());
-			// 					}
-								HidMessage::Action { action } => {
+									let raw = line.trim_end();
+
 									tracing::info!(
-										%action,
-										"🍎 Swift action received"
+										raw,
+										"🍎 Swift → Rust"
 									);
-								}
-							}
-							line.clear();
-							}
-						}
+									let message =
+										match serde_json::from_str::<HidMessage>(
+											raw
+										) {
+											Ok(message) => message,
+											Err(error) => {
+												tracing::error!(
+													%error,
+													raw,
+													"invalid HID message from Swift"
+												);
+												line.clear();
+												continue;
+											}
+										};
+
+									match message {
+										HidMessage::Ping { id } => {
+											tracing::info!(
+												id,
+												"🍎 Swift → Rust: PING"
+											);
+
+											let pong =
+												HidMessage::Pong { id };
+
+											let json =
+												serde_json::to_string(&pong)?;
+
+											writer
+												.write_all(json.as_bytes())
+												.await?;
+
+											writer
+												.write_all(b"\n")
+												.await?;
+
+											tracing::info!(
+												id,
+												"🍏 Rust → Swift: PONG"
+											);
+										}
+										HidMessage::Pong { id } => {
+											tracing::info!(
+												id,
+												"🍎 Swift → Rust: PONG"
+											);
+										}
+										HidMessage::NativeEvent { event } => {
+											 let latency = received_at.saturating_sub(event.sent_at);
+
+											tracing::info!(
+													event = ?event,
+													"🔥 RUST NATIVE EVENT"
+											);
+
+											match &event.kind {
+													NativeEventKind::KeyDown { key_code } => {
+															tracing::info!(
+																	key_code,
+																	"🔥 KEY DOWN"
+															);
+													}
+
+													NativeEventKind::KeyUp { key_code } => {
+															tracing::info!(
+																	key_code,
+																	"🔥 KEY UP"
+															);
+													}
+
+													other => {
+															tracing::info!(
+																	kind = ?other,
+																	"🔥 OTHER NATIVE EVENT KIND"
+															);
+													}
+											}
+
+											for action in self.observe_event(&event) {
+												tracing::info!(
+													action = %action.name,
+													code = %action.code,
+													"🔥 HOTKEY TRIGGERED"
+												);
+											}
+
+											events.emit(event.into());
+										}
+					HidMessage::Action { action } => {
+						tracing::info!(
+							%action,
+							"🍎 Swift action received"
+						);
+					}
+				}
+				line.clear();
+				}
+			}
 		}
 	}
-	pub fn observe_event(&mut self, event: &NativeEvent) -> Vec<Action> {
-		let mut triggered = Vec::new();
+	// pub async fn run(mut self, events: EventBus, cancel: CancellationToken) -> Result<()> {
+	// let stream = UnixStream::connect(&self.socket).await.with_context(|| {
+	// format!(
+	// "failed to connect to Swift HID socket {}",
+	// self.socket.display()
+	// )
+	// })?;
+	// let (reader, mut writer) = stream.into_split();
+	// let mut reader = BufReader::new(reader);
+	// let mut ping_interval = tokio::time::interval(std::time::Duration::from_secs(10));
+	// let mut ping_id = 0u64;
+	// let mut line = String::new();
+	// loop {
+	// tokio::select! {
+	// _ = cancel.cancelled() => {
+	// tracing::info!(
+	// "macOS HID cancelled"
+	// );
+	//
+	// return Ok(());
+	// }
+	// _ = ping_interval.tick() => {
+	// ping_id += 1;
+	//
+	// let ping = HidMessage::Ping {
+	// id: ping_id,
+	// };
+	//
+	// let json =
+	// serde_json::to_string(&ping)?;
+	//
+	// writer
+	// .write_all(json.as_bytes())
+	// .await?;
+	//
+	// writer
+	// .write_all(b"\n")
+	// .await?;
+	//
+	// tracing::info!(
+	// id = ping_id,
+	// "🍏 Rust → Swift: PING"
+	// );
+	// }
+	// result = reader.read_line(&mut line) => {
+	// tracing::info!("🔥 RUST READ WAKE UP");
+	// let received_at = mach_now();
+	// let bytes = result?;
+	// tracing::info!(
+	// bytes,
+	// "🔥 RUST READ COMPLETE"
+	// );
+	// if bytes == 0 {
+	// tracing::warn!("Swift HID disconnected");
+	// return Ok(());
+	// }
+	//
+	// let raw = line.trim_end();
+	//
+	// tracing::info!(
+	// raw,
+	// "🍎 Swift → Rust"
+	// );
+	// let message =
+	// match serde_json::from_str::<HidMessage>(
+	// raw
+	// ) {
+	// Ok(message) => message,
+	// Err(error) => {
+	// tracing::error!(
+	// %error,
+	// raw,
+	// "invalid HID message from Swift"
+	// );
+	// line.clear();
+	// continue;
+	// }
+	// };
+	//
+	// match message {
+	// HidMessage::Ping { id } => {
+	// tracing::info!(
+	// id,
+	// "🍎 Swift → Rust: PING"
+	// );
+	//
+	// let pong =
+	// HidMessage::Pong { id };
+	//
+	// let json =
+	// serde_json::to_string(&pong)?;
+	//
+	// writer
+	// .write_all(json.as_bytes())
+	// .await?;
+	//
+	// writer
+	// .write_all(b"\n")
+	// .await?;
+	//
+	// tracing::info!(
+	// id,
+	// "🍏 Rust → Swift: PONG"
+	// );
+	// }
+	// HidMessage::Pong { id } => {
+	// tracing::info!(
+	// id,
+	// "🍎 Swift → Rust: PONG"
+	// );
+	// }
+	// HidMessage::NativeEvent { event } => {
+	// let latency = received_at.saturating_sub(event.sent_at);
+	//
+	// match &event.kind {
+	// NativeEventKind::KeyDown { key_code } => {
+	// tracing::info!(
+	// key_code,
+	// "🔥 KEY DOWN"
+	// );
+	// }
+	//
+	// NativeEventKind::KeyUp { key_code } => {
+	// tracing::info!(
+	// key_code,
+	// "🔥 KEY UP"
+	// );
+	// }
+	//
+	// _ => {}
+	// }
+	//
+	// for action in self.observe_event(&event) {
+	// tracing::info!(
+	// action = %action.name,
+	// code = %action.code,
+	// "🔥 HOTKEY TRIGGERED"
+	// );
+	// }
+	//
+	// events.emit(event.into());
+	// }
+	// HidMessage::Action { action } => {
+	// tracing::info!(
+	// %action,
+	// "🍎 Swift action received"
+	// );
+	// }
+	// }
+	// line.clear();
+	// }
+	// }
+	// }
+	// }
 
+	pub fn observe_event(&mut self, event: &NativeEvent) -> Vec<Action> {
+		Self::init_hid_smoke_log();
+		let mut triggered = Vec::new();
 		for index in 0..self.bindings.len() {
 			if !self.bindings[index].enabled {
 				continue;
 			}
-
 			let matched = {
 				let trigger = &self.bindings[index].trigger.clone();
 				self.matches(trigger, event)
 			};
-
 			if matched {
 				let action = self.bindings[index].action.clone();
-
+				// let key = key_from_code(action.code);
+				let keycode = MacosHid::keycode_from_string(&action.code);
 				tracing::info!(
-					action = %action.name,
-					code = %action.code,
-					"🔥 HOTKEY TRIGGERED"
-				);
-
+				action = %action.name,
+				code = %action.code,
+				key = ?keycode.and_then(MacosHid::key_from_code),
+				"🔥 HOTKEY TRIGGERED"
+						);
+				let _ = Self::write_hid_trace(event, Some(&action));
 				triggered.push(action);
 			}
 		}
-
 		triggered
 	}
-	// 	fn matches(&mut self, trigger: &Trigger, event: &NativeEvent) -> bool {
-	// 		match trigger {
-	// 			Trigger::Chord { keys } => self.matches_chord(keys, event),
-	//
-	// 			Trigger::Tap { key } => self.matches_tap(key, event),
-	//
-	// 			Trigger::Repeat {
-	// 				key,
-	// 				count,
-	// 				max_interval_ms,
-	// 			} => self.matches_repeat(key, *count, *max_interval_ms, event),
-	//
-	// 			Trigger::Sequence { steps, timeout_ms } => self.matches_sequence(steps, *timeout_ms, event),
-	//
-	// 			Trigger::HoldThen { held, then } => self.matches_hold_then(held, then, event),
-	//
-	// 			Trigger::WhileHeld { key, trigger } => self.matches_while_held(key, trigger, event),
-	//
-	// 			Trigger::Ordered { events } => self.matches_ordered(events, event),
-	//
-	// 			Trigger::Pointer { trigger } => self.matches_pointer(trigger, event),
-	// 		}
-	// 	}
 }
+fn key_from_code(code: u16) -> Option<Key> {
+	match code {
+		// ─────────────────────────────────────────────
+		// Alphanumeric
+		// ─────────────────────────────────────────────
+		0x00 => Some(Key::Key("a".into())),
+		0x01 => Some(Key::Key("s".into())),
+		0x02 => Some(Key::Key("d".into())),
+		0x03 => Some(Key::Key("f".into())),
+		0x04 => Some(Key::Key("h".into())),
+		0x05 => Some(Key::Key("g".into())),
+		0x06 => Some(Key::Key("z".into())),
+		0x07 => Some(Key::Key("x".into())),
+		0x08 => Some(Key::Key("c".into())),
+		0x09 => Some(Key::Key("v".into())),
 
+		0x0B => Some(Key::Key("b".into())),
+		0x0C => Some(Key::Key("q".into())),
+		0x0D => Some(Key::Key("w".into())),
+		0x0E => Some(Key::Key("e".into())),
+		0x0F => Some(Key::Key("r".into())),
+		0x10 => Some(Key::Key("y".into())),
+		0x11 => Some(Key::Key("t".into())),
+
+		// Number row
+		0x12 => Some(Key::Key("1".into())),
+		0x13 => Some(Key::Key("2".into())),
+		0x14 => Some(Key::Key("3".into())),
+		0x15 => Some(Key::Key("4".into())),
+		0x16 => Some(Key::Key("6".into())),
+		0x17 => Some(Key::Key("5".into())),
+		0x18 => Some(Key::Key("=".into())),
+		0x19 => Some(Key::Key("9".into())),
+		0x1A => Some(Key::Key("7".into())),
+		0x1B => Some(Key::Key("-".into())),
+		0x1C => Some(Key::Key("8".into())),
+		0x1D => Some(Key::Key("0".into())),
+
+		// Letters / punctuation
+		0x1E => Some(Key::Key("]".into())),
+		0x1F => Some(Key::Key("o".into())),
+		0x20 => Some(Key::Key("u".into())),
+		0x21 => Some(Key::Key("[".into())),
+		0x22 => Some(Key::Key("i".into())),
+		0x23 => Some(Key::Key("p".into())),
+		0x25 => Some(Key::Key("l".into())),
+		0x26 => Some(Key::Key("j".into())),
+		0x27 => Some(Key::Key("'".into())),
+		0x28 => Some(Key::Key("k".into())),
+		0x29 => Some(Key::Key(";".into())),
+		0x2A => Some(Key::Key("\\".into())),
+		0x2B => Some(Key::Key(",".into())),
+		0x2C => Some(Key::Key("/".into())),
+		0x2D => Some(Key::Key("n".into())),
+		0x2E => Some(Key::Key("m".into())),
+		0x2F => Some(Key::Key(".".into())),
+
+		0x32 => Some(Key::Key("`".into())),
+		0x34 => Some(Key::Key("]".into())),
+
+		// ─────────────────────────────────────────────
+		// Editing / whitespace
+		// ─────────────────────────────────────────────
+		0x24 => Some(Key::Enter),
+		0x30 => Some(Key::Tab),
+		0x31 => Some(Key::Space),
+		0x33 => Some(Key::Backspace),
+		0x35 => Some(Key::Escape),
+
+		// ─────────────────────────────────────────────
+		// Modifiers
+		// ─────────────────────────────────────────────
+		0x37 => Some(Key::MetaLeft),
+		0x36 => Some(Key::MetaRight),
+
+		0x38 => Some(Key::ShiftLeft),
+		0x3C => Some(Key::ShiftRight),
+
+		0x3A => Some(Key::AltLeft),
+		0x3D => Some(Key::AltRight),
+
+		0x3B => Some(Key::ControlLeft),
+		0x3E => Some(Key::ControlRight),
+
+		0x39 => Some(Key::CapsLock),
+
+		// Fn / Globe
+		0x3F => Some(Key::Function),
+
+		// ─────────────────────────────────────────────
+		// Function keys
+		// ─────────────────────────────────────────────
+		0x7A => Some(Key::F(1)),
+		0x78 => Some(Key::F(2)),
+		0x63 => Some(Key::F(3)),
+		0x76 => Some(Key::F(4)),
+		0x60 => Some(Key::F(5)),
+		0x61 => Some(Key::F(6)),
+		0x62 => Some(Key::F(7)),
+		0x64 => Some(Key::F(8)),
+		0x65 => Some(Key::F(9)),
+		0x6D => Some(Key::F(10)),
+		0x67 => Some(Key::F(11)),
+		0x6F => Some(Key::F(12)),
+		0x69 => Some(Key::F(13)),
+		0x6B => Some(Key::F(14)),
+		0x71 => Some(Key::F(15)),
+		0x6A => Some(Key::F(16)),
+		0x40 => Some(Key::F(17)),
+		0x4F => Some(Key::F(18)),
+		0x50 => Some(Key::F(19)),
+		0x5A => Some(Key::F(20)),
+
+		// ─────────────────────────────────────────────
+		// Navigation
+		// ─────────────────────────────────────────────
+		0x7B => Some(Key::ArrowLeft),
+		0x7C => Some(Key::ArrowRight),
+		0x7D => Some(Key::ArrowDown),
+		0x7E => Some(Key::ArrowUp),
+
+		0x73 => Some(Key::Home),
+		0x77 => Some(Key::End),
+		0x74 => Some(Key::PageUp),
+		0x79 => Some(Key::PageDown),
+
+		// Forward Delete
+		0x75 => Some(Key::Delete),
+
+		// Help
+		0x72 => Some(Key::Help),
+
+		// ─────────────────────────────────────────────
+		// Numeric keypad
+		// ─────────────────────────────────────────────
+		0x52 => Some(Key::Key("0".into())),
+		0x53 => Some(Key::Key("1".into())),
+		0x54 => Some(Key::Key("2".into())),
+		0x55 => Some(Key::Key("3".into())),
+		0x56 => Some(Key::Key("4".into())),
+		0x57 => Some(Key::Key("5".into())),
+		0x58 => Some(Key::Key("6".into())),
+		0x59 => Some(Key::Key("7".into())),
+		0x5B => Some(Key::Key("8".into())),
+		0x5C => Some(Key::Key("9".into())),
+
+		0x41 => Some(Key::Key(".".into())),
+		0x43 => Some(Key::Key("*".into())),
+		0x45 => Some(Key::Key("+".into())),
+		0x4B => Some(Key::Key("/".into())),
+		0x4E => Some(Key::Key("-".into())),
+		0x51 => Some(Key::Key("=".into())),
+
+		// Keypad Enter
+		0x4C => Some(Key::Enter),
+
+		// Keypad Clear / Num Lock
+		0x47 => Some(Key::NumLock),
+		0x5F => Some(Key::NumLock),
+
+		// ─────────────────────────────────────────────
+		// Keypad navigation
+		// ─────────────────────────────────────────────
+		0x54 => Some(Key::Key("2".into())),
+		0x55 => Some(Key::Key("3".into())),
+		0x56 => Some(Key::Key("4".into())),
+		0x57 => Some(Key::Key("5".into())),
+		0x58 => Some(Key::Key("6".into())),
+		0x59 => Some(Key::Key("7".into())),
+		0x5B => Some(Key::Key("8".into())),
+		0x5C => Some(Key::Key("9".into())),
+
+		// ─────────────────────────────────────────────
+		// Unknown / unsupported
+		// ─────────────────────────────────────────────
+		_ => None,
+	}
+}
 impl MacosHid {
-	fn key_from_code(code: u16) -> Option<Key> {
-		match code {
-			// A-Z
-			0x00 => Some(Key::Key("a".into())),
-			0x01 => Some(Key::Key("s".into())),
-			0x02 => Some(Key::Key("d".into())),
-			0x03 => Some(Key::Key("f".into())),
-			0x04 => Some(Key::Key("h".into())),
-			0x05 => Some(Key::Key("g".into())),
-			0x06 => Some(Key::Key("z".into())),
-			0x07 => Some(Key::Key("x".into())),
-			0x08 => Some(Key::Key("c".into())),
-			0x09 => Some(Key::Key("v".into())),
-			0x0B => Some(Key::Key("b".into())),
-			0x0C => Some(Key::Key("q".into())),
-			0x0D => Some(Key::Key("w".into())),
-			0x0E => Some(Key::Key("e".into())),
-			0x0F => Some(Key::Key("r".into())),
-			0x10 => Some(Key::Key("y".into())),
-			0x11 => Some(Key::Key("t".into())),
-			0x12 => Some(Key::Key("1".into())),
-			0x13 => Some(Key::Key("2".into())),
-			0x14 => Some(Key::Key("3".into())),
-			0x15 => Some(Key::Key("4".into())),
-			0x16 => Some(Key::Key("6".into())),
-			0x17 => Some(Key::Key("5".into())),
-			0x18 => Some(Key::Key("=".into())),
-			0x19 => Some(Key::Key("9".into())),
-			0x1A => Some(Key::Key("7".into())),
-			0x1B => Some(Key::Key("-".into())),
-			0x1C => Some(Key::Key("8".into())),
-			0x1D => Some(Key::Key("0".into())),
-			0x1E => Some(Key::Key("]".into())),
-			0x1F => Some(Key::Key("o".into())),
-			0x20 => Some(Key::Key("u".into())),
-			0x21 => Some(Key::Key("[".into())),
-			0x22 => Some(Key::Key("i".into())),
-			0x23 => Some(Key::Key("p".into())),
-			0x24 => Some(Key::Enter),
-			0x25 => Some(Key::Key("l".into())),
-			0x26 => Some(Key::Key("j".into())),
-			0x27 => Some(Key::Key("'".into())),
-			0x28 => Some(Key::Key("k".into())),
-			0x29 => Some(Key::Key(";".into())),
-			0x2A => Some(Key::Key("\\".into())),
-			0x2B => Some(Key::Key(",".into())),
-			0x2C => Some(Key::Key("/".into())),
-			0x2D => Some(Key::Key("n".into())),
-			0x2E => Some(Key::Key("m".into())),
-			0x2F => Some(Key::Key(".".into())),
-
-			// Modifiers
-			0x37 => Some(Key::MetaLeft),
-			0x36 => Some(Key::MetaRight),
-
-			0x38 => Some(Key::ShiftLeft),
-			0x3C => Some(Key::ShiftRight),
-
-			0x3A => Some(Key::AltLeft),
-			0x3D => Some(Key::AltRight),
-
-			0x3B => Some(Key::ControlLeft),
-			0x3E => Some(Key::ControlRight),
-
-			// Caps Lock
-			0x39 => Some(Key::CapsLock),
-
-			// Space
-			0x31 => Some(Key::Space),
-
-			// Tab
-			0x30 => Some(Key::Tab),
-
-			// Escape
-			0x35 => Some(Key::Escape),
-
-			// Delete
-			0x33 => Some(Key::Backspace),
-
-			// Arrow keys
-			0x7E => Some(Key::ArrowUp),
-			0x7D => Some(Key::ArrowDown),
-			0x7B => Some(Key::ArrowLeft),
-			0x7C => Some(Key::ArrowRight),
-
-			_ => None,
-		}
+	/// Convert an Estate action code string into a macOS keycode.
+	pub fn keycode_from_string(code: &str) -> Option<u16> {
+		code.parse::<u16>().ok()
+	}
+	pub fn key_from_code(code: u16) -> Option<Key> {
+		key_from_code(code)
 	}
 
 	fn mouse_code(button: MouseButton) -> i64 {
@@ -903,11 +1032,8 @@ impl MacosHid {
 			(GestureEvent::Down(a), GestureEvent::Down(b)) => a == b,
 			(GestureEvent::Up(a), GestureEvent::Up(b)) => a == b,
 			(GestureEvent::Tap(a), GestureEvent::Tap(b)) => a == b,
-
 			(GestureEvent::MouseDown(a), GestureEvent::MouseDown(b)) => a == b,
-
 			(GestureEvent::MouseUp(a), GestureEvent::MouseUp(b)) => a == b,
-
 			(
 				GestureEvent::Scroll {
 					vertical: av,
@@ -946,7 +1072,6 @@ impl MacosHid {
 			.map(|event_button| event_button == button)
 			.unwrap_or(false)
 	}
-
 	fn matches_mouse_down(event: &NativeEvent, button: MouseButton) -> bool {
 		matches!(
 			&event.kind,
@@ -956,62 +1081,57 @@ impl MacosHid {
 			} if *event_button == Self::mouse_code(button)
 		)
 	}
+	fn write_hid_trace(event: &NativeEvent, action: Option<&Action>) -> std::io::Result<()> {
+		let path = std::env::current_dir()?.join("estate-hid-smoke.log");
 
-	// fn gesture_event(event: &NativeEvent) -> Option<GestureEvent> {
-	// 	match event.kind {
-	// 		NativeEventKind::KeyDown { key_code } => Self::key_from_code(key_code).map(GestureEvent::Down),
-	//
-	// 		NativeEventKind::KeyUp { key_code } => Self::key_from_code(key_code).map(GestureEvent::Up),
-	//
-	// 		NativeEventKind::MouseDown { button, .. } => {
-	// 			Self::gesture_mouse_button(button).map(GestureEvent::MouseDown)
-	// 		}
-	//
-	// 		NativeEventKind::MouseUp { button, .. } => {
-	// 			Self::gesture_mouse_button(button).map(GestureEvent::MouseUp)
-	// 		}
-	//
-	// 		NativeEventKind::Scroll {
-	// 			vertical,
-	// 			horizontal,
-	// 		} => Some(GestureEvent::Scroll {
-	// 			vertical,
-	// 			horizontal,
-	// 		}),
-	// 	}
-	// }
-	//
-	// fn gesture_key(event: &GestureEvent) -> Option<Key> {
-	// 	match event {
-	// 		GestureEvent::Down(key) | GestureEvent::Up(key) | GestureEvent::Tap(key) => Some(key.clone()),
-	// 		_ => None,
-	// 	}
-	// }
-	//
-	// fn gesture_matches(expected: &GestureEvent, actual: &GestureEvent) -> bool {
-	// 	match (expected, actual) {
-	// 		(GestureEvent::Down(a), GestureEvent::Down(b)) => a == b,
-	// 		(GestureEvent::Up(a), GestureEvent::Up(b)) => a == b,
-	// 		(GestureEvent::Tap(a), GestureEvent::Tap(b)) => a == b,
-	//
-	// 		(GestureEvent::MouseDown(a), GestureEvent::MouseDown(b)) => a == b,
-	//
-	// 		(GestureEvent::MouseUp(a), GestureEvent::MouseUp(b)) => a == b,
-	//
-	// 		(
-	// 			GestureEvent::Scroll {
-	// 				vertical: av,
-	// 				horizontal: ah,
-	// 			},
-	// 			GestureEvent::Scroll {
-	// 				vertical: bv,
-	// 				horizontal: bh,
-	// 			},
-	// 		) => av == bv && ah == bh,
-	//
-	// 		_ => false,
-	// 	}
-	// }
+		let mut file = OpenOptions::new().create(true).append(true).open(path)?;
+
+		let event_name = match &event.kind {
+			NativeEventKind::KeyDown { .. } => "↓",
+			NativeEventKind::KeyUp { .. } => "↑",
+			NativeEventKind::MouseDown { .. } => "M↓",
+			NativeEventKind::MouseUp { .. } => "M↑",
+			NativeEventKind::Scroll { .. } => "SCROLL",
+		};
+
+		writeln!(
+			file,
+			"{:<19} | {:<24} | {:<24}",
+			format_timestamp(event.sent_at as f64),
+			event_name,
+			action
+				.map(|a| format!("{} ({})", a.name, a.code))
+				.unwrap_or_default(),
+		)?;
+
+		Ok(())
+	}
+
+	fn init_hid_smoke_log() -> std::io::Result<()> {
+		let path = std::env::current_dir()?.join("estate-hid-smoke.log");
+
+		let mut file = std::fs::File::create(path)?;
+
+		writeln!(
+			file,
+			"TIME          LS LC LO LM | RS RC RO RM | FN CP | EVENT              FLAGS"
+		)?;
+		writeln!(
+			file,
+			"              -- --------- | --------- | -- -- | ------------------ ----------------"
+		)?;
+		writeln!(
+			file,
+			"Columns: LS LC LO LM = left modifiers, RS RC RO RM = right modifiers, FN CP = Fn/Caps"
+		)?;
+		writeln!(
+			file,
+			"Event flags are aggregate CoreGraphics state; left/right state is reconstructed from keycodes"
+		)?;
+		writeln!(file)?;
+
+		Ok(())
+	}
 }
 
 pub struct MacosHid {

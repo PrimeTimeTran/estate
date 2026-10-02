@@ -3,7 +3,7 @@ import CoreGraphics
 import Darwin
 import Foundation
 
-struct FrontmostApp: Codable {  
+struct FrontmostApp: Codable {
   let bundleID: String?
   let name: String?
   let pid: Int32?
@@ -115,7 +115,6 @@ print("🚀 Initial frontmost app:")
 print("   name: \(initialApp.name ?? "nil")")
 print("   bundle: \(initialApp.bundleID ?? "nil")")
 print("   pid: \(initialApp.pid.map(String.init) ?? "nil")")
-
 
 // MARK: - App activation events
 
@@ -826,29 +825,36 @@ func printEvent(_ nativeEvent: NativeEvent) {
 
   let eventDisplay = "\(arrow) \(displayName)"
 
-  print(
-    String(
-      format:
-        "%@ | %-9@ | %-9@ | %-4@ | %-14@ | %-8@ | %4lld | %10llu | %10llu | %6lld | %6lld",
-      now as NSString,
-      left as NSString,
-      right as NSString,
-      special as NSString,
-      eventDisplay as NSString,
-      flagsText as NSString,
-      info.keyCode ?? -1,
-      info.flags,
-      info.sessionFlags,
-      info.sourcePID,
-      info.sourceUserData
-    )
-  )
-  let sentAt = mach_absolute_time()
-
-  let message =
-    "{\"type\":\"native_event\"," + "\"event\":{" + "\"sent_at\":\(sentAt),"
-    + "\"kind\":\"key_down\"," + "\"key_code\":\(displayName)" + "}}"
-
+  // print(
+  //   String(
+  //     format:
+  //       "%@ | %-9@ | %-9@ | %-4@ | %-14@ | %-8@ | %4lld | %10llu | %10llu | %6lld | %6lld",
+  //     now as NSString,
+  //     left as NSString,
+  //     right as NSString,
+  //     special as NSString,
+  //     eventDisplay as NSString,
+  //     flagsText as NSString,
+  //     info.keyCode ?? -1,
+  //     info.flags,
+  //     info.sessionFlags,
+  //     info.sourcePID,
+  //     info.sourceUserData
+  //   )
+  // )
+  //   let sentAt = mach_absolute_time()
+  //
+  //   let message =
+  //     "{\"type\":\"native_event\"," + "\"event\":{" + "\"sent_at\":\(sentAt),"
+  //     + "\"kind\":\"key_down\"," + "\"key_code\":\(displayName)" + "}}"
+  //   guard estateClientFD >= 0 else {
+  //     return
+  //   }
+  //
+  //   sendEstate(
+  //     message,
+  //     on: estateClientFD
+  //   )
   // sendEstate(
   //   message,
   //   on: clientFD
@@ -858,14 +864,6 @@ func printEvent(_ nativeEvent: NativeEvent) {
   //   on: estateClientFD
   // )
 
-  guard estateClientFD >= 0 else {
-    return
-  }
-
-  sendEstate(
-    message,
-    on: estateClientFD
-  )
   fflush(stdout)
 }
 let mask =
@@ -904,18 +902,27 @@ let callback: CGEventTapCallBack = {
 
   switch type {
   case .keyDown:
-    let message =
-      "{\"type\":\"native_event\"," + "\"event\":{" + "\"sent_at\":\(sentAt),"
-      + "\"kind\":\"key_down\"," + "\"key_code\":\(rawKeyCode)" + "}}"
-
-    guard estateClientFD >= 0 else {
-      return Unmanaged.passUnretained(event)
-    }
-
-    sendEstate(
-      message,
-      on: estateClientFD
+    let keyCode = event.getIntegerValueField(
+      .keyboardEventKeycode
     )
+
+    sendKeyEvent(
+      kind: "key_down",
+      keyCode: keyCode,
+      sentAt: Int64(Date().timeIntervalSince1970 * 1000)
+    )
+  //     let message =
+  //       "{\"type\":\"native_event\"," + "\"event\":{" + "\"sent_at\":\(sentAt),"
+  //       + "\"kind\":\"key_down\"," + "\"key_code\":\(rawKeyCode)" + "}}"
+  //
+  //     guard estateClientFD >= 0 else {
+  //       return Unmanaged.passUnretained(event)
+  //     }
+  //
+  //     sendEstate(
+  //       message,
+  //       on: estateClientFD
+  //     )
   case .keyUp:
     let message =
       "{\"type\":\"native_event\"," + "\"event\":{" + "\"sent_at\":\(sentAt),"
@@ -1107,7 +1114,7 @@ let callback: CGEventTapCallBack = {
       modifierDirection: direction
     )
 
-    printEvent(nativeEvent)
+  // printEvent(nativeEvent)
   case .keyDown:
 
     let name = keyName(code)
@@ -1119,7 +1126,7 @@ let callback: CGEventTapCallBack = {
       modifierDirection: .down
     )
 
-    printEvent(nativeEvent)
+  // printEvent(nativeEvent)
 
   case .keyUp:
 
@@ -1132,7 +1139,7 @@ let callback: CGEventTapCallBack = {
       modifierDirection: .up
     )
 
-    printEvent(nativeEvent)
+  // printEvent(nativeEvent)
 
   default:
     break
@@ -1190,6 +1197,33 @@ func sendEstate(
         " 💜 SWIFT → RUST " + "fd=\(clientFD) " + "bytes=\(result) " + "write=\(elapsed / 1_000)µs"
       )
     }
+  }
+}
+
+func sendKeyEvent(
+  kind: String,
+  keyCode: Int64,
+  sentAt: Int64
+) {
+  let message: [String: Any] = [
+    "type": "native_event",
+    "event": [
+      "sent_at": sentAt,
+      "kind": kind,
+      "key_code": keyCode,
+    ],
+  ]
+
+  do {
+    let data = try JSONSerialization.data(
+      withJSONObject: message,
+      options: [.sortedKeys]
+    )
+
+    FileHandle.standardOutput.write(data)
+    FileHandle.standardOutput.write(Data([0x0A]))
+  } catch {
+    fputs("JSON serialization error: \(error)\n", stderr)
   }
 }
 func startSwiftPingLoop(

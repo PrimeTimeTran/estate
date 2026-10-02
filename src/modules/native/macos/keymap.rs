@@ -20,7 +20,6 @@ pub struct Binding {
 
 	#[serde(default)]
 	pub when: Context,
-
 	#[serde(default)]
 	pub consume: Consume,
 
@@ -141,7 +140,6 @@ pub enum Trigger {
 	/// Mouse / scroll gestures.
 	Pointer { trigger: PointerTrigger },
 }
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum Key {
 	Key(String),
@@ -159,6 +157,7 @@ pub enum Key {
 	MetaRight,
 
 	CapsLock,
+	Function,
 
 	Enter,
 	Tab,
@@ -167,12 +166,77 @@ pub enum Key {
 	Backspace,
 	Delete,
 
+	Home,
+	End,
+	PageUp,
+	PageDown,
+	Help,
+	NumLock,
+
 	ArrowUp,
 	ArrowDown,
 	ArrowLeft,
 	ArrowRight,
 
 	F(u8),
+}
+impl Key {
+	pub fn display(&self) -> String {
+		match self {
+			Key::Key(key) => key.clone(),
+
+			Key::ShiftLeft | Key::ShiftRight => "⇧".into(),
+			Key::ControlLeft | Key::ControlRight => "⌃".into(),
+			Key::AltLeft | Key::AltRight => "⌥".into(),
+			Key::MetaLeft | Key::MetaRight => "⌘".into(),
+
+			Key::CapsLock => "⇪".into(),
+			Key::Function => "fn".into(),
+
+			Key::Enter => "↩".into(),
+			Key::Tab => "⇥".into(),
+			Key::Escape => "⎋".into(),
+			Key::Space => "Space".into(),
+			Key::Backspace => "⌫".into(),
+			Key::Delete => "⌦".into(),
+
+			Key::Home => "Home".into(),
+			Key::End => "End".into(),
+			Key::PageUp => "Page Up".into(),
+			Key::PageDown => "Page Down".into(),
+			Key::Help => "Help".into(),
+			Key::NumLock => "Num Lock".into(),
+
+			Key::ArrowUp => "↑".into(),
+			Key::ArrowDown => "↓".into(),
+			Key::ArrowLeft => "←".into(),
+			Key::ArrowRight => "→".into(),
+
+			Key::F(n) => format!("F{n}"),
+		}
+	}
+}
+
+fn display_event(event: &NativeEventKind) -> String {
+	match event {
+		NativeEventKind::KeyDown { key_code, .. } => {
+			let key = MacosHid::key_from_code(*key_code)
+				.map(|k| k.display())
+				.unwrap_or_else(|| "?".into());
+
+			format!("KEY DOWN   code={:<3} key={:<8}", key_code, key)
+		}
+
+		NativeEventKind::KeyUp { key_code, .. } => {
+			let key = MacosHid::key_from_code(*key_code)
+				.map(|k| k.display())
+				.unwrap_or_else(|| "?".into());
+
+			format!("KEY UP     code={:<3} key={:<8}", key_code, key)
+		}
+
+		_ => String::new(),
+	}
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum GestureEvent {
