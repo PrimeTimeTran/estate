@@ -33,7 +33,7 @@ enum Kind: String, Codable {
 }
 
 // MARK: - Feature Flags
-
+let enablePrintEvent = false
 let enableEstateSocket = true
 let enableWorkspaceObserver = true
 let enableInitialForegroundApp = true
@@ -41,13 +41,11 @@ let enableCGEventTap = true
 
 let enableEventLogging = true
 let enableWorkspaceLogging = true
-let enableSocketLogging = true
+var estateClientFD: Int32 = -1
+var state = ModifierState()
 
 // MARK: - Shared Observer State
-
 formatter.dateFormat = "HH:mm:ss.SSS"
-
-var state = ModifierState()
 
 var shouldStartEstateSocket = true
 let socketPath = "/tmp/estate-hid.sock"
@@ -74,7 +72,6 @@ let watchedKeyCodes: Set<CGKeyCode> = [
   56,  // Left Shift
   60,  // Right Shift
 ]
-var estateClientFD: Int32 = -1
 let pid = ProcessInfo.processInfo.processIdentifier
 let sourcePID = ProcessInfo.processInfo.processIdentifier
 let formatter = DateFormatter()
@@ -94,11 +91,6 @@ struct FrontmostApp: Codable {
   let bundleID: String?
   let name: String?
   let pid: Int32?
-}
-struct EventEnvelope: Codable {
-  let type: String
-  let version: UInt
-  let event: NativeEvent
 }
 struct EstateNativeEventMessage: Codable {
   let type: String
@@ -515,36 +507,113 @@ func aggregateModifiers(_ modifiers: ModifierSnapshot?) -> String {
     + "\(keyState(opt, "⌥")) "
     + "\(keyState(cmd, "⌘"))"
 }
-func printHeader() {
-  print("")
-  print(
-    "TIME          " + "LS LC LO LM | " + "RS RC RO RM | " + "FN CP | " + "EVENT              "
-      + "FLAGS"
-  )
 
-  print(
-    "              " + "-- --------- | --------- | " + "-- -- | " + "------------------- "
-      + "----------------"
-  )
+func printEvent(_ nativeEvent: NativeEvent) {
+  let now = formatter.string(from: Date())
+  let modifiers = nativeEvent.modifiers
 
-  fflush(stdout)
-}
-func sendNativeEvent(
-  _ event: NativeEvent,
-  on clientFD: Int32
-) {
-  do {
-    let message = EstateNativeEventMessage(event: event)
-    let data = try JSONEncoder().encode(message)
-
-    guard let json = String(data: data, encoding: .utf8) else {
-      return
+  let arrow: String = {
+    if let direction = nativeEvent.direction {
+      return direction == .down ? "↓" : "↑"
     }
 
-    sendEstate(json, on: clientFD)
-  } catch {
-    print("❌ failed to encode native event: \(error)")
-  }
+    switch nativeEvent.kind {
+    case .keyDown, .mouseDown:
+      return "↓"
+
+    case .keyUp, .mouseUp:
+      return "↑"
+
+    default:
+      return " "
+    }
+  }()
+
+  let left =
+    "\(keyState(modifiers?.leftShift ?? false, "⇧")) "
+    + "\(keyState(modifiers?.leftCtrl ?? false, "⌃")) "
+    + "\(keyState(modifiers?.leftOpt ?? false, "⌥")) "
+    + "\(keyState(modifiers?.leftCmd ?? false, "⌘"))"
+
+  let right =
+    "\(keyState(modifiers?.rightShift ?? false, "⇧")) "
+    + "\(keyState(modifiers?.rightCtrl ?? false, "⌃")) "
+    + "\(keyState(modifiers?.rightOpt ?? false, "⌥")) "
+    + "\(keyState(modifiers?.rightCmd ?? false, "⌘"))"
+
+  let special =
+    "\(keyState(modifiers?.fn ?? false, "fn")) "
+    + "\(keyState(modifiers?.caps ?? false, "⇪"))"
+
+  let flagsText = aggregateModifiers(modifiers)
+
+  // Semantic key code first. Fall back to the raw CGEvent
+  // for debugging if it still exists.
+  let keyCode: Int64? = {
+    guard let keyCode = nativeEvent.keyCode else {
+      return nil
+    }
+
+    return Int64(keyCode)
+  }()
+
+  let displayName: String = {
+    guard let keyCode else {
+      return nativeEvent.name
+    }
+
+    switch keyCode {
+    case 55, 54:
+      return "⌘"
+
+    case 58, 61:
+      return "⌥"
+
+    case 59, 62:
+      return "⌃"
+
+    case 56, 60:
+      return "⇧"
+
+    case 63:
+      return "fn"
+
+    case 48:
+      return "⇥"
+
+    case 49:
+      return "␠"
+
+    case 36:
+      return "↵"
+
+    case 53:
+      return "⎋"
+
+    case 51:
+      return "⌫"
+
+    default:
+      return nativeEvent.name
+    }
+  }()
+
+  let eventDisplay = "\(arrow) \(displayName)"
+
+  print(
+    String(
+      format:
+        "%@ | %-9@ | %-9@ | %-4@ | %-14@ | %-8@ | %4lld",
+      now as NSString,
+      left as NSString,
+      right as NSString,
+      special as NSString,
+      eventDisplay as NSString,
+      flagsText as NSString,
+      keyCode ?? -1
+    )
+  )
+  fflush(stdout)
 }
 func makeEvent(
   _ event: CGEvent,
@@ -717,112 +786,33 @@ func makeEvent(
     )
   }
 }
-func printEvent(_ nativeEvent: NativeEvent) {
-  let now = formatter.string(from: Date())
-  let modifiers = nativeEvent.modifiers
+func sendNativeEvent(
+  _ event: NativeEvent,
+  on clientFD: Int32
+) {
+  guard clientFD >= 0 else {
+    if enablePrintEvent {
+      print("⚠️ SWIFT → RUST skipped: invalid client fd=\(clientFD)")
+      printEvent(event)
+    }
+    return
+  }
+  do {
+    let message = EstateNativeEventMessage(event: event)
+    let data = try JSONEncoder().encode(message)
 
-  let arrow: String = {
-    if let direction = nativeEvent.direction {
-      return direction == .down ? "↓" : "↑"
+    if enablePrintEvent {
+      printEvent(event)
     }
 
-    switch nativeEvent.kind {
-    case .keyDown, .mouseDown:
-      return "↓"
-
-    case .keyUp, .mouseUp:
-      return "↑"
-
-    default:
-      return " "
-    }
-  }()
-
-  let left =
-    "\(keyState(modifiers?.leftShift ?? false, "⇧")) "
-    + "\(keyState(modifiers?.leftCtrl ?? false, "⌃")) "
-    + "\(keyState(modifiers?.leftOpt ?? false, "⌥")) "
-    + "\(keyState(modifiers?.leftCmd ?? false, "⌘"))"
-
-  let right =
-    "\(keyState(modifiers?.rightShift ?? false, "⇧")) "
-    + "\(keyState(modifiers?.rightCtrl ?? false, "⌃")) "
-    + "\(keyState(modifiers?.rightOpt ?? false, "⌥")) "
-    + "\(keyState(modifiers?.rightCmd ?? false, "⌘"))"
-
-  let special =
-    "\(keyState(modifiers?.fn ?? false, "fn")) "
-    + "\(keyState(modifiers?.caps ?? false, "⇪"))"
-
-  let flagsText = aggregateModifiers(modifiers)
-
-  // Semantic key code first. Fall back to the raw CGEvent
-  // for debugging if it still exists.
-  let keyCode: Int64? = {
-    guard let keyCode = nativeEvent.keyCode else {
-      return nil
+    guard let json = String(data: data, encoding: .utf8) else {
+      return
     }
 
-    return Int64(keyCode)
-  }()
-
-  let displayName: String = {
-    guard let keyCode else {
-      return nativeEvent.name
-    }
-
-    switch keyCode {
-    case 55, 54:
-      return "⌘"
-
-    case 58, 61:
-      return "⌥"
-
-    case 59, 62:
-      return "⌃"
-
-    case 56, 60:
-      return "⇧"
-
-    case 63:
-      return "fn"
-
-    case 48:
-      return "⇥"
-
-    case 49:
-      return "␠"
-
-    case 36:
-      return "↵"
-
-    case 53:
-      return "⎋"
-
-    case 51:
-      return "⌫"
-
-    default:
-      return nativeEvent.name
-    }
-  }()
-
-  let eventDisplay = "\(arrow) \(displayName)"
-
-  print(
-    String(
-      format:
-        "%@ | %-9@ | %-9@ | %-4@ | %-14@ | %-8@ | %4lld",
-      now as NSString,
-      left as NSString,
-      right as NSString,
-      special as NSString,
-      eventDisplay as NSString,
-      flagsText as NSString,
-      keyCode ?? -1
-    )
-  )
-  fflush(stdout)
+    sendEstate(json, on: clientFD)
+  } catch {
+    print("❌ failed to encode native event: \(error)")
+  }
 }
 func sendEstate(
   _ message: String,
@@ -877,7 +867,6 @@ func sendKeyEvent(
     fputs("JSON serialization error: \(error)\n", stderr)
   }
 }
-
 func handleEstateConnection(
   _ clientFD: Int32
 ) {
@@ -936,6 +925,34 @@ func handleEstateConnection(
       )
     }
   }
+}
+
+func emitForegroundApp(_ app: FrontmostApp) {
+  let now = DispatchTime.now().uptimeNanoseconds
+
+  let event = NativeEvent(
+    sentAt: now,
+    kind: .frontmostApp,
+    source: .workspace,
+    timestamp: mach_absolute_time(),
+
+    keyCode: nil,
+    button: nil,
+    x: nil,
+    y: nil,
+    vertical: nil,
+    horizontal: nil,
+
+    name: app.name ?? "",
+    modifiers: nil,
+    direction: nil,
+    frontmostApp: app
+  )
+
+  sendNativeEvent(
+    event,
+    on: estateClientFD
+  )
 }
 func startEstateSocket() {
   func startSwiftPingLoop(
@@ -1021,51 +1038,30 @@ func startEstateSocket() {
     )
     guard clientFD >= 0 else {
       print(
-        "accept failed: " + "\(String(cString: strerror(errno)))"
+        "accept failed: "
+          + "\(String(cString: strerror(errno)))"
       )
       continue
     }
+
     estateClientFD = clientFD
+
     print(
-      "ESTATE RUST connected fd=\(estateClientFD)"
+      "🔥 ESTATE RUST CONNECTED fd=\(clientFD)"
     )
 
-    // startSwiftPingLoop(clientFD)
+    handleEstateConnection(clientFD)
+
+    close(clientFD)
+
+    estateClientFD = -1
+    print("🔌 ESTATE RUST DISCONNECTED")
 
     handleEstateConnection(
       estateClientFD
     )
+    // startSwiftPingLoop(clientFD)
   }
-}
-func machNow() -> UInt64 {
-  mach_absolute_time()
-}
-func emitForegroundApp(_ app: FrontmostApp) {
-  let now = DispatchTime.now().uptimeNanoseconds
-
-  let event = NativeEvent(
-    sentAt: now,
-    kind: .frontmostApp,
-    source: .workspace,
-    timestamp: mach_absolute_time(),
-
-    keyCode: nil,
-    button: nil,
-    x: nil,
-    y: nil,
-    vertical: nil,
-    horizontal: nil,
-
-    name: app.name ?? "",
-    modifiers: nil,
-    direction: nil,
-    frontmostApp: app
-  )
-
-  sendNativeEvent(
-    event,
-    on: estateClientFD
-  )
 }
 func frontmostApplication() -> FrontmostApp {
   let app = NSWorkspace.shared.frontmostApplication
@@ -1075,9 +1071,25 @@ func frontmostApplication() -> FrontmostApp {
     pid: app?.processIdentifier
   )
 }
+func machNow() -> UInt64 {
+  mach_absolute_time()
+}
+func printHeader() {
+  print("")
+  print(
+    "TIME          " + "LS LC LO LM | " + "RS RC RO RM | " + "FN CP | " + "EVENT              "
+      + "FLAGS"
+  )
+
+  print(
+    "              " + "-- --------- | --------- | " + "-- -- | " + "------------------- "
+      + "----------------"
+  )
+
+  fflush(stdout)
+}
 
 // MARK: - Estate Transport
-
 if enableEstateSocket {
   print("🚀 Starting Estate socket...")
 
@@ -1089,7 +1101,6 @@ if enableEstateSocket {
 }
 
 // MARK: - Initial Foreground Application
-
 if enableInitialForegroundApp {
   let initialApp = frontmostApplication()
 
@@ -1104,7 +1115,6 @@ if enableInitialForegroundApp {
 }
 
 // MARK: - Workspace / Foreground Application Observer
-
 if enableWorkspaceObserver {
   NSWorkspace.shared.notificationCenter.addObserver(
     forName: NSWorkspace.didActivateApplicationNotification,
@@ -1151,17 +1161,16 @@ if enableWorkspaceObserver {
 }
 
 // MARK: - Keyboard / CGEvent Observation
-
 if enableCGEventTap {
-
   formatter.dateFormat = "HH:mm:ss.SSS"
-  var state = ModifierState()
 
   let callback: CGEventTapCallBack = {
     proxy,
     type,
     event,
     userInfo in
+    // print("🔥 CGEVENT TYPE: \(type.rawValue)")
+    fflush(stdout)
 
     if type == .tapDisabledByTimeout {
       print("!!! EVENT TAP DISABLED: TIMEOUT")
@@ -1180,11 +1189,8 @@ if enableCGEventTap {
     )
 
     switch type {
-
     // MARK: Modifier
-
     case .flagsChanged:
-
       if code == 0 {
         if enableEventLogging {
           print(
@@ -1200,7 +1206,6 @@ if enableCGEventTap {
       }
 
       let name = modifierName(code)
-
       // Update our left/right modifier state BEFORE
       // constructing the normalized event.
       let direction = updateModifierState(
@@ -1267,7 +1272,6 @@ if enableCGEventTap {
       }
 
     // MARK: Key Down
-
     case .keyDown:
 
       let name = keyName(code)
@@ -1297,6 +1301,82 @@ if enableCGEventTap {
         type: type,
         description: name,
         modifierDirection: .up
+      )
+
+      if enableEstateSocket {
+        sendNativeEvent(
+          nativeEvent,
+          on: estateClientFD
+        )
+      }
+
+    // MARK: Mouse
+
+    case .leftMouseDown,
+      .leftMouseUp,
+      .rightMouseDown,
+      .rightMouseUp,
+      .otherMouseDown,
+      .otherMouseUp:
+
+      let buttonNumber =
+        event.getIntegerValueField(
+          .mouseEventButtonNumber
+        )
+
+      let direction: KeyDirection =
+        switch type {
+        case .leftMouseDown,
+          .rightMouseDown,
+          .otherMouseDown:
+          .down
+
+        case .leftMouseUp,
+          .rightMouseUp,
+          .otherMouseUp:
+          .up
+
+        default:
+          fatalError("Unexpected mouse event type")
+        }
+
+      let kind: NativeEvent.Kind =
+        switch type {
+        case .leftMouseDown,
+          .rightMouseDown,
+          .otherMouseDown:
+          .mouseDown
+
+        case .leftMouseUp,
+          .rightMouseUp,
+          .otherMouseUp:
+          .mouseUp
+
+        default:
+          fatalError("Unexpected mouse event type")
+        }
+
+      let location = event.location
+
+      let nativeEvent = NativeEvent(
+        sentAt: DispatchTime.now().uptimeNanoseconds,
+        kind: kind,
+        source: .cgEvent,
+        timestamp: event.timestamp,
+
+        keyCode: nil,
+
+        button: buttonNumber,
+        x: location.x,
+        y: location.y,
+
+        vertical: nil,
+        horizontal: nil,
+
+        name: "Mouse \(buttonNumber + 1)",
+        modifiers: ModifierSnapshot(from: state),
+        direction: direction,
+        frontmostApp: nil
       )
 
       if enableEstateSocket {
@@ -1372,7 +1452,6 @@ if enableCGEventTap {
 }
 
 // MARK: - Main Run Loop
-
 print("")
 print("🚀 Estate native PID: \(pid)")
 print("")
