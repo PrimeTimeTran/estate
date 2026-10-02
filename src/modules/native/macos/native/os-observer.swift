@@ -32,6 +32,24 @@ enum Kind: String, Codable {
   case modifierChanged = "ModifierChanged"
 }
 
+// MARK: - Feature Flags
+
+let enableEstateSocket = true
+let enableWorkspaceObserver = true
+let enableInitialForegroundApp = true
+let enableCGEventTap = true
+
+let enableEventLogging = true
+let enableWorkspaceLogging = true
+let enableSocketLogging = true
+
+// MARK: - Shared Observer State
+
+formatter.dateFormat = "HH:mm:ss.SSS"
+
+var state = ModifierState()
+
+var shouldStartEstateSocket = true
 let socketPath = "/tmp/estate-hid.sock"
 let modifiers: [Int64: String] = [
   56: "LSHIFT",
@@ -71,7 +89,7 @@ let mask =
   | CGEventMask(1 << CGEventType.otherMouseDown.rawValue)
   | CGEventMask(1 << CGEventType.otherMouseUp.rawValue)
   | CGEventMask(1 << CGEventType.scrollWheel.rawValue)
-  
+
 struct FrontmostApp: Codable {
   let bundleID: String?
   let name: String?
@@ -859,33 +877,7 @@ func sendKeyEvent(
     fputs("JSON serialization error: \(error)\n", stderr)
   }
 }
-func startSwiftPingLoop(
-  _ clientFD: Int32
-) {
-  Thread {
-    var id: UInt64 = 0
 
-    while true {
-      sleep(10)
-
-      id += 1
-
-      let message =
-        #"{"type":"ping","id":"#
-        + "\(id)"
-        + "}"
-
-      guard estateClientFD >= 0 else {
-        continue
-      }
-
-      sendEstate(
-        message,
-        on: estateClientFD
-      )
-    }
-  }.start()
-}
 func handleEstateConnection(
   _ clientFD: Int32
 ) {
@@ -946,25 +938,46 @@ func handleEstateConnection(
   }
 }
 func startEstateSocket() {
-  let socketPath = "/tmp/estate-hid.sock"
+  func startSwiftPingLoop(
+    _ clientFD: Int32
+  ) {
+    Thread {
+      var id: UInt64 = 0
 
+      while true {
+        sleep(10)
+
+        id += 1
+
+        let message =
+          #"{"type":"ping","id":"#
+          + "\(id)"
+          + "}"
+
+        guard estateClientFD >= 0 else {
+          continue
+        }
+
+        sendEstate(
+          message,
+          on: estateClientFD
+        )
+      }
+    }.start()
+  }
   try? FileManager.default.removeItem(
     atPath: socketPath
   )
-
   let serverFD = socket(
     AF_UNIX,
     SOCK_STREAM,
     0
   )
-
   guard serverFD >= 0 else {
     fatalError("failed to create socket")
   }
-
   var address = sockaddr_un()
   address.sun_family = sa_family_t(AF_UNIX)
-
   withUnsafeMutableBytes(
     of: &address.sun_path
   ) { buffer in
@@ -975,7 +988,6 @@ func startEstateSocket() {
 
     buffer.copyBytes(from: bytes)
   }
-
   let bindResult =
     withUnsafePointer(to: &address) {
       $0.withMemoryRebound(
@@ -991,39 +1003,29 @@ func startEstateSocket() {
         )
       }
     }
-
   guard bindResult == 0 else {
     fatalError(
       "failed to bind \(socketPath): " + "\(String(cString: strerror(errno)))"
     )
   }
-
   guard listen(serverFD, 1) == 0 else {
     fatalError(
       "failed to listen: " + "\(String(cString: strerror(errno)))"
     )
   }
-
-  // print(
-  //   "ESTATE HID listening: \(socketPath)"
-  // )
-
   while true {
     let clientFD = accept(
       serverFD,
       nil,
       nil
     )
-
     guard clientFD >= 0 else {
       print(
         "accept failed: " + "\(String(cString: strerror(errno)))"
       )
       continue
     }
-
     estateClientFD = clientFD
-
     print(
       "ESTATE RUST connected fd=\(estateClientFD)"
     )
@@ -1060,21 +1062,10 @@ func emitForegroundApp(_ app: FrontmostApp) {
     frontmostApp: app
   )
 
-  let envelope = EventEnvelope(
-    type: "native_event",
-    version: 1,
-    event: event
+  sendNativeEvent(
+    event,
+    on: estateClientFD
   )
-
-  do {
-    let data = try JSONEncoder().encode(envelope)
-
-    if let json = String(data: data, encoding: .utf8) {
-      print("🍎 \(json)")
-    }
-  } catch {
-    print("❌ failed to encode event: \(error)")
-  }
 }
 func frontmostApplication() -> FrontmostApp {
   let app = NSWorkspace.shared.frontmostApplication
@@ -1085,310 +1076,305 @@ func frontmostApplication() -> FrontmostApp {
   )
 }
 
-let initialApp = frontmostApplication()
+// MARK: - Estate Transport
 
-print("🚀 Initial frontmost app:")
-print("   name: \(initialApp.name ?? "nil")")
-print("   bundle: \(initialApp.bundleID ?? "nil")")
-print("   pid: \(initialApp.pid.map(String.init) ?? "nil")")
+if enableEstateSocket {
+  print("🚀 Starting Estate socket...")
 
-NSWorkspace.shared.notificationCenter.addObserver(
-  forName: NSWorkspace.didActivateApplicationNotification,
-  object: nil,
-  queue: .main
-) { notification in
-  guard
-    let app =
-      notification.userInfo?[
-        NSWorkspace.applicationUserInfoKey
-      ] as? NSRunningApplication
-  else {
-    print("⚠️ activation notification without app")
-    return
+  Thread {
+    startEstateSocket()
+  }.start()
+} else {
+  print("⏭️ Estate socket disabled")
+}
+
+// MARK: - Initial Foreground Application
+
+if enableInitialForegroundApp {
+  let initialApp = frontmostApplication()
+
+  print("🚀 Initial frontmost app:")
+  print("   name: \(initialApp.name ?? "nil")")
+  print("   bundle: \(initialApp.bundleID ?? "nil")")
+  print("   pid: \(initialApp.pid.map(String.init) ?? "nil")")
+
+  if enableEstateSocket {
+    emitForegroundApp(initialApp)
   }
+}
 
-  let frontmost = FrontmostApp(
-    bundleID: app.bundleIdentifier,
-    name: app.localizedName,
-    pid: app.processIdentifier
-  )
+// MARK: - Workspace / Foreground Application Observer
+
+if enableWorkspaceObserver {
+  NSWorkspace.shared.notificationCenter.addObserver(
+    forName: NSWorkspace.didActivateApplicationNotification,
+    object: nil,
+    queue: .main
+  ) { notification in
+
+    guard
+      let app =
+        notification.userInfo?[
+          NSWorkspace.applicationUserInfoKey
+        ] as? NSRunningApplication
+    else {
+      if enableWorkspaceLogging {
+        print("⚠️ activation notification without app")
+      }
+      return
+    }
+
+    let frontmost = FrontmostApp(
+      bundleID: app.bundleIdentifier,
+      name: app.localizedName,
+      pid: app.processIdentifier
+    )
+
+    if enableWorkspaceLogging {
+      print("")
+      print("🔥 FOREGROUND APP CHANGED")
+      print("   name: \(frontmost.name ?? "nil")")
+      print("   bundle: \(frontmost.bundleID ?? "nil")")
+      print("   pid: \(frontmost.pid.map(String.init) ?? "nil")")
+    }
+
+    if enableEstateSocket {
+      emitForegroundApp(frontmost)
+    }
+  }
 
   print("")
-  print("🔥 FOREGROUND APP CHANGED")
-  print("   name: \(frontmost.name ?? "nil")")
-  print("   bundle: \(frontmost.bundleID ?? "nil")")
-  print("   pid: \(frontmost.pid.map(String.init) ?? "nil")")
-
-  emitForegroundApp(frontmost)
+  print("👀 Watching for foreground application changes...")
+  print("   Try ⌘Tab between applications.")
+} else {
+  print("⏭️ Workspace observer disabled")
 }
-print("")
-print("👀 Watching for foreground application changes...")
-print("   Try ⌘Tab between applications.")
-print("")
 
-formatter.dateFormat = "HH:mm:ss.SSS"
-var state = ModifierState()
+// MARK: - Keyboard / CGEvent Observation
 
-let callback: CGEventTapCallBack = {
-  proxy,
-  type,
-  event,
-  userInfo in
+if enableCGEventTap {
 
-  // ------------------------------------------------------------
-  // Event tap status
-  // ------------------------------------------------------------
+  formatter.dateFormat = "HH:mm:ss.SSS"
+  var state = ModifierState()
 
-  if type == .tapDisabledByTimeout {
-    print("!!! EVENT TAP DISABLED: TIMEOUT")
-    fflush(stdout)
-    return Unmanaged.passUnretained(event)
-  }
+  let callback: CGEventTapCallBack = {
+    proxy,
+    type,
+    event,
+    userInfo in
 
-  if type == .tapDisabledByUserInput {
-    print("!!! EVENT TAP DISABLED: USER INPUT")
-    fflush(stdout)
-    return Unmanaged.passUnretained(event)
-  }
-
-  // ------------------------------------------------------------
-  // Common event data
-  // ------------------------------------------------------------
-
-  let code = event.getIntegerValueField(
-    .keyboardEventKeycode
-  )
-
-  // ------------------------------------------------------------
-  // Event processing
-  // ------------------------------------------------------------
-
-  switch type {
-
-  case .flagsChanged:
-
-    if code == 0 {
-      print(
-        "⚠️ NON-MODIFIER FLAGS EVENT: "
-          + "keycode=0 "
-          + "time=\(event.timestamp) "
-          + "flags=\(event.flags.rawValue)"
-      )
+    if type == .tapDisabledByTimeout {
+      print("!!! EVENT TAP DISABLED: TIMEOUT")
       fflush(stdout)
+      return Unmanaged.passUnretained(event)
+    }
+
+    if type == .tapDisabledByUserInput {
+      print("!!! EVENT TAP DISABLED: USER INPUT")
+      fflush(stdout)
+      return Unmanaged.passUnretained(event)
+    }
+
+    let code = event.getIntegerValueField(
+      .keyboardEventKeycode
+    )
+
+    switch type {
+
+    // MARK: Modifier
+
+    case .flagsChanged:
+
+      if code == 0 {
+        if enableEventLogging {
+          print(
+            "⚠️ NON-MODIFIER FLAGS EVENT: "
+              + "keycode=0 "
+              + "time=\(event.timestamp) "
+              + "flags=\(event.flags.rawValue)"
+          )
+          fflush(stdout)
+        }
+
+        break
+      }
+
+      let name = modifierName(code)
+
+      // Update our left/right modifier state BEFORE
+      // constructing the normalized event.
+      let direction = updateModifierState(
+        keyCode: code
+      )
+
+      if watchedKeyCodes.contains(CGKeyCode(code)) {
+
+        let rightCommandHeld = CGEventSource.keyState(
+          .combinedSessionState,
+          key: 54
+        )
+
+        let leftCommandHeld = CGEventSource.keyState(
+          .combinedSessionState,
+          key: 55
+        )
+
+        let sourcePID = event.getIntegerValueField(
+          .eventSourceUnixProcessID
+        )
+
+        let sourceState = event.getIntegerValueField(
+          .eventSourceStateID
+        )
+
+        let keyboardType = event.getIntegerValueField(
+          .keyboardEventKeyboardType
+        )
+
+        let autorepeat = event.getIntegerValueField(
+          .keyboardEventAutorepeat
+        )
+
+        let sessionFlags =
+          CGEventSource.flagsState(
+            .combinedSessionState
+          ).rawValue
+
+        // Keep these available while debugging.
+        _ = rightCommandHeld
+        _ = leftCommandHeld
+        _ = sourcePID
+        _ = sourceState
+        _ = keyboardType
+        _ = autorepeat
+        _ = sessionFlags
+
+        fflush(stdout)
+      }
+
+      let nativeEvent = makeEvent(
+        event,
+        type: type,
+        description: name,
+        modifierDirection: direction
+      )
+
+      if enableEstateSocket {
+        sendNativeEvent(
+          nativeEvent,
+          on: estateClientFD
+        )
+      }
+
+    // MARK: Key Down
+
+    case .keyDown:
+
+      let name = keyName(code)
+
+      let nativeEvent = makeEvent(
+        event,
+        type: type,
+        description: name,
+        modifierDirection: .down
+      )
+
+      if enableEstateSocket {
+        sendNativeEvent(
+          nativeEvent,
+          on: estateClientFD
+        )
+      }
+
+    // MARK: Key Up
+
+    case .keyUp:
+
+      let name = keyName(code)
+
+      let nativeEvent = makeEvent(
+        event,
+        type: type,
+        description: name,
+        modifierDirection: .up
+      )
+
+      if enableEstateSocket {
+        sendNativeEvent(
+          nativeEvent,
+          on: estateClientFD
+        )
+      }
+
+    default:
       break
     }
 
-    let name = modifierName(code)
-
-    let direction = updateModifierState(
-      keyCode: code
-    )
-
-    if watchedKeyCodes.contains(CGKeyCode(code)) {
-      let rightCommandHeld = CGEventSource.keyState(
-        .combinedSessionState,
-        key: 54
-      )
-
-      let leftCommandHeld = CGEventSource.keyState(
-        .combinedSessionState,
-        key: 55
-      )
-
-      let sourcePID = event.getIntegerValueField(
-        .eventSourceUnixProcessID
-      )
-
-      let sourceState = event.getIntegerValueField(
-        .eventSourceStateID
-      )
-
-      let keyboardType = event.getIntegerValueField(
-        .keyboardEventKeyboardType
-      )
-
-      let autorepeat = event.getIntegerValueField(
-        .keyboardEventAutorepeat
-      )
-
-      let sessionFlags =
-        CGEventSource.flagsState(
-          .combinedSessionState
-        ).rawValue
-
-      fflush(stdout)
-    }
-
-    let nativeEvent = makeEvent(
-      event,
-      type: type,
-      description: name,
-      modifierDirection: direction
-    )
-
-    sendNativeEvent(
-      nativeEvent,
-      on: estateClientFD
-    )
-
-  case .keyDown:
-
-    let name = keyName(code)
-
-    let nativeEvent = makeEvent(
-      event,
-      type: type,
-      description: name,
-      modifierDirection: .down
-    )
-
-    sendNativeEvent(
-      nativeEvent,
-      on: estateClientFD
-    )
-
-  case .keyUp:
-
-    let name = keyName(code)
-
-    let nativeEvent = makeEvent(
-      event,
-      type: type,
-      description: name,
-      modifierDirection: .up
-    )
-
-    sendNativeEvent(
-      nativeEvent,
-      on: estateClientFD
-    )
-
-  default:
-    break
+    return Unmanaged.passUnretained(event)
   }
 
-  return Unmanaged.passUnretained(event)
-}
-guard
-  let tap = CGEvent.tapCreate(
-    tap: .cgSessionEventTap,
-    place: .headInsertEventTap,
-    options: .listenOnly,
-    eventsOfInterest: mask,
-    callback: callback,
-    userInfo: nil
+  // MARK: Install Event Tap
+
+  guard
+    let tap = CGEvent.tapCreate(
+      tap: .cgSessionEventTap,
+      place: .headInsertEventTap,
+      options: .listenOnly,
+      eventsOfInterest: mask,
+      callback: callback,
+      userInfo: nil
+    )
+  else {
+    fputs(
+      "Cannot create event tap. Check Input Monitoring permissions.\n",
+      stderr
+    )
+    exit(1)
+  }
+
+  let source = CFMachPortCreateRunLoopSource(
+    kCFAllocatorDefault,
+    tap,
+    0
   )
-else {
-  fputs(
-    "Cannot create event tap. Check Input Monitoring permissions.\n",
-    stderr
+
+  CFRunLoopAddSource(
+    CFRunLoopGetCurrent(),
+    source,
+    .commonModes
   )
-  exit(1)
+
+  CGEvent.tapEnable(
+    tap: tap,
+    enable: true
+  )
+
+  print("👀 Watching CGEvents...")
+
+  printHeader()
+
+  print(
+    "Columns: LS LC LO LM = left modifiers, "
+      + "RS RC RO RM = right modifiers, "
+      + "FN CP = Fn/Caps"
+  )
+
+  print(
+    "Event flags are aggregate CoreGraphics state; "
+      + "left/right state is reconstructed from keycodes."
+  )
+
+  print("")
+  fflush(stdout)
+
+} else {
+  print("⏭️ CGEvent tap disabled")
 }
 
-let source = CFMachPortCreateRunLoopSource(
-  kCFAllocatorDefault,
-  tap,
-  0
-)
+// MARK: - Main Run Loop
 
-CFRunLoopAddSource(
-  CFRunLoopGetCurrent(),
-  source,
-  .commonModes
-)
-
-CGEvent.tapEnable(
-  tap: tap,
-  enable: true
-)
-
-printHeader()
-print(
-  "Columns: LS LC LO LM = left modifiers, " + "RS RC RO RM = right modifiers, " + "FN CP = Fn/Caps"
-)
-print(
-  "Event flags are aggregate CoreGraphics state; "
-    + "left/right state is reconstructed from keycodes."
-)
 print("")
-fflush(stdout)
-Thread {
-  startEstateSocket()
-}.start()
+print("🚀 Estate native PID: \(pid)")
+print("")
+
 CFRunLoopRun()
-
-print("Estate native PID: \(pid)")
-
-try? FileManager.default.removeItem(atPath: socketPath)
-let serverFD = socket(AF_UNIX, SOCK_STREAM, 0)
-
-guard serverFD >= 0 else {
-  fatalError("failed to create socket")
-}
-
-var address = sockaddr_un()
-address.sun_family = sa_family_t(AF_UNIX)
-
-withUnsafeMutableBytes(of: &address.sun_path) { buffer in
-  let bytes = socketPath.utf8CString.map { UInt8(bitPattern: $0) }
-  buffer.copyBytes(from: bytes)
-}
-let bindResult = withUnsafePointer(to: &address) {
-  $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-    bind(serverFD, $0, socklen_t(MemoryLayout<sockaddr_un>.size))
-  }
-}
-
-guard bindResult == 0 else {
-  fatalError("failed to bind \(socketPath)")
-}
-
-guard listen(serverFD, 1) == 0 else {
-  fatalError("failed to listen")
-}
-let clientFD = accept(serverFD, nil, nil)
-
-guard clientFD >= 0 else {
-  fatalError("failed to accept Rust connection")
-}
-
-print("ESTATE RUST connected")
-
-while true {
-  var buffer = [UInt8](repeating: 0, count: 4096)
-
-  let count = read(
-    clientFD,
-    &buffer,
-    buffer.count
-  )
-
-  if count <= 0 {
-    print("Rust disconnected")
-    break
-  }
-
-  let message =
-    String(
-      bytes: buffer[..<count],
-      encoding: .utf8
-    ) ?? ""
-
-  print("RUST → SWIFT: \(message.trimmingCharacters(in: .whitespacesAndNewlines))")
-
-  if message.contains("PING") {
-    let response = "PONG\n"
-
-    response.withCString { ptr in
-      _ = write(
-        clientFD,
-        ptr,
-        strlen(ptr)
-      )
-    }
-    print("SWIFT → RUST: PONG")
-  }
-}
-
-emitForegroundApp(initialApp)

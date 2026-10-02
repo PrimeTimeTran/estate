@@ -26,7 +26,7 @@ pub enum HidMessage {
 	#[serde(rename = "action")]
 	Action { action: String },
 }
-#[derive(Debug, Default, Clone, Copy)]
+#[derive(Debug, Default, Clone)]
 struct HidState {
 	shift_left: bool,
 	shift_right: bool,
@@ -42,6 +42,7 @@ struct HidState {
 
 	caps: bool,
 	function: bool,
+	frontmost_app: String,
 }
 pub struct HidObserver {
 	state: HidState,
@@ -230,12 +231,9 @@ impl MacosHid {
 		writer: &mut tokio::net::unix::OwnedWriteHalf,
 		events: &EventBus,
 	) -> Result<()> {
-		// tracing::info!("🍎 Swift → Rust");
-
 		let Some(message) = self.parse_message(raw) else {
 			return Ok(());
 		};
-
 		match message {
 			HidMessage::Ping { id } => {
 				self.handle_ping(id, writer).await?;
@@ -259,7 +257,6 @@ impl MacosHid {
 	fn parse_message(&self, raw: &str) -> Option<HidMessage> {
 		let value: serde_json::Value = match serde_json::from_str(raw) {
 			Ok(value) => value,
-
 			Err(error) => {
 				tracing::error!(
 					%error,
@@ -269,19 +266,10 @@ impl MacosHid {
 				return None;
 			}
 		};
-
-		// tracing::info!(
-		// 	"📦 RAW HID MESSAGE:\n{}",
-		// 	serde_json::to_string_pretty(&value).unwrap_or_else(|_| raw.to_string())
-		// );
-
-		// Swift native_event has its own wire representation.
 		if value.get("type").and_then(|v| v.as_str()) == Some("native_event") {
 			let event_value = value.get("event")?;
-
 			let swift_event: SwiftNativeEvent = match serde_json::from_value(event_value.clone()) {
 				Ok(event) => event,
-
 				Err(error) => {
 					tracing::error!(
 						%error,
@@ -328,7 +316,7 @@ impl MacosHid {
 	}
 	fn handle_native_event(&mut self, event: NativeEvent, received_at: u64, events: &EventBus) {
 		self.update_state(&event);
-		self.print_event(&event);
+
 		// let latency = received_at.saturating_sub(event.sent_at);
 		// self.log_native_event(&event);
 		// for action in self.observe_event(&event) {
@@ -342,25 +330,24 @@ impl MacosHid {
 	}
 	fn update_state(&mut self, event: &NativeEvent) {
 		let m = &event.modifiers;
-
 		self.state.shift_left = m.shift_left;
 		self.state.shift_right = m.shift_right;
-
 		self.state.ctrl_left = m.ctrl_left;
 		self.state.ctrl_right = m.ctrl_right;
-
 		self.state.opt_left = m.opt_left;
 		self.state.opt_right = m.opt_right;
-
 		self.state.cmd_left = m.cmd_left;
 		self.state.cmd_right = m.cmd_right;
-
 		self.state.caps = m.caps;
 		self.state.function = m.function;
+		if let Some(app) = &event.frontmost_app {
+			self.state.frontmost_app = app.name.clone();
+		}
+		self.print_event(event);
 	}
 	fn print_event(&mut self, event: &NativeEvent) {
 		let s = &self.state;
-
+		let app = display_name(&s.frontmost_app, 10);
 		let left = format!(
 			"{} {} {} {}",
 			key_state(s.shift_left, "⇧"),
@@ -386,7 +373,6 @@ impl MacosHid {
 		};
 
 		let name = event.name.as_deref().unwrap_or("");
-
 		let event_display = format!("{arrow} {name}");
 
 		let key_code = event
@@ -395,11 +381,10 @@ impl MacosHid {
 			.unwrap_or_default();
 
 		println!(
-			"{:<17} | {:<17} | {:<7} | {:<16} | {:>5}",
-			left, right, special, event_display, key_code,
+			"{:<10} | {:<17} | {:<17} | {:<7} | {:<16} | {:>5}",
+			app, left, right, special, event_display, key_code,
 		);
 	}
-
 	fn key_state(active: bool, symbol: &str) -> &str {
 		if active { symbol } else { "·" }
 	}
@@ -1877,6 +1862,15 @@ pub struct SwiftNativeEvent {
 
 	#[serde(default)]
 	pub modifiers: Option<SwiftModifiers>,
+	#[serde(rename = "frontmostApp", default)]
+	pub frontmost_app: Option<SwiftFrontmostApp>,
+}
+#[derive(Debug, Clone, Deserialize)]
+struct SwiftFrontmostApp {
+	#[serde(rename = "bundleID")]
+	bundle_id: String,
+	name: String,
+	pid: i64,
 }
 impl SwiftNativeEvent {
 	fn into_native_event(self) -> Option<NativeEvent> {
@@ -1893,17 +1887,18 @@ impl SwiftNativeEvent {
 				key_code: self.key_code?,
 			},
 
-			"mouse_down" => {
-				return None;
+			"frontmost_app" => {
+				let app = self.frontmost_app.as_ref()?;
+				NativeEventKind::FrontmostApp {
+					name: app.name.clone(),
+					bundle_id: app.bundle_id.clone(),
+					pid: app.pid,
+				}
 			}
 
-			"mouse_up" => {
-				return None;
-			}
-
-			"scroll" => {
-				return None;
-			}
+			"mouse_down" => return None,
+			"mouse_up" => return None,
+			"scroll" => return None,
 
 			_ => return None,
 		};
@@ -1912,6 +1907,11 @@ impl SwiftNativeEvent {
 
 		Some(NativeEvent {
 			sent_at: self.sent_at.or(self.timestamp).unwrap_or_default(),
+			frontmost_app: self.frontmost_app.map(|app| FrontmostApp {
+				name: app.name,
+				bundle_id: app.bundle_id,
+				pid: app.pid,
+			}),
 			kind,
 			source: Some(self.source),
 			timestamp: self.timestamp,
@@ -2003,4 +2003,26 @@ fn parse_message(line: &str) -> anyhow::Result<HidMessage> {
 
 fn key_state(active: bool, symbol: &str) -> &str {
 	if active { symbol } else { "·" }
+}
+
+fn display_name(value: &str, max: usize) -> String {
+	let mut chars = value.chars();
+
+	let truncated: String = chars.by_ref().take(max).collect();
+
+	if chars.next().is_some() {
+		format!("{truncated}…")
+	} else {
+		truncated
+	}
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FrontmostApp {
+	pub pid: i64,
+
+	#[serde(rename = "bundleID")]
+	pub bundle_id: String,
+
+	pub name: String,
 }

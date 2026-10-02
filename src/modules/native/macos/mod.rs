@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-use anyhow::{Context as CtxAnyhow, Result};
+pub use anyhow::{Context as CtxAnyhow, Result};
 pub use core_foundation::runloop::{CFRunLoop, kCFRunLoopCommonModes, kCFRunLoopDefaultMode};
 pub use core_graphics::{
 	display::{CGDisplay, CGPoint, CGRect},
@@ -8,8 +8,7 @@ pub use core_graphics::{
 	event_source::{CGEventSource, CGEventSourceStateID},
 	geometry,
 };
-
-use mach2::mach_time;
+pub use mach2::mach_time;
 pub use winit::platform::macos::{ActivationPolicy, EventLoopBuilderExtMacOS};
 
 pub use host::*;
@@ -70,7 +69,14 @@ pub enum NativeEventKind {
 
 	ModifierChanged,
 	#[serde(rename = "frontmost_app")]
-	FrontmostApp,
+	FrontmostApp {
+		name: String,
+
+		#[serde(rename = "bundleID")]
+		bundle_id: String,
+
+		pid: i64,
+	},
 }
 
 impl App<Context> {
@@ -237,6 +243,9 @@ pub struct NativeEvent {
 
 	#[serde(default)]
 	pub direction: Option<keymap::KeyDirection>,
+
+	#[serde(default)]
+	pub frontmost_app: Option<FrontmostApp>,
 }
 
 #[derive(Clone)]
