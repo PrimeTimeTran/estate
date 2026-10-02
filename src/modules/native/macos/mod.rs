@@ -34,22 +34,41 @@ pub use server::*;
 #[serde(tag = "kind")]
 pub enum NativeEventKind {
 	#[serde(rename = "key_down")]
-	KeyDown { key_code: u16 },
+	KeyDown {
+		key_code: u16,
+	},
 
 	#[serde(rename = "key_up")]
-	KeyUp { key_code: u16 },
+	KeyUp {
+		key_code: u16,
+	},
 
 	#[serde(rename = "mouse_down")]
-	MouseDown { button: i64, x: f64, y: f64 },
+	MouseDown {
+		button: i64,
+		x: f64,
+		y: f64,
+	},
 
 	#[serde(rename = "mouse_up")]
-	MouseUp { button: i64, x: f64, y: f64 },
+	MouseUp {
+		button: i64,
+		x: f64,
+		y: f64,
+	},
 
 	#[serde(rename = "scroll")]
-	Scroll { vertical: i64, horizontal: i64 },
+	Scroll {
+		vertical: i64,
+		horizontal: i64,
+	},
 
 	#[serde(rename = "flags_changed")]
-	FlagsChanged { key_code: u16 },
+	FlagsChanged {
+		key_code: u16,
+	},
+
+	ModifierChanged,
 }
 
 impl App<Context> {
@@ -167,9 +186,13 @@ impl From<NativeEventKind> for e::EventKind {
 	fn from(native: NativeEventKind) -> Self {
 		match native {
 			NativeEventKind::KeyDown { key_code } => e::EventKind::KeyDown { key_code },
+
 			NativeEventKind::KeyUp { key_code } => e::EventKind::KeyUp { key_code },
+
 			NativeEventKind::MouseDown { button, x, y } => e::EventKind::MouseDown { button, x, y },
+
 			NativeEventKind::MouseUp { button, x, y } => e::EventKind::MouseUp { button, x, y },
+
 			NativeEventKind::Scroll {
 				vertical,
 				horizontal,
@@ -177,7 +200,13 @@ impl From<NativeEventKind> for e::EventKind {
 				vertical,
 				horizontal,
 			},
-			NativeEventKind::FlagsChanged { key_code } => EventKind::FlagsChanged { key_code },
+
+			NativeEventKind::FlagsChanged { key_code } => e::EventKind::FlagsChanged { key_code },
+
+			_ => {
+				// Safe fallback while debugging inbound events.
+				e::EventKind::Unknown
+			}
 		}
 	}
 }
@@ -187,6 +216,8 @@ pub struct NativeEvent {
 	pub sent_at: u64,
 	#[serde(flatten)]
 	pub kind: NativeEventKind,
+	// pub modifiers: Option<ModifierSnapshot>,
+	#[serde(default)]
 	pub modifiers: ModifierSnapshot,
 }
 

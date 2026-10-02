@@ -165,7 +165,25 @@ print("   Try ⌘Tab between applications.")
 print("")
 
 var estateClientFD: Int32 = -1
+enum KeyDirection: String, Codable {
+  case down
+  case up
 
+  var symbol: String {
+    switch self {
+    case .down:
+      return "↓"
+    case .up:
+      return "↑"
+    }
+  }
+}
+enum EventSource: String, Codable {
+  case cgEvent
+  case hid
+  case workspace
+  case accessibility
+}
 let watchedKeyCodes: Set<CGKeyCode> = [
   58,  // Left Option
   61,  // Right Option
@@ -197,37 +215,18 @@ struct ModifierState: Codable {
     case lShift = "shift_left"
     case rShift = "shift_right"
 
-    case lCtrl = "control_left"
-    case rCtrl = "control_right"
+    case lCtrl = "ctrl_left"
+    case rCtrl = "ctrl_right"
 
-    case lOpt = "alt_left"
-    case rOpt = "alt_right"
+    case lOpt = "opt_left"
+    case rOpt = "opt_right"
 
-    case lCmd = "command_left"
-    case rCmd = "command_right"
+    case lCmd = "cmd_left"
+    case rCmd = "cmd_right"
 
     case fn = "function"
-    case caps = "caps_lock"
+    case caps = "caps"
   }
-}
-enum KeyDirection: String, Codable {
-  case down
-  case up
-
-  var symbol: String {
-    switch self {
-    case .down:
-      return "↓"
-    case .up:
-      return "↑"
-    }
-  }
-}
-enum EventSource: String, Codable {
-  case cgEvent
-  case hid
-  case workspace
-  case accessibility
 }
 struct ModifierSnapshot: Codable {
   let leftShift: Bool
@@ -242,6 +241,21 @@ struct ModifierSnapshot: Codable {
 
   let fn: Bool
   let caps: Bool
+
+  enum CodingKeys: String, CodingKey {
+    case leftShift = "shift_left"
+    case leftCtrl = "ctrl_left"
+    case leftOpt = "opt_left"
+    case leftCmd = "cmd_left"
+
+    case rightShift = "shift_right"
+    case rightCtrl = "ctrl_right"
+    case rightOpt = "opt_right"
+    case rightCmd = "cmd_right"
+
+    case fn = "function"
+    case caps = "caps"
+  }
 
   init(from state: ModifierState) {
     self.leftShift = state.lShift
@@ -291,6 +305,45 @@ struct NativeEvent: Codable {
   let locationY: Double?
 
   let frontmostApp: FrontmostApp?
+}
+enum NativeEventKind: String, Codable {
+  case keyDown
+  case keyUp
+  case flagsChanged
+  case mouse
+  case hid
+  case frontmostApp
+}
+struct EstateNativeEvent: Codable {
+  let sentAt: UInt64
+  let kind: NativeEventKind
+  let modifiers: ModifierSnapshot
+  let source: EventSource
+  let timestamp: UInt64
+  let name: String
+  let direction: KeyDirection?
+  let event: CGEventInfo?
+
+  enum CodingKeys: String, CodingKey {
+    case sentAt = "sent_at"
+    case kind
+    case modifiers
+    case source
+    case timestamp
+    case name
+    case direction
+    case event
+  }
+}
+enum CodingKeys: String, CodingKey {
+  case sentAt = "sent_at"
+  case kind
+  case modifiers
+  case source
+  case timestamp
+  case name
+  case direction
+  case event
 }
 
 var state = ModifierState()
@@ -1169,17 +1222,16 @@ else {
   )
   exit(1)
 }
-func machNow() -> UInt64 {
-  mach_absolute_time()
-}
+
+
 func sendEstate(
   _ message: String,
   on clientFD: Int32
 ) {
   let payload = message + "\n"
-
-  print("💜 SEND ATTEMPT fd=\(clientFD) bytes=\(payload.utf8.count)")
-  print("💜 SEND DATA \(payload.trimmingCharacters(in: .newlines))")
+// 
+//   print("💜 SEND ATTEMPT fd=\(clientFD) bytes=\(payload.utf8.count)")
+//   print("💜 SEND DATA \(payload.trimmingCharacters(in: .newlines))")
 
   payload.withCString { ptr in
     let length = strlen(ptr)
@@ -1195,9 +1247,9 @@ func sendEstate(
         "❌ SWIFT → RUST write failed: \(String(cString: strerror(errno)))"
       )
     } else {
-      print(
-        "💜 SWIFT → RUST SENT fd=\(clientFD) bytes=\(result)/\(length)"
-      )
+      // print(
+      //   "💜 SWIFT → RUST SENT fd=\(clientFD) bytes=\(result)/\(length)"
+      // )
     }
   }
 }
@@ -1215,13 +1267,11 @@ func sendKeyEvent(
       "key_code": keyCode,
     ],
   ]
-
   do {
     let data = try JSONSerialization.data(
       withJSONObject: message,
       options: [.sortedKeys]
     )
-
     FileHandle.standardOutput.write(data)
     FileHandle.standardOutput.write(Data([0x0A]))
   } catch {
@@ -1526,3 +1576,6 @@ while true {
 }
 
 emitForegroundApp(initialApp)
+func machNow() -> UInt64 {
+  mach_absolute_time()
+}

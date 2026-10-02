@@ -249,6 +249,7 @@ pub enum EventKind {
 	Scroll { vertical: i64, horizontal: i64 },
 	FlagsChanged { key_code: u16 },
 	ModifierChanged { modifiers: ModifierSnapshot },
+	Unknown
 }
 
 /// ## [EventSource]
@@ -417,7 +418,7 @@ impl EventBus {
 	pub fn emit(&self, event: e::Event) {
 		match self.tx.send(event.clone()) {
 			Ok(count) => {
-				tracing::info!("📡 Event emitted: {:?} → {} receiver(s)", event.kind, count);
+				// tracing::info!("📡 Event emitted: {:?} → {} receiver(s)", event.kind, count);
 			}
 			Err(_) => {
 				tracing::info!("⚠️ Event emitted with NO receivers: {:?}", event.kind);
