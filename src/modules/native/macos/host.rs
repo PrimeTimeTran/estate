@@ -66,7 +66,6 @@ where
 
 impl<C: Ctx> Host<C> {
 	pub fn new(context: Arc<C>, tokio: tokio::runtime::Runtime) -> anyhow::Result<Self> {
-		tracing::info!("🍏 Host loi");
 		let handle = tokio.handle().clone();
 		let event_bus = EventBus::new();
 		let runtime = NativeRuntime::new(Arc::clone(&context), handle.clone(), event_bus.clone())?;
@@ -81,22 +80,17 @@ impl<C: Ctx> Host<C> {
 		})
 	}
 	pub fn start(&mut self) -> Result<()> {
-		tracing::info!("🍏 start_context_watcher");
-
 		self.start_context_watcher()?;
 		self.start_hid_bridge()?;
 		Ok(())
 	}
 	pub fn start_context_watcher(&mut self) -> Result<()> {
-		tracing::info!("🍏 start_context_watcher");
 		Ok(())
 	}
 	pub fn start_hid_bridge(&mut self) -> Result<()> {
-		tracing::info!("🍏 start_hid_bridge");
 		Ok(())
 	}
 	pub fn start_hid(&self) -> Result<WorkHandle<C, tokio::task::JoinHandle<()>>> {
-		tracing::info!("🍏 start_hid loi");
 		// - Enable/Disable Native Logs
 		// - Enable/Disable from settings
 		// - Enable/Disable from settings

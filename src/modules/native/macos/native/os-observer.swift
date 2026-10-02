@@ -13,6 +13,7 @@ struct EventEnvelope: Codable {
   let version: UInt
   let event: NativeEvent
 }
+
 func emitForegroundApp(_ app: FrontmostApp) {
   let event = NativeEvent(
     kind: .frontmostApp,
@@ -45,7 +46,15 @@ func emitForegroundApp(_ app: FrontmostApp) {
     print("❌ failed to encode event: \(error)")
   }
 }
+struct EstateNativeEventMessage: Codable {
+  let type: String
+  let event: NativeEvent
 
+  init(event: NativeEvent) {
+    self.type = "native_event"
+    self.event = event
+  }
+}
 func frontmostApplication() -> FrontmostApp {
   let app = NSWorkspace.shared.frontmostApplication
   return FrontmostApp(
@@ -156,26 +165,7 @@ print("   Try ⌘Tab between applications.")
 print("")
 
 var estateClientFD: Int32 = -1
-struct KeyboardModifierState: Codable {
-  var shift: Bool = false
-  var ctrl: Bool = false
-  var opt: Bool = false
-  var cmd: Bool = false
-}
-struct KeyboardModifierSnapshot: Codable {
-  let leftShift: Bool
-  let leftCtrl: Bool
-  let leftOpt: Bool
-  let leftCmd: Bool
 
-  let rightShift: Bool
-  let rightCtrl: Bool
-  let rightOpt: Bool
-  let rightCmd: Bool
-
-  let fn: Bool
-  let caps: Bool
-}
 let watchedKeyCodes: Set<CGKeyCode> = [
   58,  // Left Option
   61,  // Right Option
@@ -189,7 +179,7 @@ let watchedKeyCodes: Set<CGKeyCode> = [
 ]
 let formatter = DateFormatter()
 formatter.dateFormat = "HH:mm:ss.SSS"
-struct ModifierState {
+struct ModifierState: Codable {
   var lShift = false
   var lCtrl = false
   var lOpt = false
@@ -202,6 +192,23 @@ struct ModifierState {
 
   var fn = false
   var caps = false
+
+  enum CodingKeys: String, CodingKey {
+    case lShift = "shift_left"
+    case rShift = "shift_right"
+
+    case lCtrl = "control_left"
+    case rCtrl = "control_right"
+
+    case lOpt = "alt_left"
+    case rOpt = "alt_right"
+
+    case lCmd = "command_left"
+    case rCmd = "command_right"
+
+    case fn = "function"
+    case caps = "caps_lock"
+  }
 }
 enum KeyDirection: String, Codable {
   case down
@@ -583,6 +590,23 @@ func printHeader() {
 
   fflush(stdout)
 }
+func sendNativeEvent(
+  _ event: NativeEvent,
+  on clientFD: Int32
+) {
+  do {
+    let message = EstateNativeEventMessage(event: event)
+    let data = try JSONEncoder().encode(message)
+
+    guard let json = String(data: data, encoding: .utf8) else {
+      return
+    }
+
+    sendEstate(json, on: clientFD)
+  } catch {
+    print("❌ failed to encode native event: \(error)")
+  }
+}
 func makeEvent(
   _ event: CGEvent,
   type: CGEventType,
@@ -902,27 +926,18 @@ let callback: CGEventTapCallBack = {
 
   switch type {
   case .keyDown:
-    let keyCode = event.getIntegerValueField(
-      .keyboardEventKeycode
-    )
+    let message =
+      "{\"type\":\"native_event\"," + "\"event\":{" + "\"sent_at\":\(sentAt),"
+      + "\"kind\":\"key_down\"," + "\"key_code\":\(rawKeyCode)" + "}}"
 
-    sendKeyEvent(
-      kind: "key_down",
-      keyCode: keyCode,
-      sentAt: Int64(Date().timeIntervalSince1970 * 1000)
+    guard estateClientFD >= 0 else {
+      return Unmanaged.passUnretained(event)
+    }
+
+    sendEstate(
+      message,
+      on: estateClientFD
     )
-  //     let message =
-  //       "{\"type\":\"native_event\"," + "\"event\":{" + "\"sent_at\":\(sentAt),"
-  //       + "\"kind\":\"key_down\"," + "\"key_code\":\(rawKeyCode)" + "}}"
-  //
-  //     guard estateClientFD >= 0 else {
-  //       return Unmanaged.passUnretained(event)
-  //     }
-  //
-  //     sendEstate(
-  //       message,
-  //       on: estateClientFD
-  //     )
   case .keyUp:
     let message =
       "{\"type\":\"native_event\"," + "\"event\":{" + "\"sent_at\":\(sentAt),"
@@ -1113,38 +1128,28 @@ let callback: CGEventTapCallBack = {
       description: name,
       modifierDirection: direction
     )
-
-  // printEvent(nativeEvent)
+    sendNativeEvent(nativeEvent, on: estateClientFD)
   case .keyDown:
-
     let name = keyName(code)
-
     let nativeEvent = makeEvent(
       event,
       type: type,
       description: name,
       modifierDirection: .down
     )
-
-  // printEvent(nativeEvent)
-
+    sendNativeEvent(nativeEvent, on: estateClientFD)
   case .keyUp:
-
     let name = keyName(code)
-
     let nativeEvent = makeEvent(
       event,
       type: type,
       description: name,
       modifierDirection: .up
     )
-
-  // printEvent(nativeEvent)
-
+    sendNativeEvent(nativeEvent, on: estateClientFD)
   default:
     break
   }
-
   return Unmanaged.passUnretained(event)
 }
 
@@ -1171,9 +1176,10 @@ func sendEstate(
   _ message: String,
   on clientFD: Int32
 ) {
-  let started = DispatchTime.now().uptimeNanoseconds
-
   let payload = message + "\n"
+
+  print("💜 SEND ATTEMPT fd=\(clientFD) bytes=\(payload.utf8.count)")
+  print("💜 SEND DATA \(payload.trimmingCharacters(in: .newlines))")
 
   payload.withCString { ptr in
     let length = strlen(ptr)
@@ -1184,17 +1190,13 @@ func sendEstate(
       length
     )
 
-    let elapsed =
-      DispatchTime.now().uptimeNanoseconds
-      - started
-
     if result < 0 {
       print(
-        "❌ SWIFT → RUST write failed: " + "\(String(cString: strerror(errno)))"
+        "❌ SWIFT → RUST write failed: \(String(cString: strerror(errno)))"
       )
     } else {
       print(
-        " 💜 SWIFT → RUST " + "fd=\(clientFD) " + "bytes=\(result) " + "write=\(elapsed / 1_000)µs"
+        "💜 SWIFT → RUST SENT fd=\(clientFD) bytes=\(result)/\(length)"
       )
     }
   }
@@ -1371,9 +1373,9 @@ func startEstateSocket() {
     )
   }
 
-  print(
-    "ESTATE HID listening: \(socketPath)"
-  )
+  // print(
+  //   "ESTATE HID listening: \(socketPath)"
+  // )
 
   while true {
     let clientFD = accept(
@@ -1477,7 +1479,7 @@ guard listen(serverFD, 1) == 0 else {
   fatalError("failed to listen")
 }
 
-print("ESTATE HID listening: \(socketPath)")
+// print("ESTATE HID listening: \(socketPath)")
 
 let clientFD = accept(serverFD, nil, nil)
 

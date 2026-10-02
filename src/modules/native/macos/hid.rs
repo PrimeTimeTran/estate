@@ -99,351 +99,373 @@ impl MacosHid {
 		Ok(())
 	}
 	pub async fn run(mut self, events: EventBus, cancel: CancellationToken) -> Result<()> {
-		let stream = UnixStream::connect(&self.socket).await.with_context(|| {
-			format!(
-				"failed to connect to Swift HID socket {}",
-				self.socket.display()
-			)
-		})?;
+		let stream = self.connect().await?;
 		let (reader, mut writer) = stream.into_split();
+
 		let mut reader = BufReader::new(reader);
 		let mut ping_interval = tokio::time::interval(std::time::Duration::from_secs(10));
+
 		let mut ping_id = 0u64;
 		let mut line = String::new();
+
 		loop {
 			tokio::select! {
-									_ = cancel.cancelled() => {
-										tracing::info!(
-											"macOS HID cancelled"
-										);
-
-										return Ok(());
-									}
-									_ = ping_interval.tick() => {
-										ping_id += 1;
-
-										let ping = HidMessage::Ping {
-											id: ping_id,
-										};
-
-										let json =
-											serde_json::to_string(&ping)?;
-
-										writer
-											.write_all(json.as_bytes())
-											.await?;
-
-										writer
-											.write_all(b"\n")
-											.await?;
-
-										tracing::info!(
-											id = ping_id,
-											"🍏 Rust → Swift: PING"
-										);
-									}
-									result = reader.read_line(&mut line) => {
-									tracing::info!("🔥 RUST READ WAKE UP");
-									let received_at = mach_now();
-									let bytes = result?;
-									tracing::info!(
-										bytes,
-										"🔥 RUST READ COMPLETE"
-									);
-									if bytes == 0 {
-										tracing::warn!("Swift HID disconnected");
-										return Ok(());
-									}
-
-									let raw = line.trim_end();
-
-									tracing::info!(
-										raw,
-										"🍎 Swift → Rust"
-									);
-									let message =
-										match serde_json::from_str::<HidMessage>(
-											raw
-										) {
-											Ok(message) => message,
-											Err(error) => {
-												tracing::error!(
-													%error,
-													raw,
-													"invalid HID message from Swift"
-												);
-												line.clear();
-												continue;
-											}
-										};
-
-									match message {
-										HidMessage::Ping { id } => {
-											tracing::info!(
-												id,
-												"🍎 Swift → Rust: PING"
-											);
-
-											let pong =
-												HidMessage::Pong { id };
-
-											let json =
-												serde_json::to_string(&pong)?;
-
-											writer
-												.write_all(json.as_bytes())
-												.await?;
-
-											writer
-												.write_all(b"\n")
-												.await?;
-
-											tracing::info!(
-												id,
-												"🍏 Rust → Swift: PONG"
-											);
-										}
-										HidMessage::Pong { id } => {
-											tracing::info!(
-												id,
-												"🍎 Swift → Rust: PONG"
-											);
-										}
-										HidMessage::NativeEvent { event } => {
-											 let latency = received_at.saturating_sub(event.sent_at);
-
-											tracing::info!(
-													event = ?event,
-													"🔥 RUST NATIVE EVENT"
-											);
-
-											match &event.kind {
-													NativeEventKind::KeyDown { key_code } => {
-															tracing::info!(
-																	key_code,
-																	"🔥 KEY DOWN"
-															);
-													}
-
-													NativeEventKind::KeyUp { key_code } => {
-															tracing::info!(
-																	key_code,
-																	"🔥 KEY UP"
-															);
-													}
-
-													other => {
-															tracing::info!(
-																	kind = ?other,
-																	"🔥 OTHER NATIVE EVENT KIND"
-															);
-													}
-											}
-
-											for action in self.observe_event(&event) {
-												tracing::info!(
-													action = %action.name,
-													code = %action.code,
-													"🔥 HOTKEY TRIGGERED"
-												);
-											}
-
-											events.emit(event.into());
-										}
-					HidMessage::Action { action } => {
-						tracing::info!(
-							%action,
-							"🍎 Swift action received"
-						);
+					_ = cancel.cancelled() => {
+							tracing::info!("macOS HID cancelled");
+							return Ok(());
 					}
+
+					_ = ping_interval.tick() => {
+							ping_id += 1;
+							self.send_ping(&mut writer, ping_id).await?;
+					}
+
+					result = reader.read_line(&mut line) => {
+							let received_at = mach_now();
+							let bytes = result?;
+
+							if bytes == 0 {
+									tracing::warn!("Swift HID disconnected");
+									return Ok(());
+							}
+
+							self.handle_line(
+									line.trim_end(),
+									received_at,
+									&mut writer,
+									&events,
+							).await?;
+
+							line.clear();
+					}
+			}
+		}
+	}
+	async fn connect(&self) -> Result<UnixStream> {
+		tracing::info!(
+				socket = %self.socket.display(),
+				"🍎 connecting to macOS HID"
+		);
+
+		loop {
+			match UnixStream::connect(&self.socket).await {
+				Ok(stream) => {
+					tracing::info!(
+							socket = %self.socket.display(),
+							"🍎 connected to macOS HID"
+					);
+
+					return Ok(stream);
 				}
-				line.clear();
+
+				Err(error) => {
+					tracing::debug!(
+							%error,
+							socket = %self.socket.display(),
+							"waiting for macOS HID socket"
+					);
+
+					tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 				}
 			}
 		}
 	}
-	// pub async fn run(mut self, events: EventBus, cancel: CancellationToken) -> Result<()> {
-	// let stream = UnixStream::connect(&self.socket).await.with_context(|| {
-	// format!(
-	// "failed to connect to Swift HID socket {}",
-	// self.socket.display()
-	// )
-	// })?;
-	// let (reader, mut writer) = stream.into_split();
-	// let mut reader = BufReader::new(reader);
-	// let mut ping_interval = tokio::time::interval(std::time::Duration::from_secs(10));
-	// let mut ping_id = 0u64;
-	// let mut line = String::new();
-	// loop {
-	// tokio::select! {
-	// _ = cancel.cancelled() => {
-	// tracing::info!(
-	// "macOS HID cancelled"
-	// );
-	//
-	// return Ok(());
-	// }
-	// _ = ping_interval.tick() => {
-	// ping_id += 1;
-	//
-	// let ping = HidMessage::Ping {
-	// id: ping_id,
-	// };
-	//
-	// let json =
-	// serde_json::to_string(&ping)?;
-	//
-	// writer
-	// .write_all(json.as_bytes())
-	// .await?;
-	//
-	// writer
-	// .write_all(b"\n")
-	// .await?;
-	//
-	// tracing::info!(
-	// id = ping_id,
-	// "🍏 Rust → Swift: PING"
-	// );
-	// }
-	// result = reader.read_line(&mut line) => {
-	// tracing::info!("🔥 RUST READ WAKE UP");
-	// let received_at = mach_now();
-	// let bytes = result?;
-	// tracing::info!(
-	// bytes,
-	// "🔥 RUST READ COMPLETE"
-	// );
-	// if bytes == 0 {
-	// tracing::warn!("Swift HID disconnected");
-	// return Ok(());
-	// }
-	//
-	// let raw = line.trim_end();
-	//
-	// tracing::info!(
-	// raw,
-	// "🍎 Swift → Rust"
-	// );
-	// let message =
-	// match serde_json::from_str::<HidMessage>(
-	// raw
-	// ) {
-	// Ok(message) => message,
-	// Err(error) => {
-	// tracing::error!(
-	// %error,
-	// raw,
-	// "invalid HID message from Swift"
-	// );
-	// line.clear();
-	// continue;
-	// }
-	// };
-	//
-	// match message {
-	// HidMessage::Ping { id } => {
-	// tracing::info!(
-	// id,
-	// "🍎 Swift → Rust: PING"
-	// );
-	//
-	// let pong =
-	// HidMessage::Pong { id };
-	//
-	// let json =
-	// serde_json::to_string(&pong)?;
-	//
-	// writer
-	// .write_all(json.as_bytes())
-	// .await?;
-	//
-	// writer
-	// .write_all(b"\n")
-	// .await?;
-	//
-	// tracing::info!(
-	// id,
-	// "🍏 Rust → Swift: PONG"
-	// );
-	// }
-	// HidMessage::Pong { id } => {
-	// tracing::info!(
-	// id,
-	// "🍎 Swift → Rust: PONG"
-	// );
-	// }
-	// HidMessage::NativeEvent { event } => {
-	// let latency = received_at.saturating_sub(event.sent_at);
-	//
-	// match &event.kind {
-	// NativeEventKind::KeyDown { key_code } => {
-	// tracing::info!(
-	// key_code,
-	// "🔥 KEY DOWN"
-	// );
-	// }
-	//
-	// NativeEventKind::KeyUp { key_code } => {
-	// tracing::info!(
-	// key_code,
-	// "🔥 KEY UP"
-	// );
-	// }
-	//
-	// _ => {}
-	// }
-	//
-	// for action in self.observe_event(&event) {
-	// tracing::info!(
-	// action = %action.name,
-	// code = %action.code,
-	// "🔥 HOTKEY TRIGGERED"
-	// );
-	// }
-	//
-	// events.emit(event.into());
-	// }
-	// HidMessage::Action { action } => {
-	// tracing::info!(
-	// %action,
-	// "🍎 Swift action received"
-	// );
-	// }
-	// }
-	// line.clear();
-	// }
-	// }
-	// }
-	// }
+	async fn send_ping(&self, writer: &mut tokio::net::unix::OwnedWriteHalf, id: u64) -> Result<()> {
+		let message = HidMessage::Ping { id };
 
+		self.send_message(writer, &message).await?;
+
+		tracing::info!(id, "🍏 Rust → Swift: PING");
+
+		Ok(())
+	}
+	async fn send_message(
+		&self,
+		writer: &mut tokio::net::unix::OwnedWriteHalf,
+		message: &HidMessage,
+	) -> Result<()> {
+		let json = serde_json::to_string(message)?;
+
+		writer.write_all(json.as_bytes()).await?;
+		writer.write_all(b"\n").await?;
+
+		Ok(())
+	}
+	async fn handle_ping(
+		&self,
+		id: u64,
+		writer: &mut tokio::net::unix::OwnedWriteHalf,
+	) -> Result<()> {
+		tracing::info!(id, "🍎 Swift → Rust: PING");
+
+		let pong = HidMessage::Pong { id };
+
+		self.send_message(writer, &pong).await?;
+
+		tracing::info!(id, "🍏 Rust → Swift: PONG");
+
+		Ok(())
+	}
+	async fn handle_line(
+		&mut self,
+		raw: &str,
+		received_at: u64,
+		writer: &mut tokio::net::unix::OwnedWriteHalf,
+		events: &EventBus,
+	) -> Result<()> {
+		tracing::info!(raw, "🍎 Swift → Rust");
+
+		let Some(message) = self.parse_message(raw) else {
+			return Ok(());
+		};
+
+		match message {
+			HidMessage::Ping { id } => {
+				self.handle_ping(id, writer).await?;
+			}
+
+			HidMessage::Pong { id } => {
+				self.handle_pong(id);
+			}
+
+			HidMessage::NativeEvent { event } => {
+				self.handle_native_event(event, received_at, events);
+			}
+
+			HidMessage::Action { action } => {
+				self.handle_action(action);
+			}
+		}
+
+		Ok(())
+	}
+	fn parse_message(&self, raw: &str) -> Option<HidMessage> {
+		match serde_json::from_str::<HidMessage>(raw) {
+			Ok(message) => Some(message),
+
+			Err(error) => {
+				tracing::error!(
+						%error,
+						raw,
+						"invalid HID message from Swift"
+				);
+
+				None
+			}
+		}
+	}
+	fn handle_action(&self, action: String) {
+		tracing::info!(
+				action = %action,
+				"🍎 Swift action received"
+		);
+	}
+	fn handle_native_event(&mut self, event: NativeEvent, received_at: u64, events: &EventBus) {
+		let latency = received_at.saturating_sub(event.sent_at);
+		self.log_native_event(&event);
+		for action in self.observe_event(&event) {
+			tracing::info!(
+					action = %action.name,
+					code = %action.code,
+					"🔥 HOTKEY TRIGGERED"
+			);
+		}
+		events.emit(event.into());
+	}
+	fn log_native_event(&self, event: &NativeEvent) {
+		let modifiers = self.modifier_display(&event.modifiers);
+
+		let (kind, code, key, details) = match &event.kind {
+			NativeEventKind::KeyDown { key_code } => {
+				let key = Self::key_from_code(*key_code);
+
+				(
+					"KEY DOWN",
+					key_code.to_string(),
+					key.map(|key| key.display()).unwrap_or_else(|| "?".into()),
+					String::new(),
+				)
+			}
+
+			NativeEventKind::KeyUp { key_code } => {
+				let key = Self::key_from_code(*key_code);
+
+				(
+					"KEY UP",
+					key_code.to_string(),
+					key.map(|key| key.display()).unwrap_or_else(|| "?".into()),
+					String::new(),
+				)
+			}
+
+			NativeEventKind::FlagsChanged { key_code, .. } => {
+				let key = Self::key_from_code(*key_code);
+
+				(
+					"FLAGS",
+					key_code.to_string(),
+					key.map(|key| key.display()).unwrap_or_else(|| "?".into()),
+					String::new(),
+				)
+			}
+
+			NativeEventKind::MouseDown { button, x, y } => (
+				"MOUSE DOWN",
+				"".into(),
+				"".into(),
+				format!("button={button} x={x:.1} y={y:.1}"),
+			),
+
+			NativeEventKind::MouseUp { button, x, y } => (
+				"MOUSE UP",
+				"".into(),
+				"".into(),
+				format!("button={button} x={x:.1} y={y:.1}"),
+			),
+
+			NativeEventKind::Scroll {
+				vertical,
+				horizontal,
+			} => (
+				"SCROLL",
+				"".into(),
+				"".into(),
+				format!("v={vertical} h={horizontal}"),
+			),
+
+			other => ("OTHER", "".into(), "".into(), format!("{other:?}")),
+		};
+
+		tracing::info!(
+			"│ {:<10} │ {:>4} │ {:<14} │ {:<18} │ {} │",
+			kind,
+			code,
+			key,
+			modifiers,
+			details,
+		);
+	}
+	fn log_key_event(&self, event: &NativeEvent) {
+		match &event.kind {
+			NativeEventKind::KeyDown { key_code } => {
+				let key = Self::key_from_code(*key_code);
+
+				// tracing::info!(
+				// key_code,
+				// key = ?key,
+				// "🔥 KEY DOWN"
+				// );
+			}
+
+			NativeEventKind::KeyUp { key_code } => {
+				let key = Self::key_from_code(*key_code);
+				//
+				// tracing::info!(
+				// key_code,
+				// key = ?key,
+				// "🔥 KEY UP"
+				// );
+			}
+
+			other => {
+				tracing::info!(
+						kind = ?other,
+						"🔥 OTHER NATIVE EVENT KIND"
+				);
+			}
+		}
+	}
+	fn handle_pong(&self, id: u64) {
+		tracing::info!(id, "🍎 Swift → Rust: PONG");
+	}
+	fn modifier_display(&self, modifiers: &ModifierSnapshot) -> String {
+		let mut parts = Vec::new();
+
+		if modifiers.shift_left {
+			parts.push("⇧L");
+		}
+		if modifiers.shift_right {
+			parts.push("⇧R");
+		}
+
+		if modifiers.control_left {
+			parts.push("⌃L");
+		}
+		if modifiers.control_right {
+			parts.push("⌃R");
+		}
+
+		if modifiers.alt_left {
+			parts.push("⌥L");
+		}
+		if modifiers.alt_right {
+			parts.push("⌥R");
+		}
+
+		if modifiers.command_left {
+			parts.push("⌘L");
+		}
+		if modifiers.command_right {
+			parts.push("⌘R");
+		}
+
+		if modifiers.caps_lock {
+			parts.push("⇪");
+		}
+
+		if modifiers.function {
+			parts.push("fn");
+		}
+
+		if parts.is_empty() {
+			"·".to_string()
+		} else {
+			parts.join(" ")
+		}
+	}
 	pub fn observe_event(&mut self, event: &NativeEvent) -> Vec<Action> {
 		Self::init_hid_smoke_log();
+
 		let mut triggered = Vec::new();
+
 		for index in 0..self.bindings.len() {
-			if !self.bindings[index].enabled {
+			let (enabled, trigger, action) = {
+				let binding = &self.bindings[index];
+
+				(
+					binding.enabled,
+					binding.trigger.clone(),
+					binding.action.clone(),
+				)
+			};
+
+			if !enabled {
 				continue;
 			}
-			let matched = {
-				let trigger = &self.bindings[index].trigger.clone();
-				self.matches(trigger, event)
-			};
-			if matched {
-				let action = self.bindings[index].action.clone();
-				// let key = key_from_code(action.code);
-				let keycode = MacosHid::keycode_from_string(&action.code);
-				tracing::info!(
-				action = %action.name,
-				code = %action.code,
-				key = ?keycode.and_then(MacosHid::key_from_code),
-				"🔥 HOTKEY TRIGGERED"
-						);
-				let _ = Self::write_hid_trace(event, Some(&action));
-				triggered.push(action);
+
+			let matched = self.matches(&trigger, event);
+
+			if !matched {
+				continue;
 			}
+
+			let keycode = MacosHid::keycode_from_string(&action.code);
+
+			tracing::info!(
+					action = %action.name,
+					code = %action.code,
+					key = ?keycode.and_then(MacosHid::key_from_code),
+					"🔥 HOTKEY TRIGGERED"
+			);
+
+			let _ = Self::write_hid_trace(event, Some(&action));
+
+			triggered.push(action);
 		}
+
 		triggered
 	}
+	fn check_keybinds_for_trigger() {}
 }
 fn key_from_code(code: u16) -> Option<Key> {
 	match code {
@@ -1006,6 +1028,7 @@ impl MacosHid {
 			NativeEventKind::KeyDown { key_code } => {
 				Self::key_from_code(*key_code).map(GestureEvent::Down)
 			}
+			NativeEventKind::FlagsChanged { .. } => None,
 
 			NativeEventKind::KeyUp { key_code } => Self::key_from_code(*key_code).map(GestureEvent::Up),
 
@@ -1092,6 +1115,7 @@ impl MacosHid {
 			NativeEventKind::MouseDown { .. } => "M↓",
 			NativeEventKind::MouseUp { .. } => "M↑",
 			NativeEventKind::Scroll { .. } => "SCROLL",
+			NativeEventKind::FlagsChanged { .. } => "⇄",
 		};
 
 		writeln!(
@@ -1331,4 +1355,21 @@ fn default_bindings() -> Vec<Binding> {
 			enabled: true,
 		},
 	]
+}
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ModifierSnapshot {
+	pub shift_left: bool,
+	pub shift_right: bool,
+
+	pub control_left: bool,
+	pub control_right: bool,
+
+	pub alt_left: bool,
+	pub alt_right: bool,
+
+	pub command_left: bool,
+	pub command_right: bool,
+
+	pub caps_lock: bool,
+	pub function: bool,
 }

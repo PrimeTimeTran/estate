@@ -47,6 +47,9 @@ pub enum NativeEventKind {
 
 	#[serde(rename = "scroll")]
 	Scroll { vertical: i64, horizontal: i64 },
+
+	#[serde(rename = "flags_changed")]
+	FlagsChanged { key_code: u16 },
 }
 
 impl App<Context> {
@@ -174,6 +177,7 @@ impl From<NativeEventKind> for e::EventKind {
 				vertical,
 				horizontal,
 			},
+			NativeEventKind::FlagsChanged { key_code } => EventKind::FlagsChanged { key_code },
 		}
 	}
 }
@@ -183,6 +187,7 @@ pub struct NativeEvent {
 	pub sent_at: u64,
 	#[serde(flatten)]
 	pub kind: NativeEventKind,
+	pub modifiers: ModifierSnapshot,
 }
 
 #[derive(Clone)]

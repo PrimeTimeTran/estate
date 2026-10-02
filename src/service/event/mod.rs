@@ -247,6 +247,8 @@ pub enum EventKind {
 	MouseDown { button: i64, x: f64, y: f64 },
 	MouseUp { button: i64, x: f64, y: f64 },
 	Scroll { vertical: i64, horizontal: i64 },
+	FlagsChanged { key_code: u16 },
+	ModifierChanged { modifiers: ModifierSnapshot },
 }
 
 /// ## [EventSource]
