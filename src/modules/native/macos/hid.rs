@@ -1861,7 +1861,23 @@ pub struct SwiftNativeEvent {
 	pub key_code: Option<u16>,
 
 	#[serde(default)]
+	pub button: Option<i64>,
+
+	#[serde(default)]
+	pub x: Option<f64>,
+
+	#[serde(default)]
+	pub y: Option<f64>,
+
+	#[serde(default)]
+	pub vertical: Option<i64>,
+
+	#[serde(default)]
+	pub horizontal: Option<i64>,
+
+	#[serde(default)]
 	pub modifiers: Option<SwiftModifiers>,
+
 	#[serde(rename = "frontmostApp", default)]
 	pub frontmost_app: Option<SwiftFrontmostApp>,
 }
@@ -1896,9 +1912,22 @@ impl SwiftNativeEvent {
 				}
 			}
 
-			"mouse_down" => return None,
-			"mouse_up" => return None,
-			"scroll" => return None,
+			"mouse_down" => NativeEventKind::MouseDown {
+				button: self.button?,
+				x: self.x?,
+				y: self.y?,
+			},
+
+			"mouse_up" => NativeEventKind::MouseUp {
+				button: self.button?,
+				x: self.x?,
+				y: self.y?,
+			},
+
+			"scroll" => NativeEventKind::Scroll {
+				vertical: self.vertical?,
+				horizontal: self.horizontal?,
+			},
 
 			_ => return None,
 		};
