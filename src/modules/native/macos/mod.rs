@@ -69,6 +69,8 @@ pub enum NativeEventKind {
 	},
 
 	ModifierChanged,
+	#[serde(rename = "frontmost_app")]
+	FrontmostApp,
 }
 
 impl App<Context> {
@@ -214,11 +216,27 @@ impl From<NativeEventKind> for e::EventKind {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NativeEvent {
 	pub sent_at: u64,
+
 	#[serde(flatten)]
 	pub kind: NativeEventKind,
-	// pub modifiers: Option<ModifierSnapshot>,
+
 	#[serde(default)]
 	pub modifiers: ModifierSnapshot,
+
+	#[serde(default)]
+	pub source: Option<String>,
+
+	#[serde(default)]
+	pub timestamp: Option<u64>,
+
+	#[serde(default)]
+	pub key_code: Option<u16>,
+
+	#[serde(default)]
+	pub name: Option<String>,
+
+	#[serde(default)]
+	pub direction: Option<keymap::KeyDirection>,
 }
 
 #[derive(Clone)]

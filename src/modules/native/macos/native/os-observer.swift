@@ -15,18 +15,24 @@ struct EventEnvelope: Codable {
 }
 
 func emitForegroundApp(_ app: FrontmostApp) {
+  let now = DispatchTime.now().uptimeNanoseconds
+
   let event = NativeEvent(
+    sentAt: now,
     kind: .frontmostApp,
     source: .workspace,
     timestamp: mach_absolute_time(),
-    event: nil,
+
+    keyCode: nil,
+    button: nil,
+    x: nil,
+    y: nil,
+    vertical: nil,
+    horizontal: nil,
+
     name: app.name ?? "",
     modifiers: nil,
     direction: nil,
-    mouseButton: nil,
-    clickCount: nil,
-    locationX: nil,
-    locationY: nil,
     frontmostApp: app
   )
 
@@ -62,58 +68,6 @@ func frontmostApplication() -> FrontmostApp {
     name: app?.localizedName,
     pid: app?.processIdentifier
   )
-}
-
-func emitFrontmostApp(_ app: FrontmostApp) {
-  let nativeEvent = NativeEvent(
-    kind: .frontmostApp,
-    source: .workspace,
-    timestamp: mach_absolute_time(),
-
-    event: nil,
-    name: app.name ?? "",
-    modifiers: nil,
-    direction: nil,
-
-    mouseButton: nil,
-    clickCount: nil,
-    locationX: nil,
-    locationY: nil,
-
-    frontmostApp: app
-  )
-
-  let envelope = EventEnvelope(
-    type: "native_event",
-    version: 1,
-    event: nativeEvent
-  )
-
-  do {
-    let data = try JSONEncoder().encode(envelope)
-
-    guard
-      let message = String(
-        data: data,
-        encoding: .utf8
-      )
-    else {
-      return
-    }
-
-    guard estateClientFD >= 0 else {
-      return
-    }
-
-    sendEstate(
-      message,
-      on: estateClientFD
-    )
-  } catch {
-    print(
-      "❌ failed to encode frontmost app: \(error)"
-    )
-  }
 }
 
 // MARK: - Initial state
@@ -281,71 +235,63 @@ struct CGEventInfo: Codable {
   let sourceUserData: Int64
 }
 struct NativeEvent: Codable {
-  enum Kind: String, Codable {
-    case keyDown
-    case keyUp
-    case flagsChanged
-    case mouse
-    case hid
-    case frontmostApp
-  }
-
+  let sentAt: UInt64
   let kind: Kind
   let source: EventSource
   let timestamp: UInt64
 
-  let event: CGEventInfo?
+  let keyCode: UInt16?
+
+  let button: Int64?
+  let x: Double?
+  let y: Double?
+
+  let vertical: Int64?
+  let horizontal: Int64?
+
   let name: String
   let modifiers: ModifierSnapshot?
   let direction: KeyDirection?
 
-  let mouseButton: Int64?
-  let clickCount: Int64?
-  let locationX: Double?
-  let locationY: Double?
-
   let frontmostApp: FrontmostApp?
-}
-enum NativeEventKind: String, Codable {
-  case keyDown
-  case keyUp
-  case flagsChanged
-  case mouse
-  case hid
-  case frontmostApp
-}
-struct EstateNativeEvent: Codable {
-  let sentAt: UInt64
-  let kind: NativeEventKind
-  let modifiers: ModifierSnapshot
-  let source: EventSource
-  let timestamp: UInt64
-  let name: String
-  let direction: KeyDirection?
-  let event: CGEventInfo?
+
+  enum Kind: String, Codable {
+    case keyDown = "key_down"
+    case keyUp = "key_up"
+    case mouseDown = "mouse_down"
+    case mouseUp = "mouse_up"
+    case scroll = "scroll"
+    case flagsChanged = "flags_changed"
+    case frontmostApp = "frontmost_app"
+    case modifierChanged = "ModifierChanged"
+  }
 
   enum CodingKeys: String, CodingKey {
     case sentAt = "sent_at"
     case kind
-    case modifiers
     case source
     case timestamp
+    case keyCode = "key_code"
+    case button
+    case x
+    case y
+    case vertical
+    case horizontal
     case name
+    case modifiers
     case direction
-    case event
+    case frontmostApp
   }
 }
-enum CodingKeys: String, CodingKey {
-  case sentAt = "sent_at"
-  case kind
-  case modifiers
-  case source
-  case timestamp
-  case name
-  case direction
-  case event
+enum Kind: String, Codable {
+  case keyDown = "key_down"
+  case keyUp = "key_up"
+  case mouseDown = "mouse_down"
+  case mouseUp = "mouse_up"
+  case scroll = "scroll"
+  case flagsChanged = "flags_changed"
+  case modifierChanged = "ModifierChanged"
 }
-
 var state = ModifierState()
 func modifierName(_ keyCode: Int64) -> String {
   switch keyCode {
@@ -643,6 +589,7 @@ func printHeader() {
 
   fflush(stdout)
 }
+
 func sendNativeEvent(
   _ event: NativeEvent,
   on clientFD: Int32
@@ -685,75 +632,78 @@ func makeEvent(
     event.getIntegerValueField(
       .eventSourceUserData
     )
-
+  let now = DispatchTime.now().uptimeNanoseconds
   switch type {
-
   case .keyDown:
     return NativeEvent(
+      sentAt: now,
       kind: .keyDown,
       source: .cgEvent,
       timestamp: DispatchTime.now().uptimeNanoseconds,
-      event: CGEventInfo(
-        type: type.rawValue,
-        keyCode: keyCode,
-        flags: flags.rawValue,
-        sessionFlags: session.rawValue,
-        sourcePID: sourcePID,
-        sourceUserData: sourceUserData
-      ),
+      keyCode: UInt16(keyCode),
+      button: nil,
+      x: nil,
+      y: nil,
+      vertical: nil,
+      horizontal: nil,
+      // event: CGEventInfo(
+      //   type: type.rawValue,
+      //   keyCode: keyCode,
+      //   flags: flags.rawValue,
+      //   sessionFlags: session.rawValue,
+      //   sourcePID: sourcePID,
+      //   sourceUserData: sourceUserData
+      // ),
       name: keyName(keyCode),
       modifiers: ModifierSnapshot(from: state),
       direction: .down,
-      mouseButton: nil,
-      clickCount: nil,
-      locationX: nil,
-      locationY: nil,
       frontmostApp: nil
     )
 
   case .keyUp:
     return NativeEvent(
+      sentAt: now,
       kind: .keyUp,
       source: .cgEvent,
       timestamp: DispatchTime.now().uptimeNanoseconds,
-      event: CGEventInfo(
-        type: type.rawValue,
-        keyCode: keyCode,
-        flags: flags.rawValue,
-        sessionFlags: session.rawValue,
-        sourcePID: sourcePID,
-        sourceUserData: sourceUserData
-      ),
+      keyCode: UInt16(keyCode),
+      button: nil,
+      x: nil,
+      y: nil,
+      vertical: nil,
+      horizontal: nil,
+      // event: CGEventInfo(
+      //   type: type.rawValue,
+      //   keyCode: keyCode,
+      //   flags: flags.rawValue,
+      //   sessionFlags: session.rawValue,
+      //   sourcePID: sourcePID,
+      //   sourceUserData: sourceUserData
+      // ),
       name: keyName(keyCode),
       modifiers: ModifierSnapshot(from: state),
       direction: .up,
-      mouseButton: nil,
-      clickCount: nil,
-      locationX: nil,
-      locationY: nil,
       frontmostApp: nil
     )
 
   case .flagsChanged:
     return NativeEvent(
+      sentAt: now,
       kind: .flagsChanged,
       source: .cgEvent,
-      timestamp: DispatchTime.now().uptimeNanoseconds,
-      event: CGEventInfo(
-        type: type.rawValue,
-        keyCode: keyCode,
-        flags: flags.rawValue,
-        sessionFlags: session.rawValue,
-        sourcePID: sourcePID,
-        sourceUserData: sourceUserData
-      ),
+      timestamp: now,
+
+      keyCode: UInt16(keyCode),
+
+      button: nil,
+      x: nil,
+      y: nil,
+      vertical: nil,
+      horizontal: nil,
+
       name: description,
       modifiers: ModifierSnapshot(from: state),
       direction: modifierDirection,
-      mouseButton: nil,
-      clickCount: nil,
-      locationX: nil,
-      locationY: nil,
       frontmostApp: nil
     )
 
@@ -785,32 +735,40 @@ func makeEvent(
         fatalError("Unexpected mouse event type")
       }
 
-    let clickCount =
-      event.getIntegerValueField(
-        .mouseEventClickState
-      )
+    let kind: NativeEvent.Kind =
+      switch type {
+      case .leftMouseDown,
+        .rightMouseDown,
+        .otherMouseDown:
+        .mouseDown
+
+      case .leftMouseUp,
+        .rightMouseUp,
+        .otherMouseUp:
+        .mouseUp
+
+      default:
+        fatalError("Unexpected mouse event type")
+      }
 
     let location = event.location
 
     return NativeEvent(
-      kind: .mouse,
+      sentAt: now,
+      kind: kind,
       source: .cgEvent,
       timestamp: DispatchTime.now().uptimeNanoseconds,
-      event: CGEventInfo(
-        type: type.rawValue,
-        keyCode: nil,
-        flags: flags.rawValue,
-        sessionFlags: session.rawValue,
-        sourcePID: sourcePID,
-        sourceUserData: sourceUserData
-      ),
+
+      keyCode: nil,
+      button: buttonNumber,
+      x: location.x,
+      y: location.y,
+      vertical: nil,
+      horizontal: nil,
+
       name: "button \(buttonNumber)",
       modifiers: ModifierSnapshot(from: state),
       direction: direction,
-      mouseButton: buttonNumber,
-      clickCount: clickCount,
-      locationX: location.x,
-      locationY: location.y,
       frontmostApp: nil
     )
 
@@ -821,10 +779,6 @@ func makeEvent(
   }
 }
 func printEvent(_ nativeEvent: NativeEvent) {
-  guard let info = nativeEvent.event else {
-    return
-  }
-
   let now = formatter.string(from: Date())
   let modifiers = nativeEvent.modifiers
 
@@ -834,10 +788,10 @@ func printEvent(_ nativeEvent: NativeEvent) {
     }
 
     switch nativeEvent.kind {
-    case .keyDown:
+    case .keyDown, .mouseDown:
       return "↓"
 
-    case .keyUp:
+    case .keyUp, .mouseUp:
       return "↑"
 
     default:
@@ -863,8 +817,22 @@ func printEvent(_ nativeEvent: NativeEvent) {
 
   let flagsText = aggregateModifiers(modifiers)
 
+  // Semantic key code first. Fall back to the raw CGEvent
+  // for debugging if it still exists.
+  let keyCode: Int64? = {
+    guard let keyCode = nativeEvent.keyCode else {
+      return nil
+    }
+
+    return Int64(keyCode)
+  }()
+
   let displayName: String = {
-    switch info.keyCode {
+    guard let keyCode else {
+      return nativeEvent.name
+    }
+
+    switch keyCode {
     case 55, 54:
       return "⌘"
 
@@ -902,45 +870,19 @@ func printEvent(_ nativeEvent: NativeEvent) {
 
   let eventDisplay = "\(arrow) \(displayName)"
 
-  // print(
-  //   String(
-  //     format:
-  //       "%@ | %-9@ | %-9@ | %-4@ | %-14@ | %-8@ | %4lld | %10llu | %10llu | %6lld | %6lld",
-  //     now as NSString,
-  //     left as NSString,
-  //     right as NSString,
-  //     special as NSString,
-  //     eventDisplay as NSString,
-  //     flagsText as NSString,
-  //     info.keyCode ?? -1,
-  //     info.flags,
-  //     info.sessionFlags,
-  //     info.sourcePID,
-  //     info.sourceUserData
-  //   )
-  // )
-  //   let sentAt = mach_absolute_time()
-  //
-  //   let message =
-  //     "{\"type\":\"native_event\"," + "\"event\":{" + "\"sent_at\":\(sentAt),"
-  //     + "\"kind\":\"key_down\"," + "\"key_code\":\(displayName)" + "}}"
-  //   guard estateClientFD >= 0 else {
-  //     return
-  //   }
-  //
-  //   sendEstate(
-  //     message,
-  //     on: estateClientFD
-  //   )
-  // sendEstate(
-  //   message,
-  //   on: clientFD
-  // )
-  // sendEstate(
-  //   message,
-  //   on: estateClientFD
-  // )
-
+  print(
+    String(
+      format:
+        "%@ | %-9@ | %-9@ | %-4@ | %-14@ | %-8@ | %4lld",
+      now as NSString,
+      left as NSString,
+      right as NSString,
+      special as NSString,
+      eventDisplay as NSString,
+      flagsText as NSString,
+      keyCode ?? -1
+    )
+  )
   fflush(stdout)
 }
 let mask =
@@ -961,122 +903,6 @@ let callback: CGEventTapCallBack = {
   event,
   userInfo in
 
-  let rawKeyCode =
-    event.getIntegerValueField(
-      .keyboardEventKeycode
-    )
-
-  let mouseButton =
-    event.getIntegerValueField(
-      .mouseEventButtonNumber
-    )
-
-  let location = event.location
-
-  let rawLabel: String
-
-  let sentAt = mach_absolute_time()
-
-  switch type {
-  case .keyDown:
-    let message =
-      "{\"type\":\"native_event\"," + "\"event\":{" + "\"sent_at\":\(sentAt),"
-      + "\"kind\":\"key_down\"," + "\"key_code\":\(rawKeyCode)" + "}}"
-
-    guard estateClientFD >= 0 else {
-      return Unmanaged.passUnretained(event)
-    }
-
-    sendEstate(
-      message,
-      on: estateClientFD
-    )
-  case .keyUp:
-    let message =
-      "{\"type\":\"native_event\"," + "\"event\":{" + "\"sent_at\":\(sentAt),"
-      + "\"kind\":\"key_up\"," + "\"key_code\":\(rawKeyCode)" + "}}"
-
-    guard estateClientFD >= 0 else {
-      return Unmanaged.passUnretained(event)
-    }
-
-    sendEstate(
-      message,
-      on: estateClientFD
-    )
-  case .leftMouseDown,
-    .rightMouseDown,
-    .otherMouseDown:
-
-    let message =
-      "{\"type\":\"native_event\"," + "\"event\":{" + "\"sent_at\":\(sentAt),"
-      + "\"kind\":\"mouse_down\"," + "\"button\":\(mouseButton)," + "\"x\":\(location.x),"
-      + "\"y\":\(location.y)" + "}}"
-
-    guard estateClientFD >= 0 else {
-      return Unmanaged.passUnretained(event)
-    }
-
-    sendEstate(
-      message,
-      on: estateClientFD
-    )
-
-  case .leftMouseUp,
-    .rightMouseUp,
-    .otherMouseUp:
-
-    let message =
-      "{\"type\":\"native_event\"," + "\"event\":{" + "\"sent_at\":\(sentAt),"
-      + "\"kind\":\"mouse_up\"," + "\"button\":\(mouseButton)," + "\"x\":\(location.x),"
-      + "\"y\":\(location.y)" + "}}"
-
-    guard estateClientFD >= 0 else {
-      return Unmanaged.passUnretained(event)
-    }
-
-    sendEstate(
-      message,
-      on: estateClientFD
-    )
-  case .scrollWheel:
-
-    let vertical =
-      event.getIntegerValueField(
-        .scrollWheelEventDeltaAxis1
-      )
-
-    let horizontal =
-      event.getIntegerValueField(
-        .scrollWheelEventDeltaAxis2
-      )
-
-    let message =
-      "{\"type\":\"native_event\"," + "\"event\":{" + "\"sent_at\":\(sentAt),"
-      + "\"kind\":\"scroll\"," + "\"vertical\":\(vertical)," + "\"horizontal\":\(horizontal)" + "}}"
-
-    guard estateClientFD >= 0 else {
-      return Unmanaged.passUnretained(event)
-    }
-
-    sendEstate(
-      message,
-      on: estateClientFD
-    )
-
-  case .flagsChanged:
-    break
-  // Don't send yet.
-
-  default:
-    break
-  }
-  // print(
-  //   "RAW \(rawLabel) " + "type=\(type.rawValue) " + "button=\(mouseButton) "
-  //     + "keyCode=\(rawKeyCode)"
-  // )
-
-  fflush(stdout)
   // ------------------------------------------------------------
   // Event tap status
   // ------------------------------------------------------------
@@ -1109,11 +935,11 @@ let callback: CGEventTapCallBack = {
 
   case .flagsChanged:
 
-    // keycode 0 can appear as a flagsChanged event.
-    // Do NOT interpret it as an A key press.
     if code == 0 {
       print(
-        "⚠️ NON-MODIFIER FLAGS EVENT: " + "keycode=0 " + "time=\(event.timestamp) "
+        "⚠️ NON-MODIFIER FLAGS EVENT: "
+          + "keycode=0 "
+          + "time=\(event.timestamp) "
           + "flags=\(event.flags.rawValue)"
       )
       fflush(stdout)
@@ -1122,16 +948,9 @@ let callback: CGEventTapCallBack = {
 
     let name = modifierName(code)
 
-    // IMPORTANT:
-    // This is the ONLY place we mutate our reconstructed
-    // modifier state for this event.
     let direction = updateModifierState(
       keyCode: code
     )
-
-    // --------------------------------------------------------
-    // Watched FLAGS diagnostic
-    // --------------------------------------------------------
 
     if watchedKeyCodes.contains(CGKeyCode(code)) {
       let rightCommandHeld = CGEventSource.keyState(
@@ -1165,47 +984,59 @@ let callback: CGEventTapCallBack = {
           .combinedSessionState
         ).rawValue
 
-      // print(
-      //   "⚠️ WATCHED " + "\(direction?.rawValue.uppercased() ?? "?") " + "key=\(keyName(code)) "
-      //     + "code=\(code) "
-      //     + "time=\(event.timestamp) " + "cmd[L]=\(leftCommandHeld) "
-      //     + "cmd[R]=\(rightCommandHeld) " + "flags=\(event.flags.rawValue) "
-      //     + "session=\(sessionFlags) " + "pid=\(sourcePID) " + "state=\(sourceState) "
-      //     + "keyboard=\(keyboardType) " + "repeat=\(autorepeat)"
-      // )
       fflush(stdout)
     }
+
     let nativeEvent = makeEvent(
       event,
       type: type,
       description: name,
       modifierDirection: direction
     )
-    sendNativeEvent(nativeEvent, on: estateClientFD)
+
+    sendNativeEvent(
+      nativeEvent,
+      on: estateClientFD
+    )
+
   case .keyDown:
+
     let name = keyName(code)
+
     let nativeEvent = makeEvent(
       event,
       type: type,
       description: name,
       modifierDirection: .down
     )
-    sendNativeEvent(nativeEvent, on: estateClientFD)
+
+    sendNativeEvent(
+      nativeEvent,
+      on: estateClientFD
+    )
+
   case .keyUp:
+
     let name = keyName(code)
+
     let nativeEvent = makeEvent(
       event,
       type: type,
       description: name,
       modifierDirection: .up
     )
-    sendNativeEvent(nativeEvent, on: estateClientFD)
+
+    sendNativeEvent(
+      nativeEvent,
+      on: estateClientFD
+    )
+
   default:
     break
   }
+
   return Unmanaged.passUnretained(event)
 }
-
 guard
   let tap = CGEvent.tapCreate(
     tap: .cgSessionEventTap,
@@ -1223,15 +1054,14 @@ else {
   exit(1)
 }
 
-
 func sendEstate(
   _ message: String,
   on clientFD: Int32
 ) {
   let payload = message + "\n"
-// 
-//   print("💜 SEND ATTEMPT fd=\(clientFD) bytes=\(payload.utf8.count)")
-//   print("💜 SEND DATA \(payload.trimmingCharacters(in: .newlines))")
+  //
+  //   print("💜 SEND ATTEMPT fd=\(clientFD) bytes=\(payload.utf8.count)")
+  //   print("💜 SEND DATA \(payload.trimmingCharacters(in: .newlines))")
 
   payload.withCString { ptr in
     let length = strlen(ptr)

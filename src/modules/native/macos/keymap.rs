@@ -312,3 +312,9 @@ pub enum ModifierKey {
 	Fn,
 	CapsLock,
 }
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum KeyDirection {
+  Down,
+  Up
+}

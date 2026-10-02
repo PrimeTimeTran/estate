@@ -26,7 +26,26 @@ pub enum HidMessage {
 	#[serde(rename = "action")]
 	Action { action: String },
 }
+#[derive(Debug, Default, Clone, Copy)]
+struct HidState {
+	shift_left: bool,
+	shift_right: bool,
 
+	ctrl_left: bool,
+	ctrl_right: bool,
+
+	opt_left: bool,
+	opt_right: bool,
+
+	cmd_left: bool,
+	cmd_right: bool,
+
+	caps: bool,
+	function: bool,
+}
+pub struct HidObserver {
+	state: HidState,
+}
 impl MacosHid {
 	pub fn new() -> Result<Self> {
 		tracing::info!("MacosHid new");
@@ -35,6 +54,7 @@ impl MacosHid {
 		let enabled = true;
 
 		Ok(Self {
+			state: HidState::default(),
 			socket: PathBuf::from("/tmp/estate-hid.sock"),
 			child: None,
 			bindings: default_bindings(),
@@ -210,7 +230,7 @@ impl MacosHid {
 		writer: &mut tokio::net::unix::OwnedWriteHalf,
 		events: &EventBus,
 	) -> Result<()> {
-		// tracing::info!(raw, "🍎 Swift → Rust");
+		// tracing::info!("🍎 Swift → Rust");
 
 		let Some(message) = self.parse_message(raw) else {
 			return Ok(());
@@ -237,16 +257,65 @@ impl MacosHid {
 		Ok(())
 	}
 	fn parse_message(&self, raw: &str) -> Option<HidMessage> {
-		match serde_json::from_str::<HidMessage>(raw) {
-			Ok(message) => Some(message),
+		let value: serde_json::Value = match serde_json::from_str(raw) {
+			Ok(value) => value,
 
 			Err(error) => {
 				tracing::error!(
-						%error,
-						raw,
-						"invalid HID message from Swift"
+					%error,
+					raw,
+					"invalid JSON from Swift"
 				);
+				return None;
+			}
+		};
 
+		// tracing::info!(
+		// 	"📦 RAW HID MESSAGE:\n{}",
+		// 	serde_json::to_string_pretty(&value).unwrap_or_else(|_| raw.to_string())
+		// );
+
+		// Swift native_event has its own wire representation.
+		if value.get("type").and_then(|v| v.as_str()) == Some("native_event") {
+			let event_value = value.get("event")?;
+
+			let swift_event: SwiftNativeEvent = match serde_json::from_value(event_value.clone()) {
+				Ok(event) => event,
+
+				Err(error) => {
+					tracing::error!(
+						%error,
+						event = %event_value,
+						"❌ Swift native_event does not match wire schema"
+					);
+					return None;
+				}
+			};
+			let event = match swift_event.into_native_event() {
+				Some(event) => event,
+
+				None => {
+					tracing::warn!(raw, "unsupported Swift native event");
+					return None;
+				}
+			};
+
+			return Some(HidMessage::NativeEvent { event });
+		}
+
+		// Non-native-event messages still use the normal protocol.
+		match serde_json::from_value::<HidMessage>(value) {
+			Ok(message) => Some(message),
+
+			Err(error) => {
+				// When I press ctrl, opt, cmd, no error is produced.
+				// other keys like fn, and letters produce this one.
+				// "ERROR invalid Swift native event error=missing field `source` raw="{\"type\":\"native_event\",\"event\":{\"sent_at\":2983089874225,\"kind\":\"key_down\",\"key_code\":8}}""
+				// tracing::error!(
+				// 	%error,
+				// 	raw,
+				// 	"invalid HID message from Swift"
+				// );
 				None
 			}
 		}
@@ -258,6 +327,8 @@ impl MacosHid {
 		// );
 	}
 	fn handle_native_event(&mut self, event: NativeEvent, received_at: u64, events: &EventBus) {
+		self.update_state(&event);
+		self.print_event(&event);
 		// let latency = received_at.saturating_sub(event.sent_at);
 		// self.log_native_event(&event);
 		// for action in self.observe_event(&event) {
@@ -269,6 +340,70 @@ impl MacosHid {
 		// }
 		// events.emit(event.into());
 	}
+	fn update_state(&mut self, event: &NativeEvent) {
+		let m = &event.modifiers;
+
+		self.state.shift_left = m.shift_left;
+		self.state.shift_right = m.shift_right;
+
+		self.state.ctrl_left = m.ctrl_left;
+		self.state.ctrl_right = m.ctrl_right;
+
+		self.state.opt_left = m.opt_left;
+		self.state.opt_right = m.opt_right;
+
+		self.state.cmd_left = m.cmd_left;
+		self.state.cmd_right = m.cmd_right;
+
+		self.state.caps = m.caps;
+		self.state.function = m.function;
+	}
+	fn print_event(&mut self, event: &NativeEvent) {
+		let s = &self.state;
+
+		let left = format!(
+			"{} {} {} {}",
+			key_state(s.shift_left, "⇧"),
+			key_state(s.ctrl_left, "⌃"),
+			key_state(s.opt_left, "⌥"),
+			key_state(s.cmd_left, "⌘"),
+		);
+
+		let right = format!(
+			"{} {} {} {}",
+			key_state(s.shift_right, "⇧"),
+			key_state(s.ctrl_right, "⌃"),
+			key_state(s.opt_right, "⌥"),
+			key_state(s.cmd_right, "⌘"),
+		);
+
+		let special = format!("{} {}", key_state(s.function, "fn"), key_state(s.caps, "⇪"),);
+
+		let arrow = match event.direction {
+			Some(keymap::KeyDirection::Down) => "↓",
+			Some(keymap::KeyDirection::Up) => "↑",
+			None => " ",
+		};
+
+		let name = event.name.as_deref().unwrap_or("");
+
+		let event_display = format!("{arrow} {name}");
+
+		let key_code = event
+			.key_code
+			.map(|code| code.to_string())
+			.unwrap_or_default();
+
+		println!(
+			"{:<17} | {:<17} | {:<7} | {:<16} | {:>5}",
+			left, right, special, event_display, key_code,
+		);
+	}
+
+	fn key_state(active: bool, symbol: &str) -> &str {
+		if active { symbol } else { "·" }
+	}
+
 	fn log_native_event(&self, event: &NativeEvent) {
 		let now = event.sent_at;
 
@@ -390,84 +525,7 @@ impl MacosHid {
 			source_user_data,
 		);
 	}
-	// 	fn log_native_event(&self, event: &NativeEvent) {
-	// 		let modifiers = self.modifier_display(&event.modifiers);
-	//
-	// 		let (kind, code, key, details) = match &event.kind {
-	// 			NativeEventKind::KeyDown { key_code } => {
-	// 				let key = Self::key_from_code(*key_code);
-	//
-	// 				(
-	// 					"KEY DOWN",
-	// 					key_code.to_string(),
-	// 					key.map(|key| key.display()).unwrap_or_else(|| "?".into()),
-	// 					String::new(),
-	// 				)
-	// 			}
-	//
-	// 			NativeEventKind::KeyUp { key_code } => {
-	// 				let key = Self::key_from_code(*key_code);
-	//
-	// 				(
-	// 					"KEY UP",
-	// 					key_code.to_string(),
-	// 					key.map(|key| key.display()).unwrap_or_else(|| "?".into()),
-	// 					String::new(),
-	// 				)
-	// 			}
-	//
-	// 			NativeEventKind::FlagsChanged { key_code } => {
-	// 				let key = Self::key_from_code(*key_code);
-	//
-	// 				(
-	// 					"MODIFIER",
-	// 					key_code.to_string(),
-	// 					key.map(|key| key.display()).unwrap_or_else(|| "?".into()),
-	// 					modifiers.clone(),
-	// 				)
-	// 			}
-	//
-	// 			NativeEventKind::MouseDown { button, .. } => (
-	// 				"MOUSE DOWN",
-	// 				button.to_string(),
-	// 				String::new(),
-	// 				modifiers.clone(),
-	// 			),
-	//
-	// 			NativeEventKind::MouseUp { button, .. } => (
-	// 				"MOUSE UP",
-	// 				button.to_string(),
-	// 				String::new(),
-	// 				modifiers.clone(),
-	// 			),
-	//
-	// 			// NativeEventKind::MouseMove { x, y } => (
-	// 			// "MOUSE MOVE",
-	// 			// String::new(),
-	// 			// String::new(),
-	// 			// format!("x={x:.1} y={y:.1}"),
-	// 			// ),
-	// 			NativeEventKind::Scroll {
-	// 				vertical,
-	// 				horizontal,
-	// 			} => (
-	// 				"SCROLL",
-	// 				"".into(),
-	// 				"".into(),
-	// 				format!("v={vertical} h={horizontal}"),
-	// 			),
-	// 			other => ("OTHER", "".into(), "".into(), format!("{other:?}")),
-	// 		};
-	//
-	// 		tracing::info!(
-	// 			"│ {:<10} │ {:>4} │ {:<14} │ {:<18} │ {} │",
-	// 			kind,
-	// 			code,
-	// 			key,
-	// 			modifiers,
-	// 			details,
-	// 		);
-	// 	}
+
 	fn log_key_event(&self, event: &NativeEvent) {
 		match &event.kind {
 			NativeEventKind::KeyDown { key_code } => {
@@ -589,8 +647,6 @@ impl MacosHid {
 	// 		triggered
 	// 	}
 	pub fn _observe_event(&mut self, event: &NativeEvent) -> Vec<Action> {
-		Self::init_hid_smoke_log();
-
 		match &event.kind {
 			// NativeEventKind::FlagsChanged { .. } => self.observe_modifier(event),
 			NativeEventKind::KeyDown { .. } => self.observe_key(event),
@@ -629,16 +685,16 @@ impl MacosHid {
 		vec![]
 	}
 	fn observe_key(&mut self, event: &NativeEvent) -> Vec<Action> {
-// 		let NativeEventKind::KeyDown { key_code } = &event.kind else {
-// 			return vec![];
-// 		};
-// 
-// 		let key_code = *key_code;
-// 
-// 		let Some(key) = Self::key_from_code(key_code) else {
-// 			tracing::warn!(key_code, "KEY DOWN received but key code is not normalized");
-// 			return vec![];
-// 		};
+		// 		let NativeEventKind::KeyDown { key_code } = &event.kind else {
+		// 			return vec![];
+		// 		};
+		//
+		// 		let key_code = *key_code;
+		//
+		// 		let Some(key) = Self::key_from_code(key_code) else {
+		// 			tracing::warn!(key_code, "KEY DOWN received but key code is not normalized");
+		// 			return vec![];
+		// 		};
 
 		// tracing::info!(
 		// 	"🔑 KEY DOWN | key={:?} display={} code={} modifiers={}",
@@ -651,8 +707,6 @@ impl MacosHid {
 		vec![]
 	}
 	pub fn observe_event(&mut self, event: &NativeEvent) -> Vec<Action> {
-		Self::init_hid_smoke_log();
-
 		match &event.kind {
 			// NativeEventKind::KeyDown { .. } => self.observe_key(event),
 
@@ -1378,29 +1432,27 @@ impl MacosHid {
 		Ok(())
 	}
 	fn handle_modifier_event(&mut self, event: &SwiftNativeEvent) {
-		if event.kind != "flagsChanged" {
+		if event.kind != "flags_changed" {
 			return;
 		}
 
-		let Some(cg_event) = event.event.as_ref() else {
+		let Some(key_code) = event.key_code else {
 			tracing::warn!(
-					name = ?event.name,
-					"🍎 MODIFIER EVENT missing CGEvent payload"
+				name = ?event.name,
+				"🍎 MODIFIER EVENT missing key code"
 			);
 			return;
 		};
 
-		let key_code = cg_event.key_code;
-
 		let key = MacosHid::key_from_code(key_code);
 
 		tracing::info!(
-				name = ?event.name,
-				key_code,
-				key = ?key.map(|k| k.display()),
-				direction = ?event.direction,
-				modifiers = ?event.modifiers,
-				"🍎 MODIFIER EVENT"
+			name = ?event.name,
+			key_code,
+			key = ?key.map(|k| k.display()),
+			direction = ?event.direction,
+			modifiers = ?event.modifiers,
+			"🍎 MODIFIER EVENT"
 		);
 	}
 }
@@ -1507,7 +1559,7 @@ impl MacosHid {
 pub struct MacosHid {
 	socket: PathBuf,
 	child: Option<std::process::Child>,
-
+	state: HidState,
 	pub bindings: Vec<Binding>,
 	pub pressed: HashSet<Key>,
 	pub sequence: Vec<Trigger>,
@@ -1719,7 +1771,6 @@ pub struct ModifierSnapshot {
 	pub caps: bool,
 	pub function: bool,
 }
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Modifiers {
 	#[serde(rename = "leftShift")]
@@ -1751,118 +1802,37 @@ pub struct Modifiers {
 
 	pub caps: bool,
 }
+#[derive(Debug, Clone, Copy, Default, Deserialize)]
+struct SwiftModifiers {
+	#[serde(rename = "shift_left", default)]
+	shift_left: bool,
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "kind")]
-pub enum SwiftEvent {
-	#[serde(rename = "keyDown")]
-	KeyDown {
-		#[serde(default)]
-		modifiers: SwiftModifiers,
+	#[serde(rename = "shift_right", default)]
+	shift_right: bool,
 
-		#[serde(default)]
-		key_code: u16,
+	#[serde(rename = "ctrl_left", default)]
+	ctrl_left: bool,
 
-		#[serde(default)]
-		name: Option<String>,
+	#[serde(rename = "ctrl_right", default)]
+	ctrl_right: bool,
 
-		#[serde(default)]
-		timestamp: u64,
-	},
+	#[serde(rename = "opt_left", default)]
+	opt_left: bool,
 
-	#[serde(rename = "keyUp")]
-	KeyUp {
-		#[serde(default)]
-		modifiers: SwiftModifiers,
+	#[serde(rename = "opt_right", default)]
+	opt_right: bool,
 
-		#[serde(default)]
-		key_code: u16,
+	#[serde(rename = "cmd_left", default)]
+	cmd_left: bool,
 
-		#[serde(default)]
-		name: Option<String>,
+	#[serde(rename = "cmd_right", default)]
+	cmd_right: bool,
 
-		#[serde(default)]
-		timestamp: u64,
-	},
+	#[serde(rename = "caps", default)]
+	caps: bool,
 
-	#[serde(rename = "flagsChanged")]
-	FlagsChanged {
-		#[serde(default)]
-		modifiers: SwiftModifiers,
-
-		#[serde(default)]
-		key_code: u16,
-
-		#[serde(default)]
-		name: Option<String>,
-
-		#[serde(default)]
-		direction: Option<String>,
-
-		#[serde(default)]
-		timestamp: u64,
-	},
-
-	#[serde(rename = "mouse_down")]
-	MouseDown {
-		button: u8,
-		x: f64,
-		y: f64,
-
-		#[serde(default)]
-		sent_at: u64,
-	},
-}
-#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
-pub struct SwiftModifiers {
-	#[serde(rename = "leftShift")]
-	pub shift_left: bool,
-
-	#[serde(rename = "rightShift")]
-	pub shift_right: bool,
-
-	#[serde(rename = "leftCmd")]
-	pub cmd_left: bool,
-
-	#[serde(rename = "rightCmd")]
-	pub cmd_right: bool,
-
-	#[serde(rename = "leftOpt")]
-	pub opt_left: bool,
-
-	#[serde(rename = "rightOpt")]
-	pub opt_right: bool,
-
-	#[serde(rename = "leftCtrl")]
-	pub ctrl_left: bool,
-
-	#[serde(rename = "rightCtrl")]
-	pub ctrl_right: bool,
-
-	#[serde(rename = "fn")]
-	pub function: bool,
-
-	pub caps: bool,
-}
-impl From<SwiftModifiers> for ModifierSnapshot {
-	fn from(value: SwiftModifiers) -> Self {
-		Self {
-			shift_left: value.shift_left,
-			shift_right: value.shift_right,
-
-			ctrl_left: value.ctrl_left,
-			ctrl_right: value.ctrl_right,
-
-			opt_left: value.opt_left,
-			opt_right: value.opt_right,
-
-			cmd_left: value.cmd_left,
-			cmd_right: value.cmd_right,
-
-			caps: value.caps,
-			function: value.function,
-		}
-	}
+	#[serde(rename = "function", default)]
+	function: bool,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -1900,58 +1870,80 @@ pub struct SwiftNativeEvent {
 	pub timestamp: Option<u64>,
 
 	#[serde(default)]
-	pub modifiers: Option<SwiftModifiers>,
+	pub sent_at: Option<u64>,
 
 	#[serde(default)]
-	pub event: Option<SwiftCgEvent>,
-}
+	pub key_code: Option<u16>,
 
+	#[serde(default)]
+	pub modifiers: Option<SwiftModifiers>,
+}
 impl SwiftNativeEvent {
 	fn into_native_event(self) -> Option<NativeEvent> {
-		let cg = self.event?;
-
-		let modifiers = self.modifiers?;
-
 		let kind = match self.kind.as_str() {
-			"keyDown" => NativeEventKind::KeyDown {
-				key_code: cg.key_code,
+			"key_down" => NativeEventKind::KeyDown {
+				key_code: self.key_code?,
 			},
 
-			"keyUp" => NativeEventKind::KeyUp {
-				key_code: cg.key_code,
+			"key_up" => NativeEventKind::KeyUp {
+				key_code: self.key_code?,
 			},
 
-			"flagsChanged" => NativeEventKind::FlagsChanged {
-				key_code: cg.key_code,
+			"flags_changed" => NativeEventKind::FlagsChanged {
+				key_code: self.key_code?,
 			},
+
+			"mouse_down" => {
+				return None;
+			}
+
+			"mouse_up" => {
+				return None;
+			}
+
+			"scroll" => {
+				return None;
+			}
 
 			_ => return None,
 		};
 
+		let modifiers = self.modifiers.unwrap_or_default();
+
 		Some(NativeEvent {
-			sent_at: self.timestamp.unwrap_or_default(),
+			sent_at: self.sent_at.or(self.timestamp).unwrap_or_default(),
 			kind,
+			source: Some(self.source),
+			timestamp: self.timestamp,
+			key_code: self.key_code,
+			name: self.name,
+			direction: self
+				.direction
+				.and_then(|direction| match direction.as_str() {
+					"down" => Some(keymap::KeyDirection::Down),
+					"up" => Some(keymap::KeyDirection::Up),
+					_ => None,
+				}),
+
 			modifiers: ModifierSnapshot {
 				shift_left: modifiers.shift_left,
 				shift_right: modifiers.shift_right,
+
 				ctrl_left: modifiers.ctrl_left,
 				ctrl_right: modifiers.ctrl_right,
+
 				opt_left: modifiers.opt_left,
 				opt_right: modifiers.opt_right,
+
 				cmd_left: modifiers.cmd_left,
 				cmd_right: modifiers.cmd_right,
+
 				caps: modifiers.caps,
 				function: modifiers.function,
 			},
-			// whatever fields your NativeEvent has for the raw CG data
-			// flags: cg.flags,
-			// session_flags: cg.session_flags,
-			// source_pid: cg.source_pid,
-			// source_user_data: cg.source_user_data,
 		})
 	}
 }
-
 #[derive(Debug, Deserialize)]
 struct SwiftRawKeyEvent {
 	kind: String,
@@ -1965,13 +1957,11 @@ struct SwiftRawKeyEvent {
 	#[serde(default)]
 	event: Option<SwiftRawCgEvent>,
 }
-
 #[derive(Debug, Deserialize)]
 struct SwiftRawCgEvent {
 	#[serde(rename = "keyCode")]
 	key_code: u16,
 }
-
 #[derive(Debug, Deserialize, Default)]
 struct SwiftRawModifiers {
 	#[serde(rename = "leftShift", default)]
@@ -2008,40 +1998,9 @@ struct SwiftRawModifiers {
 fn parse_message(line: &str) -> anyhow::Result<HidMessage> {
 	let value: serde_json::Value = serde_json::from_str(line)?;
 
-	if value.get("type").and_then(|v| v.as_str()) == Some("native_event") {
-		if let Some(event) = value.get("event") {
-			if event.get("kind").and_then(|v| v.as_str()) == Some("keyDown") {
-				let raw: SwiftRawKeyEvent = serde_json::from_value(event.clone())?;
-
-				let cg = raw
-					.event
-					.ok_or_else(|| anyhow::anyhow!("keyDown missing CGEvent payload"))?;
-
-				let modifiers = raw.modifiers.unwrap_or_default();
-
-				let native = NativeEvent {
-					sent_at: raw.timestamp,
-					kind: NativeEventKind::KeyDown {
-						key_code: cg.key_code,
-					},
-					modifiers: ModifierSnapshot {
-						shift_left: modifiers.shift_left,
-						shift_right: modifiers.shift_right,
-						ctrl_left: modifiers.ctrl_left,
-						ctrl_right: modifiers.ctrl_right,
-						opt_left: modifiers.opt_left,
-						opt_right: modifiers.opt_right,
-						cmd_left: modifiers.cmd_left,
-						cmd_right: modifiers.cmd_right,
-						caps: modifiers.caps,
-						function: modifiers.function,
-					},
-				};
-
-				return Ok(HidMessage::NativeEvent { event: native });
-			}
-		}
-	}
-
 	Ok(serde_json::from_value(value)?)
+}
+
+fn key_state(active: bool, symbol: &str) -> &str {
+	if active { symbol } else { "·" }
 }
