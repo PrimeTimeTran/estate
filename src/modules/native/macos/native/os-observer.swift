@@ -3,122 +3,6 @@ import CoreGraphics
 import Darwin
 import Foundation
 
-struct FrontmostApp: Codable {
-  let bundleID: String?
-  let name: String?
-  let pid: Int32?
-}
-struct EventEnvelope: Codable {
-  let type: String
-  let version: UInt
-  let event: NativeEvent
-}
-
-func emitForegroundApp(_ app: FrontmostApp) {
-  let now = DispatchTime.now().uptimeNanoseconds
-
-  let event = NativeEvent(
-    sentAt: now,
-    kind: .frontmostApp,
-    source: .workspace,
-    timestamp: mach_absolute_time(),
-
-    keyCode: nil,
-    button: nil,
-    x: nil,
-    y: nil,
-    vertical: nil,
-    horizontal: nil,
-
-    name: app.name ?? "",
-    modifiers: nil,
-    direction: nil,
-    frontmostApp: app
-  )
-
-  let envelope = EventEnvelope(
-    type: "native_event",
-    version: 1,
-    event: event
-  )
-
-  do {
-    let data = try JSONEncoder().encode(envelope)
-
-    if let json = String(data: data, encoding: .utf8) {
-      print("🍎 \(json)")
-    }
-  } catch {
-    print("❌ failed to encode event: \(error)")
-  }
-}
-struct EstateNativeEventMessage: Codable {
-  let type: String
-  let event: NativeEvent
-
-  init(event: NativeEvent) {
-    self.type = "native_event"
-    self.event = event
-  }
-}
-func frontmostApplication() -> FrontmostApp {
-  let app = NSWorkspace.shared.frontmostApplication
-  return FrontmostApp(
-    bundleID: app?.bundleIdentifier,
-    name: app?.localizedName,
-    pid: app?.processIdentifier
-  )
-}
-
-// MARK: - Initial state
-
-let initialApp = frontmostApplication()
-
-print("🚀 Initial frontmost app:")
-print("   name: \(initialApp.name ?? "nil")")
-print("   bundle: \(initialApp.bundleID ?? "nil")")
-print("   pid: \(initialApp.pid.map(String.init) ?? "nil")")
-
-// MARK: - App activation events
-
-NSWorkspace.shared.notificationCenter.addObserver(
-  forName: NSWorkspace.didActivateApplicationNotification,
-  object: nil,
-  queue: .main
-) { notification in
-  guard
-    let app =
-      notification.userInfo?[
-        NSWorkspace.applicationUserInfoKey
-      ] as? NSRunningApplication
-  else {
-    print("⚠️ activation notification without app")
-    return
-  }
-
-  let frontmost = FrontmostApp(
-    bundleID: app.bundleIdentifier,
-    name: app.localizedName,
-    pid: app.processIdentifier
-  )
-
-  print("")
-  print("🔥 FOREGROUND APP CHANGED")
-  print("   name: \(frontmost.name ?? "nil")")
-  print("   bundle: \(frontmost.bundleID ?? "nil")")
-  print("   pid: \(frontmost.pid.map(String.init) ?? "nil")")
-
-  emitForegroundApp(frontmost)
-}
-
-// MARK: - Run loop
-
-print("")
-print("👀 Watching for foreground application changes...")
-print("   Try ⌘Tab between applications.")
-print("")
-
-var estateClientFD: Int32 = -1
 enum KeyDirection: String, Codable {
   case down
   case up
@@ -138,6 +22,29 @@ enum EventSource: String, Codable {
   case workspace
   case accessibility
 }
+enum Kind: String, Codable {
+  case keyDown = "key_down"
+  case keyUp = "key_up"
+  case mouseDown = "mouse_down"
+  case mouseUp = "mouse_up"
+  case scroll = "scroll"
+  case flagsChanged = "flags_changed"
+  case modifierChanged = "ModifierChanged"
+}
+
+let socketPath = "/tmp/estate-hid.sock"
+let modifiers: [Int64: String] = [
+  56: "LSHIFT",
+  60: "RSHIFT",
+  59: "LCTRL",
+  62: "RCTRL",
+  58: "LOPT",
+  61: "ROPT",
+  55: "LCMD",
+  54: "RCMD",
+  63: "FN",
+  57: "CAPS",
+]
 let watchedKeyCodes: Set<CGKeyCode> = [
   58,  // Left Option
   61,  // Right Option
@@ -149,8 +56,41 @@ let watchedKeyCodes: Set<CGKeyCode> = [
   56,  // Left Shift
   60,  // Right Shift
 ]
+var estateClientFD: Int32 = -1
+let pid = ProcessInfo.processInfo.processIdentifier
+let sourcePID = ProcessInfo.processInfo.processIdentifier
 let formatter = DateFormatter()
-formatter.dateFormat = "HH:mm:ss.SSS"
+let mask =
+  CGEventMask(1 << CGEventType.keyDown.rawValue)
+  | CGEventMask(1 << CGEventType.keyUp.rawValue)
+  | CGEventMask(1 << CGEventType.flagsChanged.rawValue)
+  | CGEventMask(1 << CGEventType.leftMouseDown.rawValue)
+  | CGEventMask(1 << CGEventType.leftMouseUp.rawValue)
+  | CGEventMask(1 << CGEventType.rightMouseDown.rawValue)
+  | CGEventMask(1 << CGEventType.rightMouseUp.rawValue)
+  | CGEventMask(1 << CGEventType.otherMouseDown.rawValue)
+  | CGEventMask(1 << CGEventType.otherMouseUp.rawValue)
+  | CGEventMask(1 << CGEventType.scrollWheel.rawValue)
+  
+struct FrontmostApp: Codable {
+  let bundleID: String?
+  let name: String?
+  let pid: Int32?
+}
+struct EventEnvelope: Codable {
+  let type: String
+  let version: UInt
+  let event: NativeEvent
+}
+struct EstateNativeEventMessage: Codable {
+  let type: String
+  let event: NativeEvent
+
+  init(event: NativeEvent) {
+    self.type = "native_event"
+    self.event = event
+  }
+}
 struct ModifierState: Codable {
   var lShift = false
   var lCtrl = false
@@ -283,16 +223,10 @@ struct NativeEvent: Codable {
     case frontmostApp
   }
 }
-enum Kind: String, Codable {
-  case keyDown = "key_down"
-  case keyUp = "key_up"
-  case mouseDown = "mouse_down"
-  case mouseUp = "mouse_up"
-  case scroll = "scroll"
-  case flagsChanged = "flags_changed"
-  case modifierChanged = "ModifierChanged"
+struct MouseButton: Codable {
+  let number: Int64
 }
-var state = ModifierState()
+
 func modifierName(_ keyCode: Int64) -> String {
   switch keyCode {
   case 56, 60: return "SHIFT"
@@ -305,18 +239,6 @@ func modifierName(_ keyCode: Int64) -> String {
   default: return "UNKNOWN"
   }
 }
-let modifiers: [Int64: String] = [
-  56: "LSHIFT",
-  60: "RSHIFT",
-  59: "LCTRL",
-  62: "RCTRL",
-  58: "LOPT",
-  61: "ROPT",
-  55: "LCMD",
-  54: "RCMD",
-  63: "FN",
-  57: "CAPS",
-]
 func displayKeyName(_ keyCode: Int64) -> String {
   switch keyCode {
   case 59, 62:
@@ -589,7 +511,6 @@ func printHeader() {
 
   fflush(stdout)
 }
-
 func sendNativeEvent(
   _ event: NativeEvent,
   on clientFD: Int32
@@ -885,175 +806,6 @@ func printEvent(_ nativeEvent: NativeEvent) {
   )
   fflush(stdout)
 }
-let mask =
-  CGEventMask(1 << CGEventType.keyDown.rawValue)
-  | CGEventMask(1 << CGEventType.keyUp.rawValue)
-  | CGEventMask(1 << CGEventType.flagsChanged.rawValue)
-  | CGEventMask(1 << CGEventType.leftMouseDown.rawValue)
-  | CGEventMask(1 << CGEventType.leftMouseUp.rawValue)
-  | CGEventMask(1 << CGEventType.rightMouseDown.rawValue)
-  | CGEventMask(1 << CGEventType.rightMouseUp.rawValue)
-  | CGEventMask(1 << CGEventType.otherMouseDown.rawValue)
-  | CGEventMask(1 << CGEventType.otherMouseUp.rawValue)
-  | CGEventMask(1 << CGEventType.scrollWheel.rawValue)
-
-let callback: CGEventTapCallBack = {
-  proxy,
-  type,
-  event,
-  userInfo in
-
-  // ------------------------------------------------------------
-  // Event tap status
-  // ------------------------------------------------------------
-
-  if type == .tapDisabledByTimeout {
-    print("!!! EVENT TAP DISABLED: TIMEOUT")
-    fflush(stdout)
-    return Unmanaged.passUnretained(event)
-  }
-
-  if type == .tapDisabledByUserInput {
-    print("!!! EVENT TAP DISABLED: USER INPUT")
-    fflush(stdout)
-    return Unmanaged.passUnretained(event)
-  }
-
-  // ------------------------------------------------------------
-  // Common event data
-  // ------------------------------------------------------------
-
-  let code = event.getIntegerValueField(
-    .keyboardEventKeycode
-  )
-
-  // ------------------------------------------------------------
-  // Event processing
-  // ------------------------------------------------------------
-
-  switch type {
-
-  case .flagsChanged:
-
-    if code == 0 {
-      print(
-        "⚠️ NON-MODIFIER FLAGS EVENT: "
-          + "keycode=0 "
-          + "time=\(event.timestamp) "
-          + "flags=\(event.flags.rawValue)"
-      )
-      fflush(stdout)
-      break
-    }
-
-    let name = modifierName(code)
-
-    let direction = updateModifierState(
-      keyCode: code
-    )
-
-    if watchedKeyCodes.contains(CGKeyCode(code)) {
-      let rightCommandHeld = CGEventSource.keyState(
-        .combinedSessionState,
-        key: 54
-      )
-
-      let leftCommandHeld = CGEventSource.keyState(
-        .combinedSessionState,
-        key: 55
-      )
-
-      let sourcePID = event.getIntegerValueField(
-        .eventSourceUnixProcessID
-      )
-
-      let sourceState = event.getIntegerValueField(
-        .eventSourceStateID
-      )
-
-      let keyboardType = event.getIntegerValueField(
-        .keyboardEventKeyboardType
-      )
-
-      let autorepeat = event.getIntegerValueField(
-        .keyboardEventAutorepeat
-      )
-
-      let sessionFlags =
-        CGEventSource.flagsState(
-          .combinedSessionState
-        ).rawValue
-
-      fflush(stdout)
-    }
-
-    let nativeEvent = makeEvent(
-      event,
-      type: type,
-      description: name,
-      modifierDirection: direction
-    )
-
-    sendNativeEvent(
-      nativeEvent,
-      on: estateClientFD
-    )
-
-  case .keyDown:
-
-    let name = keyName(code)
-
-    let nativeEvent = makeEvent(
-      event,
-      type: type,
-      description: name,
-      modifierDirection: .down
-    )
-
-    sendNativeEvent(
-      nativeEvent,
-      on: estateClientFD
-    )
-
-  case .keyUp:
-
-    let name = keyName(code)
-
-    let nativeEvent = makeEvent(
-      event,
-      type: type,
-      description: name,
-      modifierDirection: .up
-    )
-
-    sendNativeEvent(
-      nativeEvent,
-      on: estateClientFD
-    )
-
-  default:
-    break
-  }
-
-  return Unmanaged.passUnretained(event)
-}
-guard
-  let tap = CGEvent.tapCreate(
-    tap: .cgSessionEventTap,
-    place: .headInsertEventTap,
-    options: .listenOnly,
-    eventsOfInterest: mask,
-    callback: callback,
-    userInfo: nil
-  )
-else {
-  fputs(
-    "Cannot create event tap. Check Input Monitoring permissions.\n",
-    stderr
-  )
-  exit(1)
-}
-
 func sendEstate(
   _ message: String,
   on clientFD: Int32
@@ -1083,7 +835,6 @@ func sendEstate(
     }
   }
 }
-
 func sendKeyEvent(
   kind: String,
   keyCode: Int64,
@@ -1284,6 +1035,257 @@ func startEstateSocket() {
     )
   }
 }
+func machNow() -> UInt64 {
+  mach_absolute_time()
+}
+func emitForegroundApp(_ app: FrontmostApp) {
+  let now = DispatchTime.now().uptimeNanoseconds
+
+  let event = NativeEvent(
+    sentAt: now,
+    kind: .frontmostApp,
+    source: .workspace,
+    timestamp: mach_absolute_time(),
+
+    keyCode: nil,
+    button: nil,
+    x: nil,
+    y: nil,
+    vertical: nil,
+    horizontal: nil,
+
+    name: app.name ?? "",
+    modifiers: nil,
+    direction: nil,
+    frontmostApp: app
+  )
+
+  let envelope = EventEnvelope(
+    type: "native_event",
+    version: 1,
+    event: event
+  )
+
+  do {
+    let data = try JSONEncoder().encode(envelope)
+
+    if let json = String(data: data, encoding: .utf8) {
+      print("🍎 \(json)")
+    }
+  } catch {
+    print("❌ failed to encode event: \(error)")
+  }
+}
+func frontmostApplication() -> FrontmostApp {
+  let app = NSWorkspace.shared.frontmostApplication
+  return FrontmostApp(
+    bundleID: app?.bundleIdentifier,
+    name: app?.localizedName,
+    pid: app?.processIdentifier
+  )
+}
+
+let initialApp = frontmostApplication()
+
+print("🚀 Initial frontmost app:")
+print("   name: \(initialApp.name ?? "nil")")
+print("   bundle: \(initialApp.bundleID ?? "nil")")
+print("   pid: \(initialApp.pid.map(String.init) ?? "nil")")
+
+NSWorkspace.shared.notificationCenter.addObserver(
+  forName: NSWorkspace.didActivateApplicationNotification,
+  object: nil,
+  queue: .main
+) { notification in
+  guard
+    let app =
+      notification.userInfo?[
+        NSWorkspace.applicationUserInfoKey
+      ] as? NSRunningApplication
+  else {
+    print("⚠️ activation notification without app")
+    return
+  }
+
+  let frontmost = FrontmostApp(
+    bundleID: app.bundleIdentifier,
+    name: app.localizedName,
+    pid: app.processIdentifier
+  )
+
+  print("")
+  print("🔥 FOREGROUND APP CHANGED")
+  print("   name: \(frontmost.name ?? "nil")")
+  print("   bundle: \(frontmost.bundleID ?? "nil")")
+  print("   pid: \(frontmost.pid.map(String.init) ?? "nil")")
+
+  emitForegroundApp(frontmost)
+}
+print("")
+print("👀 Watching for foreground application changes...")
+print("   Try ⌘Tab between applications.")
+print("")
+
+formatter.dateFormat = "HH:mm:ss.SSS"
+var state = ModifierState()
+
+let callback: CGEventTapCallBack = {
+  proxy,
+  type,
+  event,
+  userInfo in
+
+  // ------------------------------------------------------------
+  // Event tap status
+  // ------------------------------------------------------------
+
+  if type == .tapDisabledByTimeout {
+    print("!!! EVENT TAP DISABLED: TIMEOUT")
+    fflush(stdout)
+    return Unmanaged.passUnretained(event)
+  }
+
+  if type == .tapDisabledByUserInput {
+    print("!!! EVENT TAP DISABLED: USER INPUT")
+    fflush(stdout)
+    return Unmanaged.passUnretained(event)
+  }
+
+  // ------------------------------------------------------------
+  // Common event data
+  // ------------------------------------------------------------
+
+  let code = event.getIntegerValueField(
+    .keyboardEventKeycode
+  )
+
+  // ------------------------------------------------------------
+  // Event processing
+  // ------------------------------------------------------------
+
+  switch type {
+
+  case .flagsChanged:
+
+    if code == 0 {
+      print(
+        "⚠️ NON-MODIFIER FLAGS EVENT: "
+          + "keycode=0 "
+          + "time=\(event.timestamp) "
+          + "flags=\(event.flags.rawValue)"
+      )
+      fflush(stdout)
+      break
+    }
+
+    let name = modifierName(code)
+
+    let direction = updateModifierState(
+      keyCode: code
+    )
+
+    if watchedKeyCodes.contains(CGKeyCode(code)) {
+      let rightCommandHeld = CGEventSource.keyState(
+        .combinedSessionState,
+        key: 54
+      )
+
+      let leftCommandHeld = CGEventSource.keyState(
+        .combinedSessionState,
+        key: 55
+      )
+
+      let sourcePID = event.getIntegerValueField(
+        .eventSourceUnixProcessID
+      )
+
+      let sourceState = event.getIntegerValueField(
+        .eventSourceStateID
+      )
+
+      let keyboardType = event.getIntegerValueField(
+        .keyboardEventKeyboardType
+      )
+
+      let autorepeat = event.getIntegerValueField(
+        .keyboardEventAutorepeat
+      )
+
+      let sessionFlags =
+        CGEventSource.flagsState(
+          .combinedSessionState
+        ).rawValue
+
+      fflush(stdout)
+    }
+
+    let nativeEvent = makeEvent(
+      event,
+      type: type,
+      description: name,
+      modifierDirection: direction
+    )
+
+    sendNativeEvent(
+      nativeEvent,
+      on: estateClientFD
+    )
+
+  case .keyDown:
+
+    let name = keyName(code)
+
+    let nativeEvent = makeEvent(
+      event,
+      type: type,
+      description: name,
+      modifierDirection: .down
+    )
+
+    sendNativeEvent(
+      nativeEvent,
+      on: estateClientFD
+    )
+
+  case .keyUp:
+
+    let name = keyName(code)
+
+    let nativeEvent = makeEvent(
+      event,
+      type: type,
+      description: name,
+      modifierDirection: .up
+    )
+
+    sendNativeEvent(
+      nativeEvent,
+      on: estateClientFD
+    )
+
+  default:
+    break
+  }
+
+  return Unmanaged.passUnretained(event)
+}
+guard
+  let tap = CGEvent.tapCreate(
+    tap: .cgSessionEventTap,
+    place: .headInsertEventTap,
+    options: .listenOnly,
+    eventsOfInterest: mask,
+    callback: callback,
+    userInfo: nil
+  )
+else {
+  fputs(
+    "Cannot create event tap. Check Input Monitoring permissions.\n",
+    stderr
+  )
+  exit(1)
+}
+
 let source = CFMachPortCreateRunLoopSource(
   kCFAllocatorDefault,
   tap,
@@ -1302,16 +1304,13 @@ CGEvent.tapEnable(
 )
 
 printHeader()
-
 print(
   "Columns: LS LC LO LM = left modifiers, " + "RS RC RO RM = right modifiers, " + "FN CP = Fn/Caps"
 )
-
 print(
   "Event flags are aggregate CoreGraphics state; "
     + "left/right state is reconstructed from keycodes."
 )
-
 print("")
 fflush(stdout)
 Thread {
@@ -1319,19 +1318,9 @@ Thread {
 }.start()
 CFRunLoopRun()
 
-struct MouseButton: Codable {
-  let number: Int64
-}
-
-let pid = ProcessInfo.processInfo.processIdentifier
-
 print("Estate native PID: \(pid)")
-let sourcePID = ProcessInfo.processInfo.processIdentifier
-
-let socketPath = "/tmp/estate-hid.sock"
 
 try? FileManager.default.removeItem(atPath: socketPath)
-
 let serverFD = socket(AF_UNIX, SOCK_STREAM, 0)
 
 guard serverFD >= 0 else {
@@ -1358,9 +1347,6 @@ guard bindResult == 0 else {
 guard listen(serverFD, 1) == 0 else {
   fatalError("failed to listen")
 }
-
-// print("ESTATE HID listening: \(socketPath)")
-
 let clientFD = accept(serverFD, nil, nil)
 
 guard clientFD >= 0 else {
@@ -1406,6 +1392,3 @@ while true {
 }
 
 emitForegroundApp(initialApp)
-func machNow() -> UInt64 {
-  mach_absolute_time()
-}
