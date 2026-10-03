@@ -453,6 +453,20 @@ where
 	// fn event(&mut self, event: &e::Event, layout: &mut Layout<C, S>, ctx: &mut AppContext<'_, C, S>);
 }
 
+pub trait DateableSession {
+	fn start(&self) -> Option<chrono::DateTime<Utc>>;
+	fn end(&self) -> Option<chrono::DateTime<Utc>>;
+  
+	fn start_readable(&self) -> Option<String> {
+		self.start()
+			.map(|dt| dt.format("%B %-d, %Y at %-I:%M:%S %p UTC").to_string())
+	}
+  
+	fn end_readable(&self) -> Option<String> {
+		self.end()
+			.map(|dt| dt.format("%B %-d, %Y at %-I:%M:%S %p UTC").to_string())
+	}
+  }
 /// The reusable spatial structure of an application UI.
 ///
 /// A `Layout` defines the common regions that a screen may use, such as

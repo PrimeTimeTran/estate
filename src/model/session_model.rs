@@ -2,8 +2,8 @@ use crate::prelude::*;
 
 #[derive(Debug, Clone, Hash, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Session {
-	pub start: Option<DateTime<Utc>>,
-	pub end: Option<DateTime<Utc>>,
+	pub start: Option<chrono::DateTime<Utc>>,
+	pub end: Option<chrono::DateTime<Utc>>,
 
 	pub start_readable: Option<String>,
 	pub end_readable: Option<String>,

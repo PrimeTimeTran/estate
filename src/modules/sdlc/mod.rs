@@ -982,8 +982,8 @@ pub mod structs {
 		pub pipeline: SprintPipeline,
 		pub attempt: u32,
 		pub stage: enums::Stage,
-		pub started_at: Instant,
-		pub stage_started_at: Instant,
+		pub time_started: Instant,
+		pub stage_time_started: Instant,
 		pub phase: SdlcPhase,
 		pub score: Option<f64>,
 		pub confidence: Option<f64>,
@@ -1001,8 +1001,8 @@ pub mod structs {
 				activity: self.activity.clone(),
 				attempt: self.attempt,
 				stage: self.stage,
-				started_at: self.started_at,
-				stage_started_at: self.stage_started_at,
+				time_started: self.time_started,
+				stage_time_started: self.stage_time_started,
 				phase: self.phase,
 				score: self.score,
 				confidence: self.confidence,
@@ -1021,8 +1021,8 @@ pub mod structs {
 		pub activity: Vec<String>,
 		pub attempt: u32,
 		pub stage: enums::Stage,
-		pub started_at: Instant,
-		pub stage_started_at: Instant,
+		pub time_started: Instant,
+		pub stage_time_started: Instant,
 		pub phase: SdlcPhase,
 		pub score: Option<f64>,
 		pub confidence: Option<f64>,
@@ -1038,8 +1038,8 @@ pub mod structs {
 	pub struct StageExecution {
 		pub stage: enums::Stage,
 		pub attempt: Attempt,
-		pub started_at: DateTime<Utc>,
-		pub completed_at: DateTime<Utc>,
+		pub time_started: chrono::DateTime<Utc>,
+		pub time_completed: chrono::DateTime<Utc>,
 		pub result: StageResult,
 	}
 
@@ -1053,9 +1053,11 @@ pub mod structs {
 		/// What actually performed the work.
 		pub actor: StageActor,
 
-		pub started_at: DateTime<Utc>,
-		pub completed_at: Option<DateTime<Utc>>,
-
+		pub time_started: DateTime<Utc>,
+		pub time_completed: Option<DateTime<Utc>>,
+		// time_started: time_readable(time_started),
+		// time_completed: time_readable(time_completed),
+		// time_total: duration_readable(time_completed - time_started), 
 		/// Semantic evaluation of the resulting artifact/work.
 		pub evaluation: Option<StageEvaluation>,
 	}
@@ -1096,9 +1098,9 @@ pub mod structs {
 		pub stage: enums::Stage,
 		pub actor: StageActor,
 
-		pub started_at: DateTime<Utc>,
-		pub completed_at: DateTime<Utc>,
-
+		pub time_started: DateTime<Utc>,
+		pub time_completed: DateTime<Utc>,
+		pub time_total: chrono::Duration,
 		pub score: f64,
 		pub confidence: f64,
 		pub passed: bool,
@@ -1143,8 +1145,8 @@ pub mod structs {
 		pub stage: enums::Stage,
 		pub stages: Vec<StageRecord>,
 		pub dir: PathBuf,
-		pub created_at: DateTime<Utc>,
-		pub updated_at: DateTime<Utc>,
+		pub time_created: DateTime<Utc>,
+		pub time_updated: DateTime<Utc>,
 		pub workspace: PathBuf,
 	}
 	pub struct SdlcView {
@@ -1234,8 +1236,8 @@ pub mod structs {
 			match event {
 				SdlcEvent::RunStarted => {
 					self.runtime.phase = SdlcPhase::Starting;
-					self.runtime.started_at = Instant::now();
-					self.runtime.stage_started_at = Instant::now();
+					self.runtime.time_started = Instant::now();
+					self.runtime.stage_time_started = Instant::now();
 					self.runtime.message = Some(String::from("Run started"));
 				}
 
@@ -1243,7 +1245,7 @@ pub mod structs {
 					self.runtime.stage = stage;
 					self.runtime.attempt = attempt.number;
 					self.runtime.phase = SdlcPhase::Starting;
-					self.runtime.stage_started_at = Instant::now();
+					self.runtime.stage_time_started = Instant::now();
 					self.runtime.score = None;
 					self.runtime.confidence = None;
 					self.runtime.error = None;
@@ -1308,7 +1310,7 @@ pub mod structs {
 
 				SdlcEvent::StageTransitioned { from: _, to } => {
 					self.runtime.stage = to;
-					self.runtime.stage_started_at = Instant::now();
+					self.runtime.stage_time_started = Instant::now();
 					self.runtime.score = None;
 					self.runtime.confidence = None;
 					self.runtime.message = Some(format!("Starting {to:?}"));
@@ -1482,7 +1484,7 @@ mod ui {
 			.to_vec()
 	}
 	pub fn header(frame: &mut Frame<'_>, view: &SdlcView, area: Rect) {
-		let elapsed = format_elapsed(view.runtime.started_at.elapsed());
+		let elapsed = format_elapsed(view.runtime.time_started.elapsed());
 		let line = Line::from(vec![
 			Span::styled(
 				format!("{:?}", view.runtime.stage),
@@ -1525,7 +1527,7 @@ mod ui {
 				.add_modifier(Modifier::BOLD),
 		};
 
-		let spinner_text = spinner(view.runtime.stage_started_at.elapsed());
+		let spinner_text = spinner(view.runtime.stage_time_started.elapsed());
 
 		let mut spans = Vec::new();
 
@@ -1592,7 +1594,7 @@ mod ui {
 
 		let status = match runtime.phase {
 			SdlcPhase::Executing => {
-				let frame = spinner(runtime.stage_started_at.elapsed());
+				let frame = spinner(runtime.stage_time_started.elapsed());
 
 				Line::from(vec![
 					Span::styled(
@@ -1702,7 +1704,7 @@ mod ui {
 			Line::from(vec![
 				Span::styled("stage time  ", Style::default().fg(Color::DarkGray)),
 				Span::styled(
-					format_elapsed(runtime.stage_started_at.elapsed()),
+					format_elapsed(runtime.stage_time_started.elapsed()),
 					Style::default().fg(Color::White),
 				),
 			]),
@@ -1738,7 +1740,7 @@ mod ui {
 	}
 	pub fn right_activity_panel(frame: &mut Frame<'_>, view: &SdlcView, area: Rect) {
 		let runtime = &view.runtime;
-		let spinner = spinner(runtime.stage_started_at.elapsed());
+		let spinner = spinner(runtime.stage_time_started.elapsed());
 		let stage_style = Style::default()
 			.fg(Color::White)
 			.add_modifier(Modifier::BOLD);
@@ -2240,7 +2242,7 @@ impl EvaluationContext {
 }
 impl Evaluator {
 	async fn evaluate_goal(&self, goal: &str) -> Result<StageEvaluation> {
-		let started_at = Utc::now();
+		let time_started = Utc::now();
 		let state = format!(
 			"## User Goal\n\n{goal}\n\n\
 			## Evaluation Context\n\n\
@@ -2392,7 +2394,7 @@ impl Evaluator {
 		Ok(StageEvaluation::new(
 			Stage::Intent,
 			StageActor::Evaluator,
-			started_at,
+			time_started,
 			smart.score,
 			smart.confidence,
 			meets_bar.noul,
@@ -2418,7 +2420,7 @@ impl Evaluator {
 		return evaluation;
 	}
 	async fn evaluate_intent(&self, ctx: &EvaluationContext) -> Result<StageEvaluation> {
-		let started_at = Utc::now();
+		let time_started = Utc::now();
 		let intent = ctx.get(SessionFile::Intent)?;
 		let response = self
 			.jev
@@ -2458,7 +2460,7 @@ impl Evaluator {
 		Ok(StageEvaluation::new(
 			Stage::Intent,
 			StageActor::Evaluator,
-			started_at,
+			time_started,
 			quality.score,
 			quality.confidence,
 			meets_bar.noul,
@@ -2481,7 +2483,7 @@ impl Evaluator {
 		))
 	}
 	async fn evaluate_spec(&self, ctx: &EvaluationContext) -> Result<StageEvaluation> {
-		let started_at = Utc::now();
+		let time_started = Utc::now();
 		let intent = ctx.get(SessionFile::Intent)?;
 		let spec = ctx.get(SessionFile::Spec)?;
 		let state = format!(
@@ -2528,7 +2530,7 @@ impl Evaluator {
 		Ok(StageEvaluation::new(
 			Stage::Spec,
 			StageActor::Sdlc,
-			started_at,
+			time_started,
 			quality.score,
 			quality.confidence,
 			meets_bar.noul,
@@ -2551,7 +2553,7 @@ impl Evaluator {
 		))
 	}
 	async fn evaluate_plan(&self, ctx: &EvaluationContext) -> Result<StageEvaluation> {
-		let started_at = Utc::now();
+		let time_started = Utc::now();
 		let intent = ctx.get(SessionFile::Intent)?;
 		let spec = ctx.get(SessionFile::Spec)?;
 		let plan = ctx.get(SessionFile::Plan)?;
@@ -2602,7 +2604,7 @@ impl Evaluator {
 		Ok(StageEvaluation::new(
 			Stage::Plan,
 			StageActor::Agent,
-			started_at,
+			time_started,
 			quality.score,
 			quality.confidence,
 			meets_bar.noul,
@@ -2625,7 +2627,7 @@ impl Evaluator {
 		))
 	}
 	async fn evaluate_build(&self, ctx: &EvaluationContext) -> Result<StageEvaluation> {
-		let started_at = Utc::now();
+		let time_started = Utc::now();
 		let intent = ctx.get(SessionFile::Intent)?;
 		let spec = ctx.get(SessionFile::Spec)?;
 		let plan = ctx.get(SessionFile::Plan)?;
@@ -2693,7 +2695,7 @@ impl Evaluator {
 		Ok(StageEvaluation::new(
 			Stage::Build,
 			StageActor::Sdlc,
-			started_at,
+			time_started,
 			quality.score,
 			quality.confidence,
 			meets_bar.noul,
@@ -2716,7 +2718,7 @@ impl Evaluator {
 		))
 	}
 	async fn evaluate_verification(&self, ctx: &EvaluationContext) -> Result<StageEvaluation> {
-		let started_at = Utc::now();
+		let time_started = Utc::now();
 		let intent = ctx.get(SessionFile::Intent)?;
 		let spec = ctx.get(SessionFile::Spec)?;
 		let tests = ctx.get(SessionFile::Tests)?;
@@ -2770,7 +2772,7 @@ impl Evaluator {
 		Ok(StageEvaluation::new(
 			Stage::Verify,
 			StageActor::Sdlc,
-			started_at,
+			time_started,
 			quality.score,
 			quality.confidence,
 			meets_bar.noul,
@@ -2805,15 +2807,9 @@ impl SdlcSession {
 			stage: Stage::Intent,
 			stages: Vec::new(),
 			dir,
-			created_at: now,
-			updated_at: now,
+			time_created: now,
+			time_updated: now,
 		})
-	}
-	fn created_at_readable(&self) -> String {
-		self.created_at.format(FMT_HUMAN_READABLE).to_string()
-	}
-	fn updated_at_readable(&self) -> String {
-		self.updated_at.format(FMT_HUMAN_READABLE).to_string()
 	}
 	fn create_readable(&self) -> String {
 		let current = Utc::now();
@@ -2824,6 +2820,14 @@ impl SdlcSession {
 	}
 }
 
+impl crate::traits::DateableSession for SdlcSession {
+	fn start(&self) -> Option<DateTime<Utc>> {
+		Some(self.time_created)
+	}
+	fn end(&self) -> Option<DateTime<Utc>> {
+		Some(self.time_updated)
+	}
+}
 impl SdlcInput {
 	pub fn text(&self) -> Option<&str> {
 		match self {
@@ -2832,27 +2836,39 @@ impl SdlcInput {
 		}
 	}
 }
-
 impl StageEvaluation {
 	fn new(
 		stage: Stage,
 		actor: StageActor,
-		started_at: DateTime<Utc>,
+		time_started: DateTime<Utc>,
 		score: f64,
 		confidence: f64,
 		meets_bar: f64,
 		evaluations: Vec<EvaluationResult>,
 	) -> Self {
+		let time_completed = Utc::now();
+		let time_total = time_completed - time_started;
 		Self {
 			stage,
 			actor,
-			started_at,
-			completed_at: Utc::now(),
+			time_started,
+			time_completed,
+			time_total,
 			score,
 			confidence,
 			passed: meets_bar >= 0.80 && confidence >= 0.70,
 			evaluations,
 		}
+	}
+	pub fn time_total_readable(&self) -> String {
+		duration_readable(self.time_total)
+	}
+	pub fn start_readable(&self) -> String {
+		time_readable(self.time_started)
+	}
+
+	pub fn end_readable(&self) -> String {
+		time_readable(self.time_completed)
 	}
 	pub fn with_evaluations(&self, checks: Vec<CheckResult>) -> Self {
 		todo!("with_evaluations")
@@ -3180,102 +3196,77 @@ impl SprintPipeline {
 		persist_evaluation(session, evaluation)?;
 		self.persist()
 	}
-	fn persist_intervention(&mut self, reason: impl Into<String>) -> Result<()> {
+	fn persist_intervention(&mut self, attempt: Attempt, reason: impl Into<String>) -> Result<()> {
 		let now = Utc::now();
-		let reason = reason.into();
-		{
-			let session = self.session()?;
-			let stage = session.stage;
-			session.stages.push(StageRecord {
-				stage,
-				attempt: Attempt {
-					stage,
-					number: 3,
-					max: 3,
-				},
-				status: StageStatus::InterventionNeeded,
-				actor: StageActor::Sdlc,
-				started_at: now,
-				completed_at: Some(now),
-				description: Some(reason),
-				evaluation: None,
-			});
-			session.updated_at = now;
-		}
-		self.persist()
+		self.push_stage_record(StageRecord {
+			stage: attempt.stage,
+			attempt,
+			status: StageStatus::InterventionNeeded,
+			actor: StageActor::Sdlc,
+			time_started: now,
+			time_completed: Some(now),
+			description: Some(reason.into()),
+			evaluation: None,
+		})
 	}
 	fn persist_outcome(&mut self, outcome: &StageOutcome) -> Result<()> {
-		let session = self.session()?;
-		let (stage, attempt, status, actor, started_at, completed_at, description, evaluation) =
-			match outcome {
-				StageOutcome::Complete {
-					execution,
-					evaluation,
-				} => (
-					execution.stage,
-					execution.attempt,
-					StageStatus::Completed,
-					evaluation.actor.clone(),
-					execution.started_at,
-					execution.completed_at,
-					None,
-					Some(evaluation.clone()),
-				),
+		let record = match outcome {
+			StageOutcome::Complete {
+				execution,
+				evaluation,
+			} => StageRecord {
+				stage: execution.stage,
+				attempt: execution.attempt,
+				status: StageStatus::Completed,
+				actor: evaluation.actor.clone(),
+				time_started: execution.time_started,
+				time_completed: Some(execution.time_completed),
+				description: None,
+				evaluation: Some(evaluation.clone()),
+			},
 
-				StageOutcome::NeedsRevision {
-					execution,
-					evaluation,
-				} => (
-					execution.stage,
-					execution.attempt,
-					StageStatus::NeedsRevision,
-					evaluation.actor.clone(),
-					execution.started_at,
-					execution.completed_at,
-					None,
-					Some(evaluation.clone()),
-				),
+			StageOutcome::NeedsRevision {
+				execution,
+				evaluation,
+			} => StageRecord {
+				stage: execution.stage,
+				attempt: execution.attempt,
+				status: StageStatus::NeedsRevision,
+				actor: evaluation.actor.clone(),
+				time_started: execution.time_started,
+				time_completed: Some(execution.time_completed),
+				description: None,
+				evaluation: Some(evaluation.clone()),
+			},
 
-				StageOutcome::ExecutionFailed {
-					stage,
-					attempt,
-					error,
-				} => (
-					*stage,
-					*attempt,
-					StageStatus::Failed,
-					StageActor::Sdlc,
-					Utc::now(),
-					Utc::now(),
-					Some(error.to_string()),
-					None,
-				),
+			StageOutcome::ExecutionFailed {
+				stage,
+				attempt,
+				error,
+			} => StageRecord {
+				stage: *stage,
+				attempt: *attempt,
+				status: StageStatus::Failed,
+				actor: StageActor::Sdlc,
+				time_started: Utc::now(),
+				time_completed: Some(Utc::now()),
+				description: Some(error.to_string()),
+				evaluation: None,
+			},
 
-				StageOutcome::EvaluationFailed { execution, error } => (
-					execution.stage,
-					execution.attempt,
-					StageStatus::EvaluationFailed,
-					StageActor::Sdlc,
-					execution.started_at,
-					execution.completed_at,
-					Some(error.to_string()),
-					None,
-				),
-			};
-
-		let record = StageRecord {
-			stage,
-			attempt,
-			status,
-			actor,
-			started_at,
-			completed_at: Some(completed_at),
-			description,
-			evaluation,
+			StageOutcome::EvaluationFailed { execution, error } => StageRecord {
+				stage: execution.stage,
+				attempt: execution.attempt,
+				status: StageStatus::EvaluationFailed,
+				actor: StageActor::Sdlc,
+				time_started: execution.time_started,
+				time_completed: Some(execution.time_completed),
+				description: Some(error.to_string()),
+				evaluation: None,
+			},
 		};
-		session.stages.push(record);
-		session.updated_at = Utc::now();
-		self.persist()
+
+		self.push_stage_record(record)
 	}
 
 	fn persist_session(&mut self) -> Result<()> {
@@ -3289,6 +3280,12 @@ impl SprintPipeline {
 		self.update_progress("SDLC session resumed")?;
 		self.persist()?;
 		Ok(())
+	}
+	fn push_stage_record(&mut self, record: StageRecord) -> Result<()> {
+		let session = self.session()?;
+		session.stages.push(record);
+		session.time_updated = Utc::now();
+		self.persist()
 	}
 	fn retry(&mut self, _stage: enums::Stage) -> Result<()> {
 		Ok(())
@@ -3365,7 +3362,7 @@ impl SprintPipeline {
 		}
 
 		session.stage = next;
-		session.updated_at = Utc::now();
+		session.time_updated = Utc::now();
 
 		self.persist()?;
 		self.session_record()?;
@@ -3418,13 +3415,16 @@ impl PipelineRuntime {
 			passed: None,
 			phase: SdlcPhase::Starting,
 			score: None,
-			stage_started_at: Instant::now(),
-			started_at: Instant::now(),
+			stage_time_started: Instant::now(),
+			time_started: Instant::now(),
 			total_agent_calls: 0,
 			total_tokens: 0,
 			error: None,
 			events: vec![],
 		}
+	}
+	fn retry(&mut self, _stage: enums::Stage) -> Result<()> {
+		Ok(())
 	}
 	pub async fn run(&mut self, input_rx: &mut UnboundedReceiver<SdlcInput>) -> Result<()> {
 		println!(">>> PipelineRuntime::run");
@@ -3486,9 +3486,6 @@ impl PipelineRuntime {
 		});
 		self.pipeline.emit(SdlcEvent::Completed);
 		sleep(DEMO_COMPLETE_DELAY).await;
-		Ok(())
-	}
-	fn retry(&mut self, _stage: enums::Stage) -> Result<()> {
 		Ok(())
 	}
 }
@@ -3586,6 +3583,18 @@ impl SprintRunner<'_> {
 	fn begin_attempt(&mut self, stage: Stage) -> Result<Attempt> {
 		self.pipeline.next_attempt(stage)
 	}
+	fn transition(&mut self, next: enums::Stage) -> Result<()> {
+		self.pipeline.transition(next)
+	}
+	fn retry(&mut self, stage: enums::Stage) -> Result<()> {
+		self.pipeline.retry(stage)
+	}
+	fn emit(&self, event: SdlcEvent) {
+		let _ = self.pipeline.event_tx.send(event);
+	}
+	fn evaluate_checks(&self, checks: Vec<CheckResult>) -> Result<Vec<CheckResult>> {
+		todo!("evaluate_checks")
+	}
 	async fn evaluate(&self, execution: &StageExecution) -> Result<StageEvaluation> {
 		let stage = execution.stage;
 		let checks = self.pipeline.run_checks(stage).await?;
@@ -3597,9 +3606,7 @@ impl SprintRunner<'_> {
 			.await?;
 		Ok(semantic.with_evaluations(structural))
 	}
-	fn evaluate_checks(&self, checks: Vec<CheckResult>) -> Result<Vec<CheckResult>> {
-		todo!("evaluate_checks")
-	}
+
 	async fn evaluate_execution(&mut self, execution: StageExecution) -> Result<StageOutcome> {
 		let stage = execution.stage;
 		self.emit(SdlcEvent::PhaseChanged {
@@ -3836,7 +3843,7 @@ impl SprintRunner<'_> {
 		attempt: Attempt,
 		pending_input: &mut Option<SdlcInput>,
 	) -> Result<StageExecution> {
-		let started_at = Utc::now();
+		let time_started = Utc::now();
 		let result = match stage {
 			Stage::Intent => self.stage_intent().await?,
 			Stage::Spec => self.stage_spec().await?,
@@ -3853,8 +3860,8 @@ impl SprintRunner<'_> {
 		Ok(StageExecution {
 			stage,
 			attempt,
-			started_at,
-			completed_at: Utc::now(),
+			time_started,
+			time_completed: Utc::now(),
 			result,
 		})
 	}
@@ -3870,15 +3877,6 @@ impl SprintRunner<'_> {
 	}
 	async fn decide(&mut self, outcome: &StageOutcome) -> Result<StageDecision> {
 		self.pipeline.decide(outcome)
-	}
-	fn transition(&mut self, next: enums::Stage) -> Result<()> {
-		self.pipeline.transition(next)
-	}
-	fn retry(&mut self, stage: enums::Stage) -> Result<()> {
-		self.pipeline.retry(stage)
-	}
-	fn emit(&self, event: SdlcEvent) {
-		let _ = self.pipeline.event_tx.send(event);
 	}
 
 	async fn wait_for_intervention(
@@ -3915,13 +3913,21 @@ impl SprintRunner<'_> {
 				Ok(RunControl::Continue)
 			}
 			StageDecision::Retry => {
+				self
+					.pipeline
+					.update_progress(&format!("Retrying stage {}", stage))?;
 				self.handle_retry(stage, attempt).await?;
+
 				Ok(RunControl::Continue)
 			}
 			StageDecision::Revise => {
 				self
+					.pipeline
+					.update_progress(&format!("Revising stage {}", stage))?;
+				self
 					.handle_revision(stage, attempt, outcome, input_rx, pending_input)
 					.await?;
+
 				Ok(RunControl::Continue)
 			}
 			StageDecision::AwaitHuman => {
@@ -3970,6 +3976,9 @@ impl SprintRunner<'_> {
 				self.emit(SdlcEvent::PhaseChanged {
 					phase: SdlcPhase::Completed,
 				});
+				self
+					.pipeline
+					.update_progress(&format!("{} completed", stage))?;
 				self.emit(SdlcEvent::Completed);
 				Ok(RunControl::Exit)
 			}
@@ -4449,15 +4458,66 @@ fn persist_evaluation(session: &mut SdlcSession, evaluation: &StageEvaluation) -
 		description: Some(String::from("Evaluation done")),
 		actor: evaluation.actor.clone(),
 		attempt: Attempt::new(),
-		completed_at: Some(Utc::now()),
 		evaluation: Some(evaluation.clone()),
-		stage: evaluation.stage.clone(),
-		started_at: evaluation.started_at,
+		stage: evaluation.stage,
+		time_started: evaluation.time_started,
+		time_completed: Some(Utc::now()),
 		status,
 	};
-
+	let time_started = evaluation.time_started;
+	let time_completed = Utc::now();
+	// let record = StageRecord {
+	// 	stage: evaluation.stage,
+	// 	attempt: Attempt::new(),
+	// 	status,
+	// 	actor: evaluation.actor.clone(),
+	// 	description: Some("Evaluation done".into()),
+	// 
+	// 	time_started: time_readable(time_started),
+	// 	time_completed: Some(time_readable(time_completed)),
+	// 	time_total: duration_readable(time_completed - time_started),
+	// 
+	// 	evaluation: Some(evaluation.clone()),
+	// };
 	session.stages.push(record);
-	session.updated_at = Utc::now();
+	session.time_updated = Utc::now();
 
 	Ok(())
+}
+
+
+pub fn time_readable(time: chrono::DateTime<chrono::Utc>) -> String {
+	time.format("%B %-d, %Y at %-I:%M:%S %p UTC").to_string()
+}
+
+pub fn short_duration_readable(duration: chrono::Duration) -> String {
+	let seconds = duration.num_seconds();
+	let hours = seconds / 3600;
+	let minutes = (seconds % 3600) / 60;
+	let seconds = seconds % 60;
+
+	match (hours, minutes, seconds) {
+		(h, m, _) if h > 0 => format!("{h} hours {m} minutes"),
+		(_, m, s) if m > 0 => format!("{m} minutes {s} seconds"),
+		(_, _, s) => format!("{s} seconds"),
+	}
+}
+
+pub fn duration_readable(duration: chrono::Duration) -> String {
+	let millis = duration.num_milliseconds();
+
+	if millis < 1000 {
+		return format!("{millis} ms");
+	}
+
+	let seconds = millis / 1000;
+	let hours = seconds / 3600;
+	let minutes = (seconds % 3600) / 60;
+	let seconds = seconds % 60;
+
+	match (hours, minutes, seconds) {
+		(h, m, _) if h > 0 => format!("{h}h {m}m"),
+		(_, m, s) if m > 0 => format!("{m}m {s}s"),
+		(_, _, s) => format!("{s}s"),
+	}
 }
