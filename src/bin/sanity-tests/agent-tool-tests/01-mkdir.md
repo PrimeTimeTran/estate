@@ -1,0 +1,9 @@
+# Test: mkdir
+
+Use the `mkdir` CLI tool.
+
+Create a directory named:
+
+`01-created-directory`
+
+Do not create any other files or directories.

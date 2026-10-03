@@ -1,0 +1,30 @@
+Create:
+
+25-pipeline-source.txt
+
+with:
+
+apple
+banana
+apple
+cherry
+banana
+apple
+
+Use a shell pipeline involving standard CLI tools to:
+
+1. sort the lines
+2. count identical adjacent values
+3. produce one line per fruit with its count
+
+Write the final result to:
+
+25-pipeline-result.txt
+
+The expected values are:
+
+3 apple
+2 banana
+1 cherry
+
+Use actual CLI tools rather than calculating the answer manually.

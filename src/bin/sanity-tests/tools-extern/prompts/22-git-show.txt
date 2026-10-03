@@ -1,0 +1,11 @@
+Use git show.
+
+Do not modify the repository.
+
+Run:
+
+git show --stat --oneline HEAD
+
+Write the output to:
+
+22-git-show-result.txt

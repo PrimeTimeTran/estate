@@ -1,0 +1,12 @@
+
+# Test: env
+
+Use the `env` CLI command.
+
+Capture the current process environment.
+
+Write the output to:
+
+`24-env-result.txt`
+
+Do not modify environment variables.

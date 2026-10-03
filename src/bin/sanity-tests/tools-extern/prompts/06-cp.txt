@@ -1,0 +1,11 @@
+Use the cp CLI tool.
+
+Copy:
+
+03-write-file.txt
+
+to:
+
+06-copied-file.txt
+
+The copied file must have identical contents.

@@ -1,0 +1,18 @@
+Create a file named:
+
+04-append-file.txt
+
+with this initial content:
+
+foobar
+
+Then append this content to the same file:
+
+baz
+
+The final file must contain exactly:
+
+foobar
+baz
+
+Do not overwrite the initial content when performing the append.

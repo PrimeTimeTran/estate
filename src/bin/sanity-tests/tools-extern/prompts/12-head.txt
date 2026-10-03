@@ -1,0 +1,17 @@
+Create a file named:
+
+12-head-source.txt
+
+with exactly these five lines:
+
+one
+two
+three
+four
+five
+
+Then use the head CLI tool to extract only the first two lines.
+
+Write the result to:
+
+12-head-result.txt

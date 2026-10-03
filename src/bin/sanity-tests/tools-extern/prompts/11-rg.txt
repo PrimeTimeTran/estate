@@ -1,0 +1,13 @@
+Use ripgrep (rg).
+
+Search all files in the current test directory for the string:
+
+foobar
+
+Write the matching results to:
+
+11-rg-result.txt
+
+Preserve the normal rg output format.
+
+Do not modify the files being searched.

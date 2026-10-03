@@ -1,0 +1,24 @@
+
+# Test: grep
+
+Create:
+
+`18-grep-source.txt`
+
+with:
+
+```text
+INFO startup
+ERROR failure
+INFO running
+WARNING something
+ERROR another failure
+```
+
+Use `grep` to find only lines containing:
+
+`ERROR`
+
+Write the result to:
+
+`18-grep-result.txt`

@@ -1,0 +1,9 @@
+Use the ls CLI tool.
+
+List the files in the current directory.
+
+Write the resulting listing to:
+
+09-ls-result.txt
+
+Do not modify any other files.

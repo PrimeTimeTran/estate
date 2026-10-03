@@ -1,0 +1,9 @@
+# Test: touch
+
+Use the `touch` CLI tool.
+
+Create an empty file named:
+
+`02-touched-file.txt`
+
+Do not write any content to the file.

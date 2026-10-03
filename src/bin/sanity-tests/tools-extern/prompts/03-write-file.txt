@@ -1,0 +1,11 @@
+Create a file named:
+
+03-write-file.txt
+
+with exactly this content:
+
+hello
+world
+foobar
+
+Do not add any additional lines or text.
