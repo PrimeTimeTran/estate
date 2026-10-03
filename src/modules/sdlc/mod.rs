@@ -3051,19 +3051,16 @@ impl SprintPipeline {
 			.recv()
 			.await
 			.ok_or_else(|| anyhow!("SDLC input channel closed"))?;
-
 		match input {
 			SdlcInput::Human(string) => {
 				self.emit(SdlcEvent::HumanInput {
 					stage,
 					input: string.clone(),
 				});
-
 				self.emit(SdlcEvent::InterventionResolved {
 					stage,
 					action: "human input provided".into(),
 				});
-
 				Ok(Intervention::Human(string))
 			}
 			SdlcInput::Retry => {
@@ -3071,7 +3068,6 @@ impl SprintPipeline {
 					stage,
 					action: "retry".into(),
 				});
-
 				Ok(Intervention::Retry)
 			}
 			SdlcInput::ProvideContext(context) => {
@@ -3079,7 +3075,6 @@ impl SprintPipeline {
 					stage,
 					action: "context provided".into(),
 				});
-
 				Ok(Intervention::ProvideContext(context))
 			}
 			SdlcInput::Reviewed => {
@@ -3087,7 +3082,6 @@ impl SprintPipeline {
 					stage,
 					action: "reviewed".into(),
 				});
-
 				Ok(Intervention::Reviewed)
 			}
 			SdlcInput::Abort => {
@@ -3095,7 +3089,6 @@ impl SprintPipeline {
 					stage,
 					action: "abort".into(),
 				});
-
 				Ok(Intervention::Abort)
 			}
 		}
