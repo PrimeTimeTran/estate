@@ -323,7 +323,7 @@ mod enums {
 		Deploy,
 		Maintain,
 		Complete,
-		SprintCompleted,
+		Finalize,
 	}
 	impl Stage {
 		pub fn next(&self) -> Option<Self> {
@@ -338,7 +338,7 @@ mod enums {
 				Self::Deploy => Some(Self::Maintain),
 				Self::Maintain => Some(Self::Complete),
 				Self::Complete => None,
-				Self::SprintCompleted => None,
+				Self::Finalize => None,
 			}
 		}
 		pub fn is_before(self, other: Stage) -> bool {
@@ -352,7 +352,7 @@ mod enums {
 				Stage::Deploy => 6,
 				Stage::Maintain => 7,
 				Stage::Complete => 8,
-				Stage::SprintCompleted => 9,
+				Stage::Finalize => 100,
 			};
 			rank(self) < rank(other)
 		}
@@ -369,7 +369,7 @@ mod enums {
 				Self::Deploy => "Deploy",
 				Self::Maintain => "Maintain",
 				Self::Complete => "Complete",
-				Self::SprintCompleted => "Sprint Completed",
+				Self::Finalize => "Finalize Sprint",
 			};
 
 			f.write_str(name)
@@ -532,7 +532,7 @@ mod enums {
 		Build,
 		Verification(Verification),
 		Complete,
-		SprintCompleted,
+		Finalize,
 	}
 	pub enum StageTransition {
 		Next,
@@ -543,8 +543,8 @@ mod enums {
 		AwaitHuman,
 	}
 }
-use enums as e;
 pub use e::*;
+use enums as e;
 pub use prompt as agent_prompts;
 use prompt::*;
 pub mod prompt {
@@ -2147,16 +2147,27 @@ mod ui {
 	}
 }
 impl LocalGenerator {
-	async fn generate_stuff(&self, prompt: &str) -> Result<String> {
+	pub fn new(agent: Agent, model: impl Into<String>) -> Self {
+		Self {
+			agent,
+			model: model.into(),
+		}
+	}
+	/// Real Estate agent path.
+	/// Uses Agent + Estate context/tools.
+	pub async fn run_agent(&self, prompt: &str) -> Result<String> {
 		let task = AgentTask::new(prompt.to_string());
-		let (event_tx, mut event_rx) = tokio::sync::mpsc::unbounded_channel();
+		let (event_tx, _event_rx) = tokio::sync::mpsc::unbounded_channel();
+
 		let result = self.agent.run_agent_loop(task, event_tx).await?;
-		println!("=== GENERATOR RESULT ===");
+
+		println!("=== AGENT RESULT ===");
 		println!("status: {:?}", result.status);
 		println!("chat: {:?}", result.chat);
 		println!("summary: {:?}", result.summary);
 		println!("logs: {:?}", result.logs);
-		println!("========================");
+		println!("====================");
+
 		Ok(
 			result
 				.chat
@@ -2697,7 +2708,7 @@ impl Evaluator {
 		let intent = ctx.get(SessionFile::Intent)?;
 		let spec = ctx.get(SessionFile::Spec)?;
 		let plan = ctx.get(SessionFile::Plan)?;
-		let tests = ctx.get(SessionFile::Test)?;
+		// let tests = ctx.get(SessionFile::Test)?;
 		let implementation = std::fs::read_dir(&self.session.dir)?
 			.filter_map(|entry| entry.ok())
 			.filter_map(|entry| {
@@ -2716,7 +2727,6 @@ impl Evaluator {
 			"## User Intent\n\n{intent}\n\n\
 			## Specification\n\n{spec}\n\n\
 			## Implementation Plan\n\n{plan}\n\n\
-			## Test Plan\n\n{tests}\n\n\
 			## Repository Artifacts\n\n{implementation}"
 		);
 		let response = self
@@ -2787,14 +2797,13 @@ impl Evaluator {
 		let time_started = Utc::now();
 		let intent = ctx.get(SessionFile::Intent)?;
 		let spec = ctx.get(SessionFile::Spec)?;
-		let tests = ctx.get(SessionFile::Test)?;
+		// let tests = ctx.get(SessionFile::Test)?;
 		let evidence = ctx
 			.get(SessionFile::Verification)
 			.unwrap_or("No verification evidence was recorded.");
 		let state = format!(
 			"## User Intent\n\n{intent}\n\n\
 		 ## Specification\n\n{spec}\n\n\
-		 ## Test Plan\n\n{tests}\n\n\
 		 ## Verification Evidence\n\n{evidence}"
 		);
 		let response = self
@@ -2943,34 +2952,42 @@ impl StageEvaluation {
 impl SprintPipeline {
 	pub async fn new() -> anyhow::Result<Self> {
 		dotenvy::dotenv().ok();
+
 		let state_path = SpecialFile::SdlcCurrent.path()?;
+
 		let session = match SpecialFile::SdlcCurrent
 			.load::<SdlcSession>()
 			.context("loading current SdlcSession")?
 		{
 			Some(session) => session,
+
 			None => {
 				let intent = "Do the work required to build this CLI";
 				let title = Self::summarize_title(intent).await?;
 				let dir = Self::init_session_dir(&title)?;
+
 				Self::init_templates(&dir)?;
+
 				let session = SdlcSession::new(title, dir)?;
 				Self::session_save(&session)?;
+
 				session
 			}
 		};
+
 		if !state_path.exists() {
 			Self::session_save(&session)?;
 		}
+
 		let evaluator = Evaluator {
 			session: session.clone(),
 			jev: TypeSafeClient::from_env()?,
 		};
-		let generator = Box::new(LocalGenerator {
-			agent: Agent::new(),
-			model: "qwen3:8b".to_string(),
-		});
+
+		let generator = Box::new(LocalGenerator::new(Agent::new(), "qwen3:8b"));
+
 		let (event_tx, _) = broadcast::channel(256);
+
 		Ok(Self {
 			evaluator,
 			generator,
@@ -3001,10 +3018,10 @@ impl SprintPipeline {
 		self.session.as_ref().map(|session| session.stage)
 	}
 	pub fn complete(&mut self) -> Result<()> {
-		self.transition(e::Stage::Complete)
+		self.transition(e::Stage::Finalize)
 	}
 	pub fn is_complete(&self) -> bool {
-		self.stage() == Some(e::Stage::Complete)
+		self.stage() == Some(e::Stage::Finalize)
 	}
 	fn stage_attempt(&self) -> u32 {
 		self.stage_attempt
@@ -3024,13 +3041,24 @@ impl SprintPipeline {
 					">>> Complete: stage={:?} attempt={}/{}",
 					execution.stage, execution.attempt.number, execution.attempt.max
 				);
-
-				if execution.stage == e::Stage::Complete {
-					println!(">>> decision = Complete");
-					StageDecision::Complete
-				} else {
-					println!(">>> decision = Continue");
-					StageDecision::Continue
+				match &execution.result {
+					StageResult::Verification(verification) => {
+						if verification.passed {
+							println!(">>> verification passed -> Continue");
+							StageDecision::Continue
+						} else {
+							println!(">>> verification failed -> Retry");
+							StageDecision::Retry
+						}
+					}
+					_ if execution.stage == e::Stage::Complete => {
+						println!(">>> decision = Complete");
+						StageDecision::Complete
+					}
+					_ => {
+						println!(">>> decision = Continue");
+						StageDecision::Continue
+					}
 				}
 			}
 
@@ -3359,7 +3387,7 @@ impl SprintPipeline {
 	fn checks_for(stage: Stage) -> Vec<(&'static str, Vec<&'static str>)> {
 		match stage {
 			Stage::Intent | Stage::Spec | Stage::Plan => Vec::new(),
-			Stage::Complete | Stage::SprintCompleted => Vec::new(),
+			Stage::Complete | Stage::Finalize => Vec::new(),
 			Stage::Deploy | Stage::Maintain => Vec::new(),
 			Stage::Build | Stage::Verify => vec![
 				("cargo check", vec!["cargo", "check"]),
@@ -3918,7 +3946,7 @@ impl SprintRunner<'_> {
 			Stage::Build => self.stage_build().await?,
 			Stage::Verify => self.stage_verify().await?,
 			Stage::Complete => StageResult::Complete,
-			Stage::SprintCompleted => StageResult::SprintCompleted,
+			Stage::Finalize => StageResult::Finalize,
 			Stage::Deploy | Stage::Maintain => {
 				return Err(anyhow!("stage {stage:?} not implemented"));
 			}

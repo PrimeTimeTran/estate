@@ -4,7 +4,7 @@
 
 Execute the implementation plan for the current SDLC feature.
 
-The Build stage is responsible for turning the intent, specification, implementation plan, and test plan into a working implementation.
+The Build stage is responsible for turning the intent, specification, and implementation plan into a working implementation, including the executable tests described by the plan.
 
 The goal is not merely to modify code or make the project compile.
 
@@ -20,7 +20,6 @@ Before changing code, read the complete set of artifacts for the current feature
 intent.md
 spec.md
 plan.md
-test.md
 ```
 
 These files establish:
@@ -56,17 +55,12 @@ If the repository differs materially from the plan, adapt the implementation to 
 
 ## Step 2 — Start With the Tests
 
-**Write the tests before implementing the behavior whenever practical.**
+Write the tests before implementing the behavior whenever practical.
 
-Use:
+Use the **Verification & Testing Strategy** and **Execution Work Order** in `plan.md`
+as the source of truth for the required tests.
 
-```text
-tests/<feature-slug>.md
-```
-
-as the source of truth for the required behavior.
-
-For each documented test:
+For each planned test:
 
 1. Identify the behavior being requested.
 2. Translate it into an executable test.
@@ -74,11 +68,8 @@ For each documented test:
 4. Run the test.
 5. Confirm that the test fails for the expected reason before implementing the feature.
 
-The initial failure should demonstrate that the desired behavior does not yet exist or is not yet correct.
-
-Do not weaken a test merely to make the existing implementation pass.
-
-Do not write tests that only verify implementation details when the specification describes observable behavior.
+The initial failure should demonstrate that the desired behavior does not yet exist
+or is not yet correct.
 
 ---
 
@@ -185,10 +176,8 @@ Existing behavior must remain intact unless the specification explicitly changes
 
 Before declaring Build complete, reread:
 
-```text
 spec/<feature-slug>.md
-tests/<feature-slug>.md
-```
+plan/<feature-slug>.md
 
 Check each requirement against the implementation and executable tests.
 
