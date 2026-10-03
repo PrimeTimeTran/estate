@@ -142,27 +142,7 @@ mod enums {
 		Completed(TaskResult),
 		Failed(StageError),
 	}
-	#[derive(Debug)]
-	pub enum StageOutcome {
-		Complete {
-			execution: StageExecution,
-			evaluation: StageEvaluation,
-		},
-		NeedsRevision {
-			execution: StageExecution,
-			evaluation: StageEvaluation,
-		},
-		ExecutionFailed {
-			stage: enums::Stage,
-			attempt: Attempt,
-			error: anyhow::Error,
-		},
 
-		EvaluationFailed {
-			execution: StageExecution,
-			error: anyhow::Error,
-		},
-	}
 	#[derive(Debug, Clone)]
 	pub enum Intervention {
 		Human(String),
@@ -262,20 +242,6 @@ mod enums {
 		Failed,
 	}
 
-	#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-	pub enum Step {
-		Boot,
-		Init,
-		Intent,
-		Spec,
-		Plan,
-		Build,
-		Verify,
-		Deploy,
-		Maintain,
-		Complete,
-	}
-
 	#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 	pub enum Stage {
 		Intent,
@@ -287,6 +253,35 @@ mod enums {
 		Maintain,
 		Complete,
 		SprintCompleted,
+	}
+	impl enums::Stage {
+		pub fn next(&self) -> Option<Self> {
+			match self {
+				Self::Intent => Some(Self::Spec),
+				Self::Spec => Some(Self::Plan),
+				Self::Plan => Some(Self::Build),
+				Self::Build => Some(Self::Verify),
+				Self::Verify => Some(Self::Complete),
+				Self::Deploy => Some(Self::Maintain),
+				Self::Maintain => Some(Self::Complete),
+				Self::Complete => None,
+				Self::SprintCompleted => None,
+			}
+		}
+		pub fn is_before(self, other: enums::Stage) -> bool {
+			let rank = |stage: enums::Stage| match stage {
+				Stage::Intent => 0,
+				Stage::Spec => 1,
+				Stage::Plan => 2,
+				Stage::Build => 3,
+				Stage::Verify => 4,
+				Stage::Deploy => 5,
+				Stage::Maintain => 6,
+				Stage::Complete => 7,
+				Stage::SprintCompleted => 8,
+			};
+			rank(self) < rank(other)
+		}
 	}
 	impl std::fmt::Display for Stage {
 		fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -329,6 +324,47 @@ mod enums {
 		Fail,
 		Complete,
 	}
+	#[derive(Debug)]
+	pub enum StageOutcome {
+		Complete {
+			execution: StageExecution,
+			evaluation: StageEvaluation,
+		},
+		NeedsRevision {
+			execution: StageExecution,
+			evaluation: StageEvaluation,
+		},
+		ExecutionFailed {
+			stage: enums::Stage,
+			attempt: Attempt,
+			error: anyhow::Error,
+		},
+
+		EvaluationFailed {
+			execution: StageExecution,
+			error: anyhow::Error,
+		},
+	}
+	impl StageOutcome {
+		pub fn stage(&self) -> enums::Stage {
+			match self {
+				Self::Complete { execution, .. }
+				| Self::NeedsRevision { execution, .. }
+				| Self::EvaluationFailed { execution, .. } => execution.stage,
+
+				Self::ExecutionFailed { stage, .. } => *stage,
+			}
+		}
+		pub fn attempt(&self) -> Attempt {
+			match self {
+				Self::Complete { execution, .. }
+				| Self::NeedsRevision { execution, .. }
+				| Self::EvaluationFailed { execution, .. } => execution.attempt,
+
+				Self::ExecutionFailed { attempt, .. } => *attempt,
+			}
+		}
+	}
 	pub enum StageOutcomeEvaluation {
 		Passed(Evaluation),
 		FailedQuality(Evaluation),
@@ -341,6 +377,45 @@ mod enums {
 		Failed,
 		NeedsRevision,
 		EvaluationFailed,
+		InterventionNeeded,
+	}
+
+	#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+	pub enum Step {
+		Boot,
+		Init,
+		Intent,
+		Spec,
+		Plan,
+		Build,
+		Verify,
+		Deploy,
+		Maintain,
+		Complete,
+	}
+	impl Step {
+		pub fn stage(self) -> Option<Stage> {
+			match self {
+				Self::Intent => Some(Stage::Intent),
+				Self::Spec => Some(Stage::Spec),
+				Self::Plan => Some(Stage::Plan),
+				Self::Build => Some(Stage::Build),
+				Self::Verify => Some(Stage::Verify),
+				Self::Boot | Self::Init | Self::Deploy | Self::Maintain | Self::Complete => None,
+			}
+		}
+		pub const ALL: &'static [Self] = &[
+			Self::Boot,
+			Self::Init,
+			Self::Intent,
+			Self::Spec,
+			Self::Plan,
+			Self::Build,
+			Self::Verify,
+			Self::Deploy,
+			Self::Maintain,
+			Self::Complete,
+		];
 	}
 	pub enum InputMode {
 		Normal,
@@ -412,7 +487,6 @@ pub mod prompt {
 	}
 	const INTENT_PROMPT: &str = include_str!("../../../ai/template/INITIAL_PROMPT.md");
 	const PROMPT_FROM_USER: &str = include_str!("../../../ai/template/user.goal.md");
-
 	pub fn for_intent(user_request: &str) -> String {
 		INTENT_PROMPT.replace("{{PROMPT_FROM_USER}}", user_request)
 	}
@@ -974,6 +1048,7 @@ pub mod structs {
 		pub attempt: Attempt,
 		pub stage: enums::Stage,
 		pub status: StageStatus,
+		pub description: Option<String>,
 
 		/// What actually performed the work.
 		pub actor: StageActor,
@@ -1080,6 +1155,187 @@ pub mod structs {
 		pub input_active: bool,
 		pub events: Vec<Event>,
 	}
+	impl SdlcView {
+		pub fn new(runtime: &PipelineRuntime) -> Self {
+			Self {
+				input_active: false,
+				input: String::new(),
+				paused: false,
+				show_logs: false,
+				events: vec![],
+				runtime: runtime.view(),
+			}
+		}
+		pub fn begin_input(&mut self) {
+			self.input_active = true;
+			self.input.clear();
+		}
+		pub fn end_input(&mut self) {
+			self.input_active = false;
+			self.input.clear();
+		}
+		pub fn is_input_active(&self) -> bool {
+			self.input_active
+		}
+		pub fn toggle_pause(&mut self) {
+			self.paused = !self.paused;
+		}
+		pub fn toggle_logs(&mut self) {
+			self.show_logs = !self.show_logs;
+		}
+		pub fn handle_input_key(
+			&mut self,
+			key: KeyEvent,
+			input_tx: &UnboundedSender<SdlcInput>,
+		) -> anyhow::Result<()> {
+			match key.code {
+				KeyCode::Char(c) => {
+					self.input.push(c);
+				}
+
+				KeyCode::Backspace => {
+					self.input.pop();
+				}
+				KeyCode::Enter => {
+					let input = std::mem::take(&mut self.input);
+					input_tx.send(SdlcInput::Human(input))?;
+					self.input_active = false;
+				}
+
+				KeyCode::Esc => {
+					self.input_active = false;
+					self.input.clear();
+				}
+
+				_ => {}
+			}
+
+			Ok(())
+		}
+		pub fn render(frame: &mut Frame<'_>, view: &SdlcView) {
+			let area = frame.area();
+			frame.render_widget(Clear, area);
+			let chunks = RatatuiLayout::default()
+				.direction(Direction::Vertical)
+				.constraints([
+					Constraint::Length(2),
+					Constraint::Length(3),
+					Constraint::Min(8),
+					Constraint::Length(3),
+				])
+				.split(area);
+			ui::stepper(frame, view, chunks[1]);
+			let body = ui::body(chunks[2]);
+			ui::left_stage_panel(frame, view, body[0]);
+			ui::right_activity_panel(frame, view, body[2]);
+			ui::footer(frame, view, chunks[3]);
+		}
+		pub fn apply(&mut self, event: SdlcEvent) {
+			match event {
+				SdlcEvent::RunStarted => {
+					self.runtime.phase = SdlcPhase::Starting;
+					self.runtime.started_at = Instant::now();
+					self.runtime.stage_started_at = Instant::now();
+					self.runtime.message = Some(String::from("Run started"));
+				}
+
+				SdlcEvent::StageStarted { stage, attempt } => {
+					self.runtime.stage = stage;
+					self.runtime.attempt = attempt.number;
+					self.runtime.phase = SdlcPhase::Starting;
+					self.runtime.stage_started_at = Instant::now();
+					self.runtime.score = None;
+					self.runtime.confidence = None;
+					self.runtime.error = None;
+					self.runtime.message = Some(format!("{stage:?}"));
+				}
+
+				SdlcEvent::Activity {
+					stage,
+					attempt,
+					message,
+				} => {
+					self.runtime.stage = stage;
+					self.runtime.attempt = attempt.number;
+					self.runtime.message = Some(message);
+				}
+
+				SdlcEvent::PhaseChanged { phase } => {
+					self.runtime.phase = match phase {
+						SdlcPhase::Executing => SdlcPhase::Executing,
+						SdlcPhase::Evaluating => SdlcPhase::Evaluating,
+						SdlcPhase::Completed => SdlcPhase::Completed,
+
+						// Add the remaining mappings for your actual
+						// SdlcPhase variants.
+						_ => self.runtime.phase,
+					};
+
+					self.runtime.message = Some(format!("{phase:?}"));
+				}
+
+				SdlcEvent::ExecutionComplete { stage } => {
+					self.runtime.stage = stage;
+					self.runtime.phase = SdlcPhase::Evaluating;
+					self.runtime.message = Some(String::from("Execution complete"));
+				}
+
+				SdlcEvent::EvaluationStarted { stage } => {
+					self.runtime.stage = stage;
+					self.runtime.phase = SdlcPhase::Evaluating;
+					self.runtime.message = Some(String::from("Evaluating"));
+				}
+
+				SdlcEvent::Evaluated {
+					stage,
+					score,
+					confidence,
+					passed,
+				} => {
+					self.runtime.stage = stage;
+					self.runtime.score = Some(score);
+					self.runtime.confidence = Some(confidence);
+
+					self.runtime.message = Some(format!(
+						"Evaluation: {:.2} (confidence {:.2})",
+						score, confidence
+					));
+
+					if !passed {
+						self.runtime.phase = SdlcPhase::Failed;
+					}
+				}
+
+				SdlcEvent::StageTransitioned { from: _, to } => {
+					self.runtime.stage = to;
+					self.runtime.stage_started_at = Instant::now();
+					self.runtime.score = None;
+					self.runtime.confidence = None;
+					self.runtime.message = Some(format!("Starting {to:?}"));
+				}
+
+				SdlcEvent::Completed => {
+					self.runtime.phase = SdlcPhase::Completed;
+					self.runtime.message = Some(String::from("SDLC complete"));
+				}
+
+				SdlcEvent::Failed { stage, error } => {
+					if let Some(stage) = stage {
+						self.runtime.stage = stage;
+					}
+
+					self.runtime.phase = SdlcPhase::Failed;
+					self.runtime.message = Some(error.clone());
+					self.runtime.error = Some(error);
+				}
+
+				event => {
+					self.runtime.events.push(event);
+				}
+			}
+		}
+	}
+
 	#[derive(Clone, Debug)]
 	pub struct ApiGenerator {
 		// whatever API client you decide to use
@@ -1482,16 +1738,12 @@ mod ui {
 	}
 	pub fn right_activity_panel(frame: &mut Frame<'_>, view: &SdlcView, area: Rect) {
 		let runtime = &view.runtime;
-
 		let spinner = spinner(runtime.stage_started_at.elapsed());
-
 		let stage_style = Style::default()
 			.fg(Color::White)
 			.add_modifier(Modifier::BOLD);
-
 		let attempt_style = Style::default().fg(Color::DarkGray);
 		let phase_style = phase_style(runtime.phase);
-
 		let phase_label = match runtime.phase {
 			SdlcPhase::Starting => "Starting",
 			SdlcPhase::Executing => "Executing",
@@ -1501,13 +1753,7 @@ mod ui {
 			SdlcPhase::Completed => "Completed",
 			SdlcPhase::Failed => "Failed",
 		};
-
 		let mut lines = Vec::new();
-
-		// ------------------------------------------------------------
-		// Current activity
-		// ------------------------------------------------------------
-
 		lines.push(Line::from(vec![
 			Span::styled(
 				format!("{spinner} "),
@@ -1518,16 +1764,10 @@ mod ui {
 			Span::styled(format!("{:?}", runtime.stage), stage_style),
 			Span::styled(format!(" · #{}", runtime.attempt), attempt_style),
 		]));
-
 		lines.push(Line::from(vec![
 			Span::raw("  ↳ "),
 			Span::styled(phase_label, phase_style),
 		]));
-
-		// ------------------------------------------------------------
-		// Current reason
-		// ------------------------------------------------------------
-
 		if let Some(message) = &runtime.message {
 			lines.push(Line::from(""));
 			lines.push(Line::from(Span::styled(
@@ -1544,11 +1784,6 @@ mod ui {
 				]));
 			}
 		}
-
-		// ------------------------------------------------------------
-		// Progression / history
-		// ------------------------------------------------------------
-
 		if !runtime.activity.is_empty() {
 			lines.push(Line::from(""));
 			lines.push(Line::from(Span::styled(
@@ -1565,7 +1800,6 @@ mod ui {
 				]));
 			}
 		}
-
 		frame.render_widget(
 			Paragraph::new(lines).wrap(Wrap { trim: true }).block(
 				Block::default()
@@ -1929,7 +2163,7 @@ impl Attempt {
 		}
 	}
 }
-pub struct EvaluationContext {
+struct EvaluationContext {
 	pub stage: Stage,
 	pub intent: Option<String>,
 	pub spec: Option<String>,
@@ -1955,7 +2189,6 @@ impl EvaluationContext {
 				.plan
 				.as_deref()
 				.ok_or_else(|| anyhow::anyhow!("plan artifact not loaded")),
-
 			SessionFile::Tests => self
 				.tests
 				.as_deref()
@@ -2166,14 +2399,12 @@ impl Evaluator {
 			evaluations,
 		))
 	}
-
 	async fn evaluate(
 		&self,
 		session: &SdlcSession,
 		execution: &StageExecution,
 	) -> Result<StageEvaluation> {
 		let ctx = EvaluationContext::load(session, execution.stage)?;
-
 		let evaluation = match execution.stage {
 			Stage::Intent => self.evaluate_intent(&ctx).await,
 			Stage::Spec => self.evaluate_spec(&ctx).await,
@@ -2188,9 +2419,7 @@ impl Evaluator {
 	}
 	async fn evaluate_intent(&self, ctx: &EvaluationContext) -> Result<StageEvaluation> {
 		let started_at = Utc::now();
-
 		let intent = ctx.get(SessionFile::Intent)?;
-
 		let response = self
 			.jev
 			.system_one(
@@ -2220,15 +2449,12 @@ impl Evaluator {
 				],
 			)
 			.await?;
-
 		let quality = response
 			.score("quality")
 			.ok_or_else(|| anyhow::anyhow!("JEV returned no intent quality score"))?;
-
 		let meets_bar = response
 			.noul("meets_bar")
 			.ok_or_else(|| anyhow::anyhow!("JEV returned no intent decision"))?;
-
 		Ok(StageEvaluation::new(
 			Stage::Intent,
 			StageActor::Evaluator,
@@ -2256,15 +2482,12 @@ impl Evaluator {
 	}
 	async fn evaluate_spec(&self, ctx: &EvaluationContext) -> Result<StageEvaluation> {
 		let started_at = Utc::now();
-
 		let intent = ctx.get(SessionFile::Intent)?;
 		let spec = ctx.get(SessionFile::Spec)?;
-
 		let state = format!(
 			"## User Intent\n\n{intent}\n\n\
          ## Specification\n\n{spec}"
 		);
-
 		let response = self
 			.jev
 			.system_one(
@@ -2296,15 +2519,12 @@ impl Evaluator {
 				],
 			)
 			.await?;
-
 		let quality = response
 			.score("quality")
 			.ok_or_else(|| anyhow::anyhow!("JEV returned no spec quality score"))?;
-
 		let meets_bar = response
 			.noul("meets_bar")
 			.ok_or_else(|| anyhow::anyhow!("JEV returned no spec decision"))?;
-
 		Ok(StageEvaluation::new(
 			Stage::Spec,
 			StageActor::Sdlc,
@@ -2332,19 +2552,16 @@ impl Evaluator {
 	}
 	async fn evaluate_plan(&self, ctx: &EvaluationContext) -> Result<StageEvaluation> {
 		let started_at = Utc::now();
-
 		let intent = ctx.get(SessionFile::Intent)?;
 		let spec = ctx.get(SessionFile::Spec)?;
 		let plan = ctx.get(SessionFile::Plan)?;
 		let tests = ctx.get(SessionFile::Tests)?;
-
 		let state = format!(
 			"## User Intent\n\n{intent}\n\n\
          ## Specification\n\n{spec}\n\n\
          ## Implementation Plan\n\n{plan}\n\n\
          ## Test Plan\n\n{tests}"
 		);
-
 		let response = self
 			.jev
 			.system_one(
@@ -2376,15 +2593,12 @@ impl Evaluator {
 				],
 			)
 			.await?;
-
 		let quality = response
 			.score("quality")
 			.ok_or_else(|| anyhow::anyhow!("JEV returned no plan quality score"))?;
-
 		let meets_bar = response
 			.noul("meets_bar")
 			.ok_or_else(|| anyhow::anyhow!("JEV returned no plan decision"))?;
-
 		Ok(StageEvaluation::new(
 			Stage::Plan,
 			StageActor::Agent,
@@ -2412,7 +2626,6 @@ impl Evaluator {
 	}
 	async fn evaluate_build(&self, ctx: &EvaluationContext) -> Result<StageEvaluation> {
 		let started_at = Utc::now();
-
 		let intent = ctx.get(SessionFile::Intent)?;
 		let spec = ctx.get(SessionFile::Spec)?;
 		let plan = ctx.get(SessionFile::Plan)?;
@@ -2431,7 +2644,6 @@ impl Evaluator {
 			})
 			.collect::<Vec<_>>()
 			.join("\n");
-
 		let state = format!(
 			"## User Intent\n\n{intent}\n\n\
 			## Specification\n\n{spec}\n\n\
@@ -2439,7 +2651,6 @@ impl Evaluator {
 			## Test Plan\n\n{tests}\n\n\
 			## Repository Artifacts\n\n{implementation}"
 		);
-
 		let response = self
 			.jev
 			.system_one(
@@ -2473,18 +2684,15 @@ impl Evaluator {
 				],
 			)
 			.await?;
-
 		let quality = response
 			.score("quality")
 			.ok_or_else(|| anyhow::anyhow!("JEV returned no build quality score"))?;
-
 		let meets_bar = response
 			.noul("meets_bar")
 			.ok_or_else(|| anyhow::anyhow!("JEV returned no build decision"))?;
-
 		Ok(StageEvaluation::new(
 			Stage::Build,
-			StageActor::Agent,
+			StageActor::Sdlc,
 			started_at,
 			quality.score,
 			quality.confidence,
@@ -2509,22 +2717,18 @@ impl Evaluator {
 	}
 	async fn evaluate_verification(&self, ctx: &EvaluationContext) -> Result<StageEvaluation> {
 		let started_at = Utc::now();
-
 		let intent = ctx.get(SessionFile::Intent)?;
 		let spec = ctx.get(SessionFile::Spec)?;
 		let tests = ctx.get(SessionFile::Tests)?;
-
 		let evidence = ctx
 			.get(SessionFile::Verification)
 			.unwrap_or("No verification evidence was recorded.");
-
 		let state = format!(
 			"## User Intent\n\n{intent}\n\n\
 		 ## Specification\n\n{spec}\n\n\
 		 ## Test Plan\n\n{tests}\n\n\
 		 ## Verification Evidence\n\n{evidence}"
 		);
-
 		let response = self
 			.jev
 			.system_one(
@@ -2557,15 +2761,12 @@ impl Evaluator {
 				],
 			)
 			.await?;
-
 		let quality = response
 			.score("quality")
 			.ok_or_else(|| anyhow::anyhow!("JEV returned no verification quality score"))?;
-
 		let meets_bar = response
 			.noul("meets_bar")
 			.ok_or_else(|| anyhow::anyhow!("JEV returned no verification decision"))?;
-
 		Ok(StageEvaluation::new(
 			Stage::Verify,
 			StageActor::Sdlc,
@@ -2596,7 +2797,6 @@ impl SdlcSession {
 	pub fn new(title: impl Into<String>, dir: PathBuf) -> Result<Self> {
 		let now = Utc::now();
 		let goal = include_str!("../../../ai/template/user.goal.md").to_string();
-
 		Ok(Self {
 			workspace: dir.clone(),
 			goal,
@@ -2623,187 +2823,7 @@ impl SdlcSession {
 		&self.workspace
 	}
 }
-impl SdlcView {
-	pub fn new(runtime: &PipelineRuntime) -> Self {
-		Self {
-			input_active: false,
-			input: String::new(),
-			paused: false,
-			show_logs: false,
-			events: vec![],
-			runtime: runtime.view(),
-		}
-	}
-	pub fn begin_input(&mut self) {
-		self.input_active = true;
-		self.input.clear();
-	}
-	pub fn end_input(&mut self) {
-		self.input_active = false;
-		self.input.clear();
-	}
-	pub fn is_input_active(&self) -> bool {
-		self.input_active
-	}
-	pub fn toggle_pause(&mut self) {
-		self.paused = !self.paused;
-	}
-	pub fn toggle_logs(&mut self) {
-		self.show_logs = !self.show_logs;
-	}
-	pub fn handle_input_key(
-		&mut self,
-		key: KeyEvent,
-		input_tx: &UnboundedSender<SdlcInput>,
-	) -> anyhow::Result<()> {
-		match key.code {
-			KeyCode::Char(c) => {
-				self.input.push(c);
-			}
 
-			KeyCode::Backspace => {
-				self.input.pop();
-			}
-			KeyCode::Enter => {
-				let input = std::mem::take(&mut self.input);
-				input_tx.send(SdlcInput::Human(input))?;
-				self.input_active = false;
-			}
-
-			KeyCode::Esc => {
-				self.input_active = false;
-				self.input.clear();
-			}
-
-			_ => {}
-		}
-
-		Ok(())
-	}
-	pub fn render(frame: &mut Frame<'_>, view: &SdlcView) {
-		let area = frame.area();
-		frame.render_widget(Clear, area);
-		let chunks = RatatuiLayout::default()
-			.direction(Direction::Vertical)
-			.constraints([
-				Constraint::Length(2),
-				Constraint::Length(3),
-				Constraint::Min(8),
-				Constraint::Length(3),
-			])
-			.split(area);
-
-		ui::stepper(frame, view, chunks[1]);
-		let body = ui::body(chunks[2]);
-		ui::left_stage_panel(frame, view, body[0]);
-		ui::right_activity_panel(frame, view, body[2]);
-		ui::footer(frame, view, chunks[3]);
-	}
-	pub fn apply(&mut self, event: SdlcEvent) {
-		match event {
-			SdlcEvent::RunStarted => {
-				self.runtime.phase = SdlcPhase::Starting;
-				self.runtime.started_at = Instant::now();
-				self.runtime.stage_started_at = Instant::now();
-				self.runtime.message = Some(String::from("Run started"));
-			}
-
-			SdlcEvent::StageStarted { stage, attempt } => {
-				self.runtime.stage = stage;
-				self.runtime.attempt = attempt.number;
-				self.runtime.phase = SdlcPhase::Starting;
-				self.runtime.stage_started_at = Instant::now();
-				self.runtime.score = None;
-				self.runtime.confidence = None;
-				self.runtime.error = None;
-				self.runtime.message = Some(format!("{stage:?}"));
-			}
-
-			SdlcEvent::Activity {
-				stage,
-				attempt,
-				message,
-			} => {
-				self.runtime.stage = stage;
-				self.runtime.attempt = attempt.number;
-				self.runtime.message = Some(message);
-			}
-
-			SdlcEvent::PhaseChanged { phase } => {
-				self.runtime.phase = match phase {
-					SdlcPhase::Executing => SdlcPhase::Executing,
-					SdlcPhase::Evaluating => SdlcPhase::Evaluating,
-					SdlcPhase::Completed => SdlcPhase::Completed,
-
-					// Add the remaining mappings for your actual
-					// SdlcPhase variants.
-					_ => self.runtime.phase,
-				};
-
-				self.runtime.message = Some(format!("{phase:?}"));
-			}
-
-			SdlcEvent::ExecutionComplete { stage } => {
-				self.runtime.stage = stage;
-				self.runtime.phase = SdlcPhase::Evaluating;
-				self.runtime.message = Some(String::from("Execution complete"));
-			}
-
-			SdlcEvent::EvaluationStarted { stage } => {
-				self.runtime.stage = stage;
-				self.runtime.phase = SdlcPhase::Evaluating;
-				self.runtime.message = Some(String::from("Evaluating"));
-			}
-
-			SdlcEvent::Evaluated {
-				stage,
-				score,
-				confidence,
-				passed,
-			} => {
-				self.runtime.stage = stage;
-				self.runtime.score = Some(score);
-				self.runtime.confidence = Some(confidence);
-
-				self.runtime.message = Some(format!(
-					"Evaluation: {:.2} (confidence {:.2})",
-					score, confidence
-				));
-
-				if !passed {
-					self.runtime.phase = SdlcPhase::Failed;
-				}
-			}
-
-			SdlcEvent::StageTransitioned { from: _, to } => {
-				self.runtime.stage = to;
-				self.runtime.stage_started_at = Instant::now();
-				self.runtime.score = None;
-				self.runtime.confidence = None;
-				self.runtime.message = Some(format!("Starting {to:?}"));
-			}
-
-			SdlcEvent::Completed => {
-				self.runtime.phase = SdlcPhase::Completed;
-				self.runtime.message = Some(String::from("SDLC complete"));
-			}
-
-			SdlcEvent::Failed { stage, error } => {
-				if let Some(stage) = stage {
-					self.runtime.stage = stage;
-				}
-
-				self.runtime.phase = SdlcPhase::Failed;
-				self.runtime.message = Some(error.clone());
-				self.runtime.error = Some(error);
-			}
-
-			event => {
-				self.runtime.events.push(event);
-			}
-		}
-	}
-}
 impl SdlcInput {
 	pub fn text(&self) -> Option<&str> {
 		match self {
@@ -2812,55 +2832,7 @@ impl SdlcInput {
 		}
 	}
 }
-impl StageOutcome {
-	fn stage(&self) -> enums::Stage {
-		match self {
-			Self::Complete { execution, .. }
-			| Self::NeedsRevision { execution, .. }
-			| Self::EvaluationFailed { execution, .. } => execution.stage,
 
-			Self::ExecutionFailed { stage, .. } => *stage,
-		}
-	}
-	fn attempt(&self) -> Attempt {
-		match self {
-			Self::Complete { execution, .. }
-			| Self::NeedsRevision { execution, .. }
-			| Self::EvaluationFailed { execution, .. } => execution.attempt,
-
-			Self::ExecutionFailed { attempt, .. } => *attempt,
-		}
-	}
-}
-impl enums::Stage {
-	pub fn next(&self) -> Option<Self> {
-		match self {
-			Self::Intent => Some(Self::Spec),
-			Self::Spec => Some(Self::Plan),
-			Self::Plan => Some(Self::Build),
-			Self::Build => Some(Self::Verify),
-			Self::Verify => Some(Self::Complete),
-			Self::Deploy => Some(Self::Maintain),
-			Self::Maintain => Some(Self::Complete),
-			Self::Complete => None,
-			Self::SprintCompleted => None,
-		}
-	}
-	pub fn is_before(self, other: enums::Stage) -> bool {
-		let rank = |stage: enums::Stage| match stage {
-			Stage::Intent => 0,
-			Stage::Spec => 1,
-			Stage::Plan => 2,
-			Stage::Build => 3,
-			Stage::Verify => 4,
-			Stage::Deploy => 5,
-			Stage::Maintain => 6,
-			Stage::Complete => 7,
-			Stage::SprintCompleted => 8,
-		};
-		rank(self) < rank(other)
-	}
-}
 impl StageEvaluation {
 	fn new(
 		stage: Stage,
@@ -2889,26 +2861,24 @@ impl StageEvaluation {
 impl SprintPipeline {
 	pub async fn new() -> anyhow::Result<Self> {
 		dotenvy::dotenv().ok();
+		let state_path = SpecialFile::SdlcCurrent.path()?;
 		let session = match SpecialFile::SdlcCurrent
 			.load::<SdlcSession>()
 			.context("loading current SdlcSession")?
 		{
 			Some(session) => session,
 			None => {
-				let agent = Agent::new();
 				let intent = "Do the work required to build this CLI";
-				// let title = Self::summarize_title(&agent, intent).await?;
 				let title = Self::summarize_title(intent).await?;
-				let dir = Self::create_dir(&title)?;
+				let dir = Self::init_session_dir(&title)?;
 				Self::init_templates(&dir)?;
 				let session = SdlcSession::new(title, dir)?;
 				Self::session_save(&session)?;
 				session
 			}
 		};
-		let state_path = session.dir.join("sdlc.current.json");
 		if !state_path.exists() {
-			std::fs::write(&state_path, serde_json::to_string_pretty(&session)?)?;
+			Self::session_save(&session)?;
 		}
 		let evaluator = Evaluator {
 			session: session.clone(),
@@ -2931,12 +2901,12 @@ impl SprintPipeline {
 	pub async fn init(&mut self, intent: impl Into<String>) -> Result<()> {
 		let intent = intent.into();
 		let title = Self::summarize_title(&intent).await?;
-		let dir = Self::create_dir(&title)?;
+		let dir = Self::init_session_dir(&title)?;
 		Self::init_templates(&dir)?;
 		let session = SdlcSession::new(title, dir)?;
 		self.session = Some(session);
 		self.stage_attempt = 0;
-		self.commit()?;
+		self.persist_session()?;
 		Ok(())
 	}
 	pub fn subscribe(&self) -> broadcast::Receiver<SdlcEvent> {
@@ -2964,30 +2934,69 @@ impl SprintPipeline {
 		todo!("fail")
 	}
 	pub fn decide(&self, outcome: &StageOutcome) -> Result<StageDecision> {
+		println!(">>> DECIDE");
+		println!(">>> outcome = {outcome:#?}");
 		let decision = match outcome {
 			StageOutcome::Complete { execution, .. } => {
+				println!(
+					">>> Complete: stage={:?} attempt={}/{}",
+					execution.stage, execution.attempt.number, execution.attempt.max
+				);
+
 				if execution.stage == enums::Stage::Complete {
+					println!(">>> decision = Complete");
 					StageDecision::Complete
 				} else {
+					println!(">>> decision = Continue");
 					StageDecision::Continue
 				}
 			}
-			StageOutcome::NeedsRevision { .. } => StageDecision::Revise,
+
+			StageOutcome::NeedsRevision { .. } => {
+				println!(">>> NeedsRevision");
+				println!(">>> decision = Revise");
+				StageDecision::Revise
+			}
+
 			StageOutcome::ExecutionFailed { attempt, .. } => {
+				println!(
+					">>> ExecutionFailed: stage={:?} attempt={}/{}",
+					attempt.stage, attempt.number, attempt.max
+				);
+
 				if attempt.number < 3 {
+					println!(">>> attempt {} < 3 -> decision = Retry", attempt.number);
 					StageDecision::Retry
 				} else {
+					println!(
+						">>> attempt {} >= 3 -> decision = AwaitHuman",
+						attempt.number
+					);
 					StageDecision::AwaitHuman
 				}
 			}
 			StageOutcome::EvaluationFailed { execution, .. } => {
+				println!(
+					">>> EvaluationFailed: stage={:?} attempt={}/{}",
+					execution.stage, execution.attempt.number, execution.attempt.max
+				);
+
 				if execution.attempt.number < 3 {
+					println!(
+						">>> attempt {} < 3 -> decision = Retry",
+						execution.attempt.number
+					);
 					StageDecision::Retry
 				} else {
+					println!(
+						">>> attempt {} >= 3 -> decision = AwaitHuman",
+						execution.attempt.number
+					);
 					StageDecision::AwaitHuman
 				}
 			}
 		};
+		println!(">>> FINAL DECISION = {decision:?}");
 		Ok(decision)
 	}
 	async fn apply(
@@ -3090,11 +3099,8 @@ impl SprintPipeline {
 			}
 		}
 	}
-	fn next_attempt(&self, stage: Stage) -> Result<Attempt> {
-		let session = self
-			.session
-			.as_ref()
-			.ok_or_else(|| anyhow!("no active SDLC session"))?;
+	fn next_attempt(&mut self, stage: Stage) -> Result<Attempt> {
+		let session = self.session()?;
 		let max = 3;
 		let number = session
 			.stages
@@ -3105,26 +3111,12 @@ impl SprintPipeline {
 			.map_or(0, |number| number + 1);
 		Ok(Attempt { stage, number, max })
 	}
-	fn commit(&mut self) -> Result<()> {
-		let session = self
-			.session
-			.as_ref()
-			.ok_or_else(|| anyhow!("no active SDLC session"))?;
-		Self::session_save(session)
-	}
-	fn create_dir(title: &str) -> Result<PathBuf> {
+	fn init_session_dir(title: &str) -> Result<PathBuf> {
 		let sessions_dir = FS::ensure_dir(SpecialFile::SessionsDir.path()?)?;
 		let date = Local::now().format("%Y-%m-%d");
 		let dir = sessions_dir.join(format!("{date}.{title}"));
 		FS::ensure_dir(&dir)?;
 		Ok(dir)
-	}
-	fn dir(&self) -> Result<&Path> {
-		self
-			.session
-			.as_ref()
-			.map(|session| session.dir.as_path())
-			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))
 	}
 	fn init_templates(dir: &Path) -> Result<()> {
 		let template_dir = SpecialFile::AiTemplateDir.path()?;
@@ -3158,21 +3150,17 @@ impl SprintPipeline {
 			.evaluate(&self.session.as_ref().unwrap(), execution)
 			.await
 	}
-	fn persist(&self) -> Result<()> {
-		FS::save(&self.state_path, &self.session)
-	}
-	fn session_read(&self, name: &str) -> Result<String> {
-		let session = self
+	fn session(&mut self) -> Result<&mut SdlcSession> {
+		self
 			.session
-			.as_ref()
-			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
-		read_from_session(name, session)
+			.as_mut()
+			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))
 	}
-	fn session_record(&self) -> Result<()> {
-		let session = self
-			.session
-			.as_ref()
-			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
+	fn session_read(&mut self, name: &str) -> Result<String> {
+		read_from_session(name, self.session()?)
+	}
+	fn session_record(&mut self) -> Result<()> {
+		let session = self.session()?;
 		let index_path = SpecialFile::SessionsIndex.path()?;
 		let mut sessions: Vec<SdlcSession> = FS::load(&index_path)?.unwrap_or_default();
 		sessions.retain(|existing| existing.id != session.id);
@@ -3184,66 +3172,96 @@ impl SprintPipeline {
 		FS::save(SpecialFile::SdlcCurrent.path()?, session)?;
 		Ok(())
 	}
-	fn record_outcome(&mut self, outcome: &StageOutcome) -> Result<()> {
-		let session = self
-			.session
-			.as_mut()
-			.ok_or_else(|| anyhow!("no active SDLC session"))?;
-
-		let (stage, attempt, status, actor, started_at, completed_at, evaluation) = match outcome {
-			StageOutcome::Complete {
-				execution,
-				evaluation,
-			} => (
-				execution.stage,
-				execution.attempt,
-				StageStatus::Completed,
-				evaluation.actor.clone(),
-				execution.started_at,
-				execution.completed_at,
-				Some(evaluation.clone()),
-			),
-
-			StageOutcome::NeedsRevision {
-				execution,
-				evaluation,
-			} => (
-				execution.stage,
-				execution.attempt,
-				StageStatus::NeedsRevision,
-				evaluation.actor.clone(),
-				execution.started_at,
-				execution.completed_at,
-				Some(evaluation.clone()),
-			),
-
-			StageOutcome::ExecutionFailed {
+	fn persist(&self) -> Result<()> {
+		FS::save(&self.state_path, &self.session)
+	}
+	fn persist_evaluation(&mut self, evaluation: &StageEvaluation) -> Result<()> {
+		let session = self.session()?;
+		persist_evaluation(session, evaluation)?;
+		self.persist()
+	}
+	fn persist_intervention(&mut self, reason: impl Into<String>) -> Result<()> {
+		let now = Utc::now();
+		let reason = reason.into();
+		{
+			let session = self.session()?;
+			let stage = session.stage;
+			session.stages.push(StageRecord {
 				stage,
-				attempt,
-				error: _,
-			} => (
-				*stage,
-				*attempt,
-				StageStatus::Failed,
-				StageActor::Sdlc,
-				Utc::now(),
-				Utc::now(),
-				None,
-			),
+				attempt: Attempt {
+					stage,
+					number: 3,
+					max: 3,
+				},
+				status: StageStatus::InterventionNeeded,
+				actor: StageActor::Sdlc,
+				started_at: now,
+				completed_at: Some(now),
+				description: Some(reason),
+				evaluation: None,
+			});
+			session.updated_at = now;
+		}
+		self.persist()
+	}
+	fn persist_outcome(&mut self, outcome: &StageOutcome) -> Result<()> {
+		let session = self.session()?;
+		let (stage, attempt, status, actor, started_at, completed_at, description, evaluation) =
+			match outcome {
+				StageOutcome::Complete {
+					execution,
+					evaluation,
+				} => (
+					execution.stage,
+					execution.attempt,
+					StageStatus::Completed,
+					evaluation.actor.clone(),
+					execution.started_at,
+					execution.completed_at,
+					None,
+					Some(evaluation.clone()),
+				),
 
-			StageOutcome::EvaluationFailed {
-				execution,
-				error: _,
-			} => (
-				execution.stage,
-				execution.attempt,
-				StageStatus::EvaluationFailed,
-				StageActor::Sdlc,
-				execution.started_at,
-				execution.completed_at,
-				None,
-			),
-		};
+				StageOutcome::NeedsRevision {
+					execution,
+					evaluation,
+				} => (
+					execution.stage,
+					execution.attempt,
+					StageStatus::NeedsRevision,
+					evaluation.actor.clone(),
+					execution.started_at,
+					execution.completed_at,
+					None,
+					Some(evaluation.clone()),
+				),
+
+				StageOutcome::ExecutionFailed {
+					stage,
+					attempt,
+					error,
+				} => (
+					*stage,
+					*attempt,
+					StageStatus::Failed,
+					StageActor::Sdlc,
+					Utc::now(),
+					Utc::now(),
+					Some(error.to_string()),
+					None,
+				),
+
+				StageOutcome::EvaluationFailed { execution, error } => (
+					execution.stage,
+					execution.attempt,
+					StageStatus::EvaluationFailed,
+					StageActor::Sdlc,
+					execution.started_at,
+					execution.completed_at,
+					Some(error.to_string()),
+					None,
+				),
+			};
 
 		let record = StageRecord {
 			stage,
@@ -3252,24 +3270,17 @@ impl SprintPipeline {
 			actor,
 			started_at,
 			completed_at: Some(completed_at),
+			description,
 			evaluation,
 		};
-
 		session.stages.push(record);
 		session.updated_at = Utc::now();
+		self.persist()
+	}
 
-		self.persist()
-	}
-	fn record_stage_outcome(&mut self, outcome: &StageOutcome) -> Result<()> {
-		self.record_outcome(outcome)
-	}
-	fn evaluation_record(&mut self, evaluation: &StageEvaluation) -> Result<()> {
-		let session = self
-			.session
-			.as_mut()
-			.ok_or_else(|| anyhow!("no active SDLC session"))?;
-		evaluation_record(session, evaluation)?;
-		self.persist()
+	fn persist_session(&mut self) -> Result<()> {
+		let session = self.session()?;
+		Self::session_save(session)
 	}
 	async fn resume(&mut self) -> Result<()> {
 		if self.session.is_none() {
@@ -3334,11 +3345,7 @@ impl SprintPipeline {
 		Ok(results)
 	}
 	fn transition(&mut self, next: enums::Stage) -> Result<()> {
-		let session = self
-			.session
-			.as_mut()
-			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
-
+		let session = self.session()?;
 		let valid = matches!(
 			(&session.stage, &next),
 			(Stage::Intent, Stage::Spec)
@@ -3365,11 +3372,8 @@ impl SprintPipeline {
 
 		Ok(())
 	}
-	fn update_progress(&self, message: &str) -> Result<()> {
-		let session = self
-			.session
-			.as_ref()
-			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
+	fn update_progress(&mut self, message: &str) -> Result<()> {
+		let session = self.session()?;
 		let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S");
 		let entry = format!("\n## {timestamp}\n\n{message}\n");
 		SessionFile::Progress.append(&session.dir, entry)?;
@@ -3435,7 +3439,6 @@ impl PipelineRuntime {
 		_input_rx: &mut UnboundedReceiver<SdlcInput>,
 	) -> Result<()> {
 		self.pipeline.emit(SdlcEvent::RunStarted);
-
 		for (index, step) in Step::ALL.iter().enumerate() {
 			if *step == Step::Complete {
 				break;
@@ -3447,105 +3450,49 @@ impl PipelineRuntime {
 			self
 				.pipeline
 				.emit(SdlcEvent::StageStarted { stage, attempt });
-
 			self.pipeline.emit(SdlcEvent::Activity {
 				stage,
 				attempt,
 				message: format!("Dry Run · step {}/{}", index + 1, Step::ALL.len(),),
 			});
-
-			// ------------------------------------------------------------
-			// Execute
-			// ------------------------------------------------------------
-
 			self.pipeline.emit(SdlcEvent::PhaseChanged {
 				phase: SdlcPhase::Executing,
 			});
-
 			sleep(DEMO_EXECUTION_TIME).await;
-
 			self.pipeline.emit(SdlcEvent::ExecutionComplete { stage });
-
-			// ------------------------------------------------------------
-			// Evaluate
-			// ------------------------------------------------------------
-
 			self.pipeline.emit(SdlcEvent::PhaseChanged {
 				phase: SdlcPhase::Evaluating,
 			});
-
 			self.pipeline.emit(SdlcEvent::EvaluationStarted { stage });
-
 			sleep(DEMO_EVALUATION_TIME).await;
-
 			self.pipeline.emit(SdlcEvent::Evaluated {
 				stage,
 				score: 0.91,
 				confidence: 0.94,
 				passed: true,
 			});
-
-			// ------------------------------------------------------------
-			// Transition
-			// ------------------------------------------------------------
-
 			let Some(next) = stage.next() else {
 				break;
 			};
-
 			self.pipeline.transition(next)?;
-
 			log_step_transition(stage, next)?;
-
 			self.pipeline.emit(SdlcEvent::StageTransitioned {
 				from: stage,
 				to: next,
 			});
 		}
-
-		// ------------------------------------------------------------
-		// Complete
-		// ------------------------------------------------------------
-
 		self.pipeline.emit(SdlcEvent::PhaseChanged {
 			phase: SdlcPhase::Completed,
 		});
-
 		self.pipeline.emit(SdlcEvent::Completed);
-
 		sleep(DEMO_COMPLETE_DELAY).await;
-
 		Ok(())
 	}
-
 	fn retry(&mut self, _stage: enums::Stage) -> Result<()> {
 		Ok(())
 	}
 }
-impl Step {
-	pub fn stage(self) -> Option<Stage> {
-		match self {
-			Self::Intent => Some(Stage::Intent),
-			Self::Spec => Some(Stage::Spec),
-			Self::Plan => Some(Stage::Plan),
-			Self::Build => Some(Stage::Build),
-			Self::Verify => Some(Stage::Verify),
-			Self::Boot | Self::Init | Self::Deploy | Self::Maintain | Self::Complete => None,
-		}
-	}
-	pub const ALL: &'static [Self] = &[
-		Self::Boot,
-		Self::Init,
-		Self::Intent,
-		Self::Spec,
-		Self::Plan,
-		Self::Build,
-		Self::Verify,
-		Self::Deploy,
-		Self::Maintain,
-		Self::Complete,
-	];
-}
+
 #[async_trait::async_trait]
 impl traits::Runner for SprintRunner<'_> {
 	type Context = UnboundedReceiver<SdlcInput>;
@@ -3571,8 +3518,7 @@ impl traits::Runner for SprintRunner<'_> {
 				.await
 				.with_context(|| format!("run_stage({stage:?})"))?;
 
-			self.persist_outcome(&outcome)?;
-
+			self.pipeline.persist_outcome(&outcome)?;
 			let decision = self.decide(&outcome).await?;
 
 			match decision {
@@ -3624,30 +3570,37 @@ impl SprintRunner<'_> {
 			.session
 			.as_ref()
 			.ok_or_else(|| anyhow::anyhow!("no SDLC session loaded"))?;
-
-		let path = session.dir.join("sdlc.current.json");
-
+		let path = SpecialFile::SdlcCurrent.path()?;
 		println!(">>> load_state path = {:?}", path);
 		println!(">>> exists = {}", path.exists());
-
 		let json = std::fs::read_to_string(&path).with_context(|| format!("reading {:?}", path))?;
-
 		println!(">>> loaded state = {}", json);
-
 		#[derive(serde::Deserialize)]
 		struct PersistedStage {
 			stage: enums::Stage,
 		}
-
 		let state: PersistedStage = serde_json::from_str(&json)?;
-
 		Ok(state.stage)
 	}
-	fn persist_outcome(&mut self, _outcome: &StageOutcome) -> Result<()> {
-		// TODO: persist outcome.
-		Ok(())
+
+	fn begin_attempt(&mut self, stage: Stage) -> Result<Attempt> {
+		self.pipeline.next_attempt(stage)
 	}
-	async fn evaluate_stage_execution(&mut self, execution: StageExecution) -> Result<StageOutcome> {
+	async fn evaluate(&self, execution: &StageExecution) -> Result<StageEvaluation> {
+		let stage = execution.stage;
+		let checks = self.pipeline.run_checks(stage).await?;
+		let structural = self.evaluate_checks(checks)?;
+		let semantic = self
+			.pipeline
+			.evaluator
+			.evaluate(&self.pipeline.session.as_ref().unwrap(), &execution)
+			.await?;
+		Ok(semantic.with_evaluations(structural))
+	}
+	fn evaluate_checks(&self, checks: Vec<CheckResult>) -> Result<Vec<CheckResult>> {
+		todo!("evaluate_checks")
+	}
+	async fn evaluate_execution(&mut self, execution: StageExecution) -> Result<StageOutcome> {
 		let stage = execution.stage;
 		self.emit(SdlcEvent::PhaseChanged {
 			phase: SdlcPhase::Evaluating,
@@ -3661,7 +3614,7 @@ impl SprintRunner<'_> {
 					confidence: evaluation.confidence,
 					passed: evaluation.passed,
 				});
-				self.pipeline.evaluation_record(&evaluation);
+				self.pipeline.persist_evaluation(&evaluation);
 				Ok(StageOutcome::Complete {
 					execution,
 					evaluation,
@@ -3669,53 +3622,6 @@ impl SprintRunner<'_> {
 			}
 			Err(error) => Ok(StageOutcome::EvaluationFailed { execution, error }),
 		}
-	}
-	fn begin_attempt(&mut self, stage: Stage) -> Result<Attempt> {
-		self.pipeline.next_attempt(stage)
-	}
-	fn evaluate_checks(&self, checks: Vec<CheckResult>) -> Result<Vec<CheckResult>> {
-		todo!("evaluate_checks")
-	}
-	async fn evaluate(&self, execution: &StageExecution) -> Result<StageEvaluation> {
-		let stage = execution.stage;
-		let checks = self.pipeline.run_checks(stage).await?;
-		let structural = self.evaluate_checks(checks)?;
-		let semantic = self
-			.pipeline
-			.evaluator
-			.evaluate(&self.pipeline.session.as_ref().unwrap(), &execution)
-			.await?;
-		Ok(semantic.with_evaluations(structural))
-	}
-	async fn stage_execute(
-		&mut self,
-		stage: enums::Stage,
-		attempt: Attempt,
-		pending_input: &mut Option<SdlcInput>,
-	) -> Result<StageExecution> {
-		let started_at = Utc::now();
-
-		let result = match stage {
-			Stage::Intent => self.stage_intent().await?,
-			Stage::Spec => self.stage_spec().await?,
-			Stage::Plan => self.stage_plan().await?,
-			Stage::Build => self.stage_build().await?,
-			Stage::Verify => self.stage_verify().await?,
-			Stage::Complete => StageResult::Complete,
-			Stage::SprintCompleted => StageResult::SprintCompleted,
-
-			Stage::Deploy | Stage::Maintain => {
-				return Err(anyhow!("stage {stage:?} not implemented"));
-			}
-		};
-
-		Ok(StageExecution {
-			stage,
-			attempt,
-			started_at,
-			completed_at: Utc::now(),
-			result,
-		})
 	}
 	async fn stage_intent(&mut self) -> Result<StageResult> {
 		let (stage, session_dir, goal) = {
@@ -3903,7 +3809,7 @@ impl SprintRunner<'_> {
 		self.emit(SdlcEvent::PhaseChanged {
 			phase: SdlcPhase::Executing,
 		});
-		let execution = match self.stage_execute(stage, attempt, pending_input).await {
+		let execution = match self.run_current_stage(stage, attempt, pending_input).await {
 			Ok(execution) => {
 				self.emit(SdlcEvent::ExecutionComplete { stage });
 				execution
@@ -3922,7 +3828,35 @@ impl SprintRunner<'_> {
 			phase: SdlcPhase::Evaluating,
 		});
 
-		self.evaluate_stage_execution(execution).await
+		self.evaluate_execution(execution).await
+	}
+	async fn run_current_stage(
+		&mut self,
+		stage: enums::Stage,
+		attempt: Attempt,
+		pending_input: &mut Option<SdlcInput>,
+	) -> Result<StageExecution> {
+		let started_at = Utc::now();
+		let result = match stage {
+			Stage::Intent => self.stage_intent().await?,
+			Stage::Spec => self.stage_spec().await?,
+			Stage::Plan => self.stage_plan().await?,
+			Stage::Build => self.stage_build().await?,
+			Stage::Verify => self.stage_verify().await?,
+			Stage::Complete => StageResult::Complete,
+			Stage::SprintCompleted => StageResult::SprintCompleted,
+
+			Stage::Deploy | Stage::Maintain => {
+				return Err(anyhow!("stage {stage:?} not implemented"));
+			}
+		};
+		Ok(StageExecution {
+			stage,
+			attempt,
+			started_at,
+			completed_at: Utc::now(),
+			result,
+		})
 	}
 	async fn verify_stage(&mut self, stage: Stage) -> Result<Verification> {
 		let checks = self.pipeline.run_checks(stage).await?;
@@ -4504,7 +4438,7 @@ impl WorkspaceSnapshot {
 		}
 	}
 }
-fn evaluation_record(session: &mut SdlcSession, evaluation: &StageEvaluation) -> Result<()> {
+fn persist_evaluation(session: &mut SdlcSession, evaluation: &StageEvaluation) -> Result<()> {
 	let status = if evaluation.passed {
 		StageStatus::Completed
 	} else {
@@ -4512,6 +4446,7 @@ fn evaluation_record(session: &mut SdlcSession, evaluation: &StageEvaluation) ->
 	};
 
 	let record = StageRecord {
+		description: Some(String::from("Evaluation done")),
 		actor: evaluation.actor.clone(),
 		attempt: Attempt::new(),
 		completed_at: Some(Utc::now()),

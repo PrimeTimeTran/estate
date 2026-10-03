@@ -22,11 +22,9 @@ pub enum SpecialFile {
 	AiTemplateDir,
 	EstateManifest,
 	HostContext,
-	LogDir,
 	SdlcCurrent,
 	SessionsDir,
 	SessionsIndex,
-	TmpDir,
 }
 impl FS {
 	pub fn load<T>(path: impl AsRef<Path>) -> Result<Option<T>>
@@ -198,10 +196,8 @@ impl SpecialFile {
 
 		Ok(match self {
 			Self::AiTemplateDir => root.join("ai/template"),
-			Self::LogDir => root.join("log"),
-			Self::TmpDir => root.join("crates/estate/log/tmp"),
 			Self::SdlcCurrent => root.join("crates/estate/log/sdlc.current.json"),
-			Self::SessionsDir => root.join("crates/estate/log/session"),
+			Self::SessionsDir => root.join("crates/estate/log"),
 			Self::SessionsIndex => root.join("crates/estate/log/sdlc.session.index.json"),
 			Self::EstateManifest => root.join("estate.toml"),
 			Self::HostContext => crate_root().join("host.env.context.json"),
