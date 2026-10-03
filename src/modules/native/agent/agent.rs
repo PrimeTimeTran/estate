@@ -13,7 +13,7 @@ use super::{
 #[derive(Debug)]
 pub enum AgentMode {
 	Chat,
-	Tool,
+	Tool, 
 }
 #[derive(PartialEq, Clone)]
 pub enum AgentStatus {
@@ -374,30 +374,7 @@ pub struct AgentBus {
 	pub tx: UnboundedSender<AgentEvent>,
 	pub event_tx: UnboundedSender<RuntimeEvent>,
 }
-// #[derive(Debug)]
-// pub struct AgentContext {
-// pub prompt: String,
-//
-// // ───── SDLC input ─────
-// pub task: AgentTask,
-//
-// pub intent: PathBuf,
-// pub spec: PathBuf,
-// pub plan: PathBuf,
-// pub tests: PathBuf,
-// pub progress: PathBuf,
-//
-// // ───── Agent execution state ─────
-// pub workspace: WorkspaceContext,
-// pub history: Vec<AgentObservation>,
-//
-// pub artifacts: Vec<Artifact>,
-// pub logs: Vec<String>,
-// pub spawned_tasks: Vec<AgentTask>,
-//
-// // ───── Verification feedback ─────
-// pub verification: Option<Verification>,
-// }
+
 #[derive(Debug)]
 pub struct AgentContext {
 	pub prompt: String,
