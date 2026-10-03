@@ -2950,8 +2950,11 @@ impl SprintPipeline {
 	pub fn stage(&self) -> Option<Stage> {
 		self.session.as_ref().map(|session| session.stage)
 	}
-	pub fn is_complete(&mut self) -> Result<()> {
+	pub fn complete(&mut self) -> Result<()> {
 		self.transition(enums::Stage::Complete)
+	}
+	pub fn is_complete(&self) -> bool {
+		self.stage() == Some(enums::Stage::Complete)
 	}
 	fn stage_attempt(&self) -> u32 {
 		self.stage_attempt
@@ -3019,7 +3022,7 @@ impl SprintPipeline {
 				Ok(RunControl::Continue)
 			}
 			StageDecision::Complete => {
-				self.is_complete()?;
+				self.complete()?;
 				Ok(RunControl::Exit)
 			}
 			StageDecision::Fail => {
