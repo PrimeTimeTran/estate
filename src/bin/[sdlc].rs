@@ -13,19 +13,22 @@ use std::io::IsTerminal;
 // cargo -q run --bin sdlc --features sdlc
 #[tokio::main]
 pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
-	let mut sdlc = SprintPipeline::new().await.context("loading SDLC")?;
-	if sdlc.stage().is_none() {
-		sdlc.init("Do the work required to build this CLI").await?;
+	let mut pipeline = SprintPipeline::new().await.context("loading SDLC")?;
+	if pipeline.stage().is_none() {
+		pipeline
+			.init("Do the work required to build this CLI")
+			.await?;
 	}
-	let mut events = sdlc.subscribe();
-	let mut view = SdlcView::new(sdlc.stage().unwrap_or(Stage::Intent));
+	let mut runtime = PipelineRuntime::new(pipeline);
+	let mut events = runtime.pipeline.subscribe();
+	let mut view = SdlcView::new(&runtime);
 	let (input_tx, mut input_rx) = tokio::sync::mpsc::unbounded_channel::<SdlcInput>();
 	let is_real_run = std::env::var_os("DRY_RUN").is_none();
 	let run = async {
 		if is_real_run {
-			sdlc.run(&mut input_rx).await
+			runtime.run(&mut input_rx).await
 		} else {
-			sdlc.run_simulated(&mut input_rx).await
+			runtime.run_simulated(&mut input_rx).await
 		}
 	};
 	tokio::pin!(run);

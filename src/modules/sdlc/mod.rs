@@ -24,14 +24,27 @@ pub use ratatui::{
 };
 use std::{io::Stdout, process::Command};
 use tokio::time::{Duration, sleep};
-
+use tracing::debug;
 // cmd+alt+f
 // - Search in all files overlay
 // cmd+shift+f
 // - Search in all files tab
 // cmd+f
 // - Search in file
+fn git_status() -> Result<String> {
+	let output = std::process::Command::new("git")
+		.args(["status", "--short"])
+		.output()?;
 
+	if !output.status.success() {
+		return Err(anyhow::anyhow!(
+			"git status failed: {}",
+			String::from_utf8_lossy(&output.stderr)
+		));
+	}
+
+	Ok(String::from_utf8(output.stdout)?)
+}
 fn format_elapsed(duration: Duration) -> String {
 	let total_seconds = duration.as_secs();
 	let hours = total_seconds / 3600;
@@ -44,29 +57,6 @@ fn format_elapsed(duration: Duration) -> String {
 		format!("{minutes}m {seconds}s")
 	} else {
 		format!("{seconds}s")
-	}
-}
-async fn monitor<F, T>(
-	stage: Stage,
-	attempt: u32,
-	run_started: Instant,
-	phase: &'static str,
-	future: F,
-) -> T
-where
-	F: Future<Output = T>,
-{
-	let started = Instant::now();
-	tokio::pin!(future);
-	let mut ticker = tokio::time::interval(STATUS_INTERVAL);
-	loop {
-		tokio::select! {
-			result = &mut future => {
-				return result;
-			}
-			_ = ticker.tick() => {
-			}
-		}
 	}
 }
 fn slugify(input: &str) -> String {
@@ -103,6 +93,1117 @@ fn log_step_transition(from: Stage, to: Stage) -> Result<()> {
 	writeln!(file, "{:?} -> {:?}", from, to)?;
 
 	Ok(())
+}
+async fn monitor<F, T>(
+	stage: Stage,
+	attempt: u32,
+	run_started: Instant,
+	phase: &'static str,
+	future: F,
+) -> T
+where
+	F: Future<Output = T>,
+{
+	let started = Instant::now();
+	tokio::pin!(future);
+	let mut ticker = tokio::time::interval(STATUS_INTERVAL);
+	loop {
+		tokio::select! {
+			result = &mut future => {
+				return result;
+			}
+			_ = ticker.tick() => {
+			}
+		}
+	}
+}
+
+mod constants {
+	const TODO: &'static str = r#"
+		- Question prompt
+		- Add progressive disclosure
+	"#;
+	use super::*;
+	pub const DEMO_COMPLETE_DELAY: Duration = Duration::from_secs(1);
+	pub const DEMO_EVALUATION_TIME: Duration = Duration::from_secs(1);
+	pub const DEMO_EXECUTION_TIME: Duration = Duration::from_secs(1);
+	pub const DEMO_RETRY_DELAY: Duration = Duration::from_secs(1);
+	pub const FMT_HUMAN_READABLE: &'static str = "%B %-d, %Y at %-I:%M:%S %p UTC";
+	pub const MAX_STAGE_ATTEMPTS: u32 = 1;
+	pub const STATUS_INTERVAL: Duration = Duration::from_secs(30);
+}
+pub use constants::*;
+
+mod enums {
+	use super::structs::*;
+	use super::*;
+	#[derive(Debug)]
+	pub enum ExecutionResult {
+		Completed(TaskResult),
+		Failed(StageError),
+	}
+	#[derive(Debug)]
+	pub enum StageOutcome {
+		Complete {
+			execution: StageExecution,
+			evaluation: StageEvaluation,
+		},
+		NeedsRevision {
+			execution: StageExecution,
+			evaluation: StageEvaluation,
+		},
+		ExecutionFailed {
+			stage: enums::Stage,
+			attempt: Attempt,
+			error: anyhow::Error,
+		},
+
+		EvaluationFailed {
+			execution: StageExecution,
+			error: anyhow::Error,
+		},
+	}
+	#[derive(Debug, Clone)]
+	pub enum Intervention {
+		Human(String),
+		Retry,
+		ProvideContext(String),
+		Reviewed,
+		Abort,
+		Revise,
+	}
+	#[derive(Debug, Clone, Copy)]
+	pub enum GenerationProvider {
+		Local,
+		Api,
+	}
+	#[derive(Debug, Clone)]
+	pub enum SdlcEvent {
+		Activity {
+			stage: Stage,
+			attempt: Attempt,
+			message: String,
+		},
+		Completed,
+		Failed {
+			stage: Option<Stage>,
+			error: String,
+		},
+		InterventionRequired {
+			stage: Stage,
+			attempt: Attempt,
+			reason: String,
+		},
+		InterventionResolved {
+			stage: Stage,
+			action: String,
+		},
+		Evaluated {
+			stage: Stage,
+			score: f64,
+			confidence: f64,
+			passed: bool,
+		},
+		EvaluationStarted {
+			stage: Stage,
+		},
+		EvaluationFailed {
+			stage: Stage,
+			error: String,
+		},
+		ExecutionComplete {
+			stage: Stage,
+		},
+		ExecutionFailed {
+			stage: Stage,
+			attempt: Attempt,
+			error: String,
+		},
+		Exited {
+			reason: String,
+		},
+		PhaseChanged {
+			phase: SdlcPhase,
+		},
+		RunStarted,
+		StageRetrying {
+			stage: Stage,
+			number: u32,
+		},
+		StageStarted {
+			stage: Stage,
+			attempt: Attempt,
+		},
+		StageTransitioned {
+			from: Stage,
+			to: Stage,
+		},
+		HumanInput {
+			stage: Stage,
+			input: String,
+		},
+	}
+	#[derive(Debug)]
+	pub enum SdlcInput {
+		Abort,
+		ProvideContext(String),
+		Retry,
+		Reviewed,
+		Human(String),
+	}
+	#[derive(Debug, Clone, Copy, PartialEq)]
+	pub enum SdlcPhase {
+		Starting,
+		Executing,
+		Evaluating,
+		Retrying,
+		AwaitingHuman,
+		Completed,
+		Failed,
+	}
+
+	#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+	pub enum Step {
+		Boot,
+		Init,
+		Intent,
+		Spec,
+		Plan,
+		Build,
+		Verify,
+		Deploy,
+		Maintain,
+		Complete,
+	}
+
+	#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+	pub enum Stage {
+		Intent,
+		Spec,
+		Plan,
+		Build,
+		Verify,
+		Deploy,
+		Maintain,
+		Complete,
+		SprintCompleted,
+	}
+	impl std::fmt::Display for Stage {
+		fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+			let name = match self {
+				Self::Intent => "Intent",
+				Self::Spec => "Spec",
+				Self::Plan => "Plan",
+				Self::Build => "Build",
+				Self::Verify => "Verify",
+				Self::Deploy => "Deploy",
+				Self::Maintain => "Maintain",
+				Self::Complete => "Complete",
+				Self::SprintCompleted => "Sprint Completed",
+			};
+
+			f.write_str(name)
+		}
+	}
+	#[derive(Debug, Clone, Copy)]
+	pub enum StageAction {
+		Continue,
+		Retry,
+		Intervene,
+		Abort,
+	}
+	#[derive(Debug, Clone, Serialize, Deserialize)]
+	pub enum StageActor {
+		Human,
+		Sdlc,
+		Evaluator,
+		Agent,
+		System,
+	}
+	#[derive(Debug)]
+	pub enum StageDecision {
+		Continue,
+		Retry,
+		Revise,
+		AwaitHuman,
+		Fail,
+		Complete,
+	}
+	pub enum StageOutcomeEvaluation {
+		Passed(Evaluation),
+		FailedQuality(Evaluation),
+		FailedRuntime(Error),
+	}
+	#[derive(Debug, Clone, Serialize, Deserialize)]
+	pub enum StageStatus {
+		Running,
+		Completed,
+		Failed,
+		NeedsRevision,
+		EvaluationFailed,
+	}
+	pub enum InputMode {
+		Normal,
+		Human { buffer: String },
+		AwaitingHuman { prompt: String },
+	}
+	#[derive(Debug)]
+	pub enum RunControl {
+		Continue,
+		Exit,
+	}
+
+	pub enum RunState {
+		Idle,
+		Running,
+		Paused,
+		AwaitingInput,
+		Completed,
+		Failed,
+		Cancelled,
+	}
+	pub enum RunResult {
+		Completed,
+		Failed,
+		Cancelled,
+	}
+	pub type PipelineId = uuid::Uuid;
+	pub struct PipelineState<S> {
+		stage: S,
+		attempt: u32,
+		status: PipelineStatus,
+	}
+	pub struct PipelineStatus;
+	#[derive(Debug, Clone, Serialize, Deserialize)]
+	pub enum StageResult {
+		Intent,
+		Spec,
+		Plan,
+		Build,
+		Verification(Verification),
+		Complete,
+		SprintCompleted,
+	}
+	pub enum StageTransition {
+		Next,
+		Repeat,
+		Goto(Stage),
+		Complete,
+		Fail,
+		AwaitHuman,
+	}
+}
+use enums as e;
+pub use enums::*;
+pub use prompt as agent_prompts;
+use prompt::*;
+pub mod prompt {
+	use super::*;
+	pub fn initial_prompt() -> Result<String> {
+		Ok(String::from(
+			"I need to build a CLI tool. I want to use NodeJS.
+			Create a file named hello-world.js in the repository root from where I ran this command.
+			This file will be the CLI entrypoint. The CLI tool should accept an
+			argument and write that value to hello-world.md.
+			The user should be able to run node hello-world.js \"hi\".
+
+			- Add tests covering both the JavaScript logic and the CLI behavior.",
+		))
+	}
+	const INTENT_PROMPT: &str = include_str!("../../../ai/template/INITIAL_PROMPT.md");
+	const PROMPT_FROM_USER: &str = include_str!("../../../ai/template/user.goal.md");
+
+	pub fn for_intent(user_request: &str) -> String {
+		INTENT_PROMPT.replace("{{PROMPT_FROM_USER}}", user_request)
+	}
+	pub fn gen_intent(goal: &str) -> Result<String> {
+		Ok(format!(
+			r#"
+				You are defining the intent for an SDLC task.
+				The user's goal is authoritative.
+
+				## User Goal
+				{goal}
+
+				## Instructions
+				Create `intent.md`.
+				Describe what the user is trying to accomplish and why.
+
+				The intent should:
+				- preserve the user's actual goal without changing its meaning
+				- describe the desired outcome
+				- establish the problem or need being addressed
+				- identify the important constraints explicitly stated by the user
+				- avoid inventing requirements that the user did not state
+				- remain implementation-independent where possible
+
+				Do not write the specification, implementation plan, or tests yet.
+
+				Use this format:
+
+				# Intent <one sentence title summary for the goal>
+
+				## Goal
+
+				<what the user wants to accomplish>
+
+				## Why
+
+				<why this work is needed>
+
+				## Constraints
+
+				- <constraint>
+
+				## Outcome
+
+				<what successful completion should accomplish>
+
+				Return only the contents of `intent.md`.
+				"#,
+		))
+	}
+	pub fn gen_spec(intent: &str) -> Result<String> {
+		if intent.trim().is_empty() {
+			return Err(anyhow!("cannot generate Spec prompt from empty Intent"));
+		}
+
+		Ok(format!(
+			r#"
+       	You are the Specification stage of an SDLC pipeline.
+
+       	Your job is to transform the approved Intent artifact below into a concrete,
+       	implementation-independent Specification.
+
+       	You are NOT implementing the feature.
+       	You are NOT writing source code.
+       	You are NOT creating a plan.
+       	You are NOT merely summarizing the Intent.
+
+       	You are defining WHAT must be built, the boundaries of the work, the
+       	constraints that apply, the expected system behavior, and the important
+       	architectural concerns that must be resolved before implementation.
+
+       	The resulting document will be written directly to:
+          spec.md
+
+       	Therefore, your entire response MUST be the specification document itself.
+       	Do not include commentary before or after the specification.
+       	Do not wrap the document in a Markdown code fence.
+
+       	The Specification MUST use exactly this structure:
+
+       	# Specification: [Feature or Project Name]
+
+       	## 1. Overview & Inherited Intent
+
+       	- **Source Intent:** intent.md
+       	- **Core Objective:** [Brief summary of what this specification builds,
+          explicitly inheriting the approved outcome from the Intent]
+
+       	## 2. Requirements & Functional Scope
+
+       	- **In-Scope:**
+          - [Core capability 1]
+          - [Core capability 2]
+
+       	- **Out-of-Scope:**
+          - [Explicit boundary / what is deferred]
+
+       	Requirements must describe observable or verifiable behavior where possible.
+       	Do not invent requirements that contradict the Intent.
+       	If the Intent leaves something unspecified, identify that uncertainty rather
+       	than silently inventing a product decision.
+
+       	## 3. Policy & Governance Constraints (Applied Skills)
+
+       	- **Brand & UX Guidelines:** [Applicable constraints, or "None identified"]
+       	- **Security & Compliance:** [Applicable data handling, access control,
+          privacy, security, and boundary constraints, or "None identified"]
+
+       	Do not invent organizational policies.
+       	Only state constraints supported by the Intent, existing project context,
+       	or explicitly applicable system/project rules.
+
+       	## 4. Proposed Design & Architecture
+
+       	- **System Impact:** [Affected components, modules, services, files,
+          persistence, APIs, integrations, or runtime boundaries]
+
+       	- **User Experience Flow:** [Expected user-visible behavior and interaction
+          flow, if applicable]
+
+       	Describe the proposed system behavior and architecture at the level needed
+       	for implementation to begin later.
+
+       	Do NOT write implementation code.
+       	Do NOT turn this section into an implementation plan.
+       	Do NOT prescribe arbitrary technologies unless required by the existing
+       	project context or the Intent.
+
+       	## 5. Flagged Areas of Concern & Conflicts
+
+       	- [Potential technical, UX, security, compatibility, performance, or
+          architectural concern]
+       	- [Unresolved contradiction or product decision requiring human input]
+
+       	If no concerns or conflicts are identified, explicitly state:
+
+       	- None identified.
+
+       	CRITICAL RULES:
+
+       	1. The Intent is the source of truth for the desired outcome.
+       	2. Preserve the Intent's objective when converting it into requirements.
+       	3. Separate requirements from implementation details.
+       	4. Explicitly define both scope and boundaries.
+       	5. Surface ambiguity instead of inventing decisions.
+       	6. Surface conflicts instead of resolving product-policy conflicts yourself.
+       	7. The Specification must be useful to a later Plan/Build stage.
+       	8. The output must be a complete Markdown specification.
+       	9. Do not discuss this prompt or your role.
+       	10. Do not output anything except the completed specification.
+
+       	Here is the approved Intent:
+
+       	---
+
+       	{intent}
+
+       	---
+
+       	Now produce the complete Specification.
+     	"#,
+		))
+	}
+
+	pub fn gen_plan(intent: &str, spec: &str) -> Result<String> {
+		if intent.trim().is_empty() {
+			return Err(anyhow!("cannot generate Plan prompt from empty Intent"));
+		}
+		if spec.trim().is_empty() {
+			return Err(anyhow!("cannot generate Plan prompt from empty Spec"));
+		}
+		Ok(format!(
+			r#"
+       	You are the Plan stage of an SDLC pipeline.
+
+       	Your job is to transform the approved Intent and Specification into a
+       	concrete, repository-aware Implementation Plan.
+
+       	You are NOT implementing the feature.
+       	You are NOT writing source code.
+       	You are NOT changing files.
+       	You are NOT merely summarizing the Specification.
+
+       	You are determining HOW the approved Specification should be implemented.
+
+       	The resulting document will be written directly to:
+
+            plan.md
+
+       	Therefore, your entire response MUST be the implementation plan itself.
+       	Do not include commentary before or after the plan.
+       	Do not wrap the document in a Markdown code fence.
+
+       	# REQUIRED OUTPUT STRUCTURE
+
+       	Your response MUST follow this structure:
+
+       	# Implementation Plan: [One-Sentence Strategy Summary]
+
+       	The title MUST be a single sentence summarizing the primary
+       	implementation strategy or technique that this plan will use.
+
+       	The title should describe HOW the work will be accomplished, not merely
+       	repeat the feature name.
+
+       	For example:
+
+       	# Implementation Plan: Introduce a normalized event pipeline that separates raw HID observation from semantic action dispatch.
+
+       	Do not use generic titles such as:
+
+       	- Implementation Plan: Keyboard Support
+       	- Implementation Plan: New Feature
+       	- Implementation Plan: Fix Bug
+
+       	The title should communicate the central technical strategy.
+
+       	## Overview
+
+       	Briefly describe what this plan accomplishes and how it directly implements
+       	the approved Specification.
+
+       	The Overview must establish the relationship:
+
+            Intent → Specification → Implementation Plan
+
+       	Do not introduce functionality that is absent from the Specification.
+
+       	## Context & References
+
+       	- **Intent Reference**: `intent.md`
+       	- **Specification Reference**: `spec.md`
+       	- **Target Repository State**: [Current branch / relevant baseline]
+
+       	Use the actual repository context available to you when known.
+
+       	## Proposed Changes
+
+       	List the precise files to create, modify, or delete.
+
+       	For every meaningful implementation change, identify the concrete file path
+       	and the action that will occur there.
+
+       	Use this structure:
+
+       	### [COMPONENT / MODULE NAME]
+
+       	- **File Path**: `path/to/file.ext`
+       	- **Action**: [Create | Modify | Delete]
+       	- **Description of changes**:
+          - Describe the structural changes.
+          - Describe the logic changes.
+          - Describe relevant API/type/interface changes.
+          - Describe how this file connects to the rest of the implementation.
+
+       	Do NOT invent arbitrary files.
+
+       	Prefer existing repository files when they already provide the appropriate
+       	extension point.
+
+       	If the repository structure is not available, clearly identify the path as
+       	requiring repository inspection rather than pretending that a path is known.
+
+       	The plan must be specific enough that another agent or developer can execute
+       	it without having to rediscover the architecture from scratch.
+
+       	## Verification & Testing Strategy
+
+       	Describe how the implementation will be verified.
+
+       	### Unit Tests
+
+       	Identify concrete tests to add or modify.
+
+       	Use:
+
+       	- [ ] Add/update test cases in `path/to/test.ext`
+       	- [ ] Verify [specific behavior]
+
+       	Tests should correspond directly to requirements in `spec.md`.
+
+       	### Integration / End-to-End Checks
+
+       	Identify integration tests, runtime checks, commands, or manual verification
+       	needed to demonstrate that the implementation works.
+
+       	Use concrete verification mechanisms where known.
+
+       	For example:
+
+       	- [ ] Run `cargo test`
+       	- [ ] Run the relevant binary
+       	- [ ] Verify the event flow produces the expected action
+       	- [ ] Verify behavior in the affected application/runtime
+
+       	Do not claim a test exists if it has not been identified.
+
+       	### Expected Constraints/Risks
+
+       	Identify potential regressions, compatibility issues, architectural risks,
+       	performance concerns, policy boundaries, or unresolved assumptions.
+
+       	Every significant concern should be connected to something identified in the
+       	Specification.
+
+       	## Execution Work Order
+
+       	Provide an ordered sequence of implementation steps for an agent or human.
+
+       	Each step must identify:
+
+       	1. What is being changed.
+       	2. Where it is being changed.
+       	3. What dependency or prerequisite it has.
+       	4. How it should be verified before proceeding.
+
+       	Example:
+
+       	1. Establish the new abstraction in `path/to/file.rs` and verify its unit tests.
+       	2. Integrate the abstraction into `path/to/module.rs`.
+       	3. Update dependent callers and tests.
+       	4. Run the integration checks.
+       	5. Perform the final regression suite.
+
+       	The work order must reflect actual dependencies between changes.
+
+       	Do not simply repeat the Proposed Changes section.
+
+       	# PLANNING RULES
+
+       	1. The Specification is the source of truth for WHAT must be built.
+       	2. The Plan defines HOW that Specification will be implemented.
+       	3. Do not expand scope beyond the Specification.
+       	4. Do not resolve unresolved product decisions from the Specification by
+          silently choosing one.
+       	5. Identify unresolved decisions as risks or blockers.
+       	6. Prefer the existing architecture and extension points over unnecessary
+          new abstractions.
+       	7. Identify concrete files, modules, types, interfaces, and tests whenever
+          repository information makes that possible.
+       	8. Do not write implementation code.
+       	9. Do not produce pseudo-code as a substitute for a plan.
+       	10. Do not produce generic advice.
+       	11. Every proposed change must have a reason tied to the Specification.
+       	12. Every verification step must prove a specific requirement or behavior.
+       	13. The Execution Work Order must be actionable by another agent.
+       	14. The final response must be a complete Markdown document.
+       	15. Output ONLY the Implementation Plan.
+
+       	# APPROVED INTENT
+
+       	---
+
+       	{intent}
+
+       	---
+
+       	# APPROVED SPECIFICATION
+
+       	---
+
+       	{spec}
+
+       	---
+
+       	Now produce the complete Implementation Plan.
+      "#,
+		))
+	}
+
+	pub fn tests_gen(intent: &str, spec: &str, plan: &str) -> String {
+		format!(
+			r#"
+			You are designing the verification plan for an SDLC task.
+
+			The user's intent is authoritative.
+
+			## Intent
+
+			{intent}
+
+			## Specification
+
+			{spec}
+
+			## Implementation Plan
+
+			{plan}
+
+			## Instructions
+
+			Create `tests.md`.
+
+			Every requirement in the specification must have at least
+			one corresponding verification test.
+
+			Tests should distinguish between:
+
+			1. deterministic checks
+				- cargo test
+				- cargo check
+				- cargo clippy
+				- cargo fmt
+				- application-specific commands
+
+			2. behavioral tests
+				- unit tests
+				- integration tests
+				- end-to-end tests
+
+			3. semantic verification
+				- requirements that cannot be established purely through
+					deterministic commands and should later be evaluated by JEV
+
+			Each test must be concrete enough that another agent can implement
+			or execute it.
+
+			Use this format:
+
+			# Tests
+
+			## Requirement: <requirement>
+
+			- [ ] <test>
+
+			Do not mark any test as complete.
+
+			Return only the contents of `tests.md`.
+		"#,
+		)
+	}
+	pub fn plan_gen(intent: &str, spec: &str) -> String {
+		format!(
+			r#"
+				You are creating an implementation plan for an SDLC system.
+
+				The user's intent is authoritative.
+
+				## Intent
+
+				{intent}
+
+				## Specification
+
+				{spec}
+
+				## Instructions
+
+				Create a concrete implementation plan.
+
+				The plan must:
+				- identify the implementation work required
+				- break the work into ordered steps
+				- identify files/components likely to change
+				- identify dependencies between steps
+				- identify how each requirement will be verified
+				- avoid inventing requirements not present in the intent or specification
+
+				Return only the contents of `plan.md`.
+			"#,
+		)
+	}
+}
+pub use structs::*;
+pub mod structs {
+	use super::*;
+	#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+	pub struct Attempt {
+		pub stage: Stage,
+		pub number: u32,
+		pub max: u32,
+	}
+	impl std::fmt::Display for Attempt {
+		fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+			write!(f, "{} attempt {}", self.stage, self.number)
+		}
+	}
+	#[derive(Clone, Debug)]
+	pub struct SprintPipeline {
+		pub evaluator: Evaluator,
+		pub generator: Box<dyn ArtifactGenerator>,
+		pub session: Option<SdlcSession>,
+		pub state_path: PathBuf,
+		pub event_tx: broadcast::Sender<SdlcEvent>,
+		pub stage_attempt: u32,
+	}
+	pub struct SprintRunner<'a> {
+		pub pipeline: &'a mut SprintPipeline,
+	}
+	#[derive(Debug, Clone)]
+	pub struct PipelineRuntime {
+		pub activity: Vec<String>,
+		pub pipeline: SprintPipeline,
+		pub attempt: u32,
+		pub stage: enums::Stage,
+		pub started_at: Instant,
+		pub stage_started_at: Instant,
+		pub phase: SdlcPhase,
+		pub score: Option<f64>,
+		pub confidence: Option<f64>,
+		pub passed: Option<bool>,
+		pub message: Option<String>,
+		pub error: Option<String>,
+		pub total_tokens: u64,
+		pub total_agent_calls: u32,
+		pub history: Vec<SdlcEvent>,
+		pub events: Vec<SdlcEvent>,
+	}
+	impl PipelineRuntime {
+		pub fn view(&self) -> PipelineRuntimeView {
+			PipelineRuntimeView {
+				activity: self.activity.clone(),
+				attempt: self.attempt,
+				stage: self.stage,
+				started_at: self.started_at,
+				stage_started_at: self.stage_started_at,
+				phase: self.phase,
+				score: self.score,
+				confidence: self.confidence,
+				passed: self.passed,
+				message: self.message.clone(),
+				error: self.error.clone(),
+				total_tokens: self.total_tokens,
+				total_agent_calls: self.total_agent_calls,
+				history: self.history.clone(),
+				events: self.events.clone(),
+			}
+		}
+	}
+	#[derive(Debug, Clone)]
+	pub struct PipelineRuntimeView {
+		pub activity: Vec<String>,
+		pub attempt: u32,
+		pub stage: enums::Stage,
+		pub started_at: Instant,
+		pub stage_started_at: Instant,
+		pub phase: SdlcPhase,
+		pub score: Option<f64>,
+		pub confidence: Option<f64>,
+		pub passed: Option<bool>,
+		pub message: Option<String>,
+		pub error: Option<String>,
+		pub total_tokens: u64,
+		pub total_agent_calls: u32,
+		pub history: Vec<SdlcEvent>,
+		pub events: Vec<SdlcEvent>,
+	}
+	#[derive(Debug)]
+	pub struct StageExecution {
+		pub stage: enums::Stage,
+		pub attempt: Attempt,
+		pub started_at: DateTime<Utc>,
+		pub completed_at: DateTime<Utc>,
+		pub result: StageResult,
+	}
+
+	#[derive(Debug, Clone, Serialize, Deserialize)]
+	pub struct StageRecord {
+		pub attempt: Attempt,
+		pub stage: enums::Stage,
+		pub status: StageStatus,
+
+		/// What actually performed the work.
+		pub actor: StageActor,
+
+		pub started_at: DateTime<Utc>,
+		pub completed_at: Option<DateTime<Utc>>,
+
+		/// Semantic evaluation of the resulting artifact/work.
+		pub evaluation: Option<StageEvaluation>,
+	}
+	#[derive(Debug)]
+	pub struct StageError;
+
+	pub struct RetryPolicy {
+		pub max_attempts: u32,
+		pub retry_execution: bool,
+		pub retry_evaluation: bool,
+		pub retry_quality: bool,
+		pub allow_human_intervention: bool,
+	}
+	#[derive(Clone, Debug)]
+	pub struct Evaluator {
+		pub jev: TypeSafeClient,
+		pub session: SdlcSession,
+	}
+	#[derive(Debug, Clone)]
+	pub struct Evaluation {
+		pub score: f64,
+		pub confidence: f64,
+		pub meets_bar: bool,
+		pub feedback: String,
+		pub criteria: Vec<CriterionResult>,
+	}
+	#[derive(Debug, Clone, Serialize, Deserialize)]
+	pub struct EvaluationResult {
+		pub name: String,
+		pub passed: bool,
+		pub score: f64,
+		pub confidence: f64,
+		pub explanation: String,
+	}
+
+	#[derive(Debug, Clone, Serialize, Deserialize)]
+	pub struct StageEvaluation {
+		pub stage: enums::Stage,
+		pub actor: StageActor,
+
+		pub started_at: DateTime<Utc>,
+		pub completed_at: DateTime<Utc>,
+
+		pub score: f64,
+		pub confidence: f64,
+		pub passed: bool,
+
+		pub evaluations: Vec<EvaluationResult>,
+	}
+	#[derive(Debug, Clone, Serialize, Deserialize)]
+	pub struct EvaluationRecord {
+		pub score: f64,
+		pub confidence: f64,
+		pub meets_bar: bool,
+		pub feedback: String,
+	}
+
+	pub struct Check {
+		pub name: String,
+		pub command: String,
+	}
+	#[derive(Debug, Clone, Serialize, Deserialize)]
+	pub struct CheckResult {
+		pub name: String,
+		pub passed: bool,
+		pub output: Option<String>,
+	}
+
+	#[derive(Debug, Clone, Serialize, Deserialize)]
+	pub struct Verification {
+		pub passed: bool,
+		// pub score: u32,
+		pub checks: Vec<CheckResult>,
+		pub evaluations: Vec<EvaluationResult>,
+	}
+
+	#[derive(Debug, Clone, Serialize, Deserialize)]
+	pub struct CriterionResult;
+
+	#[derive(Debug, Clone, Serialize, Deserialize)]
+	pub struct SdlcSession {
+		pub id: String,
+		pub title: String,
+		pub goal: String,
+		pub stage: enums::Stage,
+		pub stages: Vec<StageRecord>,
+		pub dir: PathBuf,
+		pub created_at: DateTime<Utc>,
+		pub updated_at: DateTime<Utc>,
+		pub workspace: PathBuf,
+	}
+	pub struct SdlcView {
+		pub runtime: PipelineRuntimeView,
+		pub paused: bool,
+		pub show_logs: bool,
+		pub input: String,
+		pub input_active: bool,
+		pub events: Vec<Event>,
+	}
+	#[derive(Clone, Debug)]
+	pub struct ApiGenerator {
+		// whatever API client you decide to use
+	}
+	#[derive(Clone, Debug)]
+	pub struct LocalGenerator {
+		pub agent: Agent,
+		pub model: String,
+	}
+	pub struct TerminalGuard;
+
+	#[derive(Debug, Deserialize)]
+	pub struct OllamaResponse {
+		pub model: String,
+		pub response: String,
+		pub done: bool,
+		pub done_reason: Option<String>,
+	}
+	pub struct WorkspaceSnapshot {
+		pub git_status: String,
+	}
+	#[derive(Debug, Clone)]
+	pub struct WorkspaceChanges {
+		pub git_status: String,
+	}
+	pub struct BuildResult {
+		pub changed_files: Vec<PathBuf>,
+		pub created_files: Vec<PathBuf>,
+		pub modified_files: Vec<PathBuf>,
+		pub deleted_files: Vec<PathBuf>,
+		pub commands: Vec<CommandResult>,
+		pub agent_summary: Option<String>,
+	}
+	pub struct CommandResult {}
+}
+use traits as t;
+use traits::*;
+mod traits {
+	use super::*;
+	use crate::{
+		model::{
+			AgentTask,
+			agent::{Agent, AgentContext},
+			resolver::*,
+			task::TaskResult,
+		},
+		prelude::*,
+	};
+	use anyhow::anyhow;
+	use crossterm::{
+		cursor,
+		event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
+		execute,
+		terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
+	};
+	use egui_plot::Corner;
+	use jev_sdk::{Choice, Noul, Question, Score, TypeSafeClient};
+
+	use std::{io::Stdout, process::Command};
+	use tokio::time::{Duration, sleep};
+
+	pub struct Context {}
+
+	// Steps to complete the pipeline
+	pub trait Pipeline {
+		type Stage: Stage;
+		fn id(&self) -> &PipelineId;
+		fn state(&self) -> &PipelineState<Self::Stage>;
+		fn name(&self) -> &'static str;
+		fn description(&self) -> &'static str {
+			""
+		}
+		fn stages(&self) -> &[Self::Stage];
+	}
+	#[async_trait::async_trait]
+	pub trait Runner {
+		type Context;
+		type Output;
+
+		async fn run(&mut self, ctx: &mut Self::Context) -> Result<Self::Output>;
+
+		fn cancel(&mut self);
+
+		fn is_running(&self) -> bool;
+	}
+	trait Stage {
+		fn name(&self) -> &'static str;
+		fn description(&self) -> &'static str {
+			""
+		}
+		fn prepare(&self, _ctx: &mut Context) -> Result<()> {
+			Ok(())
+		}
+		fn run(&self, ctx: &mut Context) -> Result<StageResult>;
+		fn evaluate(&self, _ctx: &Context, _result: &StageResult) -> Result<Option<Evaluation>> {
+			Ok(None)
+		}
+		fn transition(
+			&self,
+			_ctx: &Context,
+			_result: &StageResult,
+			_evaluation: Option<&Evaluation>,
+		) -> Result<StageTransition> {
+			Ok(StageTransition::Next)
+		}
+		fn cleanup(&self, _ctx: &mut Context) -> Result<()> {
+			Ok(())
+		}
+	}
+
+	// Identity & Persistence
+	#[async_trait::async_trait]
+	pub trait ArtifactGenerator: Send + Sync + Debug {
+		async fn generate(&self, prompt: &str) -> Result<String>;
+		fn clone_box(&self) -> Box<dyn ArtifactGenerator>;
+	}
+	impl Clone for Box<dyn ArtifactGenerator> {
+		fn clone(&self) -> Self {
+			self.as_ref().clone_box()
+		}
+	}
+	pub trait TextModel {
+		async fn generate(&self, prompt: &str) -> Result<String>;
+	}
 }
 mod ui {
 	use super::*;
@@ -734,723 +1835,17 @@ mod ui {
 		FRAMES[index]
 	}
 }
-pub mod prompt {
-	use super::*;
-	pub fn initial_prompt() -> Result<String> {
-		Ok(String::from(
-			"I need to build a CLI tool. I want to use NodeJS.
-			Create a file named hello-world.js in the repository root from where I ran this command.
-			This file will be the CLI entrypoint. The CLI tool should accept an
-			argument and write that value to hello-world.md.
-			The user should be able to run node hello-world.js \"hi\".
-
-			- Add tests covering both the JavaScript logic and the CLI behavior.",
-		))
-	}
-	const INTENT_PROMPT: &str = include_str!("../../../ai/template/INITIAL_PROMPT.md");
-	const PROMPT_FROM_USER: &str = include_str!("../../../ai/template/user.goal.md");
-
-	pub fn for_intent(user_request: &str) -> String {
-		INTENT_PROMPT.replace("{{PROMPT_FROM_USER}}", user_request)
-	}
-	pub fn gen_intent(goal: &str) -> Result<String> {
-		Ok(format!(
-			r#"
-				You are defining the intent for an SDLC task.
-
-				The user's goal is authoritative.
-
-				## User Goal
-
-				{goal}
-
-				## Instructions
-
-				Create `intent.md`.
-
-				Describe what the user is trying to accomplish and why.
-
-				The intent should:
-				- preserve the user's actual goal without changing its meaning
-				- describe the desired outcome
-				- establish the problem or need being addressed
-				- identify the important constraints explicitly stated by the user
-				- avoid inventing requirements that the user did not state
-				- remain implementation-independent where possible
-
-				Do not write the specification, implementation plan, or tests yet.
-
-				Use this format:
-
-				# Intent
-
-				## Goal
-
-				<what the user wants to accomplish>
-
-				## Why
-
-				<why this work is needed>
-
-				## Constraints
-
-				- <constraint>
-
-				## Outcome
-
-				<what successful completion should accomplish>
-
-				Return only the contents of `intent.md`.
-				"#,
-		))
-	}
-
-	pub fn tests_gen(intent: &str, spec: &str, plan: &str) -> String {
-		format!(
-			r#"
-			You are designing the verification plan for an SDLC task.
-
-			The user's intent is authoritative.
-
-			## Intent
-
-			{intent}
-
-			## Specification
-
-			{spec}
-
-			## Implementation Plan
-
-			{plan}
-
-			## Instructions
-
-			Create `tests.md`.
-
-			Every requirement in the specification must have at least
-			one corresponding verification test.
-
-			Tests should distinguish between:
-
-			1. deterministic checks
-				- cargo test
-				- cargo check
-				- cargo clippy
-				- cargo fmt
-				- application-specific commands
-
-			2. behavioral tests
-				- unit tests
-				- integration tests
-				- end-to-end tests
-
-			3. semantic verification
-				- requirements that cannot be established purely through
-					deterministic commands and should later be evaluated by JEV
-
-			Each test must be concrete enough that another agent can implement
-			or execute it.
-
-			Use this format:
-
-			# Tests
-
-			## Requirement: <requirement>
-
-			- [ ] <test>
-
-			Do not mark any test as complete.
-
-			Return only the contents of `tests.md`.
-		"#,
-		)
-	}
-	pub fn plan_gen(intent: &str, spec: &str) -> String {
-		format!(
-			r#"
-				You are creating an implementation plan for an SDLC system.
-
-				The user's intent is authoritative.
-
-				## Intent
-
-				{intent}
-
-				## Specification
-
-				{spec}
-
-				## Instructions
-
-				Create a concrete implementation plan.
-
-				The plan must:
-				- identify the implementation work required
-				- break the work into ordered steps
-				- identify files/components likely to change
-				- identify dependencies between steps
-				- identify how each requirement will be verified
-				- avoid inventing requirements not present in the intent or specification
-
-				Return only the contents of `plan.md`.
-			"#,
-		)
-	}
-}
-mod enums {
-	use super::structs::*;
-	use super::*;
-	#[derive(Debug)]
-	pub enum ExecutionResult {
-		Completed(TaskResult),
-		Failed(StageError),
-	}
-	#[derive(Debug)]
-	pub enum StageOutcome {
-		Complete {
-			execution: StageExecution,
-			evaluation: StageEvaluation,
-		},
-		NeedsRevision {
-			execution: StageExecution,
-			evaluation: StageEvaluation,
-		},
-		ExecutionFailed {
-			stage: enums::Stage,
-			attempt: Attempt,
-			error: anyhow::Error,
-		},
-
-		EvaluationFailed {
-			execution: StageExecution,
-			error: anyhow::Error,
-		},
-	}
-	#[derive(Debug, Clone)]
-	pub enum Intervention {
-		Human(String),
-		Retry,
-		ProvideContext(String),
-		Reviewed,
-		Abort,
-		Revise,
-	}
-	#[derive(Debug, Clone, Copy)]
-	pub enum GenerationProvider {
-		Local,
-		Api,
-	}
-	#[derive(Debug, Clone)]
-	pub enum SdlcEvent {
-		Activity {
-			stage: Stage,
-			attempt: Attempt,
-			message: String,
-		},
-		Completed,
-		Failed {
-			stage: Option<Stage>,
-			error: String,
-		},
-		InterventionRequired {
-			stage: Stage,
-			attempt: Attempt,
-			reason: String,
-		},
-		InterventionResolved {
-			stage: Stage,
-			action: String,
-		},
-		Evaluated {
-			stage: Stage,
-			score: f64,
-			confidence: f64,
-			passed: bool,
-		},
-		EvaluationStarted {
-			stage: Stage,
-		},
-		EvaluationFailed {
-			stage: Stage,
-			error: String,
-		},
-		ExecutionComplete {
-			stage: Stage,
-		},
-		ExecutionFailed {
-			stage: Stage,
-			attempt: Attempt,
-			error: String,
-		},
-		Exited {
-			reason: String,
-		},
-		PhaseChanged {
-			phase: SdlcPhase,
-		},
-		RunStarted,
-		StageRetrying {
-			stage: Stage,
-			number: u32,
-		},
-		StageStarted {
-			stage: Stage,
-			attempt: Attempt,
-		},
-		StageTransitioned {
-			from: Stage,
-			to: Stage,
-		},
-		HumanInput {
-			stage: Stage,
-			input: String,
-		},
-	}
-	#[derive(Debug)]
-	pub enum SdlcInput {
-		Abort,
-		ProvideContext(String),
-		Retry,
-		Reviewed,
-		Human(String),
-	}
-	#[derive(Debug, Clone, Copy, PartialEq)]
-	pub enum SdlcPhase {
-		Starting,
-		Executing,
-		Evaluating,
-		Retrying,
-		AwaitingHuman,
-		Completed,
-		Failed,
-	}
-
-	#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-	pub enum Step {
-		Boot,
-		Init,
-		Intent,
-		Spec,
-		Plan,
-		Build,
-		Verify,
-		Deploy,
-		Maintain,
-		Complete,
-	}
-
-	#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-	pub enum Stage {
-		Intent,
-		Spec,
-		Plan,
-		Build,
-		Verify,
-		Deploy,
-		Maintain,
-		Complete,
-		SprintCompleted,
-	}
-	impl std::fmt::Display for Stage {
-		fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-			let name = match self {
-				Self::Intent => "Intent",
-				Self::Spec => "Spec",
-				Self::Plan => "Plan",
-				Self::Build => "Build",
-				Self::Verify => "Verify",
-				Self::Deploy => "Deploy",
-				Self::Maintain => "Maintain",
-				Self::Complete => "Complete",
-				Self::SprintCompleted => "Sprint Completed",
-			};
-
-			f.write_str(name)
-		}
-	}
-	#[derive(Debug, Clone, Copy)]
-	pub enum StageAction {
-		Continue,
-		Retry,
-		Intervene,
-		Abort,
-	}
-	#[derive(Debug, Clone, Serialize, Deserialize)]
-	pub enum StageActor {
-		Human,
-		Sdlc,
-		Evaluator,
-		Agent,
-		System,
-	}
-	#[derive(Debug)]
-	pub enum StageDecision {
-		Continue,
-		Retry,
-		Revise,
-		AwaitHuman,
-		Fail,
-		Complete,
-	}
-	pub enum StageOutcomeEvaluation {
-		Passed(Evaluation),
-		FailedQuality(Evaluation),
-		FailedRuntime(Error),
-	}
-	#[derive(Debug, Clone, Serialize, Deserialize)]
-	pub enum StageStatus {
-		Running,
-		Completed,
-		Failed,
-		NeedsRevision,
-		EvaluationFailed,
-	}
-	pub enum InputMode {
-		Normal,
-		Human { buffer: String },
-		AwaitingHuman { prompt: String },
-	}
-	#[derive(Debug)]
-	pub enum RunControl {
-		Continue,
-		Exit,
-	}
-
-	pub enum RunState {
-		Idle,
-		Running,
-		Paused,
-		AwaitingInput,
-		Completed,
-		Failed,
-		Cancelled,
-	}
-	pub enum RunResult {
-		Completed,
-		Failed,
-		Cancelled,
-	}
-	pub type PipelineId = uuid::Uuid;
-	pub struct PipelineState<S> {
-		stage: S,
-		attempt: u32,
-		status: PipelineStatus,
-	}
-	pub struct PipelineStatus;
-	#[derive(Debug, Clone, Serialize, Deserialize)]
-	pub enum StageResult {
-		Intent,
-		Spec,
-		Plan,
-		Build,
-		Verification(Verification),
-		Complete,
-		SprintCompleted,
-	}
-	pub enum StageTransition {
-		Next,
-		Repeat,
-		Goto(Stage),
-		Complete,
-		Fail,
-		AwaitHuman,
-	}
-}
-mod traits {
-	use super::*;
-	use crate::{
-		model::{
-			AgentTask,
-			agent::{Agent, AgentContext},
-			resolver::*,
-			task::TaskResult,
-		},
-		prelude::*,
-	};
-	use anyhow::anyhow;
-	use crossterm::{
-		cursor,
-		event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
-		execute,
-		terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
-	};
-	use egui_plot::Corner;
-	use jev_sdk::{Choice, Noul, Question, Score, TypeSafeClient};
-
-	use std::{io::Stdout, process::Command};
-	use tokio::time::{Duration, sleep};
-
-	pub struct Context {}
-
-	// Steps to complete the pipeline
-	pub trait Pipeline {
-		type Stage: Stage;
-		fn id(&self) -> &PipelineId;
-		fn state(&self) -> &PipelineState<Self::Stage>;
-		fn name(&self) -> &'static str;
-		fn description(&self) -> &'static str {
-			""
-		}
-		fn stages(&self) -> &[Self::Stage];
-	}
-	#[async_trait::async_trait]
-	pub trait Runner {
-		type Context;
-		type Output;
-
-		async fn run(&mut self, ctx: &mut Self::Context) -> Result<Self::Output>;
-
-		fn cancel(&mut self);
-
-		fn is_running(&self) -> bool;
-	}
-	trait Stage {
-		fn name(&self) -> &'static str;
-		fn description(&self) -> &'static str {
-			""
-		}
-		fn prepare(&self, _ctx: &mut Context) -> Result<()> {
-			Ok(())
-		}
-		fn run(&self, ctx: &mut Context) -> Result<StageResult>;
-		fn evaluate(&self, _ctx: &Context, _result: &StageResult) -> Result<Option<Evaluation>> {
-			Ok(None)
-		}
-		fn transition(
-			&self,
-			_ctx: &Context,
-			_result: &StageResult,
-			_evaluation: Option<&Evaluation>,
-		) -> Result<StageTransition> {
-			Ok(StageTransition::Next)
-		}
-		fn cleanup(&self, _ctx: &mut Context) -> Result<()> {
-			Ok(())
-		}
-	}
-
-	// Identity & Persistence
-	#[async_trait::async_trait]
-	pub trait ArtifactGenerator: Send + Sync {
-		async fn generate(&self, prompt: &str) -> Result<String>;
-	}
-	pub trait TextModel {
-		async fn generate(&self, prompt: &str) -> Result<String>;
-	}
-}
-pub mod structs {
-	use super::*;
-	#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-	pub struct Attempt {
-		pub stage: Stage,
-		pub number: u32,
-		pub max: u32,
-	}
-	impl std::fmt::Display for Attempt {
-		fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-			write!(f, "{} attempt {}", self.stage, self.number)
-		}
-	}
-	pub struct SprintPipeline {
-		pub evaluator: Evaluator,
-		pub generator: Box<dyn ArtifactGenerator>,
-		pub session: Option<SdlcSession>,
-		pub state_path: PathBuf,
-		pub event_tx: broadcast::Sender<SdlcEvent>,
-		pub stage_attempt: u32,
-	}
-	pub struct SprintRunner<'a> {
-		pub pipeline: &'a mut SprintPipeline,
-	}
-	#[derive(Debug, Clone)]
-	pub struct PipelineRuntime {
-		pub activity: Vec<String>,
-		pub attempt: u32,
-		pub stage: enums::Stage,
-
-		pub started_at: Instant,
-		pub stage_started_at: Instant,
-
-		pub phase: SdlcPhase,
-
-		pub score: Option<f64>,
-		pub confidence: Option<f64>,
-		pub passed: Option<bool>,
-
-		pub message: Option<String>,
-		pub error: Option<String>,
-
-		pub total_tokens: u64,
-		pub total_agent_calls: u32,
-
-		pub history: Vec<SdlcEvent>,
-		pub events: Vec<SdlcEvent>,
-	}
-
-	#[derive(Debug)]
-	pub struct StageExecution {
-		pub stage: enums::Stage,
-		pub attempt: Attempt,
-		pub started_at: DateTime<Utc>,
-		pub completed_at: DateTime<Utc>,
-		pub result: StageResult,
-	}
-
-	#[derive(Debug, Clone, Serialize, Deserialize)]
-	pub struct StageRecord {
-		pub attempt: Attempt,
-		pub stage: enums::Stage,
-		pub status: StageStatus,
-
-		/// What actually performed the work.
-		pub actor: StageActor,
-
-		pub started_at: DateTime<Utc>,
-		pub completed_at: Option<DateTime<Utc>>,
-
-		/// Semantic evaluation of the resulting artifact/work.
-		pub evaluation: Option<StageEvaluation>,
-	}
-	#[derive(Debug)]
-	pub struct StageError;
-
-	pub struct RetryPolicy {
-		pub max_attempts: u32,
-		pub retry_execution: bool,
-		pub retry_evaluation: bool,
-		pub retry_quality: bool,
-		pub allow_human_intervention: bool,
-	}
-
-	pub struct Evaluator {
-		pub jev: TypeSafeClient,
-		pub session: SdlcSession,
-	}
-	#[derive(Debug, Clone)]
-	pub struct Evaluation {
-		pub score: f64,
-		pub confidence: f64,
-		pub meets_bar: bool,
-		pub feedback: String,
-		pub criteria: Vec<CriterionResult>,
-	}
-	#[derive(Debug, Clone, Serialize, Deserialize)]
-	pub struct EvaluationResult {
-		pub name: String,
-		pub passed: bool,
-		pub score: f64,
-		pub confidence: f64,
-		pub explanation: String,
-	}
-
-	#[derive(Debug, Clone, Serialize, Deserialize)]
-	pub struct StageEvaluation {
-		pub stage: enums::Stage,
-		pub actor: StageActor,
-
-		pub started_at: DateTime<Utc>,
-		pub completed_at: DateTime<Utc>,
-
-		pub score: f64,
-		pub confidence: f64,
-		pub passed: bool,
-
-		pub evaluations: Vec<EvaluationResult>,
-	}
-	#[derive(Debug, Clone, Serialize, Deserialize)]
-	pub struct EvaluationRecord {
-		pub score: f64,
-		pub confidence: f64,
-		pub meets_bar: bool,
-		pub feedback: String,
-	}
-
-	pub struct Check {
-		pub name: String,
-		pub command: String,
-	}
-	#[derive(Debug, Clone, Serialize, Deserialize)]
-	pub struct CheckResult {
-		pub name: String,
-		pub passed: bool,
-		pub output: Option<String>,
-	}
-
-	#[derive(Debug, Clone, Serialize, Deserialize)]
-	pub struct Verification {
-		pub passed: bool,
-		// pub score: u32,
-		pub checks: Vec<CheckResult>,
-		pub evaluations: Vec<EvaluationResult>,
-	}
-
-	#[derive(Debug, Clone, Serialize, Deserialize)]
-	pub struct CriterionResult;
-
-	#[derive(Debug, Clone, Serialize, Deserialize)]
-	pub struct SdlcSession {
-		pub id: String,
-		pub title: String,
-		pub goal: String,
-		pub stage: enums::Stage,
-		pub stages: Vec<StageRecord>,
-		pub dir: PathBuf,
-		pub created_at: DateTime<Utc>,
-		pub updated_at: DateTime<Utc>,
-		pub workspace: PathBuf,
-	}
-
-	pub struct SdlcView {
-		pub runtime: PipelineRuntime,
-		pub paused: bool,
-		pub show_logs: bool,
-		pub input: String,
-		pub input_active: bool,
-		pub events: Vec<Event>,
-	}
-	pub struct ApiGenerator {
-		// whatever API client you decide to use
-	}
-	pub struct LocalGenerator {
-		pub agent: Agent,
-		pub model: String,
-	}
-	pub struct TerminalGuard;
-
-	#[derive(Debug, Deserialize)]
-	pub struct OllamaResponse {
-		pub model: String,
-		pub response: String,
-		pub done: bool,
-		pub done_reason: Option<String>,
-	}
-}
-use enums as e;
-pub use enums::*;
-pub use prompt as agent_prompts;
-use prompt::*;
-pub use structs::*;
-use traits as t;
-
-use tracing::debug;
-use traits::*;
-
 impl LocalGenerator {
 	async fn generate_stuff(&self, prompt: &str) -> Result<String> {
 		let task = AgentTask::new(prompt.to_string());
-
 		let (event_tx, mut event_rx) = tokio::sync::mpsc::unbounded_channel();
-
 		let result = self.agent.run_agent_loop(task, event_tx).await?;
-
 		println!("=== GENERATOR RESULT ===");
 		println!("status: {:?}", result.status);
 		println!("chat: {:?}", result.chat);
 		println!("summary: {:?}", result.summary);
 		println!("logs: {:?}", result.logs);
 		println!("========================");
-
 		Ok(
 			result
 				.chat
@@ -1501,11 +1896,17 @@ impl ArtifactGenerator for LocalGenerator {
 
 		Ok(artifact.to_string())
 	}
+	fn clone_box(&self) -> Box<dyn ArtifactGenerator> {
+		Box::new(self.clone())
+	}
 }
 #[async_trait]
 impl ArtifactGenerator for ApiGenerator {
 	async fn generate(&self, prompt: &str) -> Result<String> {
 		todo!("API generate")
+	}
+	fn clone_box(&self) -> Box<dyn ArtifactGenerator> {
+		Box::new(self.clone())
 	}
 }
 impl Attempt {
@@ -1607,7 +2008,6 @@ impl EvaluationContext {
 impl Evaluator {
 	async fn evaluate_goal(&self, goal: &str) -> Result<StageEvaluation> {
 		let started_at = Utc::now();
-
 		let state = format!(
 			"## User Goal\n\n{goal}\n\n\
 			## Evaluation Context\n\n\
@@ -1616,7 +2016,6 @@ impl Evaluator {
 			SDLC pipeline. Judge the goal itself, not how well an \
 			implementation could compensate for missing information."
 		);
-
 		let response = self
 			.jev
 			.system_one(
@@ -1716,11 +2115,9 @@ impl Evaluator {
 				],
 			)
 			.await?;
-
 		let smart = response
 			.score("smart")
 			.ok_or_else(|| anyhow::anyhow!("JEV returned no SMART score"))?;
-
 		let dimensions = [
 			("specific", "specificity"),
 			("measurable", "measurability"),
@@ -1728,9 +2125,7 @@ impl Evaluator {
 			("realistic", "realism"),
 			("timely", "timeliness"),
 		];
-
 		let mut evaluations = Vec::with_capacity(7);
-
 		evaluations.push(EvaluationResult {
 			name: "smart".into(),
 			passed: smart.score >= 0.80,
@@ -1738,7 +2133,6 @@ impl Evaluator {
 			confidence: smart.confidence,
 			explanation: String::new(),
 		});
-
 		for (key, name) in dimensions {
 			let result = response
 				.score(key)
@@ -1752,11 +2146,9 @@ impl Evaluator {
 				explanation: String::new(),
 			});
 		}
-
 		let meets_bar = response
 			.noul("meets_bar")
 			.ok_or_else(|| anyhow::anyhow!("JEV returned no goal decision"))?;
-
 		evaluations.push(EvaluationResult {
 			name: "meets_bar".into(),
 			passed: meets_bar.noul >= 0.80,
@@ -1764,7 +2156,6 @@ impl Evaluator {
 			confidence: 1.0,
 			explanation: String::new(),
 		});
-
 		Ok(StageEvaluation::new(
 			Stage::Intent,
 			StageActor::Evaluator,
@@ -1783,7 +2174,7 @@ impl Evaluator {
 	) -> Result<StageEvaluation> {
 		let ctx = EvaluationContext::load(session, execution.stage)?;
 
-		match execution.stage {
+		let evaluation = match execution.stage {
 			Stage::Intent => self.evaluate_intent(&ctx).await,
 			Stage::Spec => self.evaluate_spec(&ctx).await,
 			Stage::Plan => self.evaluate_plan(&ctx).await,
@@ -1792,7 +2183,8 @@ impl Evaluator {
 			stage => Err(anyhow::anyhow!(
 				"stage {stage:?} does not support evaluation"
 			)),
-		}
+		};
+		return evaluation;
 	}
 	async fn evaluate_intent(&self, ctx: &EvaluationContext) -> Result<StageEvaluation> {
 		let started_at = Utc::now();
@@ -2200,6 +2592,301 @@ impl Evaluator {
 		))
 	}
 }
+
+impl SdlcSession {
+	pub fn new(title: impl Into<String>, dir: PathBuf) -> Result<Self> {
+		let now = Utc::now();
+		let goal = include_str!("../../../ai/template/user.goal.md").to_string();
+
+		Ok(Self {
+			workspace: dir.clone(),
+			goal,
+			id: uuid::Uuid::new_v4().to_string(),
+			title: title.into(),
+			stage: Stage::Intent,
+			stages: Vec::new(),
+			dir,
+			created_at: now,
+			updated_at: now,
+		})
+	}
+	fn created_at_readable(&self) -> String {
+		self.created_at.format(FMT_HUMAN_READABLE).to_string()
+	}
+	fn updated_at_readable(&self) -> String {
+		self.updated_at.format(FMT_HUMAN_READABLE).to_string()
+	}
+	fn create_readable(&self) -> String {
+		let current = Utc::now();
+		current.format(FMT_HUMAN_READABLE).to_string()
+	}
+	pub fn workspace(&self) -> &Path {
+		&self.workspace
+	}
+}
+impl SdlcView {
+	pub fn new(runtime: &PipelineRuntime) -> Self {
+		Self {
+			input_active: false,
+			input: String::new(),
+			paused: false,
+			show_logs: false,
+			events: vec![],
+			runtime: runtime.view(),
+		}
+	}
+	pub fn begin_input(&mut self) {
+		self.input_active = true;
+		self.input.clear();
+	}
+	pub fn end_input(&mut self) {
+		self.input_active = false;
+		self.input.clear();
+	}
+	pub fn is_input_active(&self) -> bool {
+		self.input_active
+	}
+	pub fn toggle_pause(&mut self) {
+		self.paused = !self.paused;
+	}
+	pub fn toggle_logs(&mut self) {
+		self.show_logs = !self.show_logs;
+	}
+	pub fn handle_input_key(
+		&mut self,
+		key: KeyEvent,
+		input_tx: &UnboundedSender<SdlcInput>,
+	) -> anyhow::Result<()> {
+		match key.code {
+			KeyCode::Char(c) => {
+				self.input.push(c);
+			}
+
+			KeyCode::Backspace => {
+				self.input.pop();
+			}
+			KeyCode::Enter => {
+				let input = std::mem::take(&mut self.input);
+				input_tx.send(SdlcInput::Human(input))?;
+				self.input_active = false;
+			}
+
+			KeyCode::Esc => {
+				self.input_active = false;
+				self.input.clear();
+			}
+
+			_ => {}
+		}
+
+		Ok(())
+	}
+	pub fn render(frame: &mut Frame<'_>, view: &SdlcView) {
+		let area = frame.area();
+		frame.render_widget(Clear, area);
+		let chunks = RatatuiLayout::default()
+			.direction(Direction::Vertical)
+			.constraints([
+				Constraint::Length(2),
+				Constraint::Length(3),
+				Constraint::Min(8),
+				Constraint::Length(3),
+			])
+			.split(area);
+
+		ui::stepper(frame, view, chunks[1]);
+		let body = ui::body(chunks[2]);
+		ui::left_stage_panel(frame, view, body[0]);
+		ui::right_activity_panel(frame, view, body[2]);
+		ui::footer(frame, view, chunks[3]);
+	}
+	pub fn apply(&mut self, event: SdlcEvent) {
+		match event {
+			SdlcEvent::RunStarted => {
+				self.runtime.phase = SdlcPhase::Starting;
+				self.runtime.started_at = Instant::now();
+				self.runtime.stage_started_at = Instant::now();
+				self.runtime.message = Some(String::from("Run started"));
+			}
+
+			SdlcEvent::StageStarted { stage, attempt } => {
+				self.runtime.stage = stage;
+				self.runtime.attempt = attempt.number;
+				self.runtime.phase = SdlcPhase::Starting;
+				self.runtime.stage_started_at = Instant::now();
+				self.runtime.score = None;
+				self.runtime.confidence = None;
+				self.runtime.error = None;
+				self.runtime.message = Some(format!("{stage:?}"));
+			}
+
+			SdlcEvent::Activity {
+				stage,
+				attempt,
+				message,
+			} => {
+				self.runtime.stage = stage;
+				self.runtime.attempt = attempt.number;
+				self.runtime.message = Some(message);
+			}
+
+			SdlcEvent::PhaseChanged { phase } => {
+				self.runtime.phase = match phase {
+					SdlcPhase::Executing => SdlcPhase::Executing,
+					SdlcPhase::Evaluating => SdlcPhase::Evaluating,
+					SdlcPhase::Completed => SdlcPhase::Completed,
+
+					// Add the remaining mappings for your actual
+					// SdlcPhase variants.
+					_ => self.runtime.phase,
+				};
+
+				self.runtime.message = Some(format!("{phase:?}"));
+			}
+
+			SdlcEvent::ExecutionComplete { stage } => {
+				self.runtime.stage = stage;
+				self.runtime.phase = SdlcPhase::Evaluating;
+				self.runtime.message = Some(String::from("Execution complete"));
+			}
+
+			SdlcEvent::EvaluationStarted { stage } => {
+				self.runtime.stage = stage;
+				self.runtime.phase = SdlcPhase::Evaluating;
+				self.runtime.message = Some(String::from("Evaluating"));
+			}
+
+			SdlcEvent::Evaluated {
+				stage,
+				score,
+				confidence,
+				passed,
+			} => {
+				self.runtime.stage = stage;
+				self.runtime.score = Some(score);
+				self.runtime.confidence = Some(confidence);
+
+				self.runtime.message = Some(format!(
+					"Evaluation: {:.2} (confidence {:.2})",
+					score, confidence
+				));
+
+				if !passed {
+					self.runtime.phase = SdlcPhase::Failed;
+				}
+			}
+
+			SdlcEvent::StageTransitioned { from: _, to } => {
+				self.runtime.stage = to;
+				self.runtime.stage_started_at = Instant::now();
+				self.runtime.score = None;
+				self.runtime.confidence = None;
+				self.runtime.message = Some(format!("Starting {to:?}"));
+			}
+
+			SdlcEvent::Completed => {
+				self.runtime.phase = SdlcPhase::Completed;
+				self.runtime.message = Some(String::from("SDLC complete"));
+			}
+
+			SdlcEvent::Failed { stage, error } => {
+				if let Some(stage) = stage {
+					self.runtime.stage = stage;
+				}
+
+				self.runtime.phase = SdlcPhase::Failed;
+				self.runtime.message = Some(error.clone());
+				self.runtime.error = Some(error);
+			}
+
+			event => {
+				self.runtime.events.push(event);
+			}
+		}
+	}
+}
+impl SdlcInput {
+	pub fn text(&self) -> Option<&str> {
+		match self {
+			Self::Human(value) | Self::ProvideContext(value) => Some(value),
+			Self::Abort | Self::Retry | Self::Reviewed => None,
+		}
+	}
+}
+impl StageOutcome {
+	fn stage(&self) -> enums::Stage {
+		match self {
+			Self::Complete { execution, .. }
+			| Self::NeedsRevision { execution, .. }
+			| Self::EvaluationFailed { execution, .. } => execution.stage,
+
+			Self::ExecutionFailed { stage, .. } => *stage,
+		}
+	}
+	fn attempt(&self) -> Attempt {
+		match self {
+			Self::Complete { execution, .. }
+			| Self::NeedsRevision { execution, .. }
+			| Self::EvaluationFailed { execution, .. } => execution.attempt,
+
+			Self::ExecutionFailed { attempt, .. } => *attempt,
+		}
+	}
+}
+impl enums::Stage {
+	pub fn next(&self) -> Option<Self> {
+		match self {
+			Self::Intent => Some(Self::Spec),
+			Self::Spec => Some(Self::Plan),
+			Self::Plan => Some(Self::Build),
+			Self::Build => Some(Self::Verify),
+			Self::Verify => Some(Self::Complete),
+			Self::Deploy => Some(Self::Maintain),
+			Self::Maintain => Some(Self::Complete),
+			Self::Complete => None,
+			Self::SprintCompleted => None,
+		}
+	}
+	pub fn is_before(self, other: enums::Stage) -> bool {
+		let rank = |stage: enums::Stage| match stage {
+			Stage::Intent => 0,
+			Stage::Spec => 1,
+			Stage::Plan => 2,
+			Stage::Build => 3,
+			Stage::Verify => 4,
+			Stage::Deploy => 5,
+			Stage::Maintain => 6,
+			Stage::Complete => 7,
+			Stage::SprintCompleted => 8,
+		};
+		rank(self) < rank(other)
+	}
+}
+impl StageEvaluation {
+	fn new(
+		stage: Stage,
+		actor: StageActor,
+		started_at: DateTime<Utc>,
+		score: f64,
+		confidence: f64,
+		meets_bar: f64,
+		evaluations: Vec<EvaluationResult>,
+	) -> Self {
+		Self {
+			stage,
+			actor,
+			started_at,
+			completed_at: Utc::now(),
+			score,
+			confidence,
+			passed: meets_bar >= 0.80 && confidence >= 0.70,
+			evaluations,
+		}
+	}
+	pub fn with_evaluations(&self, checks: Vec<CheckResult>) -> Self {
+		todo!("with_evaluations")
+	}
+}
 impl SprintPipeline {
 	pub async fn new() -> anyhow::Result<Self> {
 		dotenvy::dotenv().ok();
@@ -2254,105 +2941,18 @@ impl SprintPipeline {
 		self.commit()?;
 		Ok(())
 	}
-	pub async fn run(&mut self, input_rx: &mut UnboundedReceiver<SdlcInput>) -> Result<()> {
-		SprintRunner { pipeline: self }.run(input_rx).await
-	}
-	pub async fn run_simulated(
-		&mut self,
-		_input_rx: &mut UnboundedReceiver<SdlcInput>,
-	) -> Result<()> {
-		self.emit(SdlcEvent::RunStarted);
-
-		for (index, step) in Step::ALL.iter().enumerate() {
-			if *step == Step::Complete {
-				break;
-			}
-			let Some(stage) = step.stage() else {
-				continue;
-			};
-			let attempt = self.next_attempt(stage)?;
-			self.emit(SdlcEvent::StageStarted { stage, attempt });
-
-			self.emit(SdlcEvent::Activity {
-				stage,
-				attempt,
-				message: format!("Dry Run · step {}/{}", index + 1, Step::ALL.len(),),
-			});
-
-			// ------------------------------------------------------------
-			// Execute
-			// ------------------------------------------------------------
-
-			self.emit(SdlcEvent::PhaseChanged {
-				phase: SdlcPhase::Executing,
-			});
-
-			sleep(DEMO_EXECUTION_TIME).await;
-
-			self.emit(SdlcEvent::ExecutionComplete { stage });
-
-			// ------------------------------------------------------------
-			// Evaluate
-			// ------------------------------------------------------------
-
-			self.emit(SdlcEvent::PhaseChanged {
-				phase: SdlcPhase::Evaluating,
-			});
-
-			self.emit(SdlcEvent::EvaluationStarted { stage });
-
-			sleep(DEMO_EVALUATION_TIME).await;
-
-			self.emit(SdlcEvent::Evaluated {
-				stage,
-				score: 0.91,
-				confidence: 0.94,
-				passed: true,
-			});
-
-			// ------------------------------------------------------------
-			// Transition
-			// ------------------------------------------------------------
-
-			let Some(next) = stage.next() else {
-				break;
-			};
-
-			self.transition(next)?;
-
-			log_step_transition(stage, next)?;
-
-			self.emit(SdlcEvent::StageTransitioned {
-				from: stage,
-				to: next,
-			});
-		}
-
-		// ------------------------------------------------------------
-		// Complete
-		// ------------------------------------------------------------
-
-		self.emit(SdlcEvent::PhaseChanged {
-			phase: SdlcPhase::Completed,
-		});
-
-		self.emit(SdlcEvent::Completed);
-
-		sleep(DEMO_COMPLETE_DELAY).await;
-
-		Ok(())
-	}
 
 	pub fn subscribe(&self) -> broadcast::Receiver<SdlcEvent> {
 		self.event_tx.subscribe()
 	}
 	async fn summarize_title(intent: &str) -> Result<String> {
-		Ok(String::from("Create-sdlc-pipeline"))
+		Ok(String::from("create-sdlc-pipeline"))
 	}
 
 	pub fn stage(&self) -> Option<Stage> {
 		self.session.as_ref().map(|session| session.stage)
 	}
+
 	async fn stage_intent(&mut self) -> Result<StageResult> {
 		let (stage, session_dir, goal) = {
 			let session = self
@@ -2381,40 +2981,33 @@ impl SprintPipeline {
 		self.update_progress("Intent stage completed")?;
 		Ok(StageResult::Intent)
 	}
-
 	async fn stage_spec(&mut self) -> Result<StageResult> {
 		let (stage, session_dir) = {
 			let session = self
 				.session
 				.as_ref()
-				.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
-			(session.stage.clone(), session.dir.clone())
+				.ok_or_else(|| anyhow!("no active SDLC session"))?;
+			(session.stage, session.dir.clone())
 		};
-
 		if stage != Stage::Spec {
-			return Err(anyhow::anyhow!(
-				"cannot execute Spec stage while at {:?}",
-				stage
-			));
+			return Err(anyhow!("cannot execute Spec stage while at {stage:?}"));
 		}
-
 		let intent = self.session_read("intent.md")?;
-
-		let spec = format!(
-			"# Specification\n\n\
-  		 ## Intent\n\n\
-  		 {}\n\n\
-  		 ## Requirements\n\n\
-  		 - The implementation must satisfy the intent above.\n\
-  		 - The implementation must be testable.\n\
-  		 - Verification must provide deterministic evidence.\n",
-			intent.trim()
-		);
-		Self::write(session_dir.join("spec.md"), spec);
-		// let evaluation = self.evaluate_stage(Stage::Spec).await?;
-		// self.record_evaluation(evaluation)?;
+		if intent.trim().is_empty() {
+			return Err(anyhow!("Intent artifact is empty"));
+		}
+		let prompt = prompt::gen_spec(&intent)?;
+		if prompt.trim().is_empty() {
+			return Err(anyhow!("generated Spec prompt is empty"));
+		}
+		std::fs::write("/tmp/estate-spec-prompt.md", &prompt)
+			.context("writing Spec prompt debug file")?;
+		let generated = self.generator.generate(&prompt).await?;
+		if generated.trim().is_empty() {
+			return Err(anyhow!("generated Spec artifact is empty"));
+		}
+		Self::write(session_dir.join("spec.md"), generated)?;
 		self.update_progress("Spec stage completed")?;
-		// self.transition(Stage::Plan)?;
 		Ok(StageResult::Spec)
 	}
 	async fn stage_plan(&mut self) -> Result<StageResult> {
@@ -2422,22 +3015,33 @@ impl SprintPipeline {
 			let session = self
 				.session
 				.as_ref()
-				.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
-			(session.stage.clone(), session.dir.clone())
+				.ok_or_else(|| anyhow!("no active SDLC session"))?;
+
+			(session.stage, session.dir.clone())
 		};
 		if stage != Stage::Plan {
-			return Err(anyhow::anyhow!(
-				"cannot execute Plan stage while at {:?}",
-				stage
-			));
+			return Err(anyhow!("cannot execute Plan stage while at {stage:?}"));
 		}
 		let intent = self.session_read("intent.md")?;
 		let spec = self.session_read("spec.md")?;
-		let plan = self.generate_plan(&intent, &spec).await?;
-		Self::write(session_dir.join("plan.md"), plan.clone())?;
-		let tests = self.generate_tests(&intent, &spec, &plan).await?;
-		Self::write(session_dir.join("tests.md"), tests)?;
-		self.update_progress("Plan and test plan generated")?;
+		if intent.trim().is_empty() {
+			return Err(anyhow!("Intent artifact is empty"));
+		}
+		if spec.trim().is_empty() {
+			return Err(anyhow!("Spec artifact is empty"));
+		}
+		let prompt = prompt::gen_plan(&intent, &spec)?;
+		if prompt.trim().is_empty() {
+			return Err(anyhow!("generated Plan prompt is empty"));
+		}
+		std::fs::write("/tmp/estate-plan-prompt.md", &prompt)
+			.context("writing Plan prompt debug file")?;
+		let generated = self.generator.generate(&prompt).await?;
+		if generated.trim().is_empty() {
+			return Err(anyhow!("generated Plan artifact is empty"));
+		}
+		Self::write(session_dir.join("plan.md"), generated)?;
+		self.update_progress("Plan stage completed")?;
 		Ok(StageResult::Plan)
 	}
 	async fn stage_build(&mut self) -> Result<StageResult> {
@@ -2505,32 +3109,13 @@ impl SprintPipeline {
 
 		Ok(StageResult::Build)
 	}
-	// async fn stage_verify(&mut self) -> Result<StageResult> {
-	// self.update_progress("Verification started")?;
-	// let checks = self.run_checks(self.stage().unwrap()).await?;
-	// let evaluations = self.evaluate(&checks).await?;
-	// let verification = Verification {
-	// passed: self.is_passing(&checks, &evaluations),
-	// checks,
-	// evaluations,
-	// };
-	// self.update_progress(&format!(
-	// "Verification completed: passed={}",
-	// verification.passed
-	// ))?;
-	//
-	// Ok(StageResult::Verification(verification))
-	// }
 	async fn stage_verify(&mut self) -> Result<StageResult> {
 		self.update_progress("Verification started")?;
-
 		let verification = self.verify_stage(self.stage().unwrap()).await?;
-
 		self.update_progress(&format!(
 			"Verification completed: passed={}",
 			verification.passed
 		))?;
-
 		Ok(StageResult::Verification(verification))
 	}
 	async fn stage_deploy(&mut self) -> Result<()> {
@@ -2753,9 +3338,7 @@ impl SprintPipeline {
 			.session
 			.as_ref()
 			.ok_or_else(|| anyhow!("no active SDLC session"))?;
-
 		let max = 3;
-
 		let number = session
 			.stages
 			.iter()
@@ -2763,7 +3346,6 @@ impl SprintPipeline {
 			.map(|record| record.attempt.number)
 			.max()
 			.map_or(0, |number| number + 1);
-
 		Ok(Attempt { stage, number, max })
 	}
 	fn save_session(session: &SdlcSession) -> Result<()> {
@@ -2775,7 +3357,6 @@ impl SprintPipeline {
 			.session
 			.as_ref()
 			.ok_or_else(|| anyhow!("no active SDLC session"))?;
-
 		Self::save_session(session)
 	}
 	fn create_dir(title: &str) -> Result<PathBuf> {
@@ -2818,15 +3399,6 @@ impl SprintPipeline {
 	fn emit(&self, event: SdlcEvent) {
 		let _ = self.event_tx.send(event);
 	}
-
-	async fn generate_plan(&self, intent: &str, spec: &str) -> Result<String> {
-		let prompt = prompt::plan_gen(intent, spec);
-		self.generator.generate(&prompt).await
-	}
-	async fn generate_tests(&self, intent: &str, spec: &str, plan: &str) -> Result<String> {
-		let prompt = prompt::tests_gen(intent, spec, plan);
-		self.generator.generate(&prompt).await
-	}
 	async fn evaluate(&self, execution: &StageExecution) -> Result<StageEvaluation> {
 		self
 			.evaluator
@@ -2848,16 +3420,11 @@ impl SprintPipeline {
 			.session
 			.as_ref()
 			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
-
 		let index_path = SpecialFile::SessionsIndex.path()?;
-
 		let mut sessions: Vec<SdlcSession> = FS::load(&index_path)?.unwrap_or_default();
-
 		sessions.retain(|existing| existing.id != session.id);
 		sessions.push(session.clone());
-
 		FS::save(index_path, &sessions)?;
-
 		Ok(())
 	}
 	fn record_outcome(&mut self, outcome: &StageOutcome) -> Result<()> {
@@ -2939,28 +3506,12 @@ impl SprintPipeline {
 	fn record_stage_outcome(&mut self, outcome: &StageOutcome) -> Result<()> {
 		self.record_outcome(outcome)
 	}
-
-	fn record_evaluation(&mut self, evaluation: StageEvaluation) -> Result<()> {
+	fn evaluation_record(&mut self, evaluation: &StageEvaluation) -> Result<()> {
 		let session = self
 			.session
 			.as_mut()
-			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
-		let status = if evaluation.passed {
-			StageStatus::Completed
-		} else {
-			StageStatus::NeedsRevision
-		};
-		let record = StageRecord {
-			actor: evaluation.actor.clone(),
-			attempt: Attempt::new(),
-			completed_at: Some(Utc::now()),
-			evaluation: Some(evaluation.clone()),
-			stage: evaluation.stage.clone(),
-			started_at: evaluation.started_at,
-			status,
-		};
-		session.stages.push(record);
-		session.updated_at = Utc::now();
+			.ok_or_else(|| anyhow!("no active SDLC session"))?;
+		evaluation_record(session, evaluation)?;
 		self.persist()
 	}
 	async fn resume(&mut self) -> Result<()> {
@@ -3108,10 +3659,12 @@ impl SprintPipeline {
 		Ok(std::fs::write(path, contents)?)
 	}
 }
-
 impl PipelineRuntime {
-	pub fn new(stage: enums::Stage) -> Self {
+	pub fn new(pipeline: SprintPipeline) -> Self {
+		let stage = pipeline.stage().unwrap().clone();
 		Self {
+			stage,
+			pipeline,
 			activity: vec![],
 			attempt: 0,
 			confidence: None,
@@ -3120,7 +3673,6 @@ impl PipelineRuntime {
 			passed: None,
 			phase: SdlcPhase::Starting,
 			score: None,
-			stage,
 			stage_started_at: Instant::now(),
 			started_at: Instant::now(),
 			total_agent_calls: 0,
@@ -3129,280 +3681,281 @@ impl PipelineRuntime {
 			events: vec![],
 		}
 	}
-}
-impl SdlcSession {
-	pub fn new(title: impl Into<String>, dir: PathBuf) -> Result<Self> {
-		let now = Utc::now();
-		let goal = include_str!("../../../ai/template/user.goal.md").to_string();
-
-		Ok(Self {
-			workspace: dir.clone(),
-			goal,
-			id: uuid::Uuid::new_v4().to_string(),
-			title: title.into(),
-			stage: Stage::Intent,
-			stages: Vec::new(),
-			dir,
-			created_at: now,
-			updated_at: now,
-		})
+	pub async fn run(&mut self, input_rx: &mut UnboundedReceiver<SdlcInput>) -> Result<()> {
+		let mut runner = SprintRunner {
+			pipeline: &mut self.pipeline,
+		};
+		runner.run(input_rx).await
 	}
-	fn created_at_readable(&self) -> String {
-		self.created_at.format(FMT_HUMAN_READABLE).to_string()
-	}
-	fn updated_at_readable(&self) -> String {
-		self.updated_at.format(FMT_HUMAN_READABLE).to_string()
-	}
-	fn create_readable(&self) -> String {
-		let current = Utc::now();
-		current.format(FMT_HUMAN_READABLE).to_string()
-	}
-	pub fn workspace(&self) -> &Path {
-		&self.workspace
-	}
-}
-impl SdlcView {
-	pub fn new(stage: enums::Stage) -> Self {
-		Self {
-			input_active: false,
-			input: String::new(),
-			paused: false,
-			show_logs: false,
-			events: vec![],
-			runtime: PipelineRuntime::new(stage),
-		}
-	}
-	pub fn begin_input(&mut self) {
-		self.input_active = true;
-		self.input.clear();
-	}
-	pub fn end_input(&mut self) {
-		self.input_active = false;
-		self.input.clear();
-	}
-	pub fn is_input_active(&self) -> bool {
-		self.input_active
-	}
-	pub fn toggle_pause(&mut self) {
-		self.paused = !self.paused;
-	}
-	pub fn toggle_logs(&mut self) {
-		self.show_logs = !self.show_logs;
-	}
-	pub fn handle_input_key(
+	pub async fn run_simulated(
 		&mut self,
-		key: KeyEvent,
-		input_tx: &UnboundedSender<SdlcInput>,
-	) -> anyhow::Result<()> {
-		match key.code {
-			KeyCode::Char(c) => {
-				self.input.push(c);
-			}
+		_input_rx: &mut UnboundedReceiver<SdlcInput>,
+	) -> Result<()> {
+		self.pipeline.emit(SdlcEvent::RunStarted);
 
-			KeyCode::Backspace => {
-				self.input.pop();
+		for (index, step) in Step::ALL.iter().enumerate() {
+			if *step == Step::Complete {
+				break;
 			}
-			KeyCode::Enter => {
-				let input = std::mem::take(&mut self.input);
-				input_tx.send(SdlcInput::Human(input))?;
-				self.input_active = false;
-			}
+			let Some(stage) = step.stage() else {
+				continue;
+			};
+			let attempt = self.pipeline.next_attempt(stage)?;
+			self
+				.pipeline
+				.emit(SdlcEvent::StageStarted { stage, attempt });
 
-			KeyCode::Esc => {
-				self.input_active = false;
-				self.input.clear();
-			}
+			self.pipeline.emit(SdlcEvent::Activity {
+				stage,
+				attempt,
+				message: format!("Dry Run · step {}/{}", index + 1, Step::ALL.len(),),
+			});
 
-			_ => {}
+			// ------------------------------------------------------------
+			// Execute
+			// ------------------------------------------------------------
+
+			self.pipeline.emit(SdlcEvent::PhaseChanged {
+				phase: SdlcPhase::Executing,
+			});
+
+			sleep(DEMO_EXECUTION_TIME).await;
+
+			self.pipeline.emit(SdlcEvent::ExecutionComplete { stage });
+
+			// ------------------------------------------------------------
+			// Evaluate
+			// ------------------------------------------------------------
+
+			self.pipeline.emit(SdlcEvent::PhaseChanged {
+				phase: SdlcPhase::Evaluating,
+			});
+
+			self.pipeline.emit(SdlcEvent::EvaluationStarted { stage });
+
+			sleep(DEMO_EVALUATION_TIME).await;
+
+			self.pipeline.emit(SdlcEvent::Evaluated {
+				stage,
+				score: 0.91,
+				confidence: 0.94,
+				passed: true,
+			});
+
+			// ------------------------------------------------------------
+			// Transition
+			// ------------------------------------------------------------
+
+			let Some(next) = stage.next() else {
+				break;
+			};
+
+			self.pipeline.transition(next)?;
+
+			log_step_transition(stage, next)?;
+
+			self.pipeline.emit(SdlcEvent::StageTransitioned {
+				from: stage,
+				to: next,
+			});
 		}
+
+		// ------------------------------------------------------------
+		// Complete
+		// ------------------------------------------------------------
+
+		self.pipeline.emit(SdlcEvent::PhaseChanged {
+			phase: SdlcPhase::Completed,
+		});
+
+		self.pipeline.emit(SdlcEvent::Completed);
+
+		sleep(DEMO_COMPLETE_DELAY).await;
 
 		Ok(())
 	}
-	pub fn render(frame: &mut Frame<'_>, view: &SdlcView) {
-		let area = frame.area();
-		frame.render_widget(Clear, area);
-		let chunks = RatatuiLayout::default()
-			.direction(Direction::Vertical)
-			.constraints([
-				Constraint::Length(2),
-				Constraint::Length(3),
-				Constraint::Min(8),
-				Constraint::Length(3),
-			])
-			.split(area);
-
-		ui::stepper(frame, view, chunks[1]);
-		let body = ui::body(chunks[2]);
-		ui::left_stage_panel(frame, view, body[0]);
-		ui::right_activity_panel(frame, view, body[2]);
-		ui::footer(frame, view, chunks[3]);
-	}
-	pub fn apply(&mut self, event: SdlcEvent) {
-		match event {
-			SdlcEvent::RunStarted => {
-				self.runtime.phase = SdlcPhase::Starting;
-				self.runtime.started_at = Instant::now();
-				self.runtime.stage_started_at = Instant::now();
-				self.runtime.message = Some(String::from("Run started"));
-			}
-
-			SdlcEvent::StageStarted { stage, attempt } => {
-				self.runtime.stage = stage;
-				self.runtime.attempt = attempt.number;
-				self.runtime.phase = SdlcPhase::Starting;
-				self.runtime.stage_started_at = Instant::now();
-				self.runtime.score = None;
-				self.runtime.confidence = None;
-				self.runtime.error = None;
-				self.runtime.message = Some(format!("{stage:?}"));
-			}
-
-			SdlcEvent::Activity {
-				stage,
-				attempt,
-				message,
-			} => {
-				self.runtime.stage = stage;
-				self.runtime.attempt = attempt.number;
-				self.runtime.message = Some(message);
-			}
-
-			SdlcEvent::PhaseChanged { phase } => {
-				self.runtime.phase = match phase {
-					SdlcPhase::Executing => SdlcPhase::Executing,
-					SdlcPhase::Evaluating => SdlcPhase::Evaluating,
-					SdlcPhase::Completed => SdlcPhase::Completed,
-
-					// Add the remaining mappings for your actual
-					// SdlcPhase variants.
-					_ => self.runtime.phase,
-				};
-
-				self.runtime.message = Some(format!("{phase:?}"));
-			}
-
-			SdlcEvent::ExecutionComplete { stage } => {
-				self.runtime.stage = stage;
-				self.runtime.phase = SdlcPhase::Evaluating;
-				self.runtime.message = Some(String::from("Execution complete"));
-			}
-
-			SdlcEvent::EvaluationStarted { stage } => {
-				self.runtime.stage = stage;
-				self.runtime.phase = SdlcPhase::Evaluating;
-				self.runtime.message = Some(String::from("Evaluating"));
-			}
-
-			SdlcEvent::Evaluated {
-				stage,
-				score,
-				confidence,
-				passed,
-			} => {
-				self.runtime.stage = stage;
-				self.runtime.score = Some(score);
-				self.runtime.confidence = Some(confidence);
-
-				self.runtime.message = Some(format!(
-					"Evaluation: {:.2} (confidence {:.2})",
-					score, confidence
-				));
-
-				if !passed {
-					self.runtime.phase = SdlcPhase::Failed;
-				}
-			}
-
-			SdlcEvent::StageTransitioned { from: _, to } => {
-				self.runtime.stage = to;
-				self.runtime.stage_started_at = Instant::now();
-				self.runtime.score = None;
-				self.runtime.confidence = None;
-				self.runtime.message = Some(format!("Starting {to:?}"));
-			}
-
-			SdlcEvent::Completed => {
-				self.runtime.phase = SdlcPhase::Completed;
-				self.runtime.message = Some(String::from("SDLC complete"));
-			}
-
-			SdlcEvent::Failed { stage, error } => {
-				if let Some(stage) = stage {
-					self.runtime.stage = stage;
-				}
-
-				self.runtime.phase = SdlcPhase::Failed;
-				self.runtime.message = Some(error.clone());
-				self.runtime.error = Some(error);
-			}
-
-			event => {
-				self.runtime.events.push(event);
-			}
-		}
-	}
-}
-
-impl SdlcInput {
-	pub fn text(&self) -> Option<&str> {
-		match self {
-			Self::Human(value) | Self::ProvideContext(value) => Some(value),
-			Self::Abort | Self::Retry | Self::Reviewed => None,
-		}
-	}
-}
-impl enums::Stage {
-	pub fn next(&self) -> Option<Self> {
-		match self {
-			Self::Intent => Some(Self::Spec),
-			Self::Spec => Some(Self::Plan),
-			Self::Plan => Some(Self::Build),
-			Self::Build => Some(Self::Verify),
-			Self::Verify => Some(Self::Complete),
-			Self::Deploy => Some(Self::Maintain),
-			Self::Maintain => Some(Self::Complete),
-			Self::Complete => None,
-			Self::SprintCompleted => None,
-		}
-	}
-	pub fn is_before(self, other: enums::Stage) -> bool {
-		let rank = |stage: enums::Stage| match stage {
-			Stage::Intent => 0,
-			Stage::Spec => 1,
-			Stage::Plan => 2,
-			Stage::Build => 3,
-			Stage::Verify => 4,
-			Stage::Deploy => 5,
-			Stage::Maintain => 6,
-			Stage::Complete => 7,
-			Stage::SprintCompleted => 8,
+	async fn stage_intent(&mut self) -> Result<StageResult> {
+		let (stage, session_dir, goal) = {
+			let session = self
+				.pipeline
+				.session
+				.as_ref()
+				.ok_or_else(|| anyhow!("no active SDLC session"))?;
+			(session.stage, session.dir.clone(), session.goal.clone())
 		};
-		rank(self) < rank(other)
-	}
-}
-impl StageEvaluation {
-	fn new(
-		stage: Stage,
-		actor: StageActor,
-		started_at: DateTime<Utc>,
-		score: f64,
-		confidence: f64,
-		meets_bar: f64,
-		evaluations: Vec<EvaluationResult>,
-	) -> Self {
-		Self {
-			stage,
-			actor,
-			started_at,
-			completed_at: Utc::now(),
-			score,
-			confidence,
-			passed: meets_bar >= 0.80 && confidence >= 0.70,
-			evaluations,
+		if stage != Stage::Intent {
+			return Err(anyhow!("cannot execute Intent stage while at {stage:?}"));
 		}
+		if goal.trim().is_empty() {
+			return Err(anyhow!("SDLC session goal is empty"));
+		}
+		let prompt = prompt::gen_intent(&goal)?;
+		std::fs::write("/tmp/estate-intent-prompt.md", &prompt)
+			.context("writing Intent prompt debug file")?;
+		if prompt.trim().is_empty() {
+			return Err(anyhow!("generated Intent prompt is empty"));
+		}
+		let generated = self.pipeline.generator.generate(&prompt).await?;
+		if generated.trim().is_empty() {
+			return Err(anyhow!("generated Intent artifact is empty"));
+		}
+		SprintPipeline::write(session_dir.join("intent.md"), generated)?;
+		self.pipeline.update_progress("Intent stage completed")?;
+		Ok(StageResult::Intent)
 	}
-	pub fn with_evaluations(&self, checks: Vec<CheckResult>) -> Self {
-		todo!("with_evaluations")
+	async fn stage_spec(&mut self) -> Result<StageResult> {
+		let (stage, session_dir) = {
+			let session = self
+				.pipeline
+				.session
+				.as_ref()
+				.ok_or_else(|| anyhow!("no active SDLC session"))?;
+			(session.stage, session.dir.clone())
+		};
+		if stage != Stage::Spec {
+			return Err(anyhow!("cannot execute Spec stage while at {stage:?}"));
+		}
+		let intent = self.pipeline.session_read("intent.md")?;
+		if intent.trim().is_empty() {
+			return Err(anyhow!("Intent artifact is empty"));
+		}
+		let prompt = prompt::gen_spec(&intent)?;
+		if prompt.trim().is_empty() {
+			return Err(anyhow!("generated Spec prompt is empty"));
+		}
+		std::fs::write("/tmp/estate-spec-prompt.md", &prompt)
+			.context("writing Spec prompt debug file")?;
+		let generated = self.pipeline.generator.generate(&prompt).await?;
+		if generated.trim().is_empty() {
+			return Err(anyhow!("generated Spec artifact is empty"));
+		}
+		SprintPipeline::write(session_dir.join("spec.md"), generated)?;
+		self.pipeline.update_progress("Spec stage completed")?;
+		Ok(StageResult::Spec)
+	}
+	async fn stage_plan(&mut self) -> Result<StageResult> {
+		let (stage, session_dir) = {
+			let session = self
+				.pipeline
+				.session
+				.as_ref()
+				.ok_or_else(|| anyhow!("no active SDLC session"))?;
+
+			(session.stage, session.dir.clone())
+		};
+		if stage != Stage::Plan {
+			return Err(anyhow!("cannot execute Plan stage while at {stage:?}"));
+		}
+		let intent = self.pipeline.session_read("intent.md")?;
+		let spec = self.pipeline.session_read("spec.md")?;
+		if intent.trim().is_empty() {
+			return Err(anyhow!("Intent artifact is empty"));
+		}
+		if spec.trim().is_empty() {
+			return Err(anyhow!("Spec artifact is empty"));
+		}
+		let prompt = prompt::gen_plan(&intent, &spec)?;
+		if prompt.trim().is_empty() {
+			return Err(anyhow!("generated Plan prompt is empty"));
+		}
+		std::fs::write("/tmp/estate-plan-prompt.md", &prompt)
+			.context("writing Plan prompt debug file")?;
+		let generated = self.pipeline.generator.generate(&prompt).await?;
+		if generated.trim().is_empty() {
+			return Err(anyhow!("generated Plan artifact is empty"));
+		}
+		SprintPipeline::write(session_dir.join("plan.md"), generated)?;
+		self.pipeline.update_progress("Plan stage completed")?;
+		Ok(StageResult::Plan)
+	}
+	async fn stage_build(&mut self) -> Result<StageResult> {
+		let (stage, session_dir) = {
+			let session = self
+				.pipeline
+				.session
+				.as_ref()
+				.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
+
+			(session.stage.clone(), session.dir.clone())
+		};
+		if stage != Stage::Build {
+			return Err(anyhow::anyhow!(
+				"cannot execute Build stage while at {:?}",
+				stage
+			));
+		}
+		self.pipeline.update_progress("Build started")?;
+		let workspace = self
+			.pipeline
+			.session
+			.as_ref()
+			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?
+			.workspace()
+			.to_path_buf();
+		let workspace_before = WorkspaceSnapshot::capture(&workspace)?;
+
+		let task = AgentTask::new(
+			"Implement the software described by the SDLC intent, specification,
+			and plan.
+
+			You are in the BUILD stage.
+
+			Inspect the workspace using the available tools before making changes.
+
+			Implement the planned functionality by:
+			- creating required files,
+			- modifying existing source files,
+			- modifying configuration when required,
+			- adding appropriate tests,
+			- running relevant formatting, compilation, linting, and test commands,
+			- fixing errors discovered during implementation.
+			- respond with CODE ONLY. Do not response with markdown wrapping code blocks like literal ```
+			- write directly to the files. Do not
+
+			Do not merely describe an implementation. Perform the work in the
+			workspace.
+
+			Use the existing project structure and conventions whenever possible.
+
+			When implementation is complete, verify the result using the most
+			relevant available commands."
+				.into(),
+		);
+
+		let result = self.pipeline.generator.generate(&task.prompt).await?;
+		let workspace_after = WorkspaceSnapshot::capture(&workspace)?;
+		let changes = workspace_before.diff(&workspace_after);
+		SprintPipeline::write(session_dir.join("build.md"), changes.to_markdown(&result))?;
+		self.pipeline.update_progress(&format!(
+			"Build completed: {} file(s) changed",
+			changes.file_count()
+		))?;
+
+		Ok(StageResult::Build)
+	}
+	async fn stage_verify(&mut self) -> Result<StageResult> {
+		self.pipeline.update_progress("Verification started")?;
+		let verification = self
+			.pipeline
+			.verify_stage(self.pipeline.stage().unwrap())
+			.await?;
+		self.pipeline.update_progress(&format!(
+			"Verification completed: passed={}",
+			verification.passed
+		))?;
+		Ok(StageResult::Verification(verification))
+	}
+	async fn stage_deploy(&mut self) -> Result<()> {
+		todo!("sdlc deploy")
+	}
+	async fn stage_maintain(&mut self) -> Result<()> {
+		todo!("sdlc maintain")
+	}
+	async fn stage_complete(&mut self) -> Result<RunControl> {
+		todo!("WOW DONE!")
+	}
+	fn retry(&mut self, _stage: enums::Stage) -> Result<()> {
+		Ok(())
 	}
 }
 impl Step {
@@ -3501,20 +4054,16 @@ impl SprintRunner<'_> {
 		// TODO: actually restore the persisted session from sdlc.current.json.
 		Ok(self.pipeline.stage().unwrap_or(enums::Stage::Intent))
 	}
-
 	fn persist_outcome(&mut self, _outcome: &StageOutcome) -> Result<()> {
 		// TODO: persist outcome.
 		Ok(())
 	}
-
 	async fn evaluate_stage_execution(&mut self, execution: StageExecution) -> Result<StageOutcome> {
 		let stage = execution.stage;
-
 		self.emit(SdlcEvent::PhaseChanged {
 			phase: SdlcPhase::Evaluating,
 		});
 		self.emit(SdlcEvent::EvaluationStarted { stage });
-
 		match self.pipeline.evaluate(&execution).await {
 			Ok(evaluation) => {
 				self.emit(SdlcEvent::Evaluated {
@@ -3523,7 +4072,7 @@ impl SprintRunner<'_> {
 					confidence: evaluation.confidence,
 					passed: evaluation.passed,
 				});
-
+				self.pipeline.evaluation_record(&evaluation);
 				Ok(StageOutcome::Complete {
 					execution,
 					evaluation,
@@ -4128,26 +4677,7 @@ impl SprintRunner<'_> {
 		}
 	}
 }
-impl StageOutcome {
-	fn stage(&self) -> enums::Stage {
-		match self {
-			Self::Complete { execution, .. }
-			| Self::NeedsRevision { execution, .. }
-			| Self::EvaluationFailed { execution, .. } => execution.stage,
 
-			Self::ExecutionFailed { stage, .. } => *stage,
-		}
-	}
-	fn attempt(&self) -> Attempt {
-		match self {
-			Self::Complete { execution, .. }
-			| Self::NeedsRevision { execution, .. }
-			| Self::EvaluationFailed { execution, .. } => execution.attempt,
-
-			Self::ExecutionFailed { attempt, .. } => *attempt,
-		}
-	}
-}
 impl WorkspaceChanges {
 	pub fn file_count(&self) -> usize {
 		self
@@ -4176,38 +4706,6 @@ impl WorkspaceChanges {
 		markdown
 	}
 }
-impl Drop for TerminalGuard {
-	fn drop(&mut self) {
-		let _ = disable_raw_mode();
-		let mut stdout = stdout();
-		let _ = execute!(stdout, LeaveAlternateScreen);
-		let _ = execute!(stdout, cursor::Show);
-	}
-}
-
-mod constants {
-	const TODO: &'static str = r#"
-		- Question prompt
-		- Add progressive disclosure
-	"#;
-	use super::*;
-	pub const DEMO_COMPLETE_DELAY: Duration = Duration::from_secs(1);
-	pub const DEMO_EVALUATION_TIME: Duration = Duration::from_secs(1);
-	pub const DEMO_EXECUTION_TIME: Duration = Duration::from_secs(1);
-	pub const DEMO_RETRY_DELAY: Duration = Duration::from_secs(1);
-	pub const FMT_HUMAN_READABLE: &'static str = "%B %-d, %Y at %-I:%M:%S %p UTC";
-	pub const MAX_STAGE_ATTEMPTS: u32 = 1;
-	pub const STATUS_INTERVAL: Duration = Duration::from_secs(30);
-}
-pub use constants::*;
-
-pub struct WorkspaceSnapshot {
-	git_status: String,
-}
-#[derive(Debug, Clone)]
-pub struct WorkspaceChanges {
-	pub git_status: String,
-}
 impl WorkspaceSnapshot {
 	pub fn capture(workspace: impl AsRef<Path>) -> Result<Self> {
 		let workspace = workspace.as_ref();
@@ -4230,36 +4728,31 @@ impl WorkspaceSnapshot {
 				.context("git status output was not valid UTF-8")?,
 		})
 	}
-
 	pub fn diff(&self, after: &Self) -> WorkspaceChanges {
 		WorkspaceChanges {
 			git_status: after.git_status.clone(),
 		}
 	}
 }
+fn evaluation_record(session: &mut SdlcSession, evaluation: &StageEvaluation) -> Result<()> {
+	let status = if evaluation.passed {
+		StageStatus::Completed
+	} else {
+		StageStatus::NeedsRevision
+	};
 
-fn git_status() -> Result<String> {
-	let output = std::process::Command::new("git")
-		.args(["status", "--short"])
-		.output()?;
+	let record = StageRecord {
+		actor: evaluation.actor.clone(),
+		attempt: Attempt::new(),
+		completed_at: Some(Utc::now()),
+		evaluation: Some(evaluation.clone()),
+		stage: evaluation.stage.clone(),
+		started_at: evaluation.started_at,
+		status,
+	};
 
-	if !output.status.success() {
-		return Err(anyhow::anyhow!(
-			"git status failed: {}",
-			String::from_utf8_lossy(&output.stderr)
-		));
-	}
+	session.stages.push(record);
+	session.updated_at = Utc::now();
 
-	Ok(String::from_utf8(output.stdout)?)
+	Ok(())
 }
-
-pub struct BuildResult {
-	pub changed_files: Vec<PathBuf>,
-	pub created_files: Vec<PathBuf>,
-	pub modified_files: Vec<PathBuf>,
-	pub deleted_files: Vec<PathBuf>,
-	pub commands: Vec<CommandResult>,
-	pub agent_summary: Option<String>,
-}
-
-pub struct CommandResult {}
