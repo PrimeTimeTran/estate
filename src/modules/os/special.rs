@@ -11,9 +11,10 @@ use serde::{Serialize, de::DeserializeOwned};
 pub enum SessionFile {
 	Intent,
 	Spec,
-	Tests,
-	Verification,
 	Plan,
+	Test,
+	Build,
+	Verification,
 	Progress,
 }
 
@@ -164,9 +165,10 @@ impl SessionFile {
 		match self {
 			Self::Intent => "intent.md",
 			Self::Spec => "spec.md",
-			Self::Tests => "tests.md",
-			Self::Verification => "verification.md",
 			Self::Plan => "plan.md",
+			Self::Test => "tests.md",
+			Self::Build => "build.md",
+			Self::Verification => "verification.md",
 			Self::Progress => "progress.md",
 		}
 	}

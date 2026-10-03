@@ -85,6 +85,76 @@ fn slugify(input: &str) -> String {
 		slug
 	}
 }
+fn persist_evaluation(session: &mut SdlcSession, evaluation: &StageEvaluation) -> Result<()> {
+	let status = if evaluation.passed {
+		StageStatus::Completed
+	} else {
+		StageStatus::NeedsRevision
+	};
+
+	let record = StageRecord {
+		description: Some(String::from("Evaluation done")),
+		actor: evaluation.actor.clone(),
+		attempt: Attempt::new(),
+		evaluation: Some(evaluation.clone()),
+		stage: evaluation.stage,
+		time_started: evaluation.time_started,
+		time_completed: Some(Utc::now()),
+		status,
+	};
+	let time_started = evaluation.time_started;
+	let time_completed = Utc::now();
+	// let record = StageRecord {
+	// 	stage: evaluation.stage,
+	// 	attempt: Attempt::new(),
+	// 	status,
+	// 	actor: evaluation.actor.clone(),
+	// 	description: Some("Evaluation done".into()),
+	//
+	// 	time_started: time_readable(time_started),
+	// 	time_completed: Some(time_readable(time_completed)),
+	// 	time_total: duration_readable(time_completed - time_started),
+	//
+	// 	evaluation: Some(evaluation.clone()),
+	// };
+	session.stages.push(record);
+	session.time_updated = Utc::now();
+
+	Ok(())
+}
+fn time_readable(time: chrono::DateTime<chrono::Utc>) -> String {
+	time.format("%B %-d, %Y at %-I:%M:%S %p UTC").to_string()
+}
+fn short_duration_readable(duration: chrono::Duration) -> String {
+	let seconds = duration.num_seconds();
+	let hours = seconds / 3600;
+	let minutes = (seconds % 3600) / 60;
+	let seconds = seconds % 60;
+
+	match (hours, minutes, seconds) {
+		(h, m, _) if h > 0 => format!("{h} hours {m} minutes"),
+		(_, m, s) if m > 0 => format!("{m} minutes {s} seconds"),
+		(_, _, s) => format!("{s} seconds"),
+	}
+}
+fn duration_readable(duration: chrono::Duration) -> String {
+	let millis = duration.num_milliseconds();
+
+	if millis < 1000 {
+		return format!("{millis} ms");
+	}
+
+	let seconds = millis / 1000;
+	let hours = seconds / 3600;
+	let minutes = (seconds % 3600) / 60;
+	let seconds = seconds % 60;
+
+	match (hours, minutes, seconds) {
+		(h, m, _) if h > 0 => format!("{h}h {m}m"),
+		(_, m, s) if m > 0 => format!("{m}m {s}s"),
+		(_, _, s) => format!("{s}s"),
+	}
+}
 fn log_step_transition(from: Stage, to: Stage) -> Result<()> {
 	let path: PathBuf = env::current_dir()?.join("current_step.txt");
 
@@ -247,6 +317,7 @@ mod enums {
 		Intent,
 		Spec,
 		Plan,
+		Test,
 		Build,
 		Verify,
 		Deploy,
@@ -254,12 +325,14 @@ mod enums {
 		Complete,
 		SprintCompleted,
 	}
-	impl enums::Stage {
+	impl Stage {
 		pub fn next(&self) -> Option<Self> {
 			match self {
 				Self::Intent => Some(Self::Spec),
 				Self::Spec => Some(Self::Plan),
+				// Self::Plan => Some(Self::Test),
 				Self::Plan => Some(Self::Build),
+				Self::Test => Some(Self::Build),
 				Self::Build => Some(Self::Verify),
 				Self::Verify => Some(Self::Complete),
 				Self::Deploy => Some(Self::Maintain),
@@ -268,17 +341,18 @@ mod enums {
 				Self::SprintCompleted => None,
 			}
 		}
-		pub fn is_before(self, other: enums::Stage) -> bool {
-			let rank = |stage: enums::Stage| match stage {
+		pub fn is_before(self, other: Stage) -> bool {
+			let rank = |stage: Stage| match stage {
 				Stage::Intent => 0,
 				Stage::Spec => 1,
 				Stage::Plan => 2,
-				Stage::Build => 3,
-				Stage::Verify => 4,
-				Stage::Deploy => 5,
-				Stage::Maintain => 6,
-				Stage::Complete => 7,
-				Stage::SprintCompleted => 8,
+				Stage::Test => 3,
+				Stage::Build => 4,
+				Stage::Verify => 5,
+				Stage::Deploy => 6,
+				Stage::Maintain => 7,
+				Stage::Complete => 8,
+				Stage::SprintCompleted => 9,
 			};
 			rank(self) < rank(other)
 		}
@@ -289,6 +363,7 @@ mod enums {
 				Self::Intent => "Intent",
 				Self::Spec => "Spec",
 				Self::Plan => "Plan",
+				Self::Test => "Test",
 				Self::Build => "Build",
 				Self::Verify => "Verify",
 				Self::Deploy => "Deploy",
@@ -335,7 +410,7 @@ mod enums {
 			evaluation: StageEvaluation,
 		},
 		ExecutionFailed {
-			stage: enums::Stage,
+			stage: e::Stage,
 			attempt: Attempt,
 			error: anyhow::Error,
 		},
@@ -346,7 +421,7 @@ mod enums {
 		},
 	}
 	impl StageOutcome {
-		pub fn stage(&self) -> enums::Stage {
+		pub fn stage(&self) -> Stage {
 			match self {
 				Self::Complete { execution, .. }
 				| Self::NeedsRevision { execution, .. }
@@ -469,7 +544,7 @@ mod enums {
 	}
 }
 use enums as e;
-pub use enums::*;
+pub use e::*;
 pub use prompt as agent_prompts;
 use prompt::*;
 pub mod prompt {
@@ -981,7 +1056,7 @@ pub mod structs {
 		pub activity: Vec<String>,
 		pub pipeline: SprintPipeline,
 		pub attempt: u32,
-		pub stage: enums::Stage,
+		pub stage: e::Stage,
 		pub time_started: Instant,
 		pub stage_time_started: Instant,
 		pub phase: SdlcPhase,
@@ -1020,7 +1095,7 @@ pub mod structs {
 	pub struct PipelineRuntimeView {
 		pub activity: Vec<String>,
 		pub attempt: u32,
-		pub stage: enums::Stage,
+		pub stage: e::Stage,
 		pub time_started: Instant,
 		pub stage_time_started: Instant,
 		pub phase: SdlcPhase,
@@ -1036,7 +1111,7 @@ pub mod structs {
 	}
 	#[derive(Debug)]
 	pub struct StageExecution {
-		pub stage: enums::Stage,
+		pub stage: e::Stage,
 		pub attempt: Attempt,
 		pub time_started: chrono::DateTime<Utc>,
 		pub time_completed: chrono::DateTime<Utc>,
@@ -1046,7 +1121,7 @@ pub mod structs {
 	#[derive(Debug, Clone, Serialize, Deserialize)]
 	pub struct StageRecord {
 		pub attempt: Attempt,
-		pub stage: enums::Stage,
+		pub stage: e::Stage,
 		pub status: StageStatus,
 		pub description: Option<String>,
 
@@ -1057,7 +1132,7 @@ pub mod structs {
 		pub time_completed: Option<DateTime<Utc>>,
 		// time_started: time_readable(time_started),
 		// time_completed: time_readable(time_completed),
-		// time_total: duration_readable(time_completed - time_started), 
+		// time_total: duration_readable(time_completed - time_started),
 		/// Semantic evaluation of the resulting artifact/work.
 		pub evaluation: Option<StageEvaluation>,
 	}
@@ -1095,7 +1170,7 @@ pub mod structs {
 
 	#[derive(Debug, Clone, Serialize, Deserialize)]
 	pub struct StageEvaluation {
-		pub stage: enums::Stage,
+		pub stage: e::Stage,
 		pub actor: StageActor,
 
 		pub time_started: DateTime<Utc>,
@@ -1142,7 +1217,7 @@ pub mod structs {
 		pub id: Uuid,
 		pub title: String,
 		pub goal: String,
-		pub stage: enums::Stage,
+		pub stage: e::Stage,
 		pub stages: Vec<StageRecord>,
 		pub dir: PathBuf,
 		pub time_created: DateTime<Utc>,
@@ -2153,17 +2228,6 @@ impl Attempt {
 			max: 3,
 		}
 	}
-	pub fn can_retry(self) -> bool {
-		self.number < self.max
-	}
-
-	pub fn next(self) -> Self {
-		Self {
-			stage: Stage::Intent,
-			number: self.number + 1,
-			max: self.max,
-		}
-	}
 }
 struct EvaluationContext {
 	pub stage: Stage,
@@ -2181,7 +2245,6 @@ impl EvaluationContext {
 				.intent
 				.as_deref()
 				.ok_or_else(|| anyhow::anyhow!("intent artifact not loaded")),
-
 			SessionFile::Spec => self
 				.spec
 				.as_deref()
@@ -2191,10 +2254,14 @@ impl EvaluationContext {
 				.plan
 				.as_deref()
 				.ok_or_else(|| anyhow::anyhow!("plan artifact not loaded")),
-			SessionFile::Tests => self
+			SessionFile::Test => self
 				.tests
 				.as_deref()
 				.ok_or_else(|| anyhow::anyhow!("tests artifact not loaded")),
+			SessionFile::Build => self
+				.tests
+				.as_deref()
+				.ok_or_else(|| anyhow::anyhow!("build artifact not loaded")),
 
 			SessionFile::Progress => self
 				.progress
@@ -2226,7 +2293,7 @@ impl EvaluationContext {
 				_ => None,
 			},
 			tests: match stage {
-				Stage::Plan | Stage::Build | Stage::Verify => read(SessionFile::Tests),
+				Stage::Plan | Stage::Build | Stage::Verify => read(SessionFile::Test),
 				_ => None,
 			},
 			progress: match stage {
@@ -2557,12 +2624,11 @@ impl Evaluator {
 		let intent = ctx.get(SessionFile::Intent)?;
 		let spec = ctx.get(SessionFile::Spec)?;
 		let plan = ctx.get(SessionFile::Plan)?;
-		let tests = ctx.get(SessionFile::Tests)?;
 		let state = format!(
 			"## User Intent\n\n{intent}\n\n\
          ## Specification\n\n{spec}\n\n\
          ## Implementation Plan\n\n{plan}\n\n\
-         ## Test Plan\n\n{tests}"
+         "
 		);
 		let response = self
 			.jev
@@ -2631,7 +2697,7 @@ impl Evaluator {
 		let intent = ctx.get(SessionFile::Intent)?;
 		let spec = ctx.get(SessionFile::Spec)?;
 		let plan = ctx.get(SessionFile::Plan)?;
-		let tests = ctx.get(SessionFile::Tests)?;
+		let tests = ctx.get(SessionFile::Test)?;
 		let implementation = std::fs::read_dir(&self.session.dir)?
 			.filter_map(|entry| entry.ok())
 			.filter_map(|entry| {
@@ -2721,7 +2787,7 @@ impl Evaluator {
 		let time_started = Utc::now();
 		let intent = ctx.get(SessionFile::Intent)?;
 		let spec = ctx.get(SessionFile::Spec)?;
-		let tests = ctx.get(SessionFile::Tests)?;
+		let tests = ctx.get(SessionFile::Test)?;
 		let evidence = ctx
 			.get(SessionFile::Verification)
 			.unwrap_or("No verification evidence was recorded.");
@@ -2935,10 +3001,10 @@ impl SprintPipeline {
 		self.session.as_ref().map(|session| session.stage)
 	}
 	pub fn complete(&mut self) -> Result<()> {
-		self.transition(enums::Stage::Complete)
+		self.transition(e::Stage::Complete)
 	}
 	pub fn is_complete(&self) -> bool {
-		self.stage() == Some(enums::Stage::Complete)
+		self.stage() == Some(e::Stage::Complete)
 	}
 	fn stage_attempt(&self) -> u32 {
 		self.stage_attempt
@@ -2959,7 +3025,7 @@ impl SprintPipeline {
 					execution.stage, execution.attempt.number, execution.attempt.max
 				);
 
-				if execution.stage == enums::Stage::Complete {
+				if execution.stage == e::Stage::Complete {
 					println!(">>> decision = Complete");
 					StageDecision::Complete
 				} else {
@@ -3017,7 +3083,7 @@ impl SprintPipeline {
 	}
 	async fn apply(
 		&mut self,
-		stage: enums::Stage,
+		stage: e::Stage,
 		attempt: Attempt,
 		outcome: StageOutcome,
 		decision: StageDecision,
@@ -3056,7 +3122,7 @@ impl SprintPipeline {
 	}
 	async fn wait_for_intervention(
 		&mut self,
-		stage: enums::Stage,
+		stage: e::Stage,
 		attempt: Attempt,
 		reason: String,
 		input_rx: &mut tokio::sync::mpsc::UnboundedReceiver<SdlcInput>,
@@ -3221,7 +3287,7 @@ impl SprintPipeline {
 				actor: evaluation.actor.clone(),
 				time_started: execution.time_started,
 				time_completed: Some(execution.time_completed),
-				description: None,
+				description: Some(format!("Stage Completed: {}", execution.stage.clone())),
 				evaluation: Some(evaluation.clone()),
 			},
 
@@ -3235,7 +3301,7 @@ impl SprintPipeline {
 				actor: evaluation.actor.clone(),
 				time_started: execution.time_started,
 				time_completed: Some(execution.time_completed),
-				description: None,
+				description: Some(format!("Needs Revision: {}", execution.stage.clone())),
 				evaluation: Some(evaluation.clone()),
 			},
 
@@ -3287,7 +3353,7 @@ impl SprintPipeline {
 		session.time_updated = Utc::now();
 		self.persist()
 	}
-	fn retry(&mut self, _stage: enums::Stage) -> Result<()> {
+	fn retry(&mut self, _stage: e::Stage) -> Result<()> {
 		Ok(())
 	}
 	fn checks_for(stage: Stage) -> Vec<(&'static str, Vec<&'static str>)> {
@@ -3304,6 +3370,7 @@ impl SprintPipeline {
 				),
 				("cargo fmt", vec!["cargo", "fmt", "--", "--check"]),
 			],
+			_ => Vec::new(),
 		}
 	}
 	async fn run_checks(&self, stage: Stage) -> Result<Vec<CheckResult>> {
@@ -3341,7 +3408,7 @@ impl SprintPipeline {
 
 		Ok(results)
 	}
-	fn transition(&mut self, next: enums::Stage) -> Result<()> {
+	fn transition(&mut self, next: e::Stage) -> Result<()> {
 		let session = self.session()?;
 		let valid = matches!(
 			(&session.stage, &next),
@@ -3423,7 +3490,7 @@ impl PipelineRuntime {
 			events: vec![],
 		}
 	}
-	fn retry(&mut self, _stage: enums::Stage) -> Result<()> {
+	fn retry(&mut self, _stage: e::Stage) -> Result<()> {
 		Ok(())
 	}
 	pub async fn run(&mut self, input_rx: &mut UnboundedReceiver<SdlcInput>) -> Result<()> {
@@ -3561,7 +3628,7 @@ impl traits::Runner for SprintRunner<'_> {
 	}
 }
 impl SprintRunner<'_> {
-	fn load_state(&mut self) -> Result<enums::Stage> {
+	fn load_state(&mut self) -> Result<e::Stage> {
 		let session = self
 			.pipeline
 			.session
@@ -3574,7 +3641,7 @@ impl SprintRunner<'_> {
 		println!(">>> loaded state = {}", json);
 		#[derive(serde::Deserialize)]
 		struct PersistedStage {
-			stage: enums::Stage,
+			stage: e::Stage,
 		}
 		let state: PersistedStage = serde_json::from_str(&json)?;
 		Ok(state.stage)
@@ -3583,10 +3650,10 @@ impl SprintRunner<'_> {
 	fn begin_attempt(&mut self, stage: Stage) -> Result<Attempt> {
 		self.pipeline.next_attempt(stage)
 	}
-	fn transition(&mut self, next: enums::Stage) -> Result<()> {
+	fn transition(&mut self, next: e::Stage) -> Result<()> {
 		self.pipeline.transition(next)
 	}
-	fn retry(&mut self, stage: enums::Stage) -> Result<()> {
+	fn retry(&mut self, stage: e::Stage) -> Result<()> {
 		self.pipeline.retry(stage)
 	}
 	fn emit(&self, event: SdlcEvent) {
@@ -3809,7 +3876,7 @@ impl SprintRunner<'_> {
 	}
 	async fn run_stage(
 		&mut self,
-		stage: enums::Stage,
+		stage: e::Stage,
 		attempt: Attempt,
 		pending_input: &mut Option<SdlcInput>,
 	) -> Result<StageOutcome> {
@@ -3839,7 +3906,7 @@ impl SprintRunner<'_> {
 	}
 	async fn run_current_stage(
 		&mut self,
-		stage: enums::Stage,
+		stage: e::Stage,
 		attempt: Attempt,
 		pending_input: &mut Option<SdlcInput>,
 	) -> Result<StageExecution> {
@@ -3852,9 +3919,11 @@ impl SprintRunner<'_> {
 			Stage::Verify => self.stage_verify().await?,
 			Stage::Complete => StageResult::Complete,
 			Stage::SprintCompleted => StageResult::SprintCompleted,
-
 			Stage::Deploy | Stage::Maintain => {
 				return Err(anyhow!("stage {stage:?} not implemented"));
+			}
+			_ => {
+				todo!("run_current_stage")
 			}
 		};
 		Ok(StageExecution {
@@ -3881,7 +3950,7 @@ impl SprintRunner<'_> {
 
 	async fn wait_for_intervention(
 		&mut self,
-		stage: enums::Stage,
+		stage: e::Stage,
 		attempt: Attempt,
 		reason: String,
 		input_rx: &mut UnboundedReceiver<SdlcInput>,
@@ -4048,7 +4117,7 @@ impl SprintRunner<'_> {
 			}
 		}
 	}
-	async fn handle_retry(&mut self, stage: enums::Stage, attempt: Attempt) -> Result<()> {
+	async fn handle_retry(&mut self, stage: e::Stage, attempt: Attempt) -> Result<()> {
 		let next_attempt = Attempt {
 			stage,
 			number: attempt.number + 1,
@@ -4069,7 +4138,7 @@ impl SprintRunner<'_> {
 	}
 	async fn handle_revision(
 		&mut self,
-		stage: enums::Stage,
+		stage: e::Stage,
 		attempt: Attempt,
 		_outcome: StageOutcome,
 		input_rx: &mut UnboundedReceiver<SdlcInput>,
@@ -4150,7 +4219,7 @@ impl SprintRunner<'_> {
 	}
 	async fn handle_failure_execution(
 		&mut self,
-		stage: enums::Stage,
+		stage: e::Stage,
 		attempt: Attempt,
 		error: anyhow::Error,
 		input_rx: &mut tokio::sync::mpsc::UnboundedReceiver<SdlcInput>,
@@ -4224,7 +4293,7 @@ impl SprintRunner<'_> {
 	}
 	async fn handle_failure_evaluation(
 		&mut self,
-		stage: enums::Stage,
+		stage: e::Stage,
 		attempt: Attempt,
 		error: anyhow::Error,
 		input_rx: &mut tokio::sync::mpsc::UnboundedReceiver<SdlcInput>,
@@ -4303,7 +4372,7 @@ impl SprintRunner<'_> {
 	}
 	async fn handle_failure_of_quality(
 		&mut self,
-		stage: enums::Stage,
+		stage: e::Stage,
 		attempt: Attempt,
 		input_rx: &mut tokio::sync::mpsc::UnboundedReceiver<SdlcInput>,
 		pending_input: &mut Option<SdlcInput>,
@@ -4445,79 +4514,5 @@ impl WorkspaceSnapshot {
 		WorkspaceChanges {
 			git_status: after.git_status.clone(),
 		}
-	}
-}
-fn persist_evaluation(session: &mut SdlcSession, evaluation: &StageEvaluation) -> Result<()> {
-	let status = if evaluation.passed {
-		StageStatus::Completed
-	} else {
-		StageStatus::NeedsRevision
-	};
-
-	let record = StageRecord {
-		description: Some(String::from("Evaluation done")),
-		actor: evaluation.actor.clone(),
-		attempt: Attempt::new(),
-		evaluation: Some(evaluation.clone()),
-		stage: evaluation.stage,
-		time_started: evaluation.time_started,
-		time_completed: Some(Utc::now()),
-		status,
-	};
-	let time_started = evaluation.time_started;
-	let time_completed = Utc::now();
-	// let record = StageRecord {
-	// 	stage: evaluation.stage,
-	// 	attempt: Attempt::new(),
-	// 	status,
-	// 	actor: evaluation.actor.clone(),
-	// 	description: Some("Evaluation done".into()),
-	// 
-	// 	time_started: time_readable(time_started),
-	// 	time_completed: Some(time_readable(time_completed)),
-	// 	time_total: duration_readable(time_completed - time_started),
-	// 
-	// 	evaluation: Some(evaluation.clone()),
-	// };
-	session.stages.push(record);
-	session.time_updated = Utc::now();
-
-	Ok(())
-}
-
-
-pub fn time_readable(time: chrono::DateTime<chrono::Utc>) -> String {
-	time.format("%B %-d, %Y at %-I:%M:%S %p UTC").to_string()
-}
-
-pub fn short_duration_readable(duration: chrono::Duration) -> String {
-	let seconds = duration.num_seconds();
-	let hours = seconds / 3600;
-	let minutes = (seconds % 3600) / 60;
-	let seconds = seconds % 60;
-
-	match (hours, minutes, seconds) {
-		(h, m, _) if h > 0 => format!("{h} hours {m} minutes"),
-		(_, m, s) if m > 0 => format!("{m} minutes {s} seconds"),
-		(_, _, s) => format!("{s} seconds"),
-	}
-}
-
-pub fn duration_readable(duration: chrono::Duration) -> String {
-	let millis = duration.num_milliseconds();
-
-	if millis < 1000 {
-		return format!("{millis} ms");
-	}
-
-	let seconds = millis / 1000;
-	let hours = seconds / 3600;
-	let minutes = (seconds % 3600) / 60;
-	let seconds = seconds % 60;
-
-	match (hours, minutes, seconds) {
-		(h, m, _) if h > 0 => format!("{h}h {m}m"),
-		(_, m, s) if m > 0 => format!("{m}m {s}s"),
-		(_, _, s) => format!("{s}s"),
 	}
 }
