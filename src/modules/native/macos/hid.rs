@@ -48,6 +48,40 @@ fn display_name(value: &str, max: usize) -> String {
 fn default_bindings() -> Vec<Binding> {
 	vec![
 		// ─────────────────────────────────────────────
+		// Chord: Caps Lock + P
+		// ─────────────────────────────────────────────
+		Binding {
+			trigger: Trigger::Chord {
+				keys: vec![Key::CapsLock, Key::Key("p".into())],
+			},
+			action: Action {
+				name: "TestCapsP".into(),
+				description: "Test Caps Lock + P".into(),
+				code: "test.caps_p".into(),
+			},
+			when: Context::default(),
+			consume: Consume::Always,
+			enabled: true,
+		},
+		// ─────────────────────────────────────────────
+		// Double tap: Caps Lock
+		// ─────────────────────────────────────────────
+		Binding {
+			trigger: Trigger::Repeat {
+				key: Key::CapsLock,
+				count: 2,
+				max_interval_ms: Some(300),
+			},
+			action: Action {
+				name: "TestCapsDoubleTap".into(),
+				description: "Test double tap Caps Lock".into(),
+				code: "test.caps_double_tap".into(),
+			},
+			when: Context::default(),
+			consume: Consume::OnMatch,
+			enabled: true,
+		},
+		// ─────────────────────────────────────────────
 		// Chord
 		// ─────────────────────────────────────────────
 		Binding {
@@ -659,7 +693,16 @@ impl MacosHid {
 	}
 	fn handle_event(&mut self, event: NativeEvent, received_at: u64, events: &EventBus) {
 		self.state_update(&event);
+		let latency = received_at.saturating_sub(event.sent_at);
 
+		for action in self.observe_event(&event) {
+			tracing::info!(
+					action = %action.name,
+					code = %action.code,
+					latency,
+					"🔥 HOTKEY TRIGGERED"
+			);
+		}
 		// let latency = received_at.saturating_sub(event.sent_at);
 		// self.log_native_event(&event);
 		// for action in self.observe_event(&event) {

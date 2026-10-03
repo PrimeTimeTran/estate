@@ -33,7 +33,7 @@ enum Kind: String, Codable {
 }
 
 // MARK: - Feature Flags
-let enablePrintEvent = false
+let enablePrintEvent = true
 let enableEstateSocket = true
 let enableWorkspaceObserver = true
 let enableInitialForegroundApp = true
@@ -62,6 +62,7 @@ let modifiers: [Int64: String] = [
   57: "CAPS",
 ]
 let watchedKeyCodes: Set<CGKeyCode> = [
+  57,  // CAPS
   58,  // Left Option
   61,  // Right Option
   59,  // Left Control
@@ -407,7 +408,6 @@ func heldModifiers(_ flags: CGEventFlags) -> String {
   return result.joined(separator: "+")
 }
 func eventTypeName(_ type: CGEventType) -> String {
-
   switch type {
   case .keyDown:
     return "KEYDOWN"
@@ -434,49 +434,63 @@ func eventDescription(type: CGEventType, code: Int64) -> String {
     return "UNKNOWN"
   }
 }
-func updateModifierState(keyCode: Int64) -> KeyDirection? {
+func updateModifierState(
+  keyCode: Int64,
+  flags: CGEventFlags
+) -> KeyDirection? {
   let code = CGKeyCode(keyCode)
 
   switch code {
   case 56:  // Left Shift
-    state.lShift.toggle()
-    return state.lShift ? .down : .up
+    let down = flags.contains(.maskShift)
+    state.lShift = down
+    return down ? .down : .up
 
   case 60:  // Right Shift
-    state.rShift.toggle()
-    return state.rShift ? .down : .up
+    let down = flags.contains(.maskShift)
+    state.rShift = down
+    return down ? .down : .up
 
   case 59:  // Left Control
-    state.lCtrl.toggle()
-    return state.lCtrl ? .down : .up
+    let down = flags.contains(.maskControl)
+    state.lCtrl = down
+    return down ? .down : .up
 
   case 62:  // Right Control
-    state.rCtrl.toggle()
-    return state.rCtrl ? .down : .up
+    let down = flags.contains(.maskControl)
+    state.rCtrl = down
+    return down ? .down : .up
 
   case 58:  // Left Option
-    state.lOpt.toggle()
-    return state.lOpt ? .down : .up
+    let down = flags.contains(.maskAlternate)
+    state.lOpt = down
+    return down ? .down : .up
 
   case 61:  // Right Option
-    state.rOpt.toggle()
-    return state.rOpt ? .down : .up
+    let down = flags.contains(.maskAlternate)
+    state.rOpt = down
+    return down ? .down : .up
 
   case 55:  // Left Command
-    state.lCmd.toggle()
-    return state.lCmd ? .down : .up
+    let down = flags.contains(.maskCommand)
+    state.lCmd = down
+    return down ? .down : .up
 
   case 54:  // Right Command
-    state.rCmd.toggle()
-    return state.rCmd ? .down : .up
+    let down = flags.contains(.maskCommand)
+    state.rCmd = down
+    return down ? .down : .up
 
   case 63:  // Fn
-    state.fn.toggle()
-    return state.fn ? .down : .up
+    let down = flags.contains(.maskSecondaryFn)
+    state.fn = down
+    return down ? .down : .up
 
   case 57:  // Caps Lock
-    state.caps.toggle()
-    return state.caps ? .down : .up
+    let down = flags.contains(.maskAlphaShift)
+    state.caps = down
+    return down ? .down : .up
+
   default:
     return nil
   }
@@ -792,7 +806,7 @@ func sendNativeEvent(
 ) {
   guard clientFD >= 0 else {
     if enablePrintEvent {
-      print("⚠️ SWIFT → RUST skipped: invalid client fd=\(clientFD)")
+      // print("⚠️ SWIFT → RUST skipped: invalid client fd=\(clientFD)")
       printEvent(event)
     }
     return
@@ -1129,7 +1143,7 @@ if enableWorkspaceObserver {
         ] as? NSRunningApplication
     else {
       if enableWorkspaceLogging {
-        print("⚠️ activation notification without app")
+        // print("⚠️ activation notification without app")
       }
       return
     }
@@ -1170,6 +1184,16 @@ if enableCGEventTap {
     event,
     userInfo in
     // print("🔥 CGEVENT TYPE: \(type.rawValue)")
+    let code = event.getIntegerValueField(
+      .keyboardEventKeycode
+    )
+
+    if type == .flagsChanged {
+      print(
+        "🔥 RAW FLAGS: keyCode=\(code) " + "flags=0x\(String(event.flags.rawValue, radix: 16))"
+      )
+      fflush(stdout)
+    }
     fflush(stdout)
 
     if type == .tapDisabledByTimeout {
@@ -1183,79 +1207,38 @@ if enableCGEventTap {
       fflush(stdout)
       return Unmanaged.passUnretained(event)
     }
-
-    let code = event.getIntegerValueField(
-      .keyboardEventKeycode
-    )
-
     switch type {
     // MARK: Modifier
+
     case .flagsChanged:
-      if code == 0 {
+      // Only normalize actual modifier keys.
+      guard watchedKeyCodes.contains(CGKeyCode(code)) else {
         if enableEventLogging {
           print(
-            "⚠️ NON-MODIFIER FLAGS EVENT: "
-              + "keycode=0 "
+            "⚠️ IGNORED FLAGS EVENT: "
+              + "keycode=\(code) "
               + "time=\(event.timestamp) "
-              + "flags=\(event.flags.rawValue)"
+              + "flags=0x\(String(event.flags.rawValue, radix: 16))"
           )
           fflush(stdout)
         }
 
         break
       }
-
       let name = modifierName(code)
-      // Update our left/right modifier state BEFORE
-      // constructing the normalized event.
-      let direction = updateModifierState(
-        keyCode: code
+      let direction = updateModifierState(keyCode: code, flags: event.flags)
+
+      print(
+        """
+        🧠 STATE AFTER FLAGS
+           keyCode=\(code)
+           flags=0x\(String(event.flags.rawValue, radix: 16))
+           L: shift=\(state.lShift) ctrl=\(state.lCtrl) opt=\(state.lOpt) cmd=\(state.lCmd)
+           R: shift=\(state.rShift) ctrl=\(state.rCtrl) opt=\(state.rOpt) cmd=\(state.rCmd)
+           fn=\(state.fn) caps=\(state.caps)
+        """
       )
-
-      if watchedKeyCodes.contains(CGKeyCode(code)) {
-
-        let rightCommandHeld = CGEventSource.keyState(
-          .combinedSessionState,
-          key: 54
-        )
-
-        let leftCommandHeld = CGEventSource.keyState(
-          .combinedSessionState,
-          key: 55
-        )
-
-        let sourcePID = event.getIntegerValueField(
-          .eventSourceUnixProcessID
-        )
-
-        let sourceState = event.getIntegerValueField(
-          .eventSourceStateID
-        )
-
-        let keyboardType = event.getIntegerValueField(
-          .keyboardEventKeyboardType
-        )
-
-        let autorepeat = event.getIntegerValueField(
-          .keyboardEventAutorepeat
-        )
-
-        let sessionFlags =
-          CGEventSource.flagsState(
-            .combinedSessionState
-          ).rawValue
-
-        // Keep these available while debugging.
-        _ = rightCommandHeld
-        _ = leftCommandHeld
-        _ = sourcePID
-        _ = sourceState
-        _ = keyboardType
-        _ = autorepeat
-        _ = sessionFlags
-
-        fflush(stdout)
-      }
+      fflush(stdout)
 
       let nativeEvent = makeEvent(
         event,
@@ -1270,7 +1253,16 @@ if enableCGEventTap {
           on: estateClientFD
         )
       }
-
+    // 54  right command
+    // 55  left command
+    // 56  left shift
+    // 57  caps lock
+    // 58  left option
+    // 59  left control
+    // 60  right shift
+    // 61  right option
+    // 62  right control
+    // 63  fn
     // MARK: Key Down
     case .keyDown:
 
