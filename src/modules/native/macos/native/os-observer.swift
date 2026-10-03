@@ -2,6 +2,7 @@ import AppKit
 import CoreGraphics
 import Darwin
 import Foundation
+import IOKit.hid
 
 enum KeyDirection: String, Codable {
   case down
@@ -43,11 +44,12 @@ let enableEventLogging = true
 let enableWorkspaceLogging = true
 var estateClientFD: Int32 = -1
 var state = ModifierState()
-
+var hidReportSequence: UInt64 = 0
 // MARK: - Shared Observer State
 formatter.dateFormat = "HH:mm:ss.SSS"
 
 var shouldStartEstateSocket = true
+var currentDevice = "unknown"
 let socketPath = "/tmp/estate-hid.sock"
 let modifiers: [Int64: String] = [
   56: "LSHIFT",
@@ -87,7 +89,28 @@ let mask =
   | CGEventMask(1 << CGEventType.otherMouseDown.rawValue)
   | CGEventMask(1 << CGEventType.otherMouseUp.rawValue)
   | CGEventMask(1 << CGEventType.scrollWheel.rawValue)
+var hidDevices: [Int: HIDDeviceInfo] = [:]
+var hidManager: IOHIDManager?
+var registeredHIDDevices = Set<String>()
+var hidReportContexts: [String: HIDReportContext] = [:]
+final class HIDReportContext {
+  let name: String
+  let transport: String
+  let vid: Int
+  let pid: Int
 
+  init(
+    name: String,
+    transport: String,
+    vid: Int,
+    pid: Int
+  ) {
+    self.name = name
+    self.transport = transport
+    self.vid = vid
+    self.pid = pid
+  }
+}
 struct FrontmostApp: Codable {
   let bundleID: String?
   let name: String?
@@ -237,7 +260,18 @@ struct NativeEvent: Codable {
 struct MouseButton: Codable {
   let number: Int64
 }
-
+struct EventDevice {
+  let name: String
+  let vendorID: Int
+  let productID: Int
+  let transport: String
+}
+struct HIDDeviceInfo {
+  let name: String
+  let vendorID: Int
+  let productID: Int
+  let transport: String
+}
 func modifierName(_ keyCode: Int64) -> String {
   switch keyCode {
   case 56, 60: return "SHIFT"
@@ -434,6 +468,9 @@ func eventDescription(type: CGEventType, code: Int64) -> String {
     return "UNKNOWN"
   }
 }
+func eventDevice() -> String {
+  currentDevice
+}
 func updateModifierState(
   keyCode: Int64,
   flags: CGEventFlags
@@ -522,30 +559,37 @@ func aggregateModifiers(_ modifiers: ModifierSnapshot?) -> String {
     + "\(keyState(cmd, "⌘"))"
 }
 func describeFlags(_ flags: CGEventFlags) -> String {
-    var parts: [String] = []
+  var parts: [String] = []
 
-    if flags.contains(.maskShift) {
-        parts.append("SHIFT")
-    }
-    if flags.contains(.maskControl) {
-        parts.append("CTRL")
-    }
-    if flags.contains(.maskAlternate) {
-        parts.append("OPT")
-    }
-    if flags.contains(.maskCommand) {
-        parts.append("CMD")
-    }
-    if flags.contains(.maskSecondaryFn) {
-        parts.append("FN")
-    }
-    if flags.contains(.maskAlphaShift) {
-        parts.append("CAPS")
-    }
+  if flags.contains(.maskShift) {
+    parts.append("SHIFT")
+  }
+  if flags.contains(.maskControl) {
+    parts.append("CTRL")
+  }
+  if flags.contains(.maskAlternate) {
+    parts.append("OPT")
+  }
+  if flags.contains(.maskCommand) {
+    parts.append("CMD")
+  }
+  if flags.contains(.maskSecondaryFn) {
+    parts.append("FN")
+  }
+  if flags.contains(.maskAlphaShift) {
+    parts.append("CAPS")
+  }
 
-    return parts.isEmpty ? "none" : parts.joined(separator: "+")
+  return parts.isEmpty ? "none" : parts.joined(separator: "+")
 }
 func printEvent(_ nativeEvent: NativeEvent) {
+  switch nativeEvent.kind {
+  case .mouseDown, .mouseUp, .scroll:
+    return
+  default:
+    break
+  }
+
   let now = formatter.string(from: Date())
   let modifiers = nativeEvent.modifiers
 
@@ -637,11 +681,28 @@ func printEvent(_ nativeEvent: NativeEvent) {
 
   let eventDisplay = "\(arrow) \(displayName)"
 
+  // print(
+  //   String(
+  //     format:
+  //       "%@ | %-9@ | %-9@ | %-4@ | %-14@ | %-8@ | %4lld",
+  //     now as NSString,
+  //     left as NSString,
+  //     right as NSString,
+  //     special as NSString,
+  //     eventDisplay as NSString,
+  //     flagsText as NSString,
+  //     keyCode ?? -1
+  //   )
+  // )
+
+  let device = eventDevice()
+
   print(
     String(
       format:
-        "%@ | %-9@ | %-9@ | %-4@ | %-14@ | %-8@ | %4lld",
+        "%@ | %-24@ | %-9@ | %-9@ | %-4@ | %-14@ | %-8@ | %4lld",
       now as NSString,
+      device as NSString,
       left as NSString,
       right as NSString,
       special as NSString,
@@ -1125,6 +1186,256 @@ func printHeader() {
 
   fflush(stdout)
 }
+func hidDeviceInfo(_ device: IOHIDDevice) -> HIDDeviceInfo {
+  func stringProperty(_ key: CFString) -> String {
+    IOHIDDeviceGetProperty(device, key) as? String ?? "unknown"
+  }
+
+  func intProperty(_ key: CFString) -> Int {
+    (IOHIDDeviceGetProperty(device, key) as? NSNumber)?.intValue ?? 0
+  }
+
+  return HIDDeviceInfo(
+    name: stringProperty(kIOHIDProductKey as CFString),
+    vendorID: intProperty(kIOHIDVendorIDKey as CFString),
+    productID: intProperty(kIOHIDProductIDKey as CFString),
+    transport: stringProperty(kIOHIDTransportKey as CFString)
+  )
+}
+
+func startHIDKeyboardWatcher() {
+  hidManager = IOHIDManagerCreate(
+    kCFAllocatorDefault,
+    IOOptionBits(0)
+  )
+
+  guard let manager = hidManager else {
+    print("❌ Failed to create HID manager")
+    return
+  }
+
+  // nil = all HID devices.
+  IOHIDManagerSetDeviceMatching(manager, nil)
+
+  // ------------------------------------------------------------
+  // Register callback for devices that appear later.
+  // ------------------------------------------------------------
+
+  IOHIDManagerRegisterDeviceMatchingCallback(
+    manager,
+    { _, _, _, device in
+      registerHIDDevice(device)
+    },
+    nil
+  )
+
+  // ------------------------------------------------------------
+  // Enumerate devices that already exist RIGHT NOW.
+  // ------------------------------------------------------------
+
+  if let devices = IOHIDManagerCopyDevices(manager) as? Set<IOHIDDevice> {
+    print("🔥 HID DEVICES | found \(devices.count)")
+
+    for device in devices {
+      registerHIDDevice(device)
+    }
+  }
+
+  // ------------------------------------------------------------
+  // Schedule manager.
+  // ------------------------------------------------------------
+
+  IOHIDManagerScheduleWithRunLoop(
+    manager,
+    CFRunLoopGetCurrent(),
+    CFRunLoopMode.defaultMode.rawValue
+  )
+
+  let result = IOHIDManagerOpen(
+    manager,
+    IOOptionBits(0)
+  )
+
+  print("🔥 HID watcher started: \(result)")
+  fflush(stdout)
+}
+func registerHIDDevice(_ device: IOHIDDevice) {
+  let name =
+    IOHIDDeviceGetProperty(
+      device,
+      kIOHIDProductKey as CFString
+    ) as? String ?? "Unknown"
+
+  let vendor =
+    (IOHIDDeviceGetProperty(
+      device,
+      kIOHIDVendorIDKey as CFString
+    ) as? NSNumber)?.intValue ?? 0
+
+  let product =
+    (IOHIDDeviceGetProperty(
+      device,
+      kIOHIDProductIDKey as CFString
+    ) as? NSNumber)?.intValue ?? 0
+
+  let transport =
+    IOHIDDeviceGetProperty(
+      device,
+      kIOHIDTransportKey as CFString
+    ) as? String ?? "Unknown"
+
+  let usagePage =
+    (IOHIDDeviceGetProperty(
+      device,
+      kIOHIDPrimaryUsagePageKey as CFString
+    ) as? NSNumber)?.intValue ?? 0
+
+  let usage =
+    (IOHIDDeviceGetProperty(
+      device,
+      kIOHIDPrimaryUsageKey as CFString
+    ) as? NSNumber)?.intValue ?? 0
+
+  let identity =
+    "\(name)|\(vendor)|\(product)|\(transport)|\(usagePage)|\(usage)"
+
+  guard !registeredHIDDevices.contains(identity) else {
+    return
+  }
+
+  registeredHIDDevices.insert(identity)
+
+  print(
+    "🔥 HID DEVICE | "
+      + "name=\(name) | "
+      + "transport=\(transport) | "
+      + "usagePage=0x\(String(format: "%04x", usagePage)) | "
+      + "usage=0x\(String(format: "%04x", usage))"
+  )
+  fflush(stdout)
+
+  // Only register actual keyboard devices.
+  guard usagePage == 0x01, usage == 0x06 else {
+    return
+  }
+
+  print(
+    "🔥 HID WATCHING KEYBOARD | "
+      + "device=\(name) | "
+      + "transport=\(transport) | "
+      + "vid=0x\(String(format: "%04x", vendor)) "
+      + "pid=0x\(String(format: "%04x", product))"
+  )
+  fflush(stdout)
+
+  let result = IOHIDDeviceOpen(
+    device,
+    IOOptionBits(0)
+  )
+
+  print(
+    "🔥 HID KEYBOARD | "
+      + "registered=\(name) "
+      + "usagePage=0x\(String(format: "%04x", usagePage)) "
+      + "usage=0x\(String(format: "%04x", usage)) "
+      + "result=\(result)"
+  )
+  fflush(stdout)
+
+  guard result == kIOReturnSuccess else {
+    return
+  }
+
+  // ------------------------------------------------------------
+  // INPUT REPORT BUFFER
+  // ------------------------------------------------------------
+
+  let reportSize = 64
+
+  let reportBuffer =
+    UnsafeMutablePointer<UInt8>.allocate(
+      capacity: reportSize
+    )
+
+  reportBuffer.initialize(
+    repeating: 0,
+    count: reportSize
+  )
+
+  print(
+    "🔥 HID REPORT SETUP | "
+      + "device=\(name) "
+      + "bufferSize=\(reportSize)"
+  )
+  fflush(stdout)
+
+  // ------------------------------------------------------------
+  // PER-DEVICE CALLBACK CONTEXT
+  // ------------------------------------------------------------
+
+  let reportContext = HIDReportContext(
+    name: name,
+    transport: transport,
+    vid: vendor,
+    pid: product
+  )
+
+  // Keep the context alive for as long as this device is registered.
+  hidReportContexts[identity] = reportContext
+
+  // ------------------------------------------------------------
+  // ACTUAL HID INPUT REPORT CALLBACK
+  // ------------------------------------------------------------
+
+  IOHIDDeviceRegisterInputReportCallback(
+    device,
+    reportBuffer,
+    reportSize,
+    { context, result, sender, type, reportID, report, reportLength in
+
+      guard let context else {
+        print("🔥 HID RAW | context=nil")
+        fflush(stdout)
+        return
+      }
+
+      let reportContext =
+        Unmanaged<HIDReportContext>
+        .fromOpaque(context)
+        .takeUnretainedValue()
+
+      let receivedAt =
+        DispatchTime.now().uptimeNanoseconds
+
+      var bytes = ""
+
+      for i in 0..<reportLength {
+        bytes += String(
+          format: "%02x ",
+          report[i]
+        )
+      }
+
+      print(
+        "🔥 HID RAW | "
+          + "device=\(reportContext.name) "
+          + "transport=\(reportContext.transport) "
+          + "vid=0x\(String(format: "%04x", reportContext.vid)) "
+          + "pid=0x\(String(format: "%04x", reportContext.pid)) "
+          + "reportID=\(reportID) "
+          + "length=\(reportLength) "
+          + "receivedAt=\(receivedAt) "
+          + "raw=[\(bytes)]"
+      )
+
+      fflush(stdout)
+    },
+    Unmanaged.passUnretained(reportContext).toOpaque()
+  )
+
+  print("🔥 HID REPORT CALLBACK REGISTERED")
+  fflush(stdout)
+}
 
 // MARK: - Estate Transport
 if enableEstateSocket {
@@ -1206,25 +1517,29 @@ if enableCGEventTap {
     type,
     event,
     userInfo in
-    // print("🔥 CGEVENT TYPE: \(type.rawValue)")
+    let receivedAt = DispatchTime.now().uptimeNanoseconds
+    let eventTimestamp = event.timestamp
+    print(
+      "🍎 CGEVENT | "
+        + "type=\(type.rawValue) "
+        + "keyCode=\(event.getIntegerValueField(.keyboardEventKeycode)) "
+        + "eventTS=\(eventTimestamp) "
+        + "receivedAt=\(receivedAt)"
+    )
+    fflush(stdout)
     let code = event.getIntegerValueField(
       .keyboardEventKeycode
     )
-
     if type == .flagsChanged {
-      print(
-          """
-          🔥 RAW EVENT
-             type=\(type.rawValue)
-             keyCode=\(code)
-             flags=0x\(String(event.flags.rawValue, radix: 16))
-             decoded=[\(describeFlags(event.flags))]
-          """
-      )
+      // print(
+      //   "🔥 RAW | key=\(String(format: "%3d", code)) | "
+      //     + "flags=0x\(String(format: "%08llx", event.flags.rawValue)) | "
+      //     + "[\(describeFlags(event.flags))] "
+      //     + "eventTs=\(eventTimestamp) "
+      //     + "receivedAt=\(receivedAt)"
+      // )
       fflush(stdout)
     }
-    fflush(stdout)
-
     if type == .tapDisabledByTimeout {
       print("!!! EVENT TAP DISABLED: TIMEOUT")
       fflush(stdout)
@@ -1258,14 +1573,10 @@ if enableCGEventTap {
       let direction = updateModifierState(keyCode: code, flags: event.flags)
 
       print(
-        """
-        🧠 STATE AFTER FLAGS
-           keyCode=\(code)
-           flags=0x\(String(event.flags.rawValue, radix: 16))
-           L: shift=\(state.lShift) ctrl=\(state.lCtrl) opt=\(state.lOpt) cmd=\(state.lCmd)
-           R: shift=\(state.rShift) ctrl=\(state.rCtrl) opt=\(state.rOpt) cmd=\(state.rCmd)
-           fn=\(state.fn) caps=\(state.caps)
-        """
+        "🧠 STATE | " + "key=\(String(format: "%3d", code)) | "
+          + "L: ⇧=\(state.lShift) ⌃=\(state.lCtrl) ⌥=\(state.lOpt) ⌘=\(state.lCmd) | "
+          + "R: ⇧=\(state.rShift) ⌃=\(state.rCtrl) ⌥=\(state.rOpt) ⌘=\(state.rCmd) | "
+          + "fn=\(state.fn) caps=\(state.caps)"
       )
       fflush(stdout)
 
@@ -1476,5 +1787,5 @@ if enableCGEventTap {
 print("")
 print("🚀 Estate native PID: \(pid)")
 print("")
-
+startHIDKeyboardWatcher()
 CFRunLoopRun()
