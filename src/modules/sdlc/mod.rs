@@ -2904,7 +2904,7 @@ impl SprintPipeline {
 				let dir = Self::create_dir(&title)?;
 				Self::init_templates(&dir)?;
 				let session = SdlcSession::new(title, dir)?;
-				Self::save_session(&session)?;
+				Self::session_save(&session)?;
 				session
 			}
 		};
@@ -2941,239 +2941,27 @@ impl SprintPipeline {
 		self.commit()?;
 		Ok(())
 	}
-
 	pub fn subscribe(&self) -> broadcast::Receiver<SdlcEvent> {
 		self.event_tx.subscribe()
 	}
 	async fn summarize_title(intent: &str) -> Result<String> {
 		Ok(String::from("create-sdlc-pipeline"))
 	}
-
 	pub fn stage(&self) -> Option<Stage> {
 		self.session.as_ref().map(|session| session.stage)
 	}
-
-	async fn stage_intent(&mut self) -> Result<StageResult> {
-		let (stage, session_dir, goal) = {
-			let session = self
-				.session
-				.as_ref()
-				.ok_or_else(|| anyhow!("no active SDLC session"))?;
-			(session.stage, session.dir.clone(), session.goal.clone())
-		};
-		if stage != Stage::Intent {
-			return Err(anyhow!("cannot execute Intent stage while at {stage:?}"));
-		}
-		if goal.trim().is_empty() {
-			return Err(anyhow!("SDLC session goal is empty"));
-		}
-		let prompt = prompt::gen_intent(&goal)?;
-		std::fs::write("/tmp/estate-intent-prompt.md", &prompt)
-			.context("writing Intent prompt debug file")?;
-		if prompt.trim().is_empty() {
-			return Err(anyhow!("generated Intent prompt is empty"));
-		}
-		let generated = self.generator.generate(&prompt).await?;
-		if generated.trim().is_empty() {
-			return Err(anyhow!("generated Intent artifact is empty"));
-		}
-		Self::write(session_dir.join("intent.md"), generated)?;
-		self.update_progress("Intent stage completed")?;
-		Ok(StageResult::Intent)
+	pub fn is_complete(&mut self) -> Result<()> {
+		self.transition(enums::Stage::Complete)
 	}
-	async fn stage_spec(&mut self) -> Result<StageResult> {
-		let (stage, session_dir) = {
-			let session = self
-				.session
-				.as_ref()
-				.ok_or_else(|| anyhow!("no active SDLC session"))?;
-			(session.stage, session.dir.clone())
-		};
-		if stage != Stage::Spec {
-			return Err(anyhow!("cannot execute Spec stage while at {stage:?}"));
-		}
-		let intent = self.session_read("intent.md")?;
-		if intent.trim().is_empty() {
-			return Err(anyhow!("Intent artifact is empty"));
-		}
-		let prompt = prompt::gen_spec(&intent)?;
-		if prompt.trim().is_empty() {
-			return Err(anyhow!("generated Spec prompt is empty"));
-		}
-		std::fs::write("/tmp/estate-spec-prompt.md", &prompt)
-			.context("writing Spec prompt debug file")?;
-		let generated = self.generator.generate(&prompt).await?;
-		if generated.trim().is_empty() {
-			return Err(anyhow!("generated Spec artifact is empty"));
-		}
-		Self::write(session_dir.join("spec.md"), generated)?;
-		self.update_progress("Spec stage completed")?;
-		Ok(StageResult::Spec)
-	}
-	async fn stage_plan(&mut self) -> Result<StageResult> {
-		let (stage, session_dir) = {
-			let session = self
-				.session
-				.as_ref()
-				.ok_or_else(|| anyhow!("no active SDLC session"))?;
-
-			(session.stage, session.dir.clone())
-		};
-		if stage != Stage::Plan {
-			return Err(anyhow!("cannot execute Plan stage while at {stage:?}"));
-		}
-		let intent = self.session_read("intent.md")?;
-		let spec = self.session_read("spec.md")?;
-		if intent.trim().is_empty() {
-			return Err(anyhow!("Intent artifact is empty"));
-		}
-		if spec.trim().is_empty() {
-			return Err(anyhow!("Spec artifact is empty"));
-		}
-		let prompt = prompt::gen_plan(&intent, &spec)?;
-		if prompt.trim().is_empty() {
-			return Err(anyhow!("generated Plan prompt is empty"));
-		}
-		std::fs::write("/tmp/estate-plan-prompt.md", &prompt)
-			.context("writing Plan prompt debug file")?;
-		let generated = self.generator.generate(&prompt).await?;
-		if generated.trim().is_empty() {
-			return Err(anyhow!("generated Plan artifact is empty"));
-		}
-		Self::write(session_dir.join("plan.md"), generated)?;
-		self.update_progress("Plan stage completed")?;
-		Ok(StageResult::Plan)
-	}
-	async fn stage_build(&mut self) -> Result<StageResult> {
-		let (stage, session_dir) = {
-			let session = self
-				.session
-				.as_ref()
-				.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
-
-			(session.stage.clone(), session.dir.clone())
-		};
-		if stage != Stage::Build {
-			return Err(anyhow::anyhow!(
-				"cannot execute Build stage while at {:?}",
-				stage
-			));
-		}
-		self.update_progress("Build started")?;
-		let workspace = self
-			.session
-			.as_ref()
-			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?
-			.workspace()
-			.to_path_buf();
-		let workspace_before = WorkspaceSnapshot::capture(&workspace)?;
-
-		let task = AgentTask::new(
-			"Implement the software described by the SDLC intent, specification,
-			and plan.
-
-			You are in the BUILD stage.
-
-			Inspect the workspace using the available tools before making changes.
-
-			Implement the planned functionality by:
-			- creating required files,
-			- modifying existing source files,
-			- modifying configuration when required,
-			- adding appropriate tests,
-			- running relevant formatting, compilation, linting, and test commands,
-			- fixing errors discovered during implementation.
-			- respond with CODE ONLY. Do not response with markdown wrapping code blocks like literal ```
-			- write directly to the files. Do not
-
-			Do not merely describe an implementation. Perform the work in the
-			workspace.
-
-			Use the existing project structure and conventions whenever possible.
-
-			When implementation is complete, verify the result using the most
-			relevant available commands."
-				.into(),
-		);
-
-		let result = self.generator.generate(&task.prompt).await?;
-		let workspace_after = WorkspaceSnapshot::capture(&workspace)?;
-		let changes = workspace_before.diff(&workspace_after);
-
-		Self::write(session_dir.join("build.md"), changes.to_markdown(&result))?;
-
-		self.update_progress(&format!(
-			"Build completed: {} file(s) changed",
-			changes.file_count()
-		))?;
-
-		Ok(StageResult::Build)
-	}
-	async fn stage_verify(&mut self) -> Result<StageResult> {
-		self.update_progress("Verification started")?;
-		let verification = self.verify_stage(self.stage().unwrap()).await?;
-		self.update_progress(&format!(
-			"Verification completed: passed={}",
-			verification.passed
-		))?;
-		Ok(StageResult::Verification(verification))
-	}
-	async fn stage_deploy(&mut self) -> Result<()> {
-		todo!("sdlc deploy")
-	}
-	async fn stage_maintain(&mut self) -> Result<()> {
-		todo!("sdlc maintain")
-	}
-	async fn stage_complete(&mut self) -> Result<RunControl> {
-		todo!("WOW DONE!")
-	}
-
 	fn stage_attempt(&self) -> u32 {
 		self.stage_attempt
 	}
-	async fn stage_execute(
-		&mut self,
-		stage: enums::Stage,
-		attempt: Attempt,
-		pending_input: &mut Option<SdlcInput>,
-	) -> Result<StageExecution> {
-		let started_at = Utc::now();
-
-		let result = match stage {
-			Stage::Intent => self.stage_intent().await?,
-
-			Stage::Spec => self.stage_spec().await?,
-
-			Stage::Plan => self.stage_plan().await?,
-			Stage::Build => self.stage_build().await?,
-
-			Stage::Verify => self.stage_verify().await?,
-
-			Stage::Complete => StageResult::Complete,
-
-			Stage::SprintCompleted => StageResult::SprintCompleted,
-
-			Stage::Deploy | Stage::Maintain => {
-				return Err(anyhow!("stage {stage:?} not implemented"));
-			}
-		};
-
-		Ok(StageExecution {
-			stage,
-			attempt,
-			started_at,
-			completed_at: Utc::now(),
-			result,
-		})
-	}
-
 	pub fn cancel(&mut self) {
 		todo!("cancel")
 	}
 	pub fn fail(&mut self, _outcome: StageOutcome) -> Result<()> {
 		todo!("fail")
 	}
-
 	pub fn decide(&self, outcome: &StageOutcome) -> Result<StageDecision> {
 		let decision = match outcome {
 			StageOutcome::Complete { execution, .. } => {
@@ -3183,9 +2971,7 @@ impl SprintPipeline {
 					StageDecision::Continue
 				}
 			}
-
 			StageOutcome::NeedsRevision { .. } => StageDecision::Revise,
-
 			StageOutcome::ExecutionFailed { attempt, .. } => {
 				if attempt.number < 3 {
 					StageDecision::Retry
@@ -3193,7 +2979,6 @@ impl SprintPipeline {
 					StageDecision::AwaitHuman
 				}
 			}
-
 			StageOutcome::EvaluationFailed { execution, .. } => {
 				if execution.attempt.number < 3 {
 					StageDecision::Retry
@@ -3202,14 +2987,8 @@ impl SprintPipeline {
 				}
 			}
 		};
-
 		Ok(decision)
 	}
-
-	async fn execute(&mut self, stage: enums::Stage) -> Result<StageExecution> {
-		todo!("execute")
-	}
-
 	async fn apply(
 		&mut self,
 		stage: enums::Stage,
@@ -3224,40 +3003,25 @@ impl SprintPipeline {
 				let next = stage
 					.next()
 					.ok_or_else(|| anyhow!("Stage {stage:?} has no next stage"))?;
-
 				self.transition(next)?;
-
 				self.emit(SdlcEvent::StageTransitioned {
 					from: stage,
 					to: next,
 				});
-
 				Ok(RunControl::Continue)
 			}
-
 			StageDecision::Retry => Ok(RunControl::Continue),
-
-			StageDecision::Revise => {
-				// self
-				// 	.handle_revision(stage, attempt, outcome, input_rx, pending_input)
-				// 	.await?;
-
-				Ok(RunControl::Continue)
-			}
-
+			StageDecision::Revise => Ok(RunControl::Continue),
 			StageDecision::AwaitHuman => {
 				self
 					.wait_for_intervention(stage, attempt, String::from("Evaluator Decision"), input_rx)
 					.await?;
-				//
 				Ok(RunControl::Continue)
 			}
-
 			StageDecision::Complete => {
-				self.stage_complete().await?;
+				self.is_complete()?;
 				Ok(RunControl::Exit)
 			}
-
 			StageDecision::Fail => {
 				self.fail(outcome)?;
 				Ok(RunControl::Exit)
@@ -3348,16 +3112,13 @@ impl SprintPipeline {
 			.map_or(0, |number| number + 1);
 		Ok(Attempt { stage, number, max })
 	}
-	fn save_session(session: &SdlcSession) -> Result<()> {
-		FS::save(SpecialFile::SdlcCurrent.path()?, session)?;
-		Ok(())
-	}
+
 	fn commit(&mut self) -> Result<()> {
 		let session = self
 			.session
 			.as_ref()
 			.ok_or_else(|| anyhow!("no active SDLC session"))?;
-		Self::save_session(session)
+		Self::session_save(session)
 	}
 	fn create_dir(title: &str) -> Result<PathBuf> {
 		let sessions_dir = FS::ensure_dir(SpecialFile::SessionsDir.path()?)?;
@@ -3408,6 +3169,7 @@ impl SprintPipeline {
 	fn persist(&self) -> Result<()> {
 		FS::save(&self.state_path, &self.session)
 	}
+
 	fn session_read(&self, name: &str) -> Result<String> {
 		let session = self
 			.session
@@ -3425,6 +3187,10 @@ impl SprintPipeline {
 		sessions.retain(|existing| existing.id != session.id);
 		sessions.push(session.clone());
 		FS::save(index_path, &sessions)?;
+		Ok(())
+	}
+	fn session_save(session: &SdlcSession) -> Result<()> {
+		FS::save(SpecialFile::SdlcCurrent.path()?, session)?;
 		Ok(())
 	}
 	fn record_outcome(&mut self, outcome: &StageOutcome) -> Result<()> {
@@ -3643,18 +3409,6 @@ impl SprintPipeline {
 			})
 			.collect()
 	}
-	async fn verify_stage(&mut self, stage: Stage) -> Result<Verification> {
-		let checks = self.run_checks(stage).await?;
-		let evaluations = self.evaluate_checks(&checks);
-
-		let passed = self.is_passing(&checks, &evaluations);
-
-		Ok(Verification {
-			passed,
-			checks,
-			evaluations,
-		})
-	}
 	fn write(path: PathBuf, contents: String) -> Result<()> {
 		Ok(std::fs::write(path, contents)?)
 	}
@@ -3774,6 +3528,216 @@ impl PipelineRuntime {
 
 		Ok(())
 	}
+
+	fn retry(&mut self, _stage: enums::Stage) -> Result<()> {
+		Ok(())
+	}
+}
+impl Step {
+	pub fn stage(self) -> Option<Stage> {
+		match self {
+			Self::Intent => Some(Stage::Intent),
+			Self::Spec => Some(Stage::Spec),
+			Self::Plan => Some(Stage::Plan),
+			Self::Build => Some(Stage::Build),
+			Self::Verify => Some(Stage::Verify),
+			Self::Boot | Self::Init | Self::Deploy | Self::Maintain | Self::Complete => None,
+		}
+	}
+	pub const ALL: &'static [Self] = &[
+		Self::Boot,
+		Self::Init,
+		Self::Intent,
+		Self::Spec,
+		Self::Plan,
+		Self::Build,
+		Self::Verify,
+		Self::Deploy,
+		Self::Maintain,
+		Self::Complete,
+	];
+}
+#[async_trait::async_trait]
+impl traits::Runner for SprintRunner<'_> {
+	type Context = UnboundedReceiver<SdlcInput>;
+	type Output = ();
+	async fn run(&mut self, input_rx: &mut Self::Context) -> Result<Self::Output> {
+		let mut pending_input = None;
+		let mut current_stage = None;
+		let mut attempt_number = 0;
+
+		self.emit(SdlcEvent::RunStarted);
+
+		loop {
+			let stage = self.load_state()?;
+
+			// New stage = reset attempt counter.
+			if current_stage != Some(stage) {
+				current_stage = Some(stage);
+				attempt_number = 0;
+			}
+
+			let attempt = Attempt {
+				stage,
+				number: attempt_number,
+				max: 3,
+			};
+
+			let outcome = self.run_stage(stage, attempt, &mut pending_input).await?;
+
+			self.persist_outcome(&outcome)?;
+
+			let decision = self.decide(&outcome).await?;
+
+			match decision {
+				StageDecision::Retry => {
+					attempt_number += 1;
+
+					let control = self
+						.apply(outcome, StageDecision::Retry, input_rx, &mut pending_input)
+						.await?;
+
+					match control {
+						RunControl::Continue => continue,
+						RunControl::Exit => return Ok(()),
+					}
+				}
+
+				decision => {
+					let control = self
+						.apply(outcome, decision, input_rx, &mut pending_input)
+						.await?;
+
+					match control {
+						RunControl::Continue => continue,
+						RunControl::Exit => return Ok(()),
+					}
+				}
+			}
+		}
+	}
+	fn cancel(&mut self) {
+		self.pipeline.cancel();
+	}
+	fn is_running(&self) -> bool {
+		true
+		// self.pipeline.is_running()
+	}
+}
+impl SprintRunner<'_> {
+	fn load_state(&mut self) -> Result<enums::Stage> {
+		// TODO: actually restore the persisted session from sdlc.current.json.
+		Ok(self.pipeline.stage().unwrap_or(enums::Stage::Intent))
+	}
+	fn persist_outcome(&mut self, _outcome: &StageOutcome) -> Result<()> {
+		// TODO: persist outcome.
+		Ok(())
+	}
+	async fn evaluate_stage_execution(&mut self, execution: StageExecution) -> Result<StageOutcome> {
+		let stage = execution.stage;
+		self.emit(SdlcEvent::PhaseChanged {
+			phase: SdlcPhase::Evaluating,
+		});
+		self.emit(SdlcEvent::EvaluationStarted { stage });
+		match self.pipeline.evaluate(&execution).await {
+			Ok(evaluation) => {
+				self.emit(SdlcEvent::Evaluated {
+					stage,
+					score: evaluation.score,
+					confidence: evaluation.confidence,
+					passed: evaluation.passed,
+				});
+				self.pipeline.evaluation_record(&evaluation);
+				Ok(StageOutcome::Complete {
+					execution,
+					evaluation,
+				})
+			}
+			Err(error) => Ok(StageOutcome::EvaluationFailed { execution, error }),
+		}
+	}
+	fn begin_attempt(&mut self, stage: Stage) -> Result<Attempt> {
+		self.pipeline.next_attempt(stage)
+	}
+	fn evaluate_checks(&self, checks: Vec<CheckResult>) -> Result<Vec<CheckResult>> {
+		todo!("evaluate_checks")
+	}
+	async fn evaluate(&self, execution: &StageExecution) -> Result<StageEvaluation> {
+		let stage = execution.stage;
+		let checks = self.pipeline.run_checks(stage).await?;
+		let structural = self.evaluate_checks(checks)?;
+		let semantic = self
+			.pipeline
+			.evaluator
+			.evaluate(&self.pipeline.session.as_ref().unwrap(), &execution)
+			.await?;
+		Ok(semantic.with_evaluations(structural))
+	}
+
+	async fn stage_execute(
+		&mut self,
+		stage: enums::Stage,
+		attempt: Attempt,
+		pending_input: &mut Option<SdlcInput>,
+	) -> Result<StageExecution> {
+		let started_at = Utc::now();
+
+		let result = match stage {
+			Stage::Intent => self.stage_intent().await?,
+			Stage::Spec => self.stage_spec().await?,
+			Stage::Plan => self.stage_plan().await?,
+			Stage::Build => self.stage_build().await?,
+			Stage::Verify => self.stage_verify().await?,
+			Stage::Complete => StageResult::Complete,
+			Stage::SprintCompleted => StageResult::SprintCompleted,
+
+			Stage::Deploy | Stage::Maintain => {
+				return Err(anyhow!("stage {stage:?} not implemented"));
+			}
+		};
+
+		Ok(StageExecution {
+			stage,
+			attempt,
+			started_at,
+			completed_at: Utc::now(),
+			result,
+		})
+	}
+	// 	async fn stage_execute(
+	// 		&mut self,
+	// 		stage: enums::Stage,
+	// 		attempt: Attempt,
+	// 		pending_input: &mut Option<SdlcInput>,
+	// 	) -> Result<StageExecution> {
+	// 		let started_at = Utc::now();
+	// 		let result = match stage {
+	// 			Stage::Intent => self.stage_intent().await?,
+	//
+	// 			Stage::Spec => self.stage_spec().await?,
+	//
+	// 			Stage::Plan => self.stage_plan().await?,
+	// 			Stage::Build => self.stage_build().await?,
+	//
+	// 			Stage::Verify => self.stage_verify().await?,
+	//
+	// 			Stage::Complete => StageResult::Complete,
+	//
+	// 			Stage::SprintCompleted => StageResult::SprintCompleted,
+	//
+	// 			Stage::Deploy | Stage::Maintain => {
+	// 				return Err(anyhow!("stage {stage:?} not implemented"));
+	// 			}
+	// 		};
+	//
+	// 		Ok(StageExecution {
+	// 			stage,
+	// 			attempt,
+	// 			started_at,
+	// 			completed_at: Utc::now(),
+	// 			result,
+	// 		})
+	// 	}
 	async fn stage_intent(&mut self) -> Result<StageResult> {
 		let (stage, session_dir, goal) = {
 			let session = self
@@ -3935,10 +3899,7 @@ impl PipelineRuntime {
 	}
 	async fn stage_verify(&mut self) -> Result<StageResult> {
 		self.pipeline.update_progress("Verification started")?;
-		let verification = self
-			.pipeline
-			.verify_stage(self.pipeline.stage().unwrap())
-			.await?;
+		let verification = self.verify_stage(self.pipeline.stage().unwrap()).await?;
 		self.pipeline.update_progress(&format!(
 			"Verification completed: passed={}",
 			verification.passed
@@ -3954,150 +3915,6 @@ impl PipelineRuntime {
 	async fn stage_complete(&mut self) -> Result<RunControl> {
 		todo!("WOW DONE!")
 	}
-	fn retry(&mut self, _stage: enums::Stage) -> Result<()> {
-		Ok(())
-	}
-}
-impl Step {
-	pub fn stage(self) -> Option<Stage> {
-		match self {
-			Self::Intent => Some(Stage::Intent),
-			Self::Spec => Some(Stage::Spec),
-			Self::Plan => Some(Stage::Plan),
-			Self::Build => Some(Stage::Build),
-			Self::Verify => Some(Stage::Verify),
-			Self::Boot | Self::Init | Self::Deploy | Self::Maintain | Self::Complete => None,
-		}
-	}
-	pub const ALL: &'static [Self] = &[
-		Self::Boot,
-		Self::Init,
-		Self::Intent,
-		Self::Spec,
-		Self::Plan,
-		Self::Build,
-		Self::Verify,
-		Self::Deploy,
-		Self::Maintain,
-		Self::Complete,
-	];
-}
-#[async_trait::async_trait]
-impl traits::Runner for SprintRunner<'_> {
-	type Context = UnboundedReceiver<SdlcInput>;
-	type Output = ();
-	async fn run(&mut self, input_rx: &mut Self::Context) -> Result<Self::Output> {
-		let mut pending_input = None;
-		let mut current_stage = None;
-		let mut attempt_number = 0;
-
-		self.emit(SdlcEvent::RunStarted);
-
-		loop {
-			let stage = self.load_state()?;
-
-			// New stage = reset attempt counter.
-			if current_stage != Some(stage) {
-				current_stage = Some(stage);
-				attempt_number = 0;
-			}
-
-			let attempt = Attempt {
-				stage,
-				number: attempt_number,
-				max: 3,
-			};
-
-			let outcome = self.run_stage(stage, attempt, &mut pending_input).await?;
-
-			self.persist_outcome(&outcome)?;
-
-			let decision = self.decide(&outcome).await?;
-
-			match decision {
-				StageDecision::Retry => {
-					attempt_number += 1;
-
-					let control = self
-						.apply(outcome, StageDecision::Retry, input_rx, &mut pending_input)
-						.await?;
-
-					match control {
-						RunControl::Continue => continue,
-						RunControl::Exit => return Ok(()),
-					}
-				}
-
-				decision => {
-					let control = self
-						.apply(outcome, decision, input_rx, &mut pending_input)
-						.await?;
-
-					match control {
-						RunControl::Continue => continue,
-						RunControl::Exit => return Ok(()),
-					}
-				}
-			}
-		}
-	}
-	fn cancel(&mut self) {
-		self.pipeline.cancel();
-	}
-	fn is_running(&self) -> bool {
-		true
-		// self.pipeline.is_running()
-	}
-}
-impl SprintRunner<'_> {
-	fn load_state(&mut self) -> Result<enums::Stage> {
-		// TODO: actually restore the persisted session from sdlc.current.json.
-		Ok(self.pipeline.stage().unwrap_or(enums::Stage::Intent))
-	}
-	fn persist_outcome(&mut self, _outcome: &StageOutcome) -> Result<()> {
-		// TODO: persist outcome.
-		Ok(())
-	}
-	async fn evaluate_stage_execution(&mut self, execution: StageExecution) -> Result<StageOutcome> {
-		let stage = execution.stage;
-		self.emit(SdlcEvent::PhaseChanged {
-			phase: SdlcPhase::Evaluating,
-		});
-		self.emit(SdlcEvent::EvaluationStarted { stage });
-		match self.pipeline.evaluate(&execution).await {
-			Ok(evaluation) => {
-				self.emit(SdlcEvent::Evaluated {
-					stage,
-					score: evaluation.score,
-					confidence: evaluation.confidence,
-					passed: evaluation.passed,
-				});
-				self.pipeline.evaluation_record(&evaluation);
-				Ok(StageOutcome::Complete {
-					execution,
-					evaluation,
-				})
-			}
-			Err(error) => Ok(StageOutcome::EvaluationFailed { execution, error }),
-		}
-	}
-	fn begin_attempt(&mut self, stage: Stage) -> Result<Attempt> {
-		self.pipeline.next_attempt(stage)
-	}
-	fn evaluate_checks(&self, checks: Vec<CheckResult>) -> Result<Vec<CheckResult>> {
-		todo!("evaluate_checks")
-	}
-	async fn evaluate(&self, execution: &StageExecution) -> Result<StageEvaluation> {
-		let stage = execution.stage;
-		let checks = self.pipeline.run_checks(stage).await?;
-		let structural = self.evaluate_checks(checks)?;
-		let semantic = self
-			.pipeline
-			.evaluator
-			.evaluate(&self.pipeline.session.as_ref().unwrap(), &execution)
-			.await?;
-		Ok(semantic.with_evaluations(structural))
-	}
 	async fn run_stage(
 		&mut self,
 		stage: enums::Stage,
@@ -4108,11 +3925,7 @@ impl SprintRunner<'_> {
 			phase: SdlcPhase::Executing,
 		});
 
-		let execution = match self
-			.pipeline
-			.stage_execute(stage, attempt, pending_input)
-			.await
-		{
+		let execution = match self.stage_execute(stage, attempt, pending_input).await {
 			Ok(execution) => {
 				self.emit(SdlcEvent::ExecutionComplete { stage });
 				execution
@@ -4135,22 +3948,25 @@ impl SprintRunner<'_> {
 
 		self.evaluate_stage_execution(execution).await
 	}
+	async fn verify_stage(&mut self, stage: Stage) -> Result<Verification> {
+		let checks = self.pipeline.run_checks(stage).await?;
+		let evaluations = self.pipeline.evaluate_checks(&checks);
+		let passed = self.pipeline.is_passing(&checks, &evaluations);
+		Ok(Verification {
+			passed,
+			checks,
+			evaluations,
+		})
+	}
 	async fn decide(&mut self, outcome: &StageOutcome) -> Result<StageDecision> {
 		self.pipeline.decide(outcome)
 	}
-
 	fn transition(&mut self, next: enums::Stage) -> Result<()> {
 		self.pipeline.transition(next)
 	}
-
 	fn retry(&mut self, stage: enums::Stage) -> Result<()> {
 		self.pipeline.retry(stage)
 	}
-
-	// fn emit(&self, event: SdlcEvent) {
-	// 	self.pipeline.emit(event);
-	// }
-
 	fn emit(&self, event: SdlcEvent) {
 		let _ = self.pipeline.event_tx.send(event);
 	}
@@ -4167,7 +3983,6 @@ impl SprintRunner<'_> {
 			.wait_for_intervention(stage, attempt, reason, input_rx)
 			.await
 	}
-
 	async fn apply(
 		&mut self,
 		outcome: StageOutcome,
