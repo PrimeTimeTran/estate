@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-OUT_DIR="${1:-agent-tool-tests}"
+OUT_DIR="${1:-tools-host-env}"
 
 rm -rf "$OUT_DIR"
 mkdir -p "$OUT_DIR"

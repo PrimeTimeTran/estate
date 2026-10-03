@@ -1,3 +1,13 @@
+use notify::{Event, EventKind};
+
+// | Concept                         | Name           | Meaning                       |
+// | ------------------------------- | -------------- | ----------------------------- |
+// | What needs doing                | `Task`         | Logical unit of work          |
+// | An execution of it              | `Job`          | Concrete background execution |
+// | Oversees them                   | `TaskManager`  | Coordinates tasks/jobs        |
+// | Individual background execution | `Job`          | Has lifecycle/state           |
+// | UI representation               | `Task` / `Job` | Shows pending/running/etc.    |
+
 pub mod agent;
 #[path = "./agent-event.rs"]
 pub mod agent_event;
@@ -9,24 +19,14 @@ pub mod system;
 pub mod tool;
 pub mod workspace;
 
+use crate::prelude::*;
 pub use agent::*;
 pub use agent_runtime::*;
+
 pub use prompt::*;
 pub use system::*;
 pub use tool::*;
 pub use workspace::*;
-
-// | Concept                         | Name           | Meaning                       |
-// | ------------------------------- | -------------- | ----------------------------- |
-// | What needs doing                | `Task`         | Logical unit of work          |
-// | An execution of it              | `Job`          | Concrete background execution |
-// | Oversees them                   | `TaskManager`  | Coordinates tasks/jobs        |
-// | Individual background execution | `Job`          | Has lifecycle/state           |
-// | UI representation               | `Task` / `Job` | Shows pending/running/etc.    |
-
-use crate::prelude::*;
-
-use notify::{Event, EventKind};
 
 #[derive(Debug, Clone)]
 pub enum Artifact {

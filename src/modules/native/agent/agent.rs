@@ -45,11 +45,14 @@ pub enum AgentAction {
 
 	#[serde(rename = "run_command")]
 	RunCommand { command: String },
+
+	#[serde(rename = "run_command")]
+	Context,
 }
 
 fn build_prompt(ctx: &AgentContext) -> String {
 	return build_sys_action(
-		ACTION_PROMPT,
+		ACTION_PROMPT_EXECUTION,
 		&[
 			&ctx.prompt,
 			&format_workspace(&ctx.workspace),
@@ -59,9 +62,7 @@ fn build_prompt(ctx: &AgentContext) -> String {
 }
 async fn build_action(prompt: &str) -> Result<LlmAction> {
 	let client = reqwest::Client::new();
-
-	let system_prompt: &str = JSON_PROMPT;
-
+	let system_prompt: &str = JSON_PROMPT_EXECUTION;
 	let payload = serde_json::json!({
 			"model": "qwen3:8b",
 			"system": system_prompt,
@@ -69,7 +70,6 @@ async fn build_action(prompt: &str) -> Result<LlmAction> {
 			"stream": false,
 			"format": "json"
 	});
-
 	let res = client
 		.post(crate::AGENT_GEN_URL)
 		.json(&payload)
@@ -108,7 +108,6 @@ where
 	let result = ollama_generate(prompt, Some("You are a helpful assistant"), true).await?;
 	Ok(serde_json::from_str(&result)?)
 }
-
 pub async fn ollama_generate(prompt: &str, system: Option<&str>, json: bool) -> Result<String> {
 	let client = reqwest::Client::new();
 	let mut payload = serde_json::json!({
@@ -153,17 +152,17 @@ impl AgentContext {
 		Self {
 			prompt: user_prompt.clone(),
 			task: AgentTask::new(user_prompt),
-			intent: PathBuf::new(),
-			spec: PathBuf::new(),
-			plan: PathBuf::new(),
-			tests: PathBuf::new(),
-			progress: PathBuf::new(),
+			// intent: PathBuf::new(),
+			// spec: PathBuf::new(),
+			// plan: PathBuf::new(),
+			// tests: PathBuf::new(),
+			// progress: PathBuf::new(),
 			workspace: WorkspaceContext::default(),
 			history: vec![],
 			artifacts: vec![],
 			logs: vec![],
 			spawned_tasks: vec![],
-			verification: None,
+			// verification: None,
 		}
 	}
 	pub fn from_session(session: &SdlcSession) -> Result<Self> {
@@ -174,18 +173,17 @@ impl AgentContext {
 
 			task: AgentTask::from_session(session)?,
 
-			intent: dir.join("intent.md"),
-			spec: dir.join("spec.md"),
-			plan: dir.join("plan.md"),
-			tests: dir.join("tests.md"),
-			progress: dir.join("progress.md"),
-
+			// intent: dir.join("intent.md"),
+			// spec: dir.join("spec.md"),
+			// plan: dir.join("plan.md"),
+			// tests: dir.join("tests.md"),
+			// progress: dir.join("progress.md"),
 			workspace: WorkspaceContext::from_session(session)?,
 			history: Vec::new(),
 			artifacts: Vec::new(),
 			logs: Vec::new(),
 			spawned_tasks: Vec::new(),
-			verification: None,
+			// verification: None,
 		})
 	}
 }
@@ -245,27 +243,12 @@ impl Agent {
 						.history
 						.push(AgentObservation::ReadFile { path, content });
 				}
-				// AgentAction::WriteFile { path, content } => {
-				// 	self.tools.fs.write(&path, &content)?;
-
-				// 	ctx.history.push(AgentObservation::WriteFile {
-				// 		path: path.clone(),
-				// 		success: true,
-				// 	});
-
-				// 	ctx.artifacts.push(Artifact {
-				// 		path,
-				// 		// whatever fields your Artifact requires
-				// 	});
-				// }
 				AgentAction::WriteFile { path, content } => {
 					let _ = event_tx.send(RuntimeEvent::Agent(AgentEvent::Working {
 						task: task.clone(),
 						message: format!("Writing {path}"),
 					}));
-
 					self.tools.fs.write(&path, &content)?;
-
 					ctx.history.push(AgentObservation::WriteFile {
 						path,
 						success: true,
@@ -283,7 +266,46 @@ impl Agent {
 					}));
 					return Ok(result);
 				}
-				AgentAction::RunCommand { command } => {}
+				AgentAction::RunCommand { command } => {
+					let _ = event_tx.send(RuntimeEvent::Agent(AgentEvent::Working {
+						task: task.clone(),
+						message: format!("Running: {command}"),
+					}));
+
+					// eventually:
+					// let result = self.tools.shell.run(...).await?;
+
+					ctx.history.push(AgentObservation::Current {
+						message: format!("Command requested: {command}"),
+					});
+				}
+
+				AgentAction::Context { .. } => {
+					let _ = event_tx.send(RuntimeEvent::Agent(AgentEvent::Working {
+						task: task.clone(),
+						message: "Inspecting agent context".into(),
+					}));
+
+					// eventually:
+					// let context = self.context.inspect()?;
+
+					ctx.history.push(AgentObservation::Current {
+						message: "Agent context requested".into(),
+					});
+				}
+				AgentAction::Context { .. } => {
+					let _ = event_tx.send(RuntimeEvent::Agent(AgentEvent::Working {
+						task: task.clone(),
+						message: "Inspecting agent context".into(),
+					}));
+
+					// eventually:
+					// let context = self.context.inspect()?;
+
+					ctx.history.push(AgentObservation::Current {
+						message: "Agent context requested".into(),
+					});
+				}
 			}
 		}
 	}
@@ -298,6 +320,7 @@ impl Agent {
 		})
 	}
 	async fn decide_next_action(&self, ctx: &AgentContext) -> Result<AgentAction> {
+		println!("decide_next_action");
 		let prompt = build_prompt(ctx);
 		let raw = build_action(&prompt).await?;
 		let action = AgentAction::try_from(raw)?;
@@ -312,6 +335,7 @@ impl TryFrom<LlmAction> for AgentAction {
 	type Error = Error;
 
 	fn try_from(v: LlmAction) -> Result<Self, Self::Error> {
+		println!("try_from");
 		match v.action.as_str() {
 			"read_file" => Ok(Self::ReadFile {
 				path: v.path.ok_or_else(|| anyhow!("missing path"))?,
@@ -350,29 +374,40 @@ pub struct AgentBus {
 	pub tx: UnboundedSender<AgentEvent>,
 	pub event_tx: UnboundedSender<RuntimeEvent>,
 }
+// #[derive(Debug)]
+// pub struct AgentContext {
+// pub prompt: String,
+//
+// // ───── SDLC input ─────
+// pub task: AgentTask,
+//
+// pub intent: PathBuf,
+// pub spec: PathBuf,
+// pub plan: PathBuf,
+// pub tests: PathBuf,
+// pub progress: PathBuf,
+//
+// // ───── Agent execution state ─────
+// pub workspace: WorkspaceContext,
+// pub history: Vec<AgentObservation>,
+//
+// pub artifacts: Vec<Artifact>,
+// pub logs: Vec<String>,
+// pub spawned_tasks: Vec<AgentTask>,
+//
+// // ───── Verification feedback ─────
+// pub verification: Option<Verification>,
+// }
 #[derive(Debug)]
 pub struct AgentContext {
 	pub prompt: String,
-
-	// ───── SDLC input ─────
 	pub task: AgentTask,
-
-	pub intent: PathBuf,
-	pub spec: PathBuf,
-	pub plan: PathBuf,
-	pub tests: PathBuf,
-	pub progress: PathBuf,
-
-	// ───── Agent execution state ─────
 	pub workspace: WorkspaceContext,
 	pub history: Vec<AgentObservation>,
 
 	pub artifacts: Vec<Artifact>,
 	pub logs: Vec<String>,
 	pub spawned_tasks: Vec<AgentTask>,
-
-	// ───── Verification feedback ─────
-	pub verification: Option<Verification>,
 }
 #[derive(Debug, Deserialize)]
 pub struct LlmAction {
@@ -401,7 +436,6 @@ pub fn structured_prompt_chat(ctx: &AgentContext) -> String {
 		format_history(&ctx.history)
 	)
 }
-
 pub fn structured_prompt_execute(intent: &str, spec: &str, plan: &str, progress: &str) -> String {
 	format!(
 		r#"Execute the current SDLC plan.
@@ -434,4 +468,21 @@ pub fn structured_prompt_execute(intent: &str, spec: &str, plan: &str, progress:
 			"#,
 		intent, spec, plan, progress,
 	)
+}
+
+pub struct AgentContextInfo {
+	pub cwd: PathBuf,
+	pub workspace_dir: PathBuf,
+	pub project_dir: PathBuf,
+	pub settings_file: Option<PathBuf>,
+}
+pub mod traits {
+	use super::*;
+	pub trait AgentContext {
+		fn task(&self) -> &AgentTask;
+		fn workspace(&self) -> &WorkspaceContext;
+		fn history(&self) -> &[AgentObservation];
+		fn record(&mut self, observation: AgentObservation);
+		fn observe(&self) -> AgentContextInfo;
+	}
 }

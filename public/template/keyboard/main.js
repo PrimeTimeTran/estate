@@ -161,5 +161,4 @@ async function randomKeyboardTest() {
     await sleep(getRandomInt(30, 250));
   }
 }
-
-randomKeyboardTest();
+// randomKeyboardTest();

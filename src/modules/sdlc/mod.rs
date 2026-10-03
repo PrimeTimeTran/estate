@@ -1,12 +1,12 @@
 use crate::{
+	agent_event::RuntimeEvent,
 	model::{
 		AgentTask,
 		agent::{Agent, AgentContext},
 		resolver::*,
 		task::TaskResult,
 	},
-	prelude::structs as ext_structs,
-	prelude::*,
+	prelude::{structs as ext_structs, *},
 };
 use anyhow::{Context, anyhow};
 use crossterm::{
@@ -1032,6 +1032,7 @@ pub mod structs {
 		pub generator: Box<dyn ArtifactGenerator>,
 		pub session: Option<SdlcSession>,
 		pub state_path: PathBuf,
+		// pub event_tx: broadcast::Sender<SdlcEvent>,
 		pub event_tx: broadcast::Sender<SdlcEvent>,
 		pub stage_attempt: u32,
 	}
@@ -1406,7 +1407,7 @@ pub mod structs {
 	}
 	#[derive(Clone, Debug)]
 	pub struct LocalGenerator {
-		pub agent: Agent,
+		pub runtime: AgentRuntime,
 		pub model: String,
 	}
 	pub struct TerminalGuard;
@@ -2134,26 +2135,16 @@ mod ui {
 	}
 }
 impl LocalGenerator {
-	pub fn new(agent: Agent, model: impl Into<String>) -> Self {
+	pub fn new(runtime: AgentRuntime, model: impl Into<String>) -> Self {
 		Self {
-			agent,
+			runtime,
 			model: model.into(),
 		}
 	}
-	/// Real Estate agent path.
-	/// Uses Agent + Estate context/tools.
 	pub async fn run_agent(&self, prompt: &str) -> Result<String> {
 		let task = AgentTask::new(prompt.to_string());
-		let (event_tx, _event_rx) = tokio::sync::mpsc::unbounded_channel();
 
-		let result = self.agent.run_agent_loop(task, event_tx).await?;
-
-		println!("=== AGENT RESULT ===");
-		println!("status: {:?}", result.status);
-		println!("chat: {:?}", result.chat);
-		println!("summary: {:?}", result.summary);
-		println!("logs: {:?}", result.logs);
-		println!("====================");
+		let result = self.runtime.run_agent(task).await?;
 
 		Ok(
 			result
@@ -2163,7 +2154,6 @@ impl LocalGenerator {
 		)
 	}
 }
-
 #[async_trait]
 impl ArtifactGenerator for LocalGenerator {
 	async fn generate(&self, prompt: &str) -> Result<String> {
@@ -2937,7 +2927,7 @@ impl StageEvaluation {
 	}
 }
 impl SprintPipeline {
-	pub async fn new() -> anyhow::Result<Self> {
+	pub async fn new(runtime: AgentRuntime) -> anyhow::Result<Self> {
 		dotenvy::dotenv().ok();
 
 		let state_path = SpecialFile::SdlcCurrent.path()?;
@@ -2971,9 +2961,9 @@ impl SprintPipeline {
 			jev: TypeSafeClient::from_env()?,
 		};
 
-		let generator = Box::new(LocalGenerator::new(Agent::new(), "qwen3:8b"));
+		let generator = Box::new(LocalGenerator::new(runtime.clone(), "qwen3:8b"));
 
-		let (event_tx, _) = broadcast::channel(256);
+		let (event_tx, _event_rx) = tokio::sync::broadcast::channel::<SdlcEvent>(256);
 
 		Ok(Self {
 			evaluator,
@@ -3661,7 +3651,6 @@ impl SprintRunner<'_> {
 		let state: PersistedStage = serde_json::from_str(&json)?;
 		Ok(state.stage)
 	}
-
 	fn begin_attempt(&mut self, stage: Stage) -> Result<Attempt> {
 		self.pipeline.next_attempt(stage)
 	}
