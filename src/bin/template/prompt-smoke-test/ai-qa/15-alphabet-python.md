@@ -1,4 +1,8 @@
-Create a directory named `alphabet-test`.
+Work only inside `./tests`.
+
+Create this directory:
+
+./tests/15-alphabet-python/
 
 For every letter of the English alphabet, create exactly one file named after that lowercase letter using the `.py` extension.
 
@@ -39,4 +43,12 @@ a.py → a
 b.py → b
 c.py → c
 
-Do not create or modify anything outside `alphabet-test`.
+Also create:
+
+./tests/15-alphabet-python.txt
+
+containing exactly:
+
+alphabet python files completed
+
+Do not create or modify anything outside `./tests`.

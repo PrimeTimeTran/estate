@@ -1,4 +1,7 @@
-use crate::{native::poc::McpClient, prelude::*};
+use crate::{
+	native::poc::McpClient,
+	prelude::{vfs as VfsPrev, *},
+};
 use Error;
 use std::os::unix::fs::MetadataExt;
 #[derive(Debug, Default, Clone)]
@@ -102,7 +105,47 @@ pub struct AgentTools {
 	pub fs: FileSystemTool,
 	pub mcp: McpClient,
 }
-
+//
+// #[derive(Debug, Default, Clone)]
+// pub struct Vfs;
+//
+// impl Vfs {
+// 	pub fn new() -> Self {
+// 		Self
+// 	}
+//
+// 	pub fn search_files(&self, query: &str) -> Result<Vec<FileInfo>, Error> {
+// 		dbg!("Search VFS for files matching query {}", query);
+//
+// 		Ok(vec![FileInfo::default()])
+// 	}
+//
+// 	pub fn create_file(&self, path: &str, content: &str) -> Result<(), Error> {
+// 		dbg!("Create file in VFS");
+//
+// 		println!("Created file: {} ({} bytes)", path, content.len());
+//
+// 		Ok(())
+// 	}
+//
+// 	pub fn read_file(&self, path: &str) -> Result<String, Error> {
+// 		dbg!("Read file contents from VFS");
+//
+// 		Ok(format!(
+// 			"// Placeholder content for {}\n\nfn main() {{}}\n",
+// 			path
+// 		))
+// 	}
+//
+// 	pub fn write_file(&self, path: &str, content: &str) -> Result<(), Error> {
+// 		dbg!("write_file");
+// 		if let Some(parent) = std::path::Path::new(path).parent() {
+// 			std::fs::create_dir_all(parent)?;
+// 		}
+// 		std::fs::write(path, content)?;
+// 		Ok(())
+// 	}
+// }
 #[derive(Debug, Default, Clone)]
 pub struct Vfs;
 
@@ -111,35 +154,67 @@ impl Vfs {
 		Self
 	}
 
+	// 	pub fn search_files(&self, query: &str) -> Result<Vec<FileInfo>, Error> {
+	// 		dbg!("Search filesystem for files matching query {}", query);
+	//
+	// 		let root = Path::new(".");
+	//
+	// 		let mut results = Vec::new();
+	//
+	// 		for entry in walkdir::WalkDir::new(root)
+	// 			.into_iter()
+	// 			.filter_map(Result::ok)
+	// 		{
+	// 			let path = entry.path();
+	//
+	// 			if !path.is_file() {
+	// 				continue;
+	// 			}
+	//
+	// 			let path_string = path.to_string_lossy();
+	//
+	// 			if path_string.contains(query) {
+	// 				results.push(FileInfo::from_path(path)?);
+	// 			}
+	// 		}
+	//
+	// 		Ok(results)
+	// 	}
 	pub fn search_files(&self, query: &str) -> Result<Vec<FileInfo>, Error> {
-		dbg!("Search VFS for files matching query {}", query);
-
-		Ok(vec![FileInfo::default()])
+		dbg!("Search filesystem for files matching query {}", query);
+		Ok(Vec::new())
 	}
-
 	pub fn create_file(&self, path: &str, content: &str) -> Result<(), Error> {
-		dbg!("Create file in VFS");
-
-		println!("Created file: {} ({} bytes)", path, content.len());
+		dbg!("Create file: {}", path);
+		let path = Path::new(path);
+		if let Some(parent) = path.parent() {
+			std::fs::create_dir_all(parent)?;
+		}
+		std::fs::write(path, content)?;
+		println!("Created file: {} ({} bytes)", path.display(), content.len());
 
 		Ok(())
 	}
 
 	pub fn read_file(&self, path: &str) -> Result<String, Error> {
-		dbg!("Read file contents from VFS");
+		dbg!("Read file: {}", path);
 
-		Ok(format!(
-			"// Placeholder content for {}\n\nfn main() {{}}\n",
-			path
-		))
+		Ok(std::fs::read_to_string(path)?)
 	}
 
 	pub fn write_file(&self, path: &str, content: &str) -> Result<(), Error> {
-		dbg!("write_file");
-		if let Some(parent) = std::path::Path::new(path).parent() {
+		dbg!("Write file: {}", path);
+
+		let path = Path::new(path);
+
+		if let Some(parent) = path.parent() {
 			std::fs::create_dir_all(parent)?;
 		}
+
 		std::fs::write(path, content)?;
+
+		println!("Wrote file: {} ({} bytes)", path.display(), content.len());
+
 		Ok(())
 	}
 }

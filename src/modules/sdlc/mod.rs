@@ -549,17 +549,6 @@ pub use prompt as agent_prompts;
 use prompt::*;
 pub mod prompt {
 	use super::*;
-	pub fn initial_prompt() -> Result<String> {
-		Ok(String::from(
-			"I need to build a CLI tool. I want to use NodeJS.
-			Create a file named hello-world.js in the repository root from where I ran this command.
-			This file will be the CLI entrypoint. The CLI tool should accept an
-			argument and write that value to hello-world.md.
-			The user should be able to run node hello-world.js \"hi\".
-
-			- Add tests covering both the JavaScript logic and the CLI behavior.",
-		))
-	}
 	const INTENT_PROMPT: &str = include_str!("../../../ai/template/INITIAL_PROMPT.md");
 	const PROMPT_FROM_USER: &str = include_str!("../../../ai/template/user.goal.md");
 	pub fn for_intent(user_request: &str) -> String {
@@ -725,7 +714,6 @@ pub mod prompt {
      	"#,
 		))
 	}
-
 	pub fn gen_plan(intent: &str, spec: &str) -> Result<String> {
 		if intent.trim().is_empty() {
 			return Err(anyhow!("cannot generate Plan prompt from empty Intent"));
@@ -931,7 +919,6 @@ pub mod prompt {
       "#,
 		))
 	}
-
 	pub fn tests_gen(intent: &str, spec: &str, plan: &str) -> String {
 		format!(
 			r#"

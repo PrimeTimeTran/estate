@@ -1,13 +1,15 @@
-Create a directory named:
+Work only inside `./tests`.
 
-hello-project
+Create this directory:
 
-Inside that directory create:
+./tests/08-create-directory/
 
-hello.txt
+Inside it create:
+
+./tests/08-create-directory/08-create-directory.txt
 
 The file must contain exactly:
 
 hello
 
-Do not create or modify anything outside `hello-project`.
+Do not create or modify anything outside `./tests`.

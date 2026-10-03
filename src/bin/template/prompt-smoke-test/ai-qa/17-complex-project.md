@@ -1,6 +1,8 @@
+Work only inside `./tests`.
+
 Create the following project structure:
 
-qa-project/
+./tests/17-complex-project/
 ├── README.md
 ├── src/
 │   ├── main.py
@@ -52,8 +54,16 @@ data/output.txt:
 
 output
 
+Also create:
+
+./tests/17-complex-project.txt
+
+containing exactly:
+
+complex project completed
+
 Create exactly the files and directories specified above.
 
 Do not create any additional files.
 
-Do not modify anything outside `qa-project`.
+Do not modify anything outside `./tests`.

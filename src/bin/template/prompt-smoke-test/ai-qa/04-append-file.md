@@ -1,4 +1,10 @@
-The file `hello-world.txt` already contains:
+Work only inside `./tests`.
+
+The file already exists:
+
+./tests/04-append-file.txt
+
+It currently contains:
 
 foobar
 
@@ -12,3 +18,4 @@ foobar
 baz
 
 Do not modify or create any other files.
+Do not create anything outside `./tests`.

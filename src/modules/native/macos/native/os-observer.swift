@@ -396,6 +396,14 @@ func keyName(_ keyCode: Int64) -> String {
   case 109: return "F10"
   case 103: return "F11"
   case 111: return "F12"
+  case 105: return "F13"
+  case 107: return "F14"
+  case 113: return "F15"
+  case 106: return "F16"
+  case 64: return "F17"
+  case 79: return "F18"
+  case 80: return "F19"
+  case 90: return "F20"
 
   // Modifiers
   case 56: return "LSHIFT"
@@ -408,6 +416,35 @@ func keyName(_ keyCode: Int64) -> String {
   case 54: return "RCMD"
   case 63: return "FN"
   case 57: return "CAPS"
+
+  // Navigation / special
+  // Numeric keypad
+  case 71: return "NUMLOCK"
+  case 82: return "KEYPAD_0"
+  case 83: return "KEYPAD_1"
+  case 84: return "KEYPAD_2"
+  case 85: return "KEYPAD_3"
+  case 86: return "KEYPAD_4"
+  case 87: return "KEYPAD_5"
+  case 88: return "KEYPAD_6"
+  case 89: return "KEYPAD_7"
+  case 91: return "KEYPAD_8"
+  case 92: return "KEYPAD_9"
+
+  case 65: return "KEYPAD_DECIMAL"
+  case 67: return "KEYPAD_MULTIPLY"
+  case 69: return "KEYPAD_PLUS"
+  case 75: return "KEYPAD_DIVIDE"
+  case 78: return "KEYPAD_MINUS"
+  case 81: return "KEYPAD_EQUALS"
+  case 76: return "KEYPAD_ENTER"
+
+  case 114: return "HELP"
+  case 115: return "HOME"
+  case 116: return "PAGEUP"
+  case 117: return "FORWARD_DELETE"
+  case 119: return "END"
+  case 121: return "PAGEDOWN"
 
   default:
     return "KEY[\(keyCode)]"
@@ -460,7 +497,6 @@ func eventDescription(type: CGEventType, code: Int64) -> String {
   switch type {
   case .keyDown, .keyUp:
     return keyName(code)
-
   case .flagsChanged:
     return modifierName(code)
 
@@ -778,14 +814,6 @@ func makeEvent(
       y: nil,
       vertical: nil,
       horizontal: nil,
-      // event: CGEventInfo(
-      //   type: type.rawValue,
-      //   keyCode: keyCode,
-      //   flags: flags.rawValue,
-      //   sessionFlags: session.rawValue,
-      //   sourcePID: sourcePID,
-      //   sourceUserData: sourceUserData
-      // ),
       name: keyName(keyCode),
       modifiers: ModifierSnapshot(from: state),
       direction: .up,
@@ -1625,25 +1653,20 @@ if enableCGEventTap {
     // MARK: Key Up
 
     case .keyUp:
-
       let name = keyName(code)
-
       let nativeEvent = makeEvent(
         event,
         type: type,
         description: name,
         modifierDirection: .up
       )
-
       if enableEstateSocket {
         sendNativeEvent(
           nativeEvent,
           on: estateClientFD
         )
       }
-
     // MARK: Mouse
-
     case .leftMouseDown,
       .leftMouseUp,
       .rightMouseDown,

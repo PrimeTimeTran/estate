@@ -1,4 +1,8 @@
-Create a directory named `alphabet-test`.
+Work only inside `./tests`.
+
+Create this directory:
+
+./tests/14-alphabet-files/
 
 Inside it create exactly one file for every letter of the English alphabet:
 
@@ -37,4 +41,12 @@ a.txt → a
 b.txt → b
 c.txt → c
 
-Do not create or modify anything outside `alphabet-test`.
+Also create:
+
+./tests/14-alphabet-files.txt
+
+containing exactly:
+
+alphabet files completed
+
+Do not create or modify anything outside `./tests`.
