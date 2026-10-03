@@ -70,7 +70,7 @@ path = "src/bin/[mpl].rs"
 # cargo run --bin native --no-default-features --features "native,daemon,macos"
 name = "daemon"
 path = "src/bin/[hid-daemon].rs"
-required-features = ["native","daemon"]
+required-features = ["native", "daemon"]
 
 [[bin]]
 name = "native"
@@ -92,8 +92,8 @@ path = "src/bin/[sdlc].rs"
 required-features = ["native"]
 
 [[bin]]
-name = "ai-evaluator"
-path = "src/bin/template/prompt-smoke-test/main.rs"
+name = "sanity-tests"
+path = "src/bin/sanity-tests/main.rs"
 required-features = ["native"]
 
 [[bin]]
@@ -260,12 +260,7 @@ tower-lsp = { workspace = true, optional = true }
 # ============================================================
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-tokio = { version = "1", default-features = false, features = [
-  "rt",
-  "macros",
-  "time",
-  "sync",
-] }
+tokio = { version = "1", default-features = false, features = ["rt", "macros", "time", "sync"] }
 getrandom = { version = "0.4.3", features = ["wasm_js"] }
 gloo-timers = { version = "0.4", features = ["futures"] }
 js-sys = { workspace = true, optional = true }

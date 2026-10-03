@@ -11,7 +11,7 @@ struct Args {
 
 // smoke-suite
 // cargo run --bin sanity-tests -- --native src/bin/sanity-tests/tools-intern/*.md
-// cargo run --bin sanity-tests -- --native src/bin/sanity-tests/tools-extern/*.md
+// cargo run --bin sanity-tests -- --native src/bin/sanity-tests/agent-tool-tests/*.md
 fn parse_args() -> Result<Args> {
 	let mut native = false;
 	let mut prompts = Vec::new();

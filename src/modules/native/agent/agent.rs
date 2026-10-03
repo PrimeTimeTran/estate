@@ -326,6 +326,10 @@ impl TryFrom<LlmAction> for AgentAction {
 				message: v.message.unwrap_or_default(),
 			}),
 
+			"run_command" => Ok(Self::RunCommand {
+				command: v.command.ok_or_else(|| anyhow!("missing command"))?,
+			}),
+
 			"finish" => Ok(Self::Finish {
 				message: v.message.unwrap_or_default(),
 			}),
@@ -375,6 +379,7 @@ pub struct LlmAction {
 	pub action: String,
 	pub path: Option<String>,
 	pub content: Option<String>,
+	pub command: Option<String>,
 	pub message: Option<String>,
 }
 #[derive(Debug, Deserialize)]

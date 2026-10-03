@@ -99,10 +99,35 @@ fn language_from_extension(extension: &str) -> Option<String> {
 
 	Some(language.to_string())
 }
+#[derive(Debug, Default, Clone)]
+pub struct ShellTool;
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ShellCommand {
+	pub program: String,
+	pub args: Vec<String>,
+	pub cwd: Option<PathBuf>,
+	pub timeout: Option<Duration>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ShellResult {
+	pub program: String,
+	pub args: Vec<String>,
+	pub cwd: PathBuf,
+	pub exit_code: Option<i32>,
+	pub stdout: String,
+	pub stderr: String,
+}
+impl ShellTool {
+	pub async fn run(&self, command: ShellCommand) -> Result<ShellResult> {
+		todo!("dodo");
+	}
+}
 #[derive(Debug, Default, Clone)]
 pub struct AgentTools {
 	pub fs: FileSystemTool,
+	pub shell: ShellTool,
 	pub mcp: McpClient,
 }
 //
