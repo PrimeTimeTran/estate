@@ -1,0 +1,21 @@
+When the system shuts down, follow these steps:
+
+1. Wait 25 seconds for the system to fully shut down.
+2. Press and hold down the power button to power on the system.
+   * It is important that the system be fully powered off before this step,
+     and that you press and hold down the button once, not multiple times.
+     This is required to put the machine into the right mode.
+3. Release it once you see 'Loading startup options...' or a spinner.
+4. Wait for the volume list to appear.
+5. Choose 'Fedora Linux with KDE Plasma'.
+6. You will briefly see a 'macOS Recovery' dialog.
+   * If you are asked to 'Select a volume to recover',
+     then choose your normal macOS volume and click Next.
+     You may need to authenticate yourself with your macOS credentials.
+7. Once the 'Asahi Linux installer' screen appears, follow the prompts.
+
+If you end up in a bootloop or get a message telling you that macOS needs to
+be reinstalled, that means you didn't follow the steps above properly.
+Fully shut down your system without doing anything, and try again.
+If in trouble, hold down the power button to boot, select macOS, run
+this installer again, and choose the 'p' option to retry the process.

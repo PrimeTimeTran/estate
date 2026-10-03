@@ -521,7 +521,30 @@ func aggregateModifiers(_ modifiers: ModifierSnapshot?) -> String {
     + "\(keyState(opt, "⌥")) "
     + "\(keyState(cmd, "⌘"))"
 }
+func describeFlags(_ flags: CGEventFlags) -> String {
+    var parts: [String] = []
 
+    if flags.contains(.maskShift) {
+        parts.append("SHIFT")
+    }
+    if flags.contains(.maskControl) {
+        parts.append("CTRL")
+    }
+    if flags.contains(.maskAlternate) {
+        parts.append("OPT")
+    }
+    if flags.contains(.maskCommand) {
+        parts.append("CMD")
+    }
+    if flags.contains(.maskSecondaryFn) {
+        parts.append("FN")
+    }
+    if flags.contains(.maskAlphaShift) {
+        parts.append("CAPS")
+    }
+
+    return parts.isEmpty ? "none" : parts.joined(separator: "+")
+}
 func printEvent(_ nativeEvent: NativeEvent) {
   let now = formatter.string(from: Date())
   let modifiers = nativeEvent.modifiers
@@ -1190,7 +1213,13 @@ if enableCGEventTap {
 
     if type == .flagsChanged {
       print(
-        "🔥 RAW FLAGS: keyCode=\(code) " + "flags=0x\(String(event.flags.rawValue, radix: 16))"
+          """
+          🔥 RAW EVENT
+             type=\(type.rawValue)
+             keyCode=\(code)
+             flags=0x\(String(event.flags.rawValue, radix: 16))
+             decoded=[\(describeFlags(event.flags))]
+          """
       )
       fflush(stdout)
     }
