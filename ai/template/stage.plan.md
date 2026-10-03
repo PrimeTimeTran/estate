@@ -1,4 +1,4 @@
-# Implementation Plan: [Feature or Change Name]
+# Plan: [Feature or Change Name]
 
 ## Overview
 

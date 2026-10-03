@@ -312,7 +312,7 @@ mod enums {
 		Intervene,
 		Abort,
 	}
-	#[derive(Debug, Clone, Serialize, Deserialize)]
+	#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 	pub enum StageActor {
 		Human,
 		Sdlc,
@@ -334,7 +334,7 @@ mod enums {
 		FailedQuality(Evaluation),
 		FailedRuntime(Error),
 	}
-	#[derive(Debug, Clone, Serialize, Deserialize)]
+	#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 	pub enum StageStatus {
 		Running,
 		Completed,
@@ -1062,7 +1062,7 @@ pub mod structs {
 
 	#[derive(Debug, Clone, Serialize, Deserialize)]
 	pub struct SdlcSession {
-		pub id: String,
+		pub id: Uuid,
 		pub title: String,
 		pub goal: String,
 		pub stage: enums::Stage,
@@ -2592,7 +2592,6 @@ impl Evaluator {
 		))
 	}
 }
-
 impl SdlcSession {
 	pub fn new(title: impl Into<String>, dir: PathBuf) -> Result<Self> {
 		let now = Utc::now();
@@ -2601,7 +2600,7 @@ impl SdlcSession {
 		Ok(Self {
 			workspace: dir.clone(),
 			goal,
-			id: uuid::Uuid::new_v4().to_string(),
+			id: uuid::Uuid::new_v4(),
 			title: title.into(),
 			stage: Stage::Intent,
 			stages: Vec::new(),
@@ -2890,7 +2889,6 @@ impl StageEvaluation {
 impl SprintPipeline {
 	pub async fn new() -> anyhow::Result<Self> {
 		dotenvy::dotenv().ok();
-		let state_path = SpecialFile::SdlcCurrent.path()?;
 		let session = match SpecialFile::SdlcCurrent
 			.load::<SdlcSession>()
 			.context("loading current SdlcSession")?
@@ -2908,19 +2906,19 @@ impl SprintPipeline {
 				session
 			}
 		};
-
+		let state_path = session.dir.join("sdlc.current.json");
+		if !state_path.exists() {
+			std::fs::write(&state_path, serde_json::to_string_pretty(&session)?)?;
+		}
 		let evaluator = Evaluator {
 			session: session.clone(),
 			jev: TypeSafeClient::from_env()?,
 		};
-
 		let generator = Box::new(LocalGenerator {
 			agent: Agent::new(),
 			model: "qwen3:8b".to_string(),
 		});
-
 		let (event_tx, _) = broadcast::channel(256);
-
 		Ok(Self {
 			evaluator,
 			generator,
@@ -3031,7 +3029,6 @@ impl SprintPipeline {
 			}
 		}
 	}
-
 	async fn wait_for_intervention(
 		&mut self,
 		stage: enums::Stage,
@@ -3108,7 +3105,6 @@ impl SprintPipeline {
 			.map_or(0, |number| number + 1);
 		Ok(Attempt { stage, number, max })
 	}
-
 	fn commit(&mut self) -> Result<()> {
 		let session = self
 			.session
@@ -3165,7 +3161,6 @@ impl SprintPipeline {
 	fn persist(&self) -> Result<()> {
 		FS::save(&self.state_path, &self.session)
 	}
-
 	fn session_read(&self, name: &str) -> Result<String> {
 		let session = self
 			.session
@@ -3280,10 +3275,8 @@ impl SprintPipeline {
 		if self.session.is_none() {
 			return Err(anyhow::anyhow!("no active SDLC session to resume"));
 		}
-
 		self.update_progress("SDLC session resumed")?;
 		self.persist()?;
-
 		Ok(())
 	}
 	fn retry(&mut self, _stage: enums::Stage) -> Result<()> {
@@ -3307,9 +3300,7 @@ impl SprintPipeline {
 	}
 	async fn run_checks(&self, stage: Stage) -> Result<Vec<CheckResult>> {
 		let checks = Self::checks_for(stage);
-
 		let mut results = Vec::with_capacity(checks.len());
-
 		for (name, command) in checks {
 			let result = Command::new(command[0])
 				.args(&command[1..])
@@ -3432,10 +3423,12 @@ impl PipelineRuntime {
 		}
 	}
 	pub async fn run(&mut self, input_rx: &mut UnboundedReceiver<SdlcInput>) -> Result<()> {
+		println!(">>> PipelineRuntime::run");
 		let mut runner = SprintRunner {
 			pipeline: &mut self.pipeline,
 		};
-		runner.run(input_rx).await
+		println!(">>> SprintRunner constructed");
+		runner.run(input_rx).await.context("SprintRunner::run")
 	}
 	pub async fn run_simulated(
 		&mut self,
@@ -3559,19 +3552,13 @@ impl traits::Runner for SprintRunner<'_> {
 	type Output = ();
 	async fn run(&mut self, input_rx: &mut Self::Context) -> Result<Self::Output> {
 		let mut pending_input = None;
-		let mut current_stage = None;
+		let mut stage = self.load_state().context("load_state")?;
 		let mut attempt_number = 0;
 
 		self.emit(SdlcEvent::RunStarted);
 
 		loop {
-			let stage = self.load_state()?;
-
-			// New stage = reset attempt counter.
-			if current_stage != Some(stage) {
-				current_stage = Some(stage);
-				attempt_number = 0;
-			}
+			println!(">>> stage={stage:?} attempt={attempt_number}");
 
 			let attempt = Attempt {
 				stage,
@@ -3579,7 +3566,10 @@ impl traits::Runner for SprintRunner<'_> {
 				max: 3,
 			};
 
-			let outcome = self.run_stage(stage, attempt, &mut pending_input).await?;
+			let outcome = self
+				.run_stage(stage, attempt, &mut pending_input)
+				.await
+				.with_context(|| format!("run_stage({stage:?})"))?;
 
 			self.persist_outcome(&outcome)?;
 
@@ -3605,7 +3595,15 @@ impl traits::Runner for SprintRunner<'_> {
 						.await?;
 
 					match control {
-						RunControl::Continue => continue,
+						RunControl::Continue => {
+							stage = self
+								.pipeline
+								.stage()
+								.ok_or_else(|| anyhow::anyhow!("pipeline has no stage"))?;
+
+							attempt_number = 0;
+						}
+
 						RunControl::Exit => return Ok(()),
 					}
 				}
@@ -3617,13 +3615,33 @@ impl traits::Runner for SprintRunner<'_> {
 	}
 	fn is_running(&self) -> bool {
 		true
-		// self.pipeline.is_running()
 	}
 }
 impl SprintRunner<'_> {
 	fn load_state(&mut self) -> Result<enums::Stage> {
-		// TODO: actually restore the persisted session from sdlc.current.json.
-		Ok(self.pipeline.stage().unwrap_or(enums::Stage::Intent))
+		let session = self
+			.pipeline
+			.session
+			.as_ref()
+			.ok_or_else(|| anyhow::anyhow!("no SDLC session loaded"))?;
+
+		let path = session.dir.join("sdlc.current.json");
+
+		println!(">>> load_state path = {:?}", path);
+		println!(">>> exists = {}", path.exists());
+
+		let json = std::fs::read_to_string(&path).with_context(|| format!("reading {:?}", path))?;
+
+		println!(">>> loaded state = {}", json);
+
+		#[derive(serde::Deserialize)]
+		struct PersistedStage {
+			stage: enums::Stage,
+		}
+
+		let state: PersistedStage = serde_json::from_str(&json)?;
+
+		Ok(state.stage)
 	}
 	fn persist_outcome(&mut self, _outcome: &StageOutcome) -> Result<()> {
 		// TODO: persist outcome.
@@ -3669,7 +3687,6 @@ impl SprintRunner<'_> {
 			.await?;
 		Ok(semantic.with_evaluations(structural))
 	}
-
 	async fn stage_execute(
 		&mut self,
 		stage: enums::Stage,
@@ -3700,40 +3717,6 @@ impl SprintRunner<'_> {
 			result,
 		})
 	}
-	// 	async fn stage_execute(
-	// 		&mut self,
-	// 		stage: enums::Stage,
-	// 		attempt: Attempt,
-	// 		pending_input: &mut Option<SdlcInput>,
-	// 	) -> Result<StageExecution> {
-	// 		let started_at = Utc::now();
-	// 		let result = match stage {
-	// 			Stage::Intent => self.stage_intent().await?,
-	//
-	// 			Stage::Spec => self.stage_spec().await?,
-	//
-	// 			Stage::Plan => self.stage_plan().await?,
-	// 			Stage::Build => self.stage_build().await?,
-	//
-	// 			Stage::Verify => self.stage_verify().await?,
-	//
-	// 			Stage::Complete => StageResult::Complete,
-	//
-	// 			Stage::SprintCompleted => StageResult::SprintCompleted,
-	//
-	// 			Stage::Deploy | Stage::Maintain => {
-	// 				return Err(anyhow!("stage {stage:?} not implemented"));
-	// 			}
-	// 		};
-	//
-	// 		Ok(StageExecution {
-	// 			stage,
-	// 			attempt,
-	// 			started_at,
-	// 			completed_at: Utc::now(),
-	// 			result,
-	// 		})
-	// 	}
 	async fn stage_intent(&mut self) -> Result<StageResult> {
 		let (stage, session_dir, goal) = {
 			let session = self
@@ -3920,16 +3903,13 @@ impl SprintRunner<'_> {
 		self.emit(SdlcEvent::PhaseChanged {
 			phase: SdlcPhase::Executing,
 		});
-
 		let execution = match self.stage_execute(stage, attempt, pending_input).await {
 			Ok(execution) => {
 				self.emit(SdlcEvent::ExecutionComplete { stage });
 				execution
 			}
-
 			Err(error) => {
 				eprintln!("STAGE EXECUTION FAILED [{stage:?}]: {error:#}");
-
 				return Ok(StageOutcome::ExecutionFailed {
 					stage,
 					attempt,
@@ -3988,36 +3968,28 @@ impl SprintRunner<'_> {
 	) -> Result<RunControl> {
 		let stage = outcome.stage();
 		let attempt = outcome.attempt();
-
 		match decision {
 			StageDecision::Continue => {
 				let next = stage
 					.next()
 					.ok_or_else(|| anyhow!("Stage {stage:?} has no next stage"))?;
-
 				self.transition(next)?;
-
 				self.emit(SdlcEvent::StageTransitioned {
 					from: stage,
 					to: next,
 				});
-
 				Ok(RunControl::Continue)
 			}
-
 			StageDecision::Retry => {
 				self.handle_retry(stage, attempt).await?;
 				Ok(RunControl::Continue)
 			}
-
 			StageDecision::Revise => {
 				self
 					.handle_revision(stage, attempt, outcome, input_rx, pending_input)
 					.await?;
-
 				Ok(RunControl::Continue)
 			}
-
 			StageDecision::AwaitHuman => {
 				self.emit(SdlcEvent::PhaseChanged {
 					phase: SdlcPhase::AwaitingHuman,
@@ -4030,54 +4002,41 @@ impl SprintRunner<'_> {
 						input_rx,
 					)
 					.await?;
-
 				match intervention {
 					Intervention::Retry => {
 						self.handle_retry(stage, attempt).await?;
 						Ok(RunControl::Continue)
 					}
-
 					Intervention::Revise => {
 						self
 							.handle_revision(stage, attempt, outcome, input_rx, pending_input)
 							.await?;
-
 						Ok(RunControl::Continue)
 					}
-
 					Intervention::Reviewed => Ok(RunControl::Continue),
-
 					Intervention::ProvideContext(context) => {
 						*pending_input = None;
-
 						self
 							.pipeline
 							.update_progress(&format!("Human provided context: {context}"))?;
-
 						Ok(RunControl::Continue)
 					}
-
 					Intervention::Abort => Ok(RunControl::Exit),
 					Intervention::Human(str) => Ok(RunControl::Exit),
 				}
 			}
-
 			StageDecision::Fail => {
 				self.emit(SdlcEvent::Failed {
 					stage: Some(stage),
 					error: format!("Stage {stage:?} failed on attempt {}", attempt.number),
 				});
-
 				Ok(RunControl::Exit)
 			}
-
 			StageDecision::Complete => {
 				self.emit(SdlcEvent::PhaseChanged {
 					phase: SdlcPhase::Completed,
 				});
-
 				self.emit(SdlcEvent::Completed);
-
 				Ok(RunControl::Exit)
 			}
 		}

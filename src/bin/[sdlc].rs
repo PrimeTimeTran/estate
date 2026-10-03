@@ -10,19 +10,38 @@ use std::io::IsTerminal;
 //
 // let demo = std::env::var_os("DRY_RUN").is_some();
 //
+// 3. Disable TUI
+// SDLC_PLAIN=1 cargo run --bin sdlc --features sdlc
 // cargo -q run --bin sdlc --features sdlc
 #[tokio::main]
 pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
-	let mut pipeline = SprintPipeline::new().await.context("loading SDLC")?;
+	let mut pipeline = SprintPipeline::new().await.context("SprintPipeline::new")?;
+	println!(">>> pipeline created");
+
 	if pipeline.stage().is_none() {
+		println!(">>> initializing pipeline");
+
 		pipeline
 			.init("Do the work required to build this CLI")
-			.await?;
+			.await
+			.context("SprintPipeline::init")?;
+
+		println!(">>> pipeline initialized");
 	}
+
+	println!(">>> creating runtime");
 	let mut runtime = PipelineRuntime::new(pipeline);
+	println!(">>> runtime created");
 	let mut events = runtime.pipeline.subscribe();
 	let mut view = SdlcView::new(&runtime);
 	let (input_tx, mut input_rx) = tokio::sync::mpsc::unbounded_channel::<SdlcInput>();
+	let use_tui = std::env::var_os("SDLC_TUI").is_some();
+	if !use_tui {
+		println!(">>> starting runtime");
+		runtime.run(&mut input_rx).await.context("runtime.run")?;
+		println!(">>> runtime finished");
+		return Ok(());
+	}
 	let is_real_run = std::env::var_os("DRY_RUN").is_none();
 	let run = async {
 		if is_real_run {
@@ -31,6 +50,7 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 			runtime.run_simulated(&mut input_rx).await
 		}
 	};
+
 	tokio::pin!(run);
 	if !std::io::stdout().is_terminal() {
 		return Ok(());

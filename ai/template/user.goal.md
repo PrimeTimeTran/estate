@@ -1,4 +1,4 @@
-I need to build a CLI tool. I wnat to use NodeJS.
+I need to build a CLI tool. I want to use NodeJS.
 Create a file named hello-world.js in the repository root from where I ran this command.
 This file will be the CLI entrypoint. The CLI tool should accept an
 argument and write that value to hello-world.md.
