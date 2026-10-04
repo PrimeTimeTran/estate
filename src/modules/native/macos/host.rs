@@ -53,15 +53,22 @@ where
 impl<C: Ctx> Host<C> {
 	pub fn start(&mut self) -> Result<WorkHandle<C, tokio::task::JoinHandle<()>>> {
 		self.start_ipc()?;
+		// let ipc = IpcServer::new(PathBuf::from("/tmp/estate.sock"));
+		// ipc.init(&self.worker)?;
 		self.start_watchers()?;
 		// self.start_grpc_server()?;
 		Ok(self.start_hid_bridge()?)
 	}
-
 	pub fn start_ipc(&self) -> Result<()> {
-		let ipc = IpcServer::new(PathBuf::from("/tmp/estate.sock"));
-		ipc.init(&self.worker)?;
-		Ok(())
+    let ipc = IpcServer::new(PathBuf::from("/tmp/estate.sock"));
+	
+    self.worker.run_background(|_cancel| async move {
+        if let Err(error) = ipc.start().await {
+            tracing::error!(%error, "Estate IPC server stopped");
+        }
+    });
+	
+    Ok(())
 	}
 	pub fn start_watchers(&mut self) -> Result<()> {
 		// cargo.toml, settings files, caches, index,

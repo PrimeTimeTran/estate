@@ -139,7 +139,21 @@ async fn handle_connection(stream: UnixStream) -> anyhow::Result<()> {
 			IpcMessage::Shutdown => {
 				break;
 			}
-
+			IpcMessage::GetContext => {
+				let context = EstateContext {
+					connection_id,
+					active_app: "Unknown".into(),
+					workspace: None,
+					project: None,
+					mode: "Unknown".into(),
+				};
+			
+				send(
+					&mut write_half,
+					IpcMessage::ContextResult(context),
+				)
+				.await?;
+			}
 			message => {
 				tracing::debug!(
 					connection = %connection_id,

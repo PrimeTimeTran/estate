@@ -167,8 +167,53 @@ pub enum IpcMessage {
 	Error(IpcError),
 
 	Shutdown,
-}
 
+	// Tauri / Estate context
+	TauriContext,
+	EstateContext,
+	// Context
+		GetContext,
+	
+		// Filesystem
+		FsList {
+			path: String,
+		},
+	
+		FsRead {
+			path: String,
+		},
+	
+		FsCreate {
+			path: String,
+			content: String,
+		},
+	
+		FsUpdate {
+			path: String,
+			content: String,
+		},
+	
+		FsDelete {
+			path: String,
+		},
+	
+		// Responses
+		ContextResult(EstateContext),
+	
+		FsListResult {
+			entries: Vec<FileEntry>,
+		},
+	
+		FsReadResult {
+			content: String,
+		},
+	
+		FsCreateResult,
+	
+		FsUpdateResult,
+	
+		FsDeleteResult,ˆˆ
+}
 // ─────────────────────────────────────────────────────────────────────────────
 // Transport
 // ─────────────────────────────────────────────────────────────────────────────
@@ -191,4 +236,25 @@ pub struct EstatePaths {
 	pub socket_dir: PathBuf,
 	pub state_file: PathBuf,
 	pub settings_file: PathBuf,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TauriContext {
+	pub pid: u32,
+	pub platform: String,
+	pub arch: String,
+	pub cwd: String,
+}
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct EstateContext {
+	pub connection_id: Uuid,
+	pub active_app: String,
+	pub workspace: Option<String>,
+	pub project: Option<String>,
+	pub mode: String,
+}
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct FileEntry {
+	pub path: String,
+	pub kind: String,
+	pub size: Option<u64>,
 }
