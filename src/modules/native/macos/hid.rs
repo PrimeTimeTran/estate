@@ -447,6 +447,117 @@ fn key_from_code(code: u16) -> Option<Key> {
 }
 
 impl MacosHid {
+	fn handle_event(&mut self, event: NativeEvent, received_at: u64, events: &EventBus) {
+		self.state_update(&event);
+		let latency = received_at.saturating_sub(event.sent_at);
+
+		for action in self.observe_event(&event) {
+			tracing::debug!(
+					action = %action.name,
+					code = %action.code,
+					latency,
+					"🔥 HOTKEY TRIGGERED"
+			);
+		}
+		// let latency = received_at.saturating_sub(event.sent_at);
+		// self.log_native_event(&event);
+		// for action in self.observe_event(&event) {
+		// 	tracing::debug!(
+		// 			action = %action.name,
+		// 			code = %action.code,
+		// 			"🔥 HOTKEY TRIGGERED"
+		// 	);
+		// }
+		// events.emit(event.into());
+	}
+	fn state_update(&mut self, event: &NativeEvent) {
+		let m = &event.modifiers;
+		self.state.shift_left = m.shift_left;
+		self.state.shift_right = m.shift_right;
+		self.state.ctrl_left = m.ctrl_left;
+		self.state.ctrl_right = m.ctrl_right;
+		self.state.opt_left = m.opt_left;
+		self.state.opt_right = m.opt_right;
+		self.state.cmd_left = m.cmd_left;
+		self.state.cmd_right = m.cmd_right;
+		self.state.caps = m.caps;
+		self.state.function = m.function;
+		if let Some(app) = &event.frontmost_app {
+			self.state.frontmost_app = app.name.clone();
+		}
+		self.print_event(event);
+	}
+	fn print_event(&mut self, event: &NativeEvent) {
+		let s = &self.state;
+		let app = display_name(&s.frontmost_app, 10);
+
+		let left = format!(
+			"{} {} {} {}",
+			key_state(s.shift_left, "⇧"),
+			key_state(s.ctrl_left, "⌃"),
+			key_state(s.opt_left, "⌥"),
+			key_state(s.cmd_left, "⌘"),
+		);
+
+		let right = format!(
+			"{} {} {} {}",
+			key_state(s.shift_right, "⇧"),
+			key_state(s.ctrl_right, "⌃"),
+			key_state(s.opt_right, "⌥"),
+			key_state(s.cmd_right, "⌘"),
+		);
+
+		let special = format!("{} {}", key_state(s.function, "fn"), key_state(s.caps, "⇪"),);
+
+		let event_display = match event.kind {
+			NativeEventKind::Scroll {
+				vertical,
+				horizontal,
+			} => {
+				let x = event.scroll_x.unwrap_or(0.0);
+				let y = event.scroll_y.unwrap_or(0.0);
+
+				if y.abs() >= x.abs() {
+					if y > 0.0 {
+						format!("🖱 ↑ WHEEL {:>5.1}", y)
+					} else if y < 0.0 {
+						format!("🖱 ↓ WHEEL {:>5.1}", y.abs())
+					} else {
+						"🖱 · WHEEL".to_string()
+					}
+				} else if x > 0.0 {
+					format!("🖱 → WHEEL {:>5.1}", x)
+				} else if x < 0.0 {
+					format!("🖱 ← WHEEL {:>5.1}", x.abs())
+				} else {
+					"🖱 · WHEEL".to_string()
+				}
+			}
+
+			_ => {
+				let arrow = match event.direction {
+					Some(keymap::KeyDirection::Down) => "↓",
+					Some(keymap::KeyDirection::Up) => "↑",
+					None => " ",
+				};
+
+				let name = event.name.as_deref().unwrap_or("");
+				format!("{arrow} {name}")
+			}
+		};
+
+		let key_code = event
+			.key_code
+			.map(|code| code.to_string())
+			.unwrap_or_default();
+
+		println!(
+			"{:<10} | {:<17} | {:<17} | {:<7} | {:<16} | {:>5}",
+			app, left, right, special, event_display, key_code,
+		);
+	}
+}
+impl MacosHid {
 	pub fn new() -> Result<Self> {
 		Self::init_hid_smoke_log();
 		let enabled = true;
@@ -472,7 +583,7 @@ impl MacosHid {
 		let shim = format!("{source_dir}/hid-event-shim.o");
 		let output = "/tmp/estate-os-observer";
 
-		tracing::info!("🍎 building macOS OS observer");
+		tracing::debug!("🍎 building macOS OS observer");
 
 		let build = std::process::Command::new("swiftc")
 			.current_dir(source_dir)
@@ -488,7 +599,7 @@ impl MacosHid {
 			);
 		}
 
-		tracing::info!("🍎 macOS OS observer built: {output}");
+		tracing::debug!("🍎 macOS OS observer built: {output}");
 
 		let child = std::process::Command::new(output)
 			.stdin(std::process::Stdio::null())
@@ -497,7 +608,7 @@ impl MacosHid {
 			.spawn()
 			.context("failed to start /tmp/estate-os-observer")?;
 
-		tracing::info!(
+		tracing::debug!(
 			pid = child.id(),
 			socket = %self.socket.display(),
 			"🍎 macOS OS observer started"
@@ -509,7 +620,7 @@ impl MacosHid {
 	}
 	pub fn stop(&mut self) -> Result<()> {
 		if let Some(mut child) = self.child.take() {
-			tracing::info!(pid = child.id(), "🍎 stopping macOS HID");
+			tracing::debug!(pid = child.id(), "🍎 stopping macOS HID");
 			child.kill().ok();
 			child.wait().ok();
 		}
@@ -528,7 +639,7 @@ impl MacosHid {
 		loop {
 			tokio::select! {
 					_ = cancel.cancelled() => {
-							tracing::info!("macOS HID cancelled");
+							tracing::debug!("macOS HID cancelled");
 							return Ok(());
 					}
 
@@ -559,7 +670,7 @@ impl MacosHid {
 		}
 	}
 	async fn connect(&self) -> Result<UnixStream> {
-		tracing::info!(
+		tracing::debug!(
 				socket = %self.socket.display(),
 				"🍎 connecting to macOS HID"
 		);
@@ -567,7 +678,7 @@ impl MacosHid {
 		loop {
 			match UnixStream::connect(&self.socket).await {
 				Ok(stream) => {
-					tracing::info!(
+					tracing::debug!(
 							socket = %self.socket.display(),
 							"🍎 connected to macOS HID"
 					);
@@ -590,7 +701,7 @@ impl MacosHid {
 	async fn send_ping(&self, writer: &mut tokio::net::unix::OwnedWriteHalf, id: u64) -> Result<()> {
 		let message = HidMessage::Ping { id };
 		self.send_message(writer, &message).await?;
-		tracing::info!(id, "🍏 Rust → Swift: PING");
+		tracing::debug!(id, "🍏 Rust → Swift: PING");
 		Ok(())
 	}
 	async fn send_message(
@@ -610,13 +721,13 @@ impl MacosHid {
 		id: u64,
 		writer: &mut tokio::net::unix::OwnedWriteHalf,
 	) -> Result<()> {
-		// tracing::info!(id, "🍎 Swift → Rust: PING");
+		// tracing::debug!(id, "🍎 Swift → Rust: PING");
 
 		let pong = HidMessage::Pong { id };
 
 		self.send_message(writer, &pong).await?;
 
-		tracing::info!(id, "🍏 Rust → Swift: PONG");
+		tracing::debug!(id, "🍏 Rust → Swift: PONG");
 
 		Ok(())
 	}
@@ -686,91 +797,14 @@ impl MacosHid {
 		}
 	}
 	fn handle_action(&self, action: String) {
-		// tracing::info!(
+		// tracing::debug!(
 		// 		action = %action,
 		// 		"🍎 Swift action received"
 		// );
 	}
-	fn handle_event(&mut self, event: NativeEvent, received_at: u64, events: &EventBus) {
-		self.state_update(&event);
-		let latency = received_at.saturating_sub(event.sent_at);
 
-		for action in self.observe_event(&event) {
-			tracing::info!(
-					action = %action.name,
-					code = %action.code,
-					latency,
-					"🔥 HOTKEY TRIGGERED"
-			);
-		}
-		// let latency = received_at.saturating_sub(event.sent_at);
-		// self.log_native_event(&event);
-		// for action in self.observe_event(&event) {
-		// 	tracing::info!(
-		// 			action = %action.name,
-		// 			code = %action.code,
-		// 			"🔥 HOTKEY TRIGGERED"
-		// 	);
-		// }
-		// events.emit(event.into());
-	}
-	fn state_update(&mut self, event: &NativeEvent) {
-		let m = &event.modifiers;
-		self.state.shift_left = m.shift_left;
-		self.state.shift_right = m.shift_right;
-		self.state.ctrl_left = m.ctrl_left;
-		self.state.ctrl_right = m.ctrl_right;
-		self.state.opt_left = m.opt_left;
-		self.state.opt_right = m.opt_right;
-		self.state.cmd_left = m.cmd_left;
-		self.state.cmd_right = m.cmd_right;
-		self.state.caps = m.caps;
-		self.state.function = m.function;
-		if let Some(app) = &event.frontmost_app {
-			self.state.frontmost_app = app.name.clone();
-		}
-		self.print_event(event);
-	}
-	fn print_event(&mut self, event: &NativeEvent) {
-		let s = &self.state;
-		let app = display_name(&s.frontmost_app, 10);
-		let left = format!(
-			"{} {} {} {}",
-			key_state(s.shift_left, "⇧"),
-			key_state(s.ctrl_left, "⌃"),
-			key_state(s.opt_left, "⌥"),
-			key_state(s.cmd_left, "⌘"),
-		);
-		let right = format!(
-			"{} {} {} {}",
-			key_state(s.shift_right, "⇧"),
-			key_state(s.ctrl_right, "⌃"),
-			key_state(s.opt_right, "⌥"),
-			key_state(s.cmd_right, "⌘"),
-		);
-		let special = format!("{} {}", key_state(s.function, "fn"), key_state(s.caps, "⇪"),);
-		let arrow = match event.direction {
-			Some(keymap::KeyDirection::Down) => "↓",
-			Some(keymap::KeyDirection::Up) => "↑",
-			None => " ",
-		};
-
-		let name = event.name.as_deref().unwrap_or("");
-		let event_display = format!("{arrow} {name}");
-
-		let key_code = event
-			.key_code
-			.map(|code| code.to_string())
-			.unwrap_or_default();
-
-		println!(
-			"{:<10} | {:<17} | {:<17} | {:<7} | {:<16} | {:>5}",
-			app, left, right, special, event_display, key_code,
-		);
-	}
 	fn log_native_event(&self, event: &NativeEvent) {
 		let now = event.sent_at;
-
 		let (left, right, special, event_display, flags_text, key_code) = match &event.kind {
 			NativeEventKind::KeyDown { key_code } => {
 				let key = Self::key_from_code(*key_code);
@@ -861,7 +895,7 @@ impl MacosHid {
 		let session_flags: u64 = 0;
 		let source_pid: i64 = 0;
 		let source_user_data: i64 = 0;
-		tracing::info!(
+		tracing::debug!(
 			"{} | {:<9} | {:<9} | {:<4} | {:<14} | {:<8} | {:>4} | {:>10} | {:>10} | {:>6} | {:>6}",
 			now,
 			left,
@@ -881,7 +915,7 @@ impl MacosHid {
 			NativeEventKind::KeyDown { key_code } => {
 				let key = Self::key_from_code(*key_code);
 
-				// tracing::info!(
+				// tracing::debug!(
 				// key_code,
 				// key = ?key,
 				// "🔥 KEY DOWN"
@@ -891,7 +925,7 @@ impl MacosHid {
 			NativeEventKind::KeyUp { key_code } => {
 				let key = Self::key_from_code(*key_code);
 				//
-				// tracing::info!(
+				// tracing::debug!(
 				// key_code,
 				// key = ?key,
 				// "🔥 KEY UP"
@@ -899,7 +933,7 @@ impl MacosHid {
 			}
 
 			other => {
-				tracing::info!(
+				tracing::debug!(
 						kind = ?other,
 						"🔥 OTHER NATIVE EVENT KIND"
 				);
@@ -907,7 +941,7 @@ impl MacosHid {
 		}
 	}
 	fn handle_pong(&self, id: u64) {
-		tracing::info!(id, "🍎 Swift → Rust: PONG");
+		tracing::debug!(id, "🍎 Swift → Rust: PONG");
 	}
 	fn modifier_display(&self, modifiers: &ModifierSnapshot) -> String {
 		let mut parts = Vec::new();
@@ -971,11 +1005,11 @@ impl MacosHid {
 		};
 
 		let Some(key) = Self::key_from_code(*key_code) else {
-			tracing::warn!(key_code = *key_code, "unknown modifier key code");
+			// tracing::warn!(key_code = *key_code, "unknown modifier key code");
 			return vec![];
 		};
 
-		tracing::info!(
+		tracing::debug!(
 			"MODIFIER {:?} code={} modifiers={}",
 			key,
 			key_code,
@@ -1002,7 +1036,7 @@ impl MacosHid {
 		// 			return vec![];
 		// 		};
 
-		// tracing::info!(
+		// tracing::debug!(
 		// 	"🔑 KEY DOWN | key={:?} display={} code={} modifiers={}",
 		// 	key,
 		// 	key.display(),
@@ -1022,7 +1056,7 @@ impl MacosHid {
 	fn observe_mouse(&mut self, event: &NativeEvent) -> Vec<Action> {
 		match &event.kind {
 			NativeEventKind::MouseDown { button, .. } => {
-				tracing::info!(
+				tracing::debug!(
 					"MOUSE DOWN button={} modifiers={}",
 					button,
 					self.modifier_display(&event.modifiers),
@@ -1030,7 +1064,7 @@ impl MacosHid {
 			}
 
 			NativeEventKind::MouseUp { button, .. } => {
-				tracing::info!(
+				tracing::debug!(
 					"MOUSE UP button={} modifiers={}",
 					button,
 					self.modifier_display(&event.modifiers),
@@ -1544,7 +1578,7 @@ impl MacosHid {
 
 		let key = MacosHid::key_from_code(key_code);
 
-		tracing::info!(
+		tracing::debug!(
 			name = ?event.name,
 			key_code,
 			key = ?key.map(|k| k.display()),
@@ -1697,8 +1731,12 @@ impl SwiftNativeEvent {
 		};
 
 		let modifiers = self.modifiers.unwrap_or_default();
+		let scroll_x = Some(self.horizontal.unwrap_or(0) as f64);
+		let scroll_y = Some(self.vertical.unwrap_or(0) as f64);
 
 		Some(NativeEvent {
+			scroll_x,
+			scroll_y,
 			sent_at: self.sent_at.or(self.timestamp).unwrap_or_default(),
 			frontmost_app: self.frontmost_app.map(|app| FrontmostApp {
 				name: app.name,

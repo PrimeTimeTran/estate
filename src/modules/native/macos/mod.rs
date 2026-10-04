@@ -14,6 +14,9 @@ pub use winit::platform::macos::{ActivationPolicy, EventLoopBuilderExtMacOS};
 pub use host::*;
 mod host;
 
+pub mod ipc;
+pub use ipc::*;
+
 pub mod keymap;
 pub use keymap::*;
 
@@ -88,7 +91,7 @@ impl App<Context> {
 		self.init_services()?;
 		self.run_gui()?;
 		if self.mode == AppMode::Daemon {
-			let hid = self.host.start_hid()?;
+			let hid = self.host.start()?;
 			self.workers.push(hid);
 		}
 		Ok(())
@@ -240,6 +243,9 @@ pub struct NativeEvent {
 
 	#[serde(default)]
 	pub name: Option<String>,
+
+	pub scroll_x: Option<f64>,
+	pub scroll_y: Option<f64>,
 
 	#[serde(default)]
 	pub direction: Option<keymap::KeyDirection>,

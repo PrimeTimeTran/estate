@@ -167,9 +167,7 @@ where
 	#[cfg(not(feature = "web"))]
 	pub fn wait_for_ctrl_c(&self) {
 		let (tx, rx) = std::sync::mpsc::channel();
-
 		self.spawn_ctrl_c(tx);
-
 		let _ = rx.recv();
 	}
 	#[cfg(all(not(feature = "web")))]

@@ -16,17 +16,22 @@ where
 		tracing::info!("App init services");
 		self.init_api()?;
 
-		self.host.start_hid();
+		self.host.start();
+		let handle = self.worker().start_grpc_server();
+		self.workers.push(handle);
 
 		let handle = self.start_clock()?;
 		self.workers.push(handle);
+
 		#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 		{
 			let handle = self.start_cargo_watcher()?;
 			self.workers.push(handle);
+
 			let handle = self.start_cursor_watcher_from_app()?;
 			self.workers.push(handle);
 		}
+
 		tracing::info!("App init services complete");
 		Ok(())
 	}

@@ -45,7 +45,10 @@
 // 	client: EventServiceClient<Channel>,
 // }
 
-use crate::{prelude::*, proto::types as proto_types};
+use crate::{
+	prelude::{SdlcEvent, *},
+	proto::types as proto_types,
+};
 use uuid::Timestamp;
 
 #[path = "[enum].rs"]
@@ -173,6 +176,9 @@ pub mod create {
 	pub fn app(kind: EventKind) -> Event {
 		Event::app(kind)
 	}
+	pub fn sdlc(event: SdlcEvent) -> Event {
+		Event::sdlc(EventKind::Sdlc(event))
+	}
 }
 
 /// ## [AppEvent]
@@ -249,7 +255,8 @@ pub enum EventKind {
 	Scroll { vertical: i64, horizontal: i64 },
 	FlagsChanged { key_code: u16 },
 	ModifierChanged { modifiers: ModifierSnapshot },
-	Unknown
+	Sdlc(SdlcEvent),
+	Unknown,
 }
 
 /// ## [EventSource]
@@ -263,6 +270,7 @@ pub enum EventSource {
 	Daemon,
 	Editor,
 	Filesystem,
+	Sdlc,
 }
 
 impl EventSink<AppEvent> for EventLoopProxy<AppEvent> {
@@ -294,6 +302,9 @@ impl Event {
 	}
 	pub fn editor(kind: EventKind) -> Self {
 		Self::new(EventSource::Editor, kind)
+	}
+	pub fn sdlc(kind: EventKind) -> Self {
+		Self::new(EventSource::Sdlc, kind)
 	}
 }
 impl From<ProtoProblem> for ProblemLoaded {

@@ -52,7 +52,6 @@ pub struct Explain;
 impl CliCommand for Explain {
 	async fn run(&self, _ctx: &Context) {
 		println!("🧠 generating explanation of system state");
-
 		// real logic: dependency + resolution explanation
 	}
 }

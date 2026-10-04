@@ -163,7 +163,8 @@ impl App<Context> {
 		self.init_services()?;
 		self.run_gui()?;
 		if self.mode == AppMode::Daemon {
-			self.host.start()?;
+			let hid = self.host.start()?;
+			self.workers.push(hid);
 			self.init_daemon();
 		}
 
@@ -724,7 +725,21 @@ where
 	// 	self.sync_views();
 	// }
 }
-
+impl<C> HostWorker<C>
+where
+	C: Ctx,
+{
+	pub fn start_grpc_server(&self) -> WorkHandle<C, tokio::task::JoinHandle<()>> {
+		self.run_background(|cancel| async move {
+			if let Err(error) = crate::modules::grpc_server::run_server(cancel).await {
+				tracing::error!(
+					%error,
+					"❌ Estate gRPC server stopped"
+				);
+			}
+		})
+	}
+}
 impl<C> traits::Worker<C> for HostWorker<C>
 where
 	C: Ctx,

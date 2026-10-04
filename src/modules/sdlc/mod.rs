@@ -221,7 +221,7 @@ mod enums {
 		Local,
 		Api,
 	}
-	#[derive(Debug, Clone)]
+	#[derive(Debug, Clone, Deserialize, Serialize)]
 	pub enum SdlcEvent {
 		Activity {
 			stage: Stage,
@@ -295,7 +295,7 @@ mod enums {
 		Reviewed,
 		Human(String),
 	}
-	#[derive(Debug, Clone, Copy, PartialEq)]
+	#[derive(Debug, Clone, Deserialize, Serialize, Copy, PartialEq)]
 	pub enum SdlcPhase {
 		Starting,
 		Executing,
