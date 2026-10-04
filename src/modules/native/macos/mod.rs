@@ -32,7 +32,7 @@ pub use window::*;
 pub mod server;
 pub use server::*;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "kind")]
 pub enum NativeEventKind {
 	#[serde(rename = "key_down")]
@@ -222,7 +222,7 @@ impl From<NativeEventKind> for e::EventKind {
 	}
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NativeEvent {
 	pub sent_at: u64,
 

@@ -179,6 +179,17 @@ pub mod create {
 	pub fn sdlc(event: SdlcEvent) -> Event {
 		Event::sdlc(EventKind::Sdlc(event))
 	}
+	pub fn ipc(event: Event) -> EventEnvelope<EventKind> {
+		EventEnvelope {
+			id: EventId {
+				node: NodeId,
+				sequence: event.id,
+			},
+			timestamp: event.timestamp,
+			source: event.source,
+			event: event.kind,
+		}
+	}
 }
 
 /// ## [AppEvent]
@@ -351,14 +362,16 @@ pub type Problem = ProtoProblem;
 /// 	- Over the wire (Server wants users to know someone 'signed in')
 ///
 /// The following structs will cover those cases and enable
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EventEnvelope<E> {
 	pub id: EventId,
-	pub timestamp: Timestamp,
+	pub timestamp: u64,
 	pub source: EventSource,
 	pub event: E,
 }
-
-struct NodeId;
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NodeId;
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EventId {
 	pub node: NodeId,
 	pub sequence: u64,

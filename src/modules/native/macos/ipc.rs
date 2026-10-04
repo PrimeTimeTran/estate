@@ -9,12 +9,14 @@ use std::process::{Child, Command, Stdio};
 
 pub struct IpcServer {
 	socket: PathBuf,
+	events: EventBus,
 }
 
 impl IpcServer {
-	pub fn new(socket: impl Into<PathBuf>) -> Self {
+	pub fn new(socket: impl Into<PathBuf>, events: EventBus) -> Self {
 		Self {
 			socket: socket.into(),
+			events,
 		}
 	}
 	pub fn init<C>(&self, worker: &HostWorker<C>) -> Result<()>
@@ -44,8 +46,10 @@ impl IpcServer {
 		loop {
 			let (stream, _) = listener.accept().await?;
 
+			let events = self.events.clone();
+
 			tokio::spawn(async move {
-				if let Err(error) = handle_connection(stream).await {
+				if let Err(error) = handle_connection(stream, events).await {
 					tracing::debug!(
 						%error,
 						"Estate IPC connection closed"
@@ -56,7 +60,7 @@ impl IpcServer {
 	}
 }
 
-async fn handle_connection(stream: UnixStream) -> anyhow::Result<()> {
+async fn handle_connection(stream: UnixStream, events: EventBus) -> anyhow::Result<()> {
 	let connection_id = Uuid::new_v4();
 
 	let (read_half, mut write_half) = stream.into_split();
@@ -66,7 +70,7 @@ async fn handle_connection(stream: UnixStream) -> anyhow::Result<()> {
 
 	reader.read_line(&mut line).await?;
 
-	let message: IpcMessage = serde_json::from_str(&line)?;
+	let message: IpcMessage<EventKind> = serde_json::from_str(&line)?;
 
 	let hello = match message {
 		IpcMessage::Hello(hello) => hello,
@@ -120,67 +124,128 @@ async fn handle_connection(stream: UnixStream) -> anyhow::Result<()> {
 	)
 	.await?;
 
+	let mut event_rx = events.tx.subscribe();
+
 	loop {
-		line.clear();
+		tokio::select! {
+			/*
+			 * Tauri → Estate
+			 */
+			result = reader.read_line(&mut line) => {
+				let bytes = result?;
 
-		let bytes = reader.read_line(&mut line).await?;
+				if bytes == 0 {
+					break;
+				}
 
-		if bytes == 0 {
-			break;
-		}
+				let message: IpcMessage<EventKind> =
+					serde_json::from_str(&line)?;
+				match message {
+					IpcMessage::Ping { id } => {
+						send(
+							&mut write_half,
+							IpcMessage::Pong { id },
+						)
+						.await?;
+					}
 
-		let message: IpcMessage = serde_json::from_str(&line)?;
+					IpcMessage::Shutdown => {
+						break;
+					}
 
-		match message {
-			IpcMessage::Ping { id } => {
-				send(&mut write_half, IpcMessage::Pong { id }).await?;
+					IpcMessage::GetContext => {
+						let context = EstateContext {
+							connection_id,
+							active_app: "Unknown".into(),
+							workspace: None,
+							project: None,
+							mode: "Unknown".into(),
+						};
+
+						send(
+							&mut write_half,
+							IpcMessage::ContextResult(context),
+						)
+						.await?;
+					}
+
+					message => {
+						tracing::debug!(
+							connection = %connection_id,
+							?message,
+							"Estate IPC message"
+						);
+					}
+				}
+
+				line.clear();
 			}
 
-			IpcMessage::Shutdown => {
-				break;
-			}
-			IpcMessage::GetContext => {
-				let context = EstateContext {
-					connection_id,
-					active_app: "Unknown".into(),
-					workspace: None,
-					project: None,
-					mode: "Unknown".into(),
-				};
-			
-				send(
-					&mut write_half,
-					IpcMessage::ContextResult(context),
-				)
-				.await?;
-			}
-			message => {
-				tracing::debug!(
-					connection = %connection_id,
-					?message,
-					"Estate IPC message"
-				);
+			/*
+			 * Estate → Tauri
+			 */
+			result = event_rx.recv() => {
+				match result {
+					Ok(event) => {
+						tracing::debug!(
+							connection = %connection_id,
+							?event,
+							"📡 Estate IPC → event"
+						);
+
+						let envelope = EventEnvelope {
+									id: EventId {
+										node: NodeId,
+										sequence: event.id,
+									},
+									timestamp: event.timestamp,
+									source: event.source,
+									event: event.kind,
+								};
+
+						send(
+							&mut write_half,
+							IpcMessage::Event(envelope),
+						)
+						.await?;
+					}
+
+					Err(
+						tokio::sync::broadcast::error::RecvError::Lagged(count)
+					) => {
+						tracing::warn!(
+							connection = %connection_id,
+							count,
+							"Estate IPC event subscriber lagged"
+						);
+					}
+					Err(
+						tokio::sync::broadcast::error::RecvError::Closed
+					) => {
+						tracing::debug!(
+							connection = %connection_id,
+							"Estate EventBus closed"
+						);
+						break;
+					}
+				}
 			}
 		}
 	}
-
 	tracing::info!(
 		connection = %connection_id,
 		"Estate IPC client disconnected"
 	);
-
 	Ok(())
 }
 
 async fn send(
 	writer: &mut tokio::net::unix::OwnedWriteHalf,
-	message: IpcMessage,
+	message: IpcMessage<EventKind>,
 ) -> anyhow::Result<()> {
 	let json = serde_json::to_string(&message)?;
-
 	writer.write_all(json.as_bytes()).await?;
 	writer.write_all(b"\n").await?;
 	writer.flush().await?;
-
 	Ok(())
 }

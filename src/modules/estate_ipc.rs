@@ -44,12 +44,6 @@ pub struct HelloAck {
 // ─────────────────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EventEnvelope {
-	pub sequence: u64,
-	pub timestamp: u64,
-	pub event: Event,
-}
-
 pub enum IpcEvent {
 	Sdlc(SdlcEvent),
 	Native(NativeEvent),
@@ -109,31 +103,7 @@ pub enum IpcErrorCode {
 	Unsupported,
 	Internal,
 }
-// pub struct IpcServer {
-	// socket: PathBuf,
-	// events: EventBus,
-	// // eventually:
-	// // connections: ...
-// }
-// 
-// impl IpcServer {
-	// pub fn new(socket: PathBuf, events: EventBus) -> Self {
-		// Self { socket, events }
-	// }
-// 
-	// pub fn start<C>(&self, worker: &HostWorker<C>) -> Result<()>
-	// where
-		// C: Ctx,
-	// {
-		// // Unix socket setup
-		// // accept loop
-		// // connection handling
-		// // handshake
-		// // event forwarding
-		// // commands
-		// Ok(())
-	// }
-// }
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Connection
 // ─────────────────────────────────────────────────────────────────────────────
@@ -150,17 +120,20 @@ pub struct ConnectionInfo {
 // ─────────────────────────────────────────────────────────────────────────────
 // IPC Message
 // ─────────────────────────────────────────────────────────────────────────────
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum IpcMessage {
+pub enum IpcMessage<E> {
+	// Connection
 	Hello(Hello),
 	HelloAck(HelloAck),
 
-	Event(EventEnvelope),
+	// Server → client events
+	Event(EventEnvelope<E>),
 
+	// Commands
 	Command(CommandEnvelope),
 	Response(ResponseEnvelope),
 
+	// Connection control
 	Ping { id: u64 },
 	Pong { id: u64 },
 
@@ -168,61 +141,53 @@ pub enum IpcMessage {
 
 	Shutdown,
 
-	// Tauri / Estate context
-	TauriContext,
-	EstateContext,
 	// Context
-		GetContext,
-	
-		// Filesystem
-		FsList {
-			path: String,
-		},
-	
-		FsRead {
-			path: String,
-		},
-	
-		FsCreate {
-			path: String,
-			content: String,
-		},
-	
-		FsUpdate {
-			path: String,
-			content: String,
-		},
-	
-		FsDelete {
-			path: String,
-		},
-	
-		// Responses
-		ContextResult(EstateContext),
-	
-		FsListResult {
-			entries: Vec<FileEntry>,
-		},
-	
-		FsReadResult {
-			content: String,
-		},
-	
-		FsCreateResult,
-	
-		FsUpdateResult,
-	
-		FsDeleteResult,ˆˆ
+	GetContext,
+	ContextResult(EstateContext),
+
+	// Filesystem
+	FsList { path: String },
+
+	FsListResult { entries: Vec<FileEntry> },
+
+	FsRead { path: String },
+
+	FsReadResult { content: String },
+
+	FsCreate { path: String, content: String },
+
+	FsCreateResult,
+
+	FsUpdate { path: String, content: String },
+
+	FsUpdateResult,
+
+	FsDelete { path: String },
+
+	FsDeleteResult,
+
+	// Command execution
+	RunCommand { command: EstateCommand },
+
+	CommandResult { result: EstateCommandResult },
 }
 // ─────────────────────────────────────────────────────────────────────────────
 // Transport
 // ─────────────────────────────────────────────────────────────────────────────
 
 #[async_trait::async_trait]
-pub trait IpcTransport {
+pub trait IpcTransport<E>
+where
+	E: Serialize + for<'de> Deserialize<'de> + Send,
+{
 	async fn connect(&mut self) -> anyhow::Result<()>;
-	async fn send(&mut self, message: &IpcMessage) -> anyhow::Result<()>;
-	async fn receive(&mut self) -> anyhow::Result<IpcMessage>;
+	async fn send(
+		&mut self,
+		message: &IpcMessage<E>,
+	) -> anyhow::Result<()>;
+	async fn receive(
+		&mut self,
+	) -> anyhow::Result<IpcMessage<E>>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -257,4 +222,131 @@ pub struct FileEntry {
 	pub path: String,
 	pub kind: String,
 	pub size: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum EstateCommand {
+	Mkdir {
+		path: String,
+	},
+
+	Touch {
+		path: String,
+	},
+
+	WriteFile {
+		path: String,
+		content: String,
+	},
+
+	AppendFile {
+		path: String,
+		content: String,
+	},
+
+	Cat {
+		path: String,
+	},
+
+	Cp {
+		source: String,
+		destination: String,
+	},
+
+	Mv {
+		source: String,
+		destination: String,
+	},
+
+	Rm {
+		path: String,
+	},
+
+	Ls {
+		path: String,
+	},
+
+	Find {
+		path: String,
+		pattern: String,
+	},
+
+	Rg {
+		pattern: String,
+		path: String,
+	},
+
+	Head {
+		path: String,
+		lines: Option<u64>,
+	},
+
+	Tail {
+		path: String,
+		lines: Option<u64>,
+	},
+
+	Sort {
+		path: String,
+	},
+
+	Wc {
+		path: String,
+	},
+
+	Sed {
+		expression: String,
+		path: String,
+	},
+
+	Awk {
+		program: String,
+		path: String,
+	},
+
+	Grep {
+		pattern: String,
+		path: String,
+	},
+
+	GitStatus {
+		path: String,
+	},
+
+	GitDiff {
+		path: String,
+	},
+
+	GitLog {
+		path: String,
+	},
+
+	GitShow {
+		revision: String,
+		path: Option<String>,
+	},
+
+	Curl {
+		url: String,
+	},
+
+	Env {
+		name: Option<String>,
+	},
+
+	ShellPipeline {
+		commands: Vec<String>,
+	},
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EstateCommandResult {
+	pub command: EstateCommand,
+
+	pub success: bool,
+
+	pub exit_code: Option<i32>,
+
+	pub stdout: String,
+
+	pub stderr: String,
 }
