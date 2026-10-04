@@ -171,6 +171,7 @@ pub enum IpcMessage<E> {
 
 	CommandResult { result: EstateCommandResult },
 }
+pub type EstateIpcMessage = IpcMessage<EventKind>;
 // ─────────────────────────────────────────────────────────────────────────────
 // Transport
 // ─────────────────────────────────────────────────────────────────────────────

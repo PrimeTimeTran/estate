@@ -67,7 +67,6 @@ async fn handle_connection(stream: UnixStream, events: EventBus) -> anyhow::Resu
 	let mut reader = BufReader::new(read_half);
 
 	let mut line = String::new();
-
 	reader.read_line(&mut line).await?;
 
 	let message: IpcMessage<EventKind> = serde_json::from_str(&line)?;
@@ -88,6 +87,8 @@ async fn handle_connection(stream: UnixStream, events: EventBus) -> anyhow::Resu
 			anyhow::bail!("first IPC message was not Hello");
 		}
 	};
+
+	line.clear();
 
 	if hello.protocol.major != ProtocolVersion::CURRENT.major {
 		send(
@@ -138,8 +139,31 @@ async fn handle_connection(stream: UnixStream, events: EventBus) -> anyhow::Resu
 					break;
 				}
 
+				tracing::debug!(
+					connection = %connection_id,
+					line = %line.trim_end(),
+					"🔥 Estate IPC ← client"
+				);
+
 				let message: IpcMessage<EventKind> =
-					serde_json::from_str(&line)?;
+					match serde_json::from_str(&line) {
+						Ok(message) => message,
+
+						Err(error) => {
+							tracing::error!(
+								connection = %connection_id,
+								%error,
+								line = %line.trim_end(),
+								"🔥 Estate IPC failed to decode client message"
+							);
+
+							return Err(error.into());
+						}
+					};
+				tracing::info!(
+					connection = %connection_id,
+					"🔥 Estate IPC received client message"
+				);
 				match message {
 					IpcMessage::Ping { id } => {
 						send(
@@ -154,6 +178,11 @@ async fn handle_connection(stream: UnixStream, events: EventBus) -> anyhow::Resu
 					}
 
 					IpcMessage::GetContext => {
+					tracing::info!(
+						connection = %connection_id,
+						"🔥 Estate IPC → sending ContextResult"
+					);
+
 						let context = EstateContext {
 							connection_id,
 							active_app: "Unknown".into(),
@@ -161,6 +190,11 @@ async fn handle_connection(stream: UnixStream, events: EventBus) -> anyhow::Resu
 							project: None,
 							mode: "Unknown".into(),
 						};
+
+						println!(
+							"🔥 ESTATE CLIENT → GET CONTEXT JSON: {}",
+							serde_json::to_string(&IpcMessage::<EventKind>::GetContext)?
+						);
 
 						send(
 							&mut write_half,
@@ -180,7 +214,6 @@ async fn handle_connection(stream: UnixStream, events: EventBus) -> anyhow::Resu
 
 				line.clear();
 			}
-
 			/*
 			 * Estate → Tauri
 			 */
