@@ -332,7 +332,7 @@ where
 		self.event_rx.lock().unwrap().try_recv().ok()
 	}
 	fn event_processed(&self) {
-		println!("event processed")
+		// println!("event processed sss")
 	}
 	fn tasks(&self) -> &Arc<RwLock<TaskManager>> {
 		&self.tasks

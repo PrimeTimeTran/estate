@@ -60,7 +60,6 @@ pub enum IpcCommand {
 	GetStatus,
 	GetContext,
 	OpenContextPanel,
-
 	ExecuteAction { action: String },
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -343,12 +342,8 @@ pub enum EstateCommand {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EstateCommandResult {
 	pub command: EstateCommand,
-
 	pub success: bool,
-
 	pub exit_code: Option<i32>,
-
 	pub stdout: String,
-
 	pub stderr: String,
 }

@@ -1,14 +1,9 @@
-use prost_types::Timestamp;
-
 use crate::{
 	prelude::*,
 	proto::{
-		event_service_server::{EventService as EventServiceTrait, EventServiceServer},
-		problem_service_server::ProblemServiceServer,
-		submission_service_server::SubmissionServiceServer,
+		event_service_server::{EventService as EventServiceTrait, },
 		types as proto_types,
 	},
-	server::EventBus,
 };
 
 #[tonic::async_trait]

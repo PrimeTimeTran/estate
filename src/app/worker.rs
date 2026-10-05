@@ -1,5 +1,21 @@
 use crate::prelude::*;
 
+#[cfg(not(target_arch = "wasm32"))]
+pub type ClockWork<NativeContext> = WorkHandle<NativeContext, tokio::task::JoinHandle<()>>;
+
+#[cfg(target_arch = "wasm32")]
+pub type ClockWork<WebContext> = WorkHandle<WebContext, ()>;
+
+#[cfg(target_arch = "wasm32")]
+pub type PlatformJoin = ();
+
+pub enum WorkerStatus {
+	Starting,
+	Running,
+	Stopping,
+	Stopped,
+	Failed(String),
+}
 #[cfg(target_arch = "wasm32")]
 impl<C> WorkHandle<C, std::thread::JoinHandle<()>>
 where
@@ -49,43 +65,6 @@ where
 		self.cancel.cancel();
 	}
 }
-
-pub struct WorkerSupervisor<C, S>
-where
-	C: Ctx,
-{
-	workers: HashMap<WorkerId, Worker<C, S>>,
-}
-// pub enum WorkerId {
-// MacosHid,
-// CargoWatcher,
-// ActiveApp,
-// Cursor,
-// Lsp,
-// Daemon,
-// }
-pub struct WorkerId(pub &'static str);
-pub struct Worker<C, S>
-where
-	C: Ctx,
-{
-	pub name: String,
-	pub handle: WorkHandle<C, S>,
-	pub status: WorkerStatus,
-}
-pub enum WorkerStatus {
-	Starting,
-	Running,
-	Stopping,
-	Stopped,
-	Failed(String),
-}
-pub struct WorkerInfo {
-	pub id: WorkerId,
-	pub name: String,
-	pub status: WorkerStatus,
-	pub started_at: Option<Instant>,
-}
 impl<C, S> WorkerSupervisor<C, S>
 where
 	C: Ctx,
@@ -114,6 +93,21 @@ where
 	}
 }
 
+pub struct Worker<C, S>
+where
+	C: Ctx,
+{
+	pub name: String,
+	pub handle: WorkHandle<C, S>,
+	pub status: WorkerStatus,
+}
+pub struct WorkerId(pub &'static str);
+pub struct WorkerInfo {
+	pub id: WorkerId,
+	pub name: String,
+	pub status: WorkerStatus,
+	pub started_at: Option<Instant>,
+}
 /// "This is a unit of work that I know how to stop."
 ///
 pub struct WorkHandle<C, J>
@@ -127,12 +121,9 @@ where
 	#[cfg(target_arch = "wasm32")]
 	_phantom: PhantomData<J>,
 }
-
-#[cfg(target_arch = "wasm32")]
-pub type PlatformJoin = ();
-
-#[cfg(not(target_arch = "wasm32"))]
-pub type ClockWork<NativeContext> = WorkHandle<NativeContext, tokio::task::JoinHandle<()>>;
-
-#[cfg(target_arch = "wasm32")]
-pub type ClockWork<WebContext> = WorkHandle<WebContext, ()>;
+pub struct WorkerSupervisor<C, S>
+where
+	C: Ctx,
+{
+	workers: HashMap<WorkerId, Worker<C, S>>,
+}

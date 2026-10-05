@@ -68,8 +68,8 @@ pub enum KeySequence {
 	Double(KeyEvent),
 	Hold(KeyCode),
 }
-struct KeyEvent;
-struct KeyCode;
+pub struct KeyEvent;
+pub struct KeyCode;
 pub struct Tooltip;
 pub enum NotificationKind {
 	Info,
@@ -411,8 +411,8 @@ pub struct BottomRegion {
 	pub banner: Option<Banner>,
 	pub status: Option<StatusBar>,
 }
-struct ContextKey;
-struct ContextValue;
+pub struct ContextKey;
+pub struct ContextValue;
 pub struct Chrome {
 	pub leading: Vec<Adornment>,
 	pub trailing: Vec<Adornment>,

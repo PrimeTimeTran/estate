@@ -1,7 +1,7 @@
 use crate::prelude::*;
 
 #[cfg(feature = "native")]
-use crate::{model::task::TaskManagerRuntime, native::job::*};
+use crate::{model::task::TaskManagerRuntime};
 
 #[derive(Debug, Clone, Eq, Deserialize, PartialEq, Serialize)]
 pub struct Task {
