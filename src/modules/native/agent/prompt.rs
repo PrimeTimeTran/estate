@@ -1,7 +1,5 @@
-
 pub fn build_sys_action(template: &str, args: &[&str]) -> String {
 	let mut prompt = template.to_string();
-
 	for arg in args {
 		if let Some((before, after)) = prompt.split_once("{}") {
 			prompt = format!("{before}{arg}{after}");
