@@ -130,7 +130,7 @@ Read:
 
 Then create:
 
-`05-cat-result.txt`
+`05-cat.txt`
 
 containing exactly the contents read from `03-write.txt`.
 
@@ -149,7 +149,7 @@ Copy:
 
 to:
 
-`06-copied-file.txt`
+`06-copied.txt`
 
 The copied file must have identical contents.
 EOF
@@ -196,7 +196,7 @@ List the files in the current directory.
 
 Write the resulting listing to:
 
-`09-ls-result.txt`
+`09-ls.txt`
 
 Do not modify any other files.
 EOF
@@ -211,7 +211,7 @@ Find every `.txt` file inside the current test directory.
 
 Write the matching paths to:
 
-`10-find-result.txt`
+`10-find.txt`
 
 Use one path per line.
 
