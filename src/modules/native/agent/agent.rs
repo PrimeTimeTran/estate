@@ -54,7 +54,7 @@ fn build_prompt(ctx: &AgentContext) -> String {
 	let workspace = format_workspace(&ctx.workspace);
 	let history = format_history(&ctx.history);
 
-	println!("=== FORMATTED CONTEXT ===");
+	section!("FORMATTED CONTEXT");
 	println!("workspace = {:?}", workspace);
 	println!("history = {:?}", history);
 	println!("=========================");
@@ -228,6 +228,20 @@ impl AgentContext {
 		})
 	}
 }
+
+fn preview(value: impl std::fmt::Debug, max_len: usize) -> String {
+	let value = format!("{value:?}");
+
+	if value.len() > max_len {
+		format!(
+			"{}... [truncated, true_len={}]",
+			&value[..max_len],
+			value.len()
+		)
+	} else {
+		value
+	}
+}
 impl Agent {
 	pub async fn run_agent_loop(
 		&self,
@@ -239,11 +253,22 @@ impl Agent {
 		// let mut ctx = AgentContext::new(task.prompt.clone(), (*self.workspace).clone());
 		let mut ctx = AgentContext::with_workspace(task.prompt.clone(), (*self.workspace).clone());
 
-		println!("=== CONTEXT BEFORE LOOP ===");
-		println!("ctx.prompt = {:?}", ctx.prompt);
+		section!("CONTEXT");
+		println!("ctx.prompt = {}", preview(&ctx.prompt, 500));
 		println!("ctx.workspace = {:?}", ctx.workspace);
-		println!("ctx.history = {:?}", ctx.history);
-		println!("===========================");
+		const HISTORY_PREVIEW_LEN: usize = 5;
+
+		if ctx.history.len() > HISTORY_PREVIEW_LEN {
+			println!(
+				"ctx.history = {:?}... [{} more entries, total={}]",
+				&ctx.history[..HISTORY_PREVIEW_LEN],
+				ctx.history.len() - HISTORY_PREVIEW_LEN,
+				ctx.history.len()
+			);
+		} else {
+			println!("ctx.history = {:?}", ctx.history);
+		}
+
 		let _ = event_tx.send(RuntimeEvent::Agent(AgentEvent::Thinking {
 			task: task.clone(),
 		}));
@@ -318,7 +343,7 @@ impl Agent {
 					let shell_command = ShellCommand::shell(command.clone());
 					let result = self.tools.shell.run(shell_command).await?;
 
-					println!("=== SHELL RESULT ===");
+					section!("SHELL RESULT");
 					println!("exit: {:?}", result.exit_code);
 					println!("stdout: {}", result.stdout);
 					println!("stderr: {}", result.stderr);

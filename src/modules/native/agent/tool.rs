@@ -113,9 +113,8 @@ impl ShellCommand {
 	pub fn shell(command: impl Into<String>) -> Self {
 		let command = command.into();
 
-		eprintln!("=== COMMAND ===");
+		section!("COMMAND");
 		eprintln!("{command:?}");
-		eprintln!("===============");
 
 		Self {
 			program: "sh".into(),
