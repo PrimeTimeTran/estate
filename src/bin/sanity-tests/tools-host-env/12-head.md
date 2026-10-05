@@ -1,8 +1,8 @@
 Requirements:
 
-- Create, update, or edit files only in `00-sanity-tests/`.
+- Create, update, or edit files only using paths under `00-sanity-tests/`; do not rely on changing directories.
 
-First run `mkdir -p` for that directory, then `cd` into it. Create `12-head-source.txt` with:
+Your first shell command must be `mkdir -p 00-sanity-tests`. Create `00-sanity-tests/12-head-source.txt` with:
 
 ```text
 one
@@ -12,4 +12,4 @@ four
 five
 ```
 
-Use `head` to save the first two lines to `12-head-result.txt`.
+Use `head` to save the first two lines to `00-sanity-tests/12-head-result.txt`.

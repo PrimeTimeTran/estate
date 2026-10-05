@@ -1,8 +1,8 @@
 Requirements:
 
-- Create, update, or edit files only in `00-sanity-tests/`.
+- Create, update, or edit files only using paths under `00-sanity-tests/`; do not rely on changing directories.
 
-First run `mkdir -p` for that directory, then `cd` into it. Create `03-write.txt` with exactly:
+Your first shell command must be `mkdir -p 00-sanity-tests`. Create `00-sanity-tests/03-write.txt` with exactly:
 
 ```text
 hello

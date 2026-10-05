@@ -1,5 +1,5 @@
 Requirements:
 
-- Create, update, or edit files only in `00-sanity-tests/`.
+- Create, update, or edit files only using paths under `00-sanity-tests/`; do not rely on changing directories.
 
-First run `mkdir -p` for that directory, then `cd` into it. Use `curl` (not a browser) to save the response from `https://example.com` to `23-curl-result.html`.
+Your first shell command must be `mkdir -p 00-sanity-tests`. Use `curl` (not a browser) to save the response from `https://example.com` to `00-sanity-tests/23-curl-result.html`.

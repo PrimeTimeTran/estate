@@ -1,5 +1,5 @@
 Requirements:
 
-- Create, update, or edit files only in `00-sanity-tests/`.
+- Create, update, or edit files only using paths under `00-sanity-tests/`; do not rely on changing directories.
 
-First run `mkdir -p` for that directory, then `cd` into it. Use `touch` to create an empty `02-touched-file.txt`.
+Your first shell command must be `mkdir -p 00-sanity-tests`. Use `touch` to create an empty `00-sanity-tests/02-touched-file.txt`.

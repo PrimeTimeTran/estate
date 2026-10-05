@@ -1,5 +1,5 @@
 Requirements:
 
-- Create, update, or edit files only in `00-sanity-tests/`.
+- Create, update, or edit files only using paths under `00-sanity-tests/`; do not rely on changing directories.
 
-First run `mkdir -p` for that directory, then `cd` into it. Use `cat` to copy `03-write.txt` to `05-cat-result.txt` without altering the source.
+Your first shell command must be `mkdir -p 00-sanity-tests`. Use `cat 00-sanity-tests/03-write.txt` to create `00-sanity-tests/05-cat-result.txt` with identical contents. Do not alter the source.

@@ -62,10 +62,7 @@ async fn run_prompt_files(generator: &LocalGenerator, paths: &[PathBuf]) -> Resu
 	Ok(())
 }
 async fn run_prompt(generator: &LocalGenerator, path: &Path) -> Result<()> {
-	println!();
-	println!("========================================");
-	println!("PROMPT: {}", path.display());
-	println!("========================================");
+  section!(&format!("PROMPT: {}", path.display()));
 	let prompt = tokio::fs::read_to_string(path)
 		.await
 		.with_context(|| format!("reading prompt {}", path.display()))?;

@@ -1,5 +1,5 @@
 Requirements:
 
-- Create, update, or edit files only in `00-sanity-tests/`.
+- Create, update, or edit files only using paths under `00-sanity-tests/`; do not rely on changing directories.
 
-First run `mkdir -p` for that directory, then `cd` into it. Use `find` to list `.txt` source files here, one path per line, in `10-find-result.txt`. Exclude that result file.
+Your first shell command must be `mkdir -p 00-sanity-tests`. Use `find 00-sanity-tests -type f -name '*.txt' ! -path '00-sanity-tests/10-find-result.txt'` and save the matching paths, one per line, to `00-sanity-tests/10-find-result.txt`.

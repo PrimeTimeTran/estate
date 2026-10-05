@@ -1,5 +1,5 @@
 Requirements:
 
-- Create, update, or edit files only in `00-sanity-tests/`.
+- Create, update, or edit files only using paths under `00-sanity-tests/`.
 
-First run `mkdir -p` for that directory. Do not create anything else.
+Your first shell command must be `mkdir -p 00-sanity-tests`. Do not create any files or other directories.

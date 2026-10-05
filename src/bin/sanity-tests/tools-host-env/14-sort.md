@@ -1,8 +1,8 @@
 Requirements:
 
-- Create, update, or edit files only in `00-sanity-tests/`.
+- Create, update, or edit files only using paths under `00-sanity-tests/`; do not rely on changing directories.
 
-First run `mkdir -p` for that directory, then `cd` into it. Create `14-sort-source.txt` with:
+Your first shell command must be `mkdir -p 00-sanity-tests`. Create `00-sanity-tests/14-sort-source.txt` with:
 
 ```text
 delta
@@ -11,7 +11,7 @@ charlie
 bravo
 ```
 
-Use `sort` to save the alphabetized lines to `14-sort-result.txt`. Expected:
+Use `sort` to save the alphabetized lines to `00-sanity-tests/14-sort-result.txt`. Expected:
 
 ```text
 alpha

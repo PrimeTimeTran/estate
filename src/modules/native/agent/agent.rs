@@ -57,7 +57,6 @@ fn build_prompt(ctx: &AgentContext) -> String {
 	section!("FORMATTED CONTEXT");
 	println!("workspace = {:?}", workspace);
 	println!("history = {:?}", history);
-	println!("=========================");
 
 	build_sys_action(
 		ACTION_PROMPT_EXECUTION,
@@ -390,8 +389,6 @@ impl Agent {
 		})
 	}
 	async fn decide_next_action(&self, ctx: &AgentContext) -> Result<AgentAction> {
-		println!("decide_next_action");
-
 		let prompt = build_prompt(ctx);
 
 		// println!("\n========== AGENT PROMPT ==========");

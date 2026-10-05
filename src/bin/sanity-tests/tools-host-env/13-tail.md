@@ -1,8 +1,8 @@
 Requirements:
 
-- Create, update, or edit files only in `00-sanity-tests/`.
+- Create, update, or edit files only using paths under `00-sanity-tests/`; do not rely on changing directories.
 
-First run `mkdir -p` for that directory, then `cd` into it. Create `13-tail-source.txt` with:
+Your first shell command must be `mkdir -p 00-sanity-tests`. Create `00-sanity-tests/13-tail-source.txt` with:
 
 ```text
 one
@@ -12,4 +12,4 @@ four
 five
 ```
 
-Use `tail` to save the last two lines to `13-tail-result.txt`.
+Use `tail` to save the last two lines to `00-sanity-tests/13-tail-result.txt`.
