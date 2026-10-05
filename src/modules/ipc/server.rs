@@ -1,3 +1,4 @@
+use crate::prelude::*;
 use crate::prelude::{shared::Binding as OldKeyBinding, *};
 use anyhow::{Context as CtxAnyhow, Result};
 
@@ -55,8 +56,8 @@ async fn read_hello(
 		_ => {
 			send(
 				write_half,
-				IpcMessage::Error(estate_ipc::IpcError {
-					code: estate_ipc::IpcErrorCode::InvalidMessage,
+				IpcMessage::Error(IpcError {
+					code: IpcErrorCode::InvalidMessage,
 					message: "expected Hello".into(),
 				}),
 			)
@@ -76,8 +77,8 @@ async fn validate_protocol(
 
 	send(
 		write_half,
-		IpcMessage::Error(estate_ipc::IpcError {
-			code: estate_ipc::IpcErrorCode::ProtocolMismatch,
+		IpcMessage::Error(IpcError {
+			code: IpcErrorCode::ProtocolMismatch,
 			message: format!(
 				"unsupported protocol {}.{}",
 				hello.protocol.major, hello.protocol.minor

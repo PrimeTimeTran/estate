@@ -71,8 +71,8 @@ pub use crate::{
 pub use crate::{
 	app::{context::*, *},
 	modules::{
-		estate_ipc,
-		estate_ipc::*,
+		ipc,
+		ipc::*,
 		native::{
 			job,
 			runtime::*,

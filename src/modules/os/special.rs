@@ -63,7 +63,6 @@ impl FS {
 
 		fs::read_to_string(path).with_context(|| format!("read {}", path.display()))
 	}
-
 	pub fn write(path: impl Into<PathBuf>, contents: impl AsRef<[u8]>) -> Result<()> {
 		let path = Self::ensure_parent(path)?;
 
@@ -71,7 +70,6 @@ impl FS {
 
 		Ok(())
 	}
-
 	pub fn append(path: impl Into<PathBuf>, contents: impl AsRef<[u8]>) -> Result<()> {
 		let path = Self::ensure_parent(path)?;
 
@@ -112,7 +110,6 @@ impl FS {
 
 		Ok(())
 	}
-
 	pub fn ensure_parent(path: impl Into<PathBuf>) -> Result<PathBuf> {
 		let path = path.into();
 
@@ -136,7 +133,6 @@ impl FS {
 	pub fn exists(path: impl AsRef<Path>) -> bool {
 		path.as_ref().exists()
 	}
-
 	pub fn create(path: impl Into<PathBuf>, contents: impl AsRef<[u8]>) -> Result<()> {
 		let path = path.into();
 
@@ -149,7 +145,6 @@ impl FS {
 
 		Ok(())
 	}
-
 	pub fn update(path: impl Into<PathBuf>, contents: impl AsRef<[u8]>) -> Result<()> {
 		let path = path.into();
 
@@ -192,7 +187,6 @@ impl SpecialFile {
 	{
 		FS::load(self.path()?)
 	}
-
 	pub fn path(self) -> Result<PathBuf> {
 		let root = ws_path()?;
 

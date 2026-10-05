@@ -1,4 +1,4 @@
-use crate::{ipc::IpcServer, prelude::*};
+use crate::{IpcServer, prelude::*};
 
 impl<C> App<C>
 where
@@ -17,18 +17,15 @@ impl<C: Ctx> Host<C> {
 		Ok(self.start_hid_bridge()?)
 	}
 	pub fn start_ipc(&self) -> Result<()> {
-	let ipc = IpcServer::new(
-			PathBuf::from("/tmp/estate.sock"),
-			self.event_bus.clone(),
-		);
-	
-    self.worker.run_background(|_cancel| async move {
-        if let Err(error) = ipc.start().await {
-            tracing::error!(%error, "Estate IPC server stopped");
-        }
-    });
-	
-    Ok(())
+		let ipc = IpcServer::new(PathBuf::from("/tmp/estate.sock"), self.event_bus.clone());
+
+		self.worker.run_background(|_cancel| async move {
+			if let Err(error) = ipc.start().await {
+				tracing::error!(%error, "Estate IPC server stopped");
+			}
+		});
+
+		Ok(())
 	}
 	pub fn start_watchers(&mut self) -> Result<()> {
 		// cargo.toml, settings files, caches, index,

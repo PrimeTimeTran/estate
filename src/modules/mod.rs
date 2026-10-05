@@ -36,12 +36,11 @@ pub mod server;
 pub mod web;
 
 #[cfg(not(target_arch = "wasm32"))]
-pub mod estate_ipc;
-
-#[cfg(not(target_arch = "wasm32"))]
-pub use estate_ipc::*;
-
-#[cfg(not(target_arch = "wasm32"))]
 pub mod grpc_server;
 #[cfg(not(target_arch = "wasm32"))]
 pub use grpc_server::*;
+
+#[cfg(not(target_arch = "wasm32"))]
+pub mod ipc;
+#[cfg(not(target_arch = "wasm32"))]
+pub use ipc::*;

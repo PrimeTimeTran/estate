@@ -170,11 +170,12 @@ web = [
 
 [dependencies]
 # Internal
-foo = { workspace = true }
+foo = { workspace = true, optional = true, version = "0.0.1" }
 macros-decl = { workspace = true }
 macros-proc = { workspace = true }
 macros = { workspace = true }
 revelation = { workspace = true }
+cli = { optional = true, path = "../cli", version = "0.0.1" }
 
 # External
 anyhow.workspace = true
@@ -213,7 +214,6 @@ wgpu.workspace = true
 tokio-util.workspace = true
 
 # Make all these optional so they can be toggled by the native feature
-cli = { optional = true, path = "../cli", version = "0.1.0" }
 comfy-table = { workspace = true, optional = true }
 core-foundation = { workspace = true, optional = true }
 core-graphics = { workspace = true, optional = true }

@@ -17,9 +17,6 @@ pub use macos_app::*;
 pub use host::*;
 mod host;
 
-pub mod ipc;
-pub use ipc::*;
-
 pub mod keymap;
 pub use keymap::*;
 

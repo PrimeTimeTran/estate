@@ -83,17 +83,20 @@ fn slugify(input: &str) -> String {
 		slug
 	}
 }
-fn persist_evaluation(session: &mut SdlcSession, evaluation: &StageEvaluation) -> Result<()> {
+fn persist_evaluation(
+	session: &mut SdlcSession,
+	evaluation: &StageEvaluation,
+	attempt: Attempt,
+) -> Result<()> {
 	let status = if evaluation.passed {
 		StageStatus::Completed
 	} else {
 		StageStatus::NeedsRevision
 	};
-
 	let record = StageRecord {
 		description: Some(String::from("Evaluation done")),
 		actor: evaluation.actor.clone(),
-		attempt: Attempt::new(),
+		attempt,
 		evaluation: Some(evaluation.clone()),
 		stage: evaluation.stage,
 		time_started: evaluation.time_started,
@@ -140,12 +143,10 @@ fn duration_readable(duration: chrono::Duration) -> String {
 	if millis < 1000 {
 		return format!("{millis} ms");
 	}
-
 	let seconds = millis / 1000;
 	let hours = seconds / 3600;
 	let minutes = (seconds % 3600) / 60;
 	let seconds = seconds % 60;
-
 	match (hours, minutes, seconds) {
 		(h, m, _) if h > 0 => format!("{h}h {m}m"),
 		(_, m, s) if m > 0 => format!("{m}m {s}s"),
@@ -392,6 +393,7 @@ mod enums {
 		AwaitHuman,
 		Fail,
 		Complete,
+		Exit,
 	}
 	#[derive(Debug)]
 	pub enum StageOutcome {
@@ -2206,7 +2208,7 @@ impl Attempt {
 	pub fn new() -> Self {
 		Self {
 			stage: Stage::Intent,
-			number: 0,
+			number: 1,
 			max: 3,
 		}
 	}
@@ -3090,6 +3092,7 @@ impl SprintPipeline {
 		pending_input: &mut Option<SdlcInput>,
 	) -> Result<RunControl> {
 		match decision {
+			StageDecision::Exit => Ok(RunControl::Exit),
 			StageDecision::Continue => {
 				let next = stage
 					.next()
@@ -3256,9 +3259,9 @@ impl SprintPipeline {
 	fn persist(&self) -> Result<()> {
 		FS::save(&self.state_path, &self.session)
 	}
-	fn persist_evaluation(&mut self, evaluation: &StageEvaluation) -> Result<()> {
+	fn persist_evaluation(&mut self, evaluation: &StageEvaluation, attempt: Attempt) -> Result<()> {
 		let session = self.session()?;
-		persist_evaluation(session, evaluation)?;
+		persist_evaluation(session, evaluation, attempt)?;
 		self.persist()
 	}
 	fn persist_intervention(&mut self, attempt: Attempt, reason: impl Into<String>) -> Result<()> {
@@ -3586,12 +3589,24 @@ impl traits::Runner for SprintRunner<'_> {
 
 			match decision {
 				StageDecision::Retry => {
+					if attempt_number + 1 >= attempt.max {
+						tracing::warn!(
+								stage = ?stage,
+								attempt = attempt_number + 1,
+								max = attempt.max,
+								"maximum stage attempts reached"
+						);
+						let control = self
+							.apply(outcome, StageDecision::Exit, input_rx, &mut pending_input)
+							.await?;
+						match control {
+							RunControl::Continue | RunControl::Exit => return Ok(()),
+						}
+					}
 					attempt_number += 1;
-
 					let control = self
 						.apply(outcome, StageDecision::Retry, input_rx, &mut pending_input)
 						.await?;
-
 					match control {
 						RunControl::Continue => continue,
 						RunControl::Exit => return Ok(()),
@@ -3672,7 +3687,11 @@ impl SprintRunner<'_> {
 		Ok(semantic.with_evaluations(structural))
 	}
 
-	async fn evaluate_execution(&mut self, execution: StageExecution) -> Result<StageOutcome> {
+	async fn evaluate_execution(
+		&mut self,
+		execution: StageExecution,
+		attempt: Attempt,
+	) -> Result<StageOutcome> {
 		let stage = execution.stage;
 		self.emit(SdlcEvent::PhaseChanged {
 			phase: SdlcPhase::Evaluating,
@@ -3686,7 +3705,7 @@ impl SprintRunner<'_> {
 					confidence: evaluation.confidence,
 					passed: evaluation.passed,
 				});
-				self.pipeline.persist_evaluation(&evaluation);
+				self.pipeline.persist_evaluation(&evaluation, attempt);
 				Ok(StageOutcome::Complete {
 					execution,
 					evaluation,
@@ -3900,7 +3919,7 @@ impl SprintRunner<'_> {
 			phase: SdlcPhase::Evaluating,
 		});
 
-		self.evaluate_execution(execution).await
+		self.evaluate_execution(execution, attempt).await
 	}
 	async fn run_current_stage(
 		&mut self,
@@ -4036,6 +4055,13 @@ impl SprintRunner<'_> {
 				self.emit(SdlcEvent::Failed {
 					stage: Some(stage),
 					error: format!("Stage {stage:?} failed on attempt {}", attempt.number),
+				});
+				Ok(RunControl::Exit)
+			}
+			StageDecision::Exit => {
+				self.emit(SdlcEvent::Failed {
+					stage: Some(stage),
+					error: format!("Stage {stage:?} exit on attempt {}", attempt.number),
 				});
 				Ok(RunControl::Exit)
 			}
