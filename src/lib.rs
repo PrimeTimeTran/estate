@@ -23,7 +23,7 @@
 //! - [Laptop/Desktop](NativeApp)
 //! - [Web/Browser](WebApp)
 //!
-// #![allow(warnings)]
+#![allow(warnings)]
 
 // #![feature(associated_type_defaults)]
 

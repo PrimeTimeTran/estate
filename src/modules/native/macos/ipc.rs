@@ -1,11 +1,5 @@
-use crate::prelude::{
-	keymap::{Action, Binding, Context},
-	shared::Binding as OldKeyBinding,
-	*,
-};
+use crate::prelude::{shared::Binding as OldKeyBinding, *};
 use anyhow::{Context as CtxAnyhow, Result};
-use mach2::mach_time;
-use std::process::{Child, Command, Stdio};
 
 pub struct IpcServer {
 	socket: PathBuf,
@@ -35,14 +29,11 @@ impl IpcServer {
 		if self.socket.exists() {
 			tokio::fs::remove_file(&self.socket).await?;
 		}
-
 		let listener = UnixListener::bind(&self.socket)?;
-
 		tracing::info!(
 			socket = %self.socket.display(),
 			"Estate IPC listening"
 		);
-
 		loop {
 			let (stream, _) = listener.accept().await?;
 
@@ -66,17 +57,55 @@ async fn handle_connection(stream: UnixStream, events: EventBus) -> anyhow::Resu
 	let (read_half, mut write_half) = stream.into_split();
 	let mut reader = BufReader::new(read_half);
 
+	let hello = read_hello(&mut reader, &mut write_half).await?;
+
+	log_client_connected(connection_id, &hello);
+
+	send_hello_ack(&mut write_half, connection_id).await?;
+
+	let mut event_rx = events.tx.subscribe();
 	let mut line = String::new();
+
+	run_connection_loop(
+		connection_id,
+		&mut reader,
+		&mut write_half,
+		&mut event_rx,
+		&mut line,
+	)
+	.await?;
+
+	tracing::debug!(
+		connection = %connection_id,
+		"Estate IPC client disconnected"
+	);
+
+	Ok(())
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Handshake
+// ─────────────────────────────────────────────────────────────────────────────
+
+async fn read_hello(
+	reader: &mut BufReader<tokio::net::unix::OwnedReadHalf>,
+	write_half: &mut tokio::net::unix::OwnedWriteHalf,
+) -> anyhow::Result<Hello> {
+	let mut line = String::new();
+
 	reader.read_line(&mut line).await?;
 
 	let message: IpcMessage<EventKind> = serde_json::from_str(&line)?;
 
-	let hello = match message {
-		IpcMessage::Hello(hello) => hello,
+	match message {
+		IpcMessage::Hello(hello) => {
+			validate_protocol(&hello, write_half).await?;
+			Ok(hello)
+		}
 
 		_ => {
 			send(
-				&mut write_half,
+				write_half,
 				IpcMessage::Error(estate_ipc::IpcError {
 					code: estate_ipc::IpcErrorCode::InvalidMessage,
 					message: "expected Hello".into(),
@@ -86,27 +115,34 @@ async fn handle_connection(stream: UnixStream, events: EventBus) -> anyhow::Resu
 
 			anyhow::bail!("first IPC message was not Hello");
 		}
-	};
+	}
+}
 
-	line.clear();
-
-	if hello.protocol.major != ProtocolVersion::CURRENT.major {
-		send(
-			&mut write_half,
-			IpcMessage::Error(estate_ipc::IpcError {
-				code: estate_ipc::IpcErrorCode::ProtocolMismatch,
-				message: format!(
-					"unsupported protocol {}.{}",
-					hello.protocol.major, hello.protocol.minor
-				),
-			}),
-		)
-		.await?;
-
-		anyhow::bail!("IPC protocol mismatch");
+async fn validate_protocol(
+	hello: &Hello,
+	write_half: &mut tokio::net::unix::OwnedWriteHalf,
+) -> anyhow::Result<()> {
+	if hello.protocol.major == ProtocolVersion::CURRENT.major {
+		return Ok(());
 	}
 
-	tracing::info!(
+	send(
+		write_half,
+		IpcMessage::Error(estate_ipc::IpcError {
+			code: estate_ipc::IpcErrorCode::ProtocolMismatch,
+			message: format!(
+				"unsupported protocol {}.{}",
+				hello.protocol.major, hello.protocol.minor
+			),
+		}),
+	)
+	.await?;
+
+	anyhow::bail!("IPC protocol mismatch");
+}
+
+fn log_client_connected(connection_id: Uuid, hello: &Hello) {
+	tracing::debug!(
 		connection = %connection_id,
 		client = ?hello.client,
 		pid = hello.pid,
@@ -114,9 +150,14 @@ async fn handle_connection(stream: UnixStream, events: EventBus) -> anyhow::Resu
 		protocol_minor = hello.protocol.minor,
 		"Estate IPC client connected"
 	);
+}
 
+async fn send_hello_ack(
+	write_half: &mut tokio::net::unix::OwnedWriteHalf,
+	connection_id: Uuid,
+) -> anyhow::Result<()> {
 	send(
-		&mut write_half,
+		write_half,
 		IpcMessage::HelloAck(HelloAck {
 			protocol: ProtocolVersion::CURRENT,
 			server: ClientKind::Daemon,
@@ -125,153 +166,234 @@ async fn handle_connection(stream: UnixStream, events: EventBus) -> anyhow::Resu
 	)
 	.await?;
 
-	let mut event_rx = events.tx.subscribe();
+	Ok(())
+}
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Connection loop
+// ─────────────────────────────────────────────────────────────────────────────
+
+async fn run_connection_loop(
+	connection_id: Uuid,
+	reader: &mut BufReader<tokio::net::unix::OwnedReadHalf>,
+	write_half: &mut tokio::net::unix::OwnedWriteHalf,
+	event_rx: &mut tokio::sync::broadcast::Receiver<Event>,
+	line: &mut String,
+) -> anyhow::Result<()> {
 	loop {
 		tokio::select! {
 			/*
 			 * Tauri → Estate
 			 */
-			result = reader.read_line(&mut line) => {
-				let bytes = result?;
-
-				if bytes == 0 {
+			result = reader.read_line(line) => {
+				if !handle_client_input(
+					connection_id,
+					result?,
+					line,
+					write_half,
+				)
+				.await?
+				{
 					break;
-				}
-
-				tracing::debug!(
-					connection = %connection_id,
-					line = %line.trim_end(),
-					"🔥 Estate IPC ← client"
-				);
-
-				let message: IpcMessage<EventKind> =
-					match serde_json::from_str(&line) {
-						Ok(message) => message,
-
-						Err(error) => {
-							tracing::error!(
-								connection = %connection_id,
-								%error,
-								line = %line.trim_end(),
-								"🔥 Estate IPC failed to decode client message"
-							);
-
-							return Err(error.into());
-						}
-					};
-				tracing::info!(
-					connection = %connection_id,
-					"🔥 Estate IPC received client message"
-				);
-				match message {
-					IpcMessage::Ping { id } => {
-						send(
-							&mut write_half,
-							IpcMessage::Pong { id },
-						)
-						.await?;
-					}
-
-					IpcMessage::Shutdown => {
-						break;
-					}
-
-					IpcMessage::GetContext => {
-					tracing::info!(
-						connection = %connection_id,
-						"🔥 Estate IPC → sending ContextResult"
-					);
-
-						let context = EstateContext {
-							connection_id,
-							active_app: "Unknown".into(),
-							workspace: None,
-							project: None,
-							mode: "Unknown".into(),
-						};
-
-						println!(
-							"🔥 ESTATE CLIENT → GET CONTEXT JSON: {}",
-							serde_json::to_string(&IpcMessage::<EventKind>::GetContext)?
-						);
-
-						send(
-							&mut write_half,
-							IpcMessage::ContextResult(context),
-						)
-						.await?;
-					}
-
-					message => {
-						tracing::debug!(
-							connection = %connection_id,
-							?message,
-							"Estate IPC message"
-						);
-					}
 				}
 
 				line.clear();
 			}
+
 			/*
 			 * Estate → Tauri
 			 */
 			result = event_rx.recv() => {
-				match result {
-					Ok(event) => {
-						tracing::debug!(
-							connection = %connection_id,
-							?event,
-							"📡 Estate IPC → event"
-						);
-						println!(
-							"🔥 IPC SERVER → EVENT BUS EVENT: {:?}",
-							event.kind
-						);
-						let envelope = EventEnvelope {
-									id: EventId {
-										node: NodeId,
-										sequence: event.id,
-									},
-									timestamp: event.timestamp,
-									source: event.source,
-									event: event.kind,
-								};
-
-						send(
-							&mut write_half,
-							IpcMessage::Event(envelope),
-						)
-						.await?;
-					}
-
-					Err(
-						tokio::sync::broadcast::error::RecvError::Lagged(count)
-					) => {
-						tracing::warn!(
-							connection = %connection_id,
-							count,
-							"Estate IPC event subscriber lagged"
-						);
-					}
-					Err(
-						tokio::sync::broadcast::error::RecvError::Closed
-					) => {
-						tracing::debug!(
-							connection = %connection_id,
-							"Estate EventBus closed"
-						);
-						break;
-					}
+				if !handle_event_bus_message(
+					connection_id,
+					result,
+					write_half,
+				)
+				.await?
+				{
+					break;
 				}
 			}
 		}
 	}
+
+	Ok(())
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tauri → Estate
+// ─────────────────────────────────────────────────────────────────────────────
+
+async fn handle_client_input(
+	connection_id: Uuid,
+	bytes: usize,
+	line: &str,
+	write_half: &mut tokio::net::unix::OwnedWriteHalf,
+) -> anyhow::Result<bool> {
+	if bytes == 0 {
+		return Ok(false);
+	}
+
+	tracing::debug!(
+		connection = %connection_id,
+		line = %line.trim_end(),
+		"🔥 Estate IPC ← client"
+	);
+
+	let message = decode_client_message(connection_id, line)?;
+
 	tracing::info!(
 		connection = %connection_id,
-		"Estate IPC client disconnected"
+		"🔥 Estate IPC received client message"
 	);
+
+	handle_client_message(connection_id, message, write_half).await
+}
+
+fn decode_client_message(connection_id: Uuid, line: &str) -> anyhow::Result<IpcMessage<EventKind>> {
+	match serde_json::from_str(line) {
+		Ok(message) => Ok(message),
+
+		Err(error) => {
+			tracing::error!(
+				connection = %connection_id,
+				%error,
+				line = %line.trim_end(),
+				"🔥 Estate IPC failed to decode client message"
+			);
+
+			Err(error.into())
+		}
+	}
+}
+
+async fn handle_client_message(
+	connection_id: Uuid,
+	message: IpcMessage<EventKind>,
+	write_half: &mut tokio::net::unix::OwnedWriteHalf,
+) -> anyhow::Result<bool> {
+	match message {
+		IpcMessage::Ping { id } => {
+			handle_ping(write_half, id).await?;
+		}
+
+		IpcMessage::Shutdown => {
+			return Ok(false);
+		}
+
+		IpcMessage::GetContext => {
+			handle_get_context(connection_id, write_half).await?;
+		}
+
+		message => {
+			tracing::debug!(
+				connection = %connection_id,
+				?message,
+				"Estate IPC message"
+			);
+		}
+	}
+
+	Ok(true)
+}
+
+async fn handle_ping(
+	write_half: &mut tokio::net::unix::OwnedWriteHalf,
+	id: u64,
+) -> anyhow::Result<()> {
+	send(write_half, IpcMessage::Pong { id }).await?;
+
+	Ok(())
+}
+
+async fn handle_get_context(
+	connection_id: Uuid,
+	write_half: &mut tokio::net::unix::OwnedWriteHalf,
+) -> anyhow::Result<()> {
+	tracing::info!(
+		connection = %connection_id,
+		"🔥 Estate IPC → sending ContextResult"
+	);
+
+	let context = EstateContext {
+		connection_id,
+		active_app: "Unknown".into(),
+		workspace: None,
+		project: None,
+		mode: "Unknown".into(),
+	};
+
+	println!(
+		"🔥 ESTATE CLIENT → GET CONTEXT JSON: {}",
+		serde_json::to_string(&IpcMessage::<EventKind>::GetContext)?
+	);
+
+	send(write_half, IpcMessage::ContextResult(context)).await?;
+
+	Ok(())
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Estate → Tauri
+// ─────────────────────────────────────────────────────────────────────────────
+
+async fn handle_event_bus_message(
+	connection_id: Uuid,
+	result: Result<Event, tokio::sync::broadcast::error::RecvError>,
+	write_half: &mut tokio::net::unix::OwnedWriteHalf,
+) -> anyhow::Result<bool> {
+	match result {
+		Ok(event) => {
+			send_event(connection_id, event, write_half).await?;
+			Ok(true)
+		}
+
+		Err(tokio::sync::broadcast::error::RecvError::Lagged(count)) => {
+			tracing::warn!(
+				connection = %connection_id,
+				count,
+				"Estate IPC event subscriber lagged"
+			);
+
+			Ok(true)
+		}
+
+		Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+			tracing::debug!(
+				connection = %connection_id,
+				"Estate EventBus closed"
+			);
+
+			Ok(false)
+		}
+	}
+}
+
+async fn send_event(
+	connection_id: Uuid,
+	event: e::Event,
+	write_half: &mut tokio::net::unix::OwnedWriteHalf,
+) -> anyhow::Result<()> {
+	tracing::debug!(
+		connection = %connection_id,
+		?event,
+		"📡 Estate IPC → event"
+	);
+
+	println!("🔥 IPC SERVER → EVENT BUS EVENT: {:?}", event.kind);
+
+	let envelope = EventEnvelope {
+		id: EventId {
+			node: NodeId,
+			sequence: event.id,
+		},
+		timestamp: event.timestamp,
+		source: event.source,
+		event: event.kind,
+	};
+
+	send(write_half, IpcMessage::Event(envelope)).await?;
+
 	Ok(())
 }
 

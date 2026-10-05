@@ -1,11 +1,11 @@
 use crate::{
 	model::task::TaskResult,
 	prelude::{anyhow::anyhow, *},
-	sdlc::{SdlcSession, Verification},
+	sdlc::{SdlcSession},
 };
 
 use super::{
-	ACTION_PROMPT, AgentTools, DECIDE_PROMPT, JSON_PROMPT, WorkspaceContext,
+	AgentTools, DECIDE_PROMPT, WorkspaceContext,
 	agent_event::{AgentEvent, RuntimeEvent},
 	build_sys_action, build_sys_prompt,
 };
