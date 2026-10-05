@@ -1,56 +1,6 @@
 use crate::prelude::{shared::Binding as OldKeyBinding, *};
 use anyhow::{Context as CtxAnyhow, Result};
 
-pub struct IpcServer {
-	socket: PathBuf,
-	events: EventBus,
-}
-
-impl IpcServer {
-	pub fn new(socket: impl Into<PathBuf>, events: EventBus) -> Self {
-		Self {
-			socket: socket.into(),
-			events,
-		}
-	}
-	pub fn init<C>(&self, worker: &HostWorker<C>) -> Result<()>
-	where
-		C: Ctx,
-	{
-		// Unix socket setup
-		// accept loop
-		// connection handling
-		// handshake
-		// event forwarding
-		// commands
-		Ok(())
-	}
-	pub async fn start(&self) -> anyhow::Result<()> {
-		if self.socket.exists() {
-			tokio::fs::remove_file(&self.socket).await?;
-		}
-		let listener = UnixListener::bind(&self.socket)?;
-		tracing::info!(
-			socket = %self.socket.display(),
-			"Estate IPC listening"
-		);
-		loop {
-			let (stream, _) = listener.accept().await?;
-
-			let events = self.events.clone();
-
-			tokio::spawn(async move {
-				if let Err(error) = handle_connection(stream, events).await {
-					tracing::debug!(
-						%error,
-						"Estate IPC connection closed"
-					);
-				}
-			});
-		}
-	}
-}
-
 async fn handle_connection(stream: UnixStream, events: EventBus) -> anyhow::Result<()> {
 	let connection_id = Uuid::new_v4();
 
@@ -86,7 +36,6 @@ async fn handle_connection(stream: UnixStream, events: EventBus) -> anyhow::Resu
 // ─────────────────────────────────────────────────────────────────────────────
 // Handshake
 // ─────────────────────────────────────────────────────────────────────────────
-
 async fn read_hello(
 	reader: &mut BufReader<tokio::net::unix::OwnedReadHalf>,
 	write_half: &mut tokio::net::unix::OwnedWriteHalf,
@@ -117,7 +66,6 @@ async fn read_hello(
 		}
 	}
 }
-
 async fn validate_protocol(
 	hello: &Hello,
 	write_half: &mut tokio::net::unix::OwnedWriteHalf,
@@ -140,7 +88,6 @@ async fn validate_protocol(
 
 	anyhow::bail!("IPC protocol mismatch");
 }
-
 fn log_client_connected(connection_id: Uuid, hello: &Hello) {
 	tracing::debug!(
 		connection = %connection_id,
@@ -151,7 +98,6 @@ fn log_client_connected(connection_id: Uuid, hello: &Hello) {
 		"Estate IPC client connected"
 	);
 }
-
 async fn send_hello_ack(
 	write_half: &mut tokio::net::unix::OwnedWriteHalf,
 	connection_id: Uuid,
@@ -172,7 +118,6 @@ async fn send_hello_ack(
 // ─────────────────────────────────────────────────────────────────────────────
 // Connection loop
 // ─────────────────────────────────────────────────────────────────────────────
-
 async fn run_connection_loop(
 	connection_id: Uuid,
 	reader: &mut BufReader<tokio::net::unix::OwnedReadHalf>,
@@ -223,7 +168,6 @@ async fn run_connection_loop(
 // ─────────────────────────────────────────────────────────────────────────────
 // Tauri → Estate
 // ─────────────────────────────────────────────────────────────────────────────
-
 async fn handle_client_input(
 	connection_id: Uuid,
 	bytes: usize,
@@ -242,14 +186,13 @@ async fn handle_client_input(
 
 	let message = decode_client_message(connection_id, line)?;
 
-	tracing::info!(
+	tracing::debug!(
 		connection = %connection_id,
 		"🔥 Estate IPC received client message"
 	);
 
 	handle_client_message(connection_id, message, write_half).await
 }
-
 fn decode_client_message(connection_id: Uuid, line: &str) -> anyhow::Result<IpcMessage<EventKind>> {
 	match serde_json::from_str(line) {
 		Ok(message) => Ok(message),
@@ -266,7 +209,6 @@ fn decode_client_message(connection_id: Uuid, line: &str) -> anyhow::Result<IpcM
 		}
 	}
 }
-
 async fn handle_client_message(
 	connection_id: Uuid,
 	message: IpcMessage<EventKind>,
@@ -296,7 +238,6 @@ async fn handle_client_message(
 
 	Ok(true)
 }
-
 async fn handle_ping(
 	write_half: &mut tokio::net::unix::OwnedWriteHalf,
 	id: u64,
@@ -305,7 +246,6 @@ async fn handle_ping(
 
 	Ok(())
 }
-
 async fn handle_get_context(
 	connection_id: Uuid,
 	write_half: &mut tokio::net::unix::OwnedWriteHalf,
@@ -336,7 +276,6 @@ async fn handle_get_context(
 // ─────────────────────────────────────────────────────────────────────────────
 // Estate → Tauri
 // ─────────────────────────────────────────────────────────────────────────────
-
 async fn handle_event_bus_message(
 	connection_id: Uuid,
 	result: Result<Event, tokio::sync::broadcast::error::RecvError>,
@@ -379,9 +318,7 @@ async fn send_event(
 		?event,
 		"📡 Estate IPC → event"
 	);
-
 	println!("🔥 IPC SERVER → EVENT BUS EVENT: {:?}", event.kind);
-
 	let envelope = EventEnvelope {
 		id: EventId {
 			node: NodeId,
@@ -391,12 +328,9 @@ async fn send_event(
 		source: event.source,
 		event: event.kind,
 	};
-
 	send(write_half, IpcMessage::Event(envelope)).await?;
-
 	Ok(())
 }
-
 async fn send(
 	writer: &mut tokio::net::unix::OwnedWriteHalf,
 	message: IpcMessage<EventKind>,
@@ -406,4 +340,54 @@ async fn send(
 	writer.write_all(b"\n").await?;
 	writer.flush().await?;
 	Ok(())
+}
+
+impl IpcServer {
+	pub fn new(socket: impl Into<PathBuf>, events: EventBus) -> Self {
+		Self {
+			socket: socket.into(),
+			events,
+		}
+	}
+	pub fn init<C>(&self, worker: &HostWorker<C>) -> Result<()>
+	where
+		C: Ctx,
+	{
+		// Unix socket setup
+		// accept loop
+		// connection handling
+		// handshake
+		// event forwarding
+		// commands
+		Ok(())
+	}
+	pub async fn start(&self) -> anyhow::Result<()> {
+		if self.socket.exists() {
+			tokio::fs::remove_file(&self.socket).await?;
+		}
+		let listener = UnixListener::bind(&self.socket)?;
+		tracing::info!(
+			socket = %self.socket.display(),
+			"Estate IPC listening"
+		);
+		loop {
+			let (stream, _) = listener.accept().await?;
+
+			let events = self.events.clone();
+
+			tokio::spawn(async move {
+				if let Err(error) = handle_connection(stream, events).await {
+					tracing::debug!(
+						%error,
+						"Estate IPC connection closed"
+					);
+				}
+			});
+		}
+	}
+}
+
+pub struct IpcServer {
+	socket: PathBuf,
+	events: EventBus,
 }
