@@ -1,16 +1,7 @@
-
 # Test: curl
 
-Use `curl`.
+First command: run `mkdir -p 00-sanity-tests`.
 
-Make an HTTP GET request to:
+Use `curl` to make an HTTP GET request to `https://example.com` and save the response body to `00-sanity-tests/23-curl-result.html`.
 
-`https://example.com`
-
-Save the response body to:
-
-`23-curl-result.html`
-
-Do not use a browser.
-
-Do not modify any files other than `23-curl-result.html`.
+Do not use a browser or modify other files.

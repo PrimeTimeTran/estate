@@ -1,2 +1,0 @@
-ERROR failure
-ERROR another failure

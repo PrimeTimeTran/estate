@@ -1,12 +1,7 @@
-
 # Test: env
 
-Use the `env` CLI command.
+First command: run `mkdir -p 00-sanity-tests`.
 
-Capture the current process environment.
+Use the `env` CLI command to capture the current process environment, then output variable names only (no values).
 
-Write the output to:
-
-`24-env-result.txt`
-
-Do not modify environment variables.
+Save the names to `00-sanity-tests/24-env-result.txt`. Do not modify environment variables.

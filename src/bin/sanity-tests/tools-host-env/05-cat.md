@@ -1,16 +1,7 @@
-
 # Test: cat
 
-Use the `cat` CLI tool.
+First command: run `mkdir -p 00-sanity-tests`.
 
-Read:
+Use the `cat` CLI tool to read `00-sanity-tests/03-write-file.txt` and create `00-sanity-tests/05-cat-result.txt` with exactly the contents read.
 
-`03-write-file.txt`
-
-Then create:
-
-`05-cat-result.txt`
-
-containing exactly the contents read from `03-write-file.txt`.
-
-Do not use the original file as the output file.
+Do not use the source file as the output file.

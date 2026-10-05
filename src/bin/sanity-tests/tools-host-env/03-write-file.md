@@ -1,15 +1,12 @@
 # Test: write file
 
-Create a file named:
+First command: run `mkdir -p 00-sanity-tests`.
 
-`03-write-file.txt`
-
-with exactly this content:
+Create `00-sanity-tests/03-write-file.txt` with exactly this content:
 
 ```text
 hello
 world
-foobar
-````
+```
 
-Do not add any additional lines or text.
+Do not add any other text or lines.

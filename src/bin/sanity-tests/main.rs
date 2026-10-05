@@ -1,7 +1,10 @@
 use anyhow::{Context, Result, bail};
 use std::path::{Path, PathBuf};
 
-use estate::{new_agent_system, sdlc::*};
+use estate::{
+	new_agent_system,
+	sdlc::{traits::ArtifactGenerator, *},
+};
 
 #[derive(Debug)]
 struct Args {
@@ -10,7 +13,7 @@ struct Args {
 }
 
 // smoke-suite
-// cargo run --bin sanity-tests -- --native src/bin/sanity-tests/tools-intern/*.md
+// cargo run --bin sanity-tests -- --native src/bin/sanity-tests/tools-decide_next_action/*.md
 // cargo run --bin sanity-tests -- --native src/bin/sanity-tests/tools-host-env/*.md
 fn parse_args() -> Result<Args> {
 	let mut native = false;
@@ -41,11 +44,11 @@ async fn main() -> Result<()> {
 }
 async fn run_prompt_files(generator: &LocalGenerator, paths: &[PathBuf]) -> Result<()> {
 	for path in paths {
-		run_prompt_file(generator, path).await?;
+		run_prompt(generator, path).await?;
 	}
 	Ok(())
 }
-async fn run_prompt_file(generator: &LocalGenerator, path: &Path) -> Result<()> {
+async fn run_prompt(generator: &LocalGenerator, path: &Path) -> Result<()> {
 	println!();
 	println!("========================================");
 	println!("PROMPT: {}", path.display());

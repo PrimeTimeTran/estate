@@ -15,8 +15,14 @@ use std::io::IsTerminal;
 // cargo -q run --bin sdlc --features sdlc
 #[tokio::main]
 pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
+	let cli = cli::context::parse();
+	let mut config = LogConfig::load()?;
+	config.apply_cli(&cli)?;
+	logger::init_logging(&config)?;
 	let (_bus, runtime, _event_rx) = new_agent_system();
-	let mut pipeline = SprintPipeline::new(runtime).await.context("SprintPipeline::new")?;
+	let mut pipeline = SprintPipeline::new(runtime)
+		.await
+		.context("SprintPipeline::new")?;
 	println!(">>> pipeline created");
 
 	if pipeline.stage().is_none() {

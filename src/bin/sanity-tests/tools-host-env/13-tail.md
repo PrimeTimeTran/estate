@@ -1,11 +1,8 @@
-
 # Test: tail
 
-Create:
+First command: run `mkdir -p 00-sanity-tests`.
 
-`13-tail-source.txt`
-
-with exactly:
+Create `00-sanity-tests/13-tail-source.txt` with exactly:
 
 ```text
 one
@@ -15,8 +12,4 @@ four
 five
 ```
 
-Then use the `tail` CLI tool to extract only the last two lines.
-
-Write the result to:
-
-`13-tail-result.txt`
+Use the `tail` CLI tool to extract the last two lines and save them to `00-sanity-tests/13-tail-result.txt`.

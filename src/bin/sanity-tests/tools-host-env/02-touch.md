@@ -1,9 +1,5 @@
 # Test: touch
 
-Use the `touch` CLI tool.
+First command: run `mkdir -p 00-sanity-tests`.
 
-Create an empty file named:
-
-`02-touched-file.txt`
-
-Do not write any content to the file.
+Then use the `touch` CLI tool to create the empty file `00-sanity-tests/02-touched-file.txt`. Do not write content to it.

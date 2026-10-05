@@ -1,27 +1,24 @@
-
 # Test: append
 
-Create a file named:
+First command: run `mkdir -p 00-sanity-tests`.
 
-`04-append-file.txt`
-
-with this initial content:
+Create `00-sanity-tests/04-append-file.txt` with this initial content:
 
 ```text
-foobar
+foo
 ```
 
-Then append this content to the same file:
+Then use an append operation to add:
 
 ```text
-baz
+bar
 ```
 
 The final file must contain exactly:
 
 ```text
-foobar
-baz
+foo
+bar
 ```
 
-Do not overwrite the initial content when performing the append.
+Do not overwrite the initial content.

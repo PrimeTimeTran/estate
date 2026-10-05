@@ -1,16 +1,11 @@
-
 # Test: git show
 
-Use `git show`.
+First command: run `mkdir -p 00-sanity-tests`.
 
-Do not modify the repository.
-
-Run:
+From the original working directory, run:
 
 ```bash
 git show --stat --oneline HEAD
 ```
 
-Write the output to:
-
-`22-git-show-result.txt`
+Capture the output, then save it to `00-sanity-tests/22-git-show-result.txt`. Do not change repository files other than this required result file.

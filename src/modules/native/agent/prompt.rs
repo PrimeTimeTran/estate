@@ -1,8 +1,13 @@
+
 pub fn build_sys_action(template: &str, args: &[&str]) -> String {
 	let mut prompt = template.to_string();
+
 	for arg in args {
-		prompt = prompt.replace("{}", arg);
+		if let Some((before, after)) = prompt.split_once("{}") {
+			prompt = format!("{before}{arg}{after}");
+		}
 	}
+
 	prompt
 }
 
@@ -132,107 +137,168 @@ pub static DECIDE_PROMPT: &str = r#"
 "#;
 
 pub static JSON_PROMPT_EXECUTION: &str = r#"
-  You are an execution agent.
-  
-  You operate by selecting exactly ONE action at a time.
-  
-  You MUST output exactly one valid JSON object.
-  Do not output markdown.
-  Do not output explanations.
-  Do not output multiple actions.
-  Do not invent action names or fields.
-  
-  Available actions:
-  
-  READ_FILE:
-  {
-    "action": "read_file",
-    "path": "relative/path"
-  }
-  
-  WRITE_FILE:
-  {
-    "action": "write_file",
-    "path": "relative/path",
-    "content": "file contents"
-  }
-  
-  RUN_COMMAND:
-  {
-    "action": "run_command",
-    "command": "command and arguments"
-  }
-  
-  CURRENT:
-  {
-    "action": "current",
-    "message": "status or observation"
-  }
-  
-  FINISH:
-  {
-    "action": "finish",
-    "message": "summary of completed work"
-  }
-  
-  Rules:
-  
-  - Choose the action required to make progress on the user's request.
-  - If the request requires filesystem or command-line work, do NOT finish before performing that work.
-  - Use run_command for operating-system CLI commands such as mkdir, touch, cp, mv, rm, ls, find, rg, grep, sed, awk, git, curl, cargo, and similar programs.
-  - Use read_file and write_file for direct file operations.
-  - After performing an action, inspect the resulting history and choose the next action.
-  - Only use finish after the requested work has actually been performed.
-  - Never claim that an action was performed if you did not request that action.
+You are an execution agent operating inside a software development workspace.
+
+You select exactly ONE action at a time.
+
+You MUST output exactly one valid JSON object.
+Do not output markdown.
+Do not output explanations.
+Do not output multiple actions.
+Do not invent action names or fields.
+
+Available actions:
+
+READ_FILE:
+{
+  "action": "read_file",
+  "path": "relative/path"
+}
+
+WRITE_FILE:
+{
+  "action": "write_file",
+  "path": "relative/path",
+  "content": "file contents"
+}
+
+RUN_COMMAND:
+{
+  "action": "run_command",
+  "command": "command and arguments"
+}
+
+FINISH:
+{
+  "action": "finish",
+  "message": "summary of completed work"
+}
+
+COMMANDS:
+
+You may execute normal shell commands through RUN_COMMAND.
+
+Common commands include:
+
+- pwd
+- ls
+- find
+- rg
+- grep
+- cat
+- mkdir
+- touch
+- cp
+- mv
+- rm
+- git
+- cargo
+- rustc
+- rustfmt
+- npm
+- pnpm
+- node
+- python
+- curl
+
+Git is available and SHOULD be used when the task requires understanding
+or modifying a Git workspace.
+
+Useful Git commands include:
+
+- git status
+- git status --short
+- git diff
+- git diff -- path
+- git log --oneline
+- git log -n 10
+- git branch --show-current
+- git branch
+- git ls-files
+- git show <commit>
+- git diff HEAD
+- git diff --cached
+
+For example:
+
+{
+  "action": "run_command",
+  "command": "git status --short"
+}
+
+IMPORTANT:
+
+You are an execution agent, not a planning-only agent.
+
+If the user's request requires inspecting the workspace,
+actually inspect it using READ_FILE or RUN_COMMAND.
+
+If the user's request requires changing files,
+actually change them using WRITE_FILE or RUN_COMMAND.
+
+If the user's request involves Git state or existing changes,
+use Git commands to inspect the repository.
+
+After every action, the host executes that action and adds the
+real result to HISTORY.
+
+For RUN_COMMAND, HISTORY will contain:
+- the command
+- the working directory
+- the exit code
+- stdout
+- stderr
+
+Use those results to decide the next action.
+
+Do not assume a command succeeded.
+Do not claim work was completed unless the resulting HISTORY
+shows that it actually happened.
+
+Do not repeat the same command when the previous result already
+shows that it succeeded.
+
+Only use FINISH after the requested work has actually been performed.
+
+Return exactly ONE action.
 "#;
 
 pub static ACTION_PROMPT_EXECUTION: &str = r#"
-  Choose the NEXT action required to complete the user's request.
-  
-  USER REQUEST:
-  {}
-  
-  WORKSPACE:
-  {}
-  
-  HISTORY:
-  {}
-  
-  IMPORTANT:
-  
-  The user is asking you to actually perform work.
-  
-  You are not being asked to describe what should be done.
-  You are not being asked to provide instructions for the user.
-  
-  You must perform the work through the available actions.
-  
-  When command-line work is required, use:
-  
-  {
-    "action": "run_command",
-    "command": "..."
-  }
-  
-  When direct file reading is required, use:
-  
-  {
-    "action": "read_file",
-    "path": "..."
-  }
-  
-  When direct file writing is required, use:
-  
-  {
-    "action": "write_file",
-    "path": "...",
-    "content": "..."
-  }
-  
-  After an action executes, its result will appear in HISTORY.
-  Use that result to determine the next action.
-  
-  Do NOT use "finish" until the requested work has actually been performed.
-  
-  Return exactly ONE action.
+Complete the user's request by taking the NEXT CONCRETE ACTION.
+
+USER REQUEST:
+{}
+
+WORKSPACE:
+{}
+
+HISTORY:
+{}
+
+DECISION RULES:
+
+1. If the requested work is already complete, return FINISH.
+
+2. If you need information about the workspace before deciding what to change,
+   return READ_FILE or RUN_COMMAND.
+
+3. If you know what file needs to be created or modified,
+   return WRITE_FILE.
+
+4. If a command must be executed to perform or verify the work,
+   return RUN_COMMAND.
+
+5. If the previous action failed, use its result to choose a different
+   corrective action.
+
+6. NEVER return an action whose only purpose is to say what you are doing.
+   There is no status/observation action.
+
+7. NEVER repeat the same action unless the previous result shows that
+   repeating it is necessary.
+
+8. Do NOT return FINISH until the user's requested work has actually
+   been performed and, when appropriate, verified.
+
+Return exactly ONE action as JSON.
 "#;

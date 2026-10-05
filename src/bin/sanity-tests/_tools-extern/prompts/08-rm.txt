@@ -1,7 +1,0 @@
-Use the rm CLI tool.
-
-Delete:
-
-07-moved-file.txt
-
-Do not delete any other file.

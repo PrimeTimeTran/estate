@@ -14,7 +14,21 @@ pub struct AgentRuntime {
 }
 impl AgentRuntime {
 	pub async fn run_agent(&self, task: AgentTask) -> Result<TaskResult> {
-		let agent = Agent::new();
+		// Start completely fresh.
+		// let agent = Agent::new()
+
+		// 		// Or explicitly scan/load a workspace.
+		// 		let workspace = WorkspaceContext::load()?;
+		// 		let agent = Agent::with_workspace(workspace);
+		//
+		// 		// Or bind to an SDLC session.
+		// 		let workspace = WorkspaceContext::from_session(&session)?;
+		// 		let agent = Agent::with_workspace(workspace);
+		// 		agent.run_agent_loop(task, self.event_tx.clone()).await
+
+		let cwd = std::env::current_dir()?;
+		let agent = Agent::with_cwd(cwd);
+
 		agent.run_agent_loop(task, self.event_tx.clone()).await
 	}
 

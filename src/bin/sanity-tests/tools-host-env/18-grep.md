@@ -1,11 +1,8 @@
-
 # Test: grep
 
-Create:
+First command: run `mkdir -p 00-sanity-tests`.
 
-`18-grep-source.txt`
-
-with:
+Create `00-sanity-tests/18-grep-source.txt` with:
 
 ```text
 INFO startup
@@ -15,10 +12,4 @@ WARNING something
 ERROR another failure
 ```
 
-Use `grep` to find only lines containing:
-
-`ERROR`
-
-Write the result to:
-
-`18-grep-result.txt`
+Use `grep` to find only lines containing `ERROR` and save them to `00-sanity-tests/18-grep-result.txt`.

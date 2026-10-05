@@ -109,7 +109,16 @@ pub struct ShellCommand {
 	pub cwd: Option<PathBuf>,
 	pub timeout: Option<Duration>,
 }
-
+impl ShellCommand {
+	pub fn shell(command: impl Into<String>) -> Self {
+		Self {
+			program: "sh".into(),
+			args: vec!["-c".into(), command.into()],
+			cwd: None,
+			timeout: None,
+		}
+	}
+}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ShellResult {
 	pub program: String,
@@ -121,7 +130,97 @@ pub struct ShellResult {
 }
 impl ShellTool {
 	pub async fn run(&self, command: ShellCommand) -> Result<ShellResult> {
-		todo!("dodo");
+		let ShellCommand {
+			program,
+			args,
+			cwd,
+			timeout,
+		} = command;
+
+		let working_dir = cwd.unwrap_or(std::env::current_dir()?);
+
+		let mut process = tokio::process::Command::new(&program);
+
+		process
+			.args(&args)
+			.current_dir(&working_dir)
+			.stdout(std::process::Stdio::piped())
+			.stderr(std::process::Stdio::piped());
+
+		let mut child = process.spawn()
+			.with_context(|| {
+				format!(
+					"failed to spawn `{program} {}`",
+					args.join(" ")
+				)
+			})?;
+
+		let stdout = child.stdout.take();
+		let stderr = child.stderr.take();
+
+		let stdout_task = tokio::spawn(async move {
+			if let Some(stdout) = stdout {
+				use tokio::io::AsyncReadExt;
+
+				let mut bytes = Vec::new();
+				let mut reader = stdout;
+
+				reader.read_to_end(&mut bytes).await?;
+				Ok::<_, std::io::Error>(bytes)
+			} else {
+				Ok(Vec::new())
+			}
+		});
+
+		let stderr_task = tokio::spawn(async move {
+			if let Some(stderr) = stderr {
+				use tokio::io::AsyncReadExt;
+
+				let mut bytes = Vec::new();
+				let mut reader = stderr;
+
+				reader.read_to_end(&mut bytes).await?;
+				Ok::<_, std::io::Error>(bytes)
+			} else {
+				Ok(Vec::new())
+			}
+		});
+
+		let status = if let Some(timeout) = timeout {
+			match tokio::time::timeout(timeout, child.wait()).await {
+				Ok(result) => result?,
+				Err(_) => {
+					child.kill().await?;
+					child.wait().await.ok();
+
+					return Err(anyhow::anyhow!(
+						"command timed out after {:?}: {} {}",
+						timeout,
+						program,
+						args.join(" ")
+					));
+				}
+			}
+		} else {
+			child.wait().await?
+		};
+
+		let stdout = stdout_task
+			.await??
+			;
+
+		let stderr = stderr_task
+			.await??
+			;
+
+		Ok(ShellResult {
+			program,
+			args,
+			cwd: working_dir,
+			exit_code: status.code(),
+			stdout: String::from_utf8_lossy(&stdout).into_owned(),
+			stderr: String::from_utf8_lossy(&stderr).into_owned(),
+		})
 	}
 }
 #[derive(Debug, Default, Clone)]

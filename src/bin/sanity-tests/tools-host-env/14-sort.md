@@ -1,11 +1,8 @@
-
 # Test: sort
 
-Create:
+First command: run `mkdir -p 00-sanity-tests`.
 
-`14-sort-source.txt`
-
-with exactly:
+Create `00-sanity-tests/14-sort-source.txt` with exactly:
 
 ```text
 delta
@@ -14,13 +11,9 @@ charlie
 bravo
 ```
 
-Use the `sort` CLI tool to sort the lines alphabetically.
+Use the `sort` CLI tool to sort the lines alphabetically. Save the result to `00-sanity-tests/14-sort-result.txt`.
 
-Write the result to:
-
-`14-sort-result.txt`
-
-The result must be:
+The result must be exactly:
 
 ```text
 alpha
@@ -28,4 +21,3 @@ bravo
 charlie
 delta
 ```
-

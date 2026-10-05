@@ -1,7 +1,7 @@
 use crate::{
 	model::task::TaskResult,
 	prelude::{anyhow::anyhow, *},
-	sdlc::{SdlcSession},
+	sdlc::SdlcSession,
 };
 
 use super::{
@@ -13,7 +13,7 @@ use super::{
 #[derive(Debug)]
 pub enum AgentMode {
 	Chat,
-	Tool, 
+	Tool,
 }
 #[derive(PartialEq, Clone)]
 pub enum AgentStatus {
@@ -27,6 +27,7 @@ pub enum AgentObservation {
 	ReadFile { path: String, content: String },
 	WriteFile { path: String, success: bool },
 	Current { message: String },
+	RunCommand { result: ShellResult },
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "action")]
@@ -51,14 +52,22 @@ pub enum AgentAction {
 }
 
 fn build_prompt(ctx: &AgentContext) -> String {
-	return build_sys_action(
+	let workspace = format_workspace(&ctx.workspace);
+	let history = format_history(&ctx.history);
+
+	println!("=== FORMATTED CONTEXT ===");
+	println!("workspace = {:?}", workspace);
+	println!("history = {:?}", history);
+	println!("=========================");
+
+	build_sys_action(
 		ACTION_PROMPT_EXECUTION,
 		&[
 			&ctx.prompt,
-			&format_workspace(&ctx.workspace),
-			&format_history(&ctx.history),
+			&workspace,
+			&history,
 		],
-	);
+	)
 }
 async fn build_action(prompt: &str) -> Result<LlmAction> {
 	let client = reqwest::Client::new();
@@ -77,24 +86,52 @@ async fn build_action(prompt: &str) -> Result<LlmAction> {
 		.await?
 		.json::<serde_json::Value>()
 		.await?;
-
+	let response = res["response"].as_str().unwrap_or("");
+	let action: serde_json::Value = serde_json::from_str(response)?;
+	println!(
+		"actionchoice   {}",
+		action["message"].as_str().unwrap_or("")
+	);
 	let response_text = res["response"].as_str().unwrap_or("{}");
-
 	let raw: LlmAction = serde_json::from_str(response_text)?;
-
 	Ok(raw)
 }
-fn format_workspace(workspace: &WorkspaceContext) -> String {
+pub fn format_workspace(workspace: &WorkspaceContext) -> String {
 	let mut output = String::new();
 
-	for file in &workspace.files {
-		output.push_str(&format!("\n--- {} ---\n{}\n", file.path, file.content));
+	output.push_str(&format!(
+		"CWD: {}\n",
+		workspace.cwd.to_string_lossy()
+	));
+
+	if workspace.files.is_empty() {
+		output.push_str("FILES: none discovered\n");
+	} else {
+		output.push_str("FILES:\n");
+
+		for file in &workspace.files {
+			output.push_str(&format!("- {}\n", file.path));
+		}
 	}
 
 	output
 }
 fn format_history(history: &[AgentObservation]) -> String {
-	serde_json::to_string_pretty(history).unwrap_or_else(|_| "[]".to_string())
+	if history.is_empty() {
+		return "No actions have been performed yet.".into();
+	}
+
+	let mut output = String::new();
+
+	for (index, observation) in history.iter().enumerate() {
+		output.push_str(&format!(
+			"{}. {:?}\n",
+			index + 1,
+			observation
+		));
+	}
+
+	output
 }
 pub async fn prompt_chat(ctx: &AgentContext) -> Result<String> {
 	let prompt = structured_prompt_chat(ctx);
@@ -141,7 +178,24 @@ impl Agent {
 			workspace: Arc::new(WorkspaceContext::default()),
 		}
 	}
+	pub fn with_workspace(workspace: WorkspaceContext) -> Self {
+		Self {
+			id: uuid::Uuid::new_v4().to_string(),
+			tools: AgentTools::default(),
+			workspace: Arc::new(workspace),
+		}
+	}
+	pub fn with_cwd(cwd: impl Into<PathBuf>) -> Self {
+		let workspace = WorkspaceContext::from_cwd(cwd);
+
+		Self {
+			id: uuid::Uuid::new_v4().to_string(),
+			tools: AgentTools::default(),
+			workspace: Arc::new(workspace),
+		}
+	}
 }
+
 impl Default for Agent {
 	fn default() -> Self {
 		Self::new()
@@ -152,38 +206,37 @@ impl AgentContext {
 		Self {
 			prompt: user_prompt.clone(),
 			task: AgentTask::new(user_prompt),
-			// intent: PathBuf::new(),
-			// spec: PathBuf::new(),
-			// plan: PathBuf::new(),
-			// tests: PathBuf::new(),
-			// progress: PathBuf::new(),
 			workspace: WorkspaceContext::default(),
-			history: vec![],
-			artifacts: vec![],
-			logs: vec![],
-			spawned_tasks: vec![],
-			// verification: None,
-		}
-	}
-	pub fn from_session(session: &SdlcSession) -> Result<Self> {
-		let dir = &session.dir;
-
-		Ok(Self {
-			prompt: session.goal.clone(),
-
-			task: AgentTask::from_session(session)?,
-
-			// intent: dir.join("intent.md"),
-			// spec: dir.join("spec.md"),
-			// plan: dir.join("plan.md"),
-			// tests: dir.join("tests.md"),
-			// progress: dir.join("progress.md"),
-			workspace: WorkspaceContext::from_session(session)?,
 			history: Vec::new(),
 			artifacts: Vec::new(),
 			logs: Vec::new(),
 			spawned_tasks: Vec::new(),
-			// verification: None,
+		}
+	}
+
+	pub fn with_workspace(user_prompt: String, workspace: WorkspaceContext) -> Self {
+		Self {
+			prompt: user_prompt.clone(),
+			task: AgentTask::new(user_prompt),
+			workspace,
+			history: Vec::new(),
+			artifacts: Vec::new(),
+			logs: Vec::new(),
+			spawned_tasks: Vec::new(),
+		}
+	}
+
+	pub fn from_session(session: &SdlcSession) -> Result<Self> {
+		let workspace = WorkspaceContext::from_session(session)?;
+
+		Ok(Self {
+			prompt: session.goal.clone(),
+			task: AgentTask::from_session(session)?,
+			workspace,
+			history: Vec::new(),
+			artifacts: Vec::new(),
+			logs: Vec::new(),
+			spawned_tasks: Vec::new(),
 		})
 	}
 }
@@ -196,7 +249,13 @@ impl Agent {
 		let mut steps = 0;
 		let max_steps = 10;
 		// let mut ctx = AgentContext::new(task.prompt.clone(), (*self.workspace).clone());
-		let mut ctx = AgentContext::new(task.prompt.clone());
+		let mut ctx = AgentContext::with_workspace(task.prompt.clone(), (*self.workspace).clone());
+
+		println!("=== CONTEXT BEFORE LOOP ===");
+		println!("ctx.prompt = {:?}", ctx.prompt);
+		println!("ctx.workspace = {:?}", ctx.workspace);
+		println!("ctx.history = {:?}", ctx.history);
+		println!("===========================");
 		let _ = event_tx.send(RuntimeEvent::Agent(AgentEvent::Thinking {
 			task: task.clone(),
 		}));
@@ -267,17 +326,17 @@ impl Agent {
 					return Ok(result);
 				}
 				AgentAction::RunCommand { command } => {
-					let _ = event_tx.send(RuntimeEvent::Agent(AgentEvent::Working {
-						task: task.clone(),
-						message: format!("Running: {command}"),
-					}));
+					println!("commandcommand {}", command);
+					let shell_command = ShellCommand::shell(command.clone());
+					let result = self.tools.shell.run(shell_command).await?;
 
-					// eventually:
-					// let result = self.tools.shell.run(...).await?;
+					println!("=== SHELL RESULT ===");
+					println!("exit: {:?}", result.exit_code);
+					println!("stdout: {}", result.stdout);
+					println!("stderr: {}", result.stderr);
+					println!("====================");
 
-					ctx.history.push(AgentObservation::Current {
-						message: format!("Command requested: {command}"),
-					});
+					ctx.history.push(AgentObservation::RunCommand { result });
 				}
 
 				AgentAction::Context { .. } => {
@@ -311,9 +370,7 @@ impl Agent {
 	}
 	async fn decide_mode(&self, ctx: &AgentContext) -> Result<AgentMode> {
 		let prompt = build_sys_prompt(DECIDE_PROMPT, &ctx.prompt);
-
 		let raw: LlmMode = prompt_ollama_json(&prompt).await?;
-
 		Ok(match raw.mode.as_str() {
 			"tool" => AgentMode::Tool,
 			_ => AgentMode::Chat,
@@ -321,7 +378,13 @@ impl Agent {
 	}
 	async fn decide_next_action(&self, ctx: &AgentContext) -> Result<AgentAction> {
 		println!("decide_next_action");
+
 		let prompt = build_prompt(ctx);
+
+		println!("\n========== AGENT PROMPT ==========");
+		println!("{prompt}");
+		println!("==================================\n");
+
 		let raw = build_action(&prompt).await?;
 		let action = AgentAction::try_from(raw)?;
 		Ok(action)
