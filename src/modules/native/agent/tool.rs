@@ -111,9 +111,15 @@ pub struct ShellCommand {
 }
 impl ShellCommand {
 	pub fn shell(command: impl Into<String>) -> Self {
+		let command = command.into();
+
+		eprintln!("=== COMMAND ===");
+		eprintln!("{command:?}");
+		eprintln!("===============");
+
 		Self {
 			program: "sh".into(),
-			args: vec!["-c".into(), command.into()],
+			args: vec!["-c".into(), command],
 			cwd: None,
 			timeout: None,
 		}
@@ -147,13 +153,9 @@ impl ShellTool {
 			.stdout(std::process::Stdio::piped())
 			.stderr(std::process::Stdio::piped());
 
-		let mut child = process.spawn()
-			.with_context(|| {
-				format!(
-					"failed to spawn `{program} {}`",
-					args.join(" ")
-				)
-			})?;
+		let mut child = process
+			.spawn()
+			.with_context(|| format!("failed to spawn `{program} {}`", args.join(" ")))?;
 
 		let stdout = child.stdout.take();
 		let stderr = child.stderr.take();
@@ -205,13 +207,9 @@ impl ShellTool {
 			child.wait().await?
 		};
 
-		let stdout = stdout_task
-			.await??
-			;
+		let stdout = stdout_task.await??;
 
-		let stderr = stderr_task
-			.await??
-			;
+		let stderr = stderr_task.await??;
 
 		Ok(ShellResult {
 			program,

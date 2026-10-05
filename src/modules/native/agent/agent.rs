@@ -24,26 +24,25 @@ pub enum AgentStatus {
 }
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum AgentObservation {
-	ReadFile { path: String, content: String },
-	WriteFile { path: String, success: bool },
+	// ReadFile { path: String, content: String },
+	// WriteFile { path: String, success: bool },
 	Current { message: String },
 	RunCommand { result: ShellResult },
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "action")]
 pub enum AgentAction {
-	#[serde(rename = "read_file")]
-	ReadFile { path: String },
-
-	#[serde(rename = "write_file")]
-	WriteFile { path: String, content: String },
-
+	// 	#[serde(rename = "read_file")]
+	// 	ReadFile { path: String },
+	//
+	// 	#[serde(rename = "write_file")]
+	// 	WriteFile { path: String, content: String },
+	//
 	#[serde(rename = "finish")]
 	Finish { message: String },
-
+	//
 	#[serde(rename = "current")]
 	Current { message: String },
-
 	#[serde(rename = "run_command")]
 	RunCommand { command: String },
 
@@ -62,11 +61,7 @@ fn build_prompt(ctx: &AgentContext) -> String {
 
 	build_sys_action(
 		ACTION_PROMPT_EXECUTION,
-		&[
-			&ctx.prompt,
-			&workspace,
-			&history,
-		],
+		&[&ctx.prompt, &workspace, &history],
 	)
 }
 async fn build_action(prompt: &str) -> Result<LlmAction> {
@@ -89,7 +84,7 @@ async fn build_action(prompt: &str) -> Result<LlmAction> {
 	let response = res["response"].as_str().unwrap_or("");
 	let action: serde_json::Value = serde_json::from_str(response)?;
 	println!(
-		"actionchoice   {}",
+		"action choice   {}",
 		action["message"].as_str().unwrap_or("")
 	);
 	let response_text = res["response"].as_str().unwrap_or("{}");
@@ -99,10 +94,7 @@ async fn build_action(prompt: &str) -> Result<LlmAction> {
 pub fn format_workspace(workspace: &WorkspaceContext) -> String {
 	let mut output = String::new();
 
-	output.push_str(&format!(
-		"CWD: {}\n",
-		workspace.cwd.to_string_lossy()
-	));
+	output.push_str(&format!("CWD: {}\n", workspace.cwd.to_string_lossy()));
 
 	if workspace.files.is_empty() {
 		output.push_str("FILES: none discovered\n");
@@ -124,11 +116,7 @@ fn format_history(history: &[AgentObservation]) -> String {
 	let mut output = String::new();
 
 	for (index, observation) in history.iter().enumerate() {
-		output.push_str(&format!(
-			"{}. {:?}\n",
-			index + 1,
-			observation
-		));
+		output.push_str(&format!("{}. {:?}\n", index + 1, observation));
 	}
 
 	output
@@ -292,27 +280,27 @@ impl Agent {
 						.history
 						.push(AgentObservation::Current { message: response });
 				}
-				AgentAction::ReadFile { path } => {
-					let _ = event_tx.send(RuntimeEvent::Agent(AgentEvent::Working {
-						task: task.clone(),
-						message: format!("Reading {path}"),
-					}));
-					let content = self.tools.fs.read(&path)?;
-					ctx
-						.history
-						.push(AgentObservation::ReadFile { path, content });
-				}
-				AgentAction::WriteFile { path, content } => {
-					let _ = event_tx.send(RuntimeEvent::Agent(AgentEvent::Working {
-						task: task.clone(),
-						message: format!("Writing {path}"),
-					}));
-					self.tools.fs.write(&path, &content)?;
-					ctx.history.push(AgentObservation::WriteFile {
-						path,
-						success: true,
-					});
-				}
+				// 				AgentAction::ReadFile { path } => {
+				// 					let _ = event_tx.send(RuntimeEvent::Agent(AgentEvent::Working {
+				// 						task: task.clone(),
+				// 						message: format!("Reading {path}"),
+				// 					}));
+				// 					let content = self.tools.fs.read(&path)?;
+				// 					ctx
+				// 						.history
+				// 						.push(AgentObservation::ReadFile { path, content });
+				// 				}
+				// 				AgentAction::WriteFile { path, content } => {
+				// 					let _ = event_tx.send(RuntimeEvent::Agent(AgentEvent::Working {
+				// 						task: task.clone(),
+				// 						message: format!("Writing {path}"),
+				// 					}));
+				// 					self.tools.fs.write(&path, &content)?;
+				// 					ctx.history.push(AgentObservation::WriteFile {
+				// 						path,
+				// 						success: true,
+				// 					});
+				// 				}
 				AgentAction::Finish { message } => {
 					if ctx.history.is_empty() {
 						return Err(anyhow!(
@@ -326,7 +314,7 @@ impl Agent {
 					return Ok(result);
 				}
 				AgentAction::RunCommand { command } => {
-					println!("commandcommand {}", command);
+					// println!("commandcommand {}", command);
 					let shell_command = ShellCommand::shell(command.clone());
 					let result = self.tools.shell.run(shell_command).await?;
 
@@ -381,9 +369,9 @@ impl Agent {
 
 		let prompt = build_prompt(ctx);
 
-		println!("\n========== AGENT PROMPT ==========");
-		println!("{prompt}");
-		println!("==================================\n");
+		// println!("\n========== AGENT PROMPT ==========");
+		// println!("{prompt}");
+		// println!("==================================\n");
 
 		let raw = build_action(&prompt).await?;
 		let action = AgentAction::try_from(raw)?;
@@ -398,21 +386,19 @@ impl TryFrom<LlmAction> for AgentAction {
 	type Error = Error;
 
 	fn try_from(v: LlmAction) -> Result<Self, Self::Error> {
-		println!("try_from");
 		match v.action.as_str() {
-			"read_file" => Ok(Self::ReadFile {
-				path: v.path.ok_or_else(|| anyhow!("missing path"))?,
-			}),
-
-			"write_file" => Ok(Self::WriteFile {
-				path: v.path.ok_or_else(|| anyhow!("missing path"))?,
-				content: v.content.ok_or_else(|| anyhow!("missing content"))?,
-			}),
-
-			"current" => Ok(Self::Current {
-				message: v.message.unwrap_or_default(),
-			}),
-
+			// 			"read_file" => Ok(Self::ReadFile {
+			// 				path: v.path.ok_or_else(|| anyhow!("missing path"))?,
+			// 			}),
+			//
+			// 			"write_file" => Ok(Self::WriteFile {
+			// 				path: v.path.ok_or_else(|| anyhow!("missing path"))?,
+			// 				content: v.content.ok_or_else(|| anyhow!("missing content"))?,
+			// 			}),
+			//
+			// 			"current" => Ok(Self::Current {
+			// 				message: v.message.unwrap_or_default(),
+			// 			}),
 			"run_command" => Ok(Self::RunCommand {
 				command: v.command.ok_or_else(|| anyhow!("missing command"))?,
 			}),
@@ -474,39 +460,6 @@ pub fn structured_prompt_chat(ctx: &AgentContext) -> String {
 		"#,
 		ctx.prompt,
 		format_history(&ctx.history)
-	)
-}
-pub fn structured_prompt_execute(intent: &str, spec: &str, plan: &str, progress: &str) -> String {
-	format!(
-		r#"Execute the current SDLC plan.
-				You are an execution agent working in a repository.
-				You must perform the user's requested work using the available tools.
-
-				Do NOT use "finish" merely to acknowledge the request.
-				Do NOT use "finish" because you believe you have explained what should be done.
-				Only use "finish" after you have actually performed the requested changes.
-
-				For a file-creation or file-modification task:
-				1. Inspect the repository when necessary.
-				2. Perform the requested changes with write_file.
-				3. Perform any requested tests or verification.
-				4. Only then return finish.
-
-				The task is considered incomplete until the requested repository changes actually exist.
-
-				Intent:
-				{}
-
-				Specification:
-				{}
-
-				Plan:
-				{}
-
-				Progress:
-				{}
-			"#,
-		intent, spec, plan, progress,
 	)
 }
 
