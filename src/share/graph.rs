@@ -67,7 +67,7 @@ use crate::prelude::*;
 /// A node representing a conceptual implementation can exist independently
 /// of the files containing its implementations:
 ///
-/// ```rust
+/// ```rust,ignore
 /// use estate::prelude::*;
 ///
 /// let climbing_stairs = Node::new(

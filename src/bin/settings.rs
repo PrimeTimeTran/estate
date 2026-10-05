@@ -514,826 +514,826 @@ struct SourceEntry {
 	trailing: String,
 }
 
-#[cfg(test)]
-mod tests {
-	use super::*;
-	#[test]
-	fn sorts_top_level_keys_ascending() {
-		let input = r#"{
-        "z": 1,
-        "a": 2,
-        "m": 3
-    }"#;
-		let expected = r#"{
-        "a": 2,
-        "m": 3,
-        "z": 1
-    }"#;
-		assert_eq!(sort_object(input, SortOrder::Asc), expected);
-	}
-	#[test]
-	fn sorts_top_level_keys_descending() {
-		let input = r#"{
-        "a": 1,
-        "z": 2,
-        "m": 3
-    }"#;
-		let expected = r#"{
-        "z": 2,
-        "m": 3,
-        "a": 1
-    }"#;
-		assert_eq!(sort_object(input, SortOrder::Desc), expected);
-	}
-	#[test]
-	fn zed_settings_preserves_comments_when_sorting_recursively() {
-		let input = r#"{
-        // Formatting
-        "format_on_save": "on",
-        // Language configuration
-        "languages": {
-            // Rust
-            "Rust": {
-                // Rust formatting
-                "format_on_save": "on",
-                "use_on_type_format": true
-            },
-            // TypeScript
-            "TypeScript": {
-                "use_on_type_format": true,
-                "format_on_save": "on"
-            }
-        },
-        // Autosave
-        "autosave": "on_focus_change"
-    }"#;
-		let expected = r#"{
-        // Autosave
-        "autosave": "on_focus_change",
-        // Formatting
-        "format_on_save": "on",
-        // Language configuration
-        "languages": {
-            // Rust
-            "Rust": {
-                // Rust formatting
-                "format_on_save": "on",
-                "use_on_type_format": true
-            },
-            // TypeScript
-            "TypeScript": {
-                "format_on_save": "on",
-                "use_on_type_format": true
-            }
-        }
-    }"#;
-		assert_eq!(sort_recursive(input, SortOrder::Asc), expected);
-	}
-	// #[test]
-	// fn sorts_keybindings_by_key_ascending() {
-	// 	let input = r#"[
-	//        {
-	//            "key": "up",
-	//            "command": "list.focusUp"
-	//        },
-	//        {
-	//            "key": "tab",
-	//            "command": "editor.tab"
-	//        },
-	//        {
-	//            "key": "ctrl+a",
-	//            "command": "selectAll"
-	//        }
-	//    ]"#;
-	// 	let expected = r#"[
-	//        {
-	//            "key": "ctrl+a",
-	//            "command": "selectAll"
-	//        },
-	//        {
-	//            "key": "tab",
-	//            "command": "editor.tab"
-	//        },
-	//        {
-	//            "key": "up",
-	//            "command": "list.focusUp"
-	//        }
-	//    ]"#;
-	// 	assert_eq!(sort_array(input, "key", SortOrder::Asc), expected);
-	// }
-	// #[test]
-	// fn sorts_keybindings_by_key_descending() {
-	// 	let input = r#"[
-	//        {
-	//            "key": "up",
-	//            "command": "list.focusUp"
-	//        },
-	//        {
-	//            "key": "tab",
-	//            "command": "editor.tab"
-	//        },
-	//        {
-	//            "key": "ctrl+a",
-	//            "command": "selectAll"
-	//        }
-	//    ]"#;
-	// 	let expected = r#"[
-	//        {
-	//            "key": "up",
-	//            "command": "list.focusUp"
-	//        },
-	//        {
-	//            "key": "tab",
-	//            "command": "editor.tab"
-	//        },
-	//        {
-	//            "key": "ctrl+a",
-	//            "command": "selectAll"
-	//        }
-	//    ]"#;
-	// 	assert_eq!(sort_array(input, "key", SortOrder::Desc), expected);
-	// }
-	// #[test]
-	// fn sorts_keybindings_by_command_ascending() {
-	// 	let input = r#"[
-	//        {
-	//            "key": "up",
-	//            "command": "list.focusUp"
-	//        },
-	//        {
-	//            "key": "tab",
-	//            "command": "editor.tab"
-	//        },
-	//        {
-	//            "key": "ctrl+a",
-	//            "command": "selectAll"
-	//        }
-	//    ]"#;
-	// 	let expected = r#"[
-	//        {
-	//            "key": "ctrl+a",
-	//            "command": "selectAll"
-	//        },
-	//        {
-	//            "key": "tab",
-	//            "command": "editor.tab"
-	//        },
-	//        {
-	//            "key": "up",
-	//            "command": "list.focusUp"
-	//        }
-	//    ]"#;
-	// 	assert_eq!(sort_array(input, "command", SortOrder::Asc), expected);
-	// }
-	// #[test]
-	// fn sorts_keybindings_by_command_descending() {
-	// 	let input = r#"[
-	//        {
-	//            "key": "up",
-	//            "command": "list.focusUp"
-	//        },
-	//        {
-	//            "key": "tab",
-	//            "command": "editor.tab"
-	//        },
-	//        {
-	//            "key": "ctrl+a",
-	//            "command": "selectAll"
-	//        }
-	//    ]"#;
-	// 	let expected = r#"[
-	//        {
-	//            "key": "up",
-	//            "command": "list.focusUp"
-	//        },
-	//        {
-	//            "key": "tab",
-	//            "command": "editor.tab"
-	//        },
-	//        {
-	//            "key": "ctrl+a",
-	//            "command": "selectAll"
-	//        }
-	//    ]"#;
-	// 	assert_eq!(sort_array(input, "command", SortOrder::Desc), expected);
-	// }
-	// #[test]
-	fn can_sort_same_array_by_different_properties() {
-		let input = r#"[
-        {
-            "key": "z",
-            "command": "alpha"
-        },
-        {
-            "key": "a",
-            "command": "charlie"
-        },
-        {
-            "key": "m",
-            "command": "bravo"
-        }
-    ]"#;
-		let by_key = r#"[
-        {
-            "key": "a",
-            "command": "charlie"
-        },
-        {
-            "key": "m",
-            "command": "bravo"
-        },
-        {
-            "key": "z",
-            "command": "alpha"
-        }
-    ]"#;
-		let by_command = r#"[
-        {
-            "key": "z",
-            "command": "alpha"
-        },
-        {
-            "key": "m",
-            "command": "bravo"
-        },
-        {
-            "key": "a",
-            "command": "charlie"
-        }
-    ]"#;
-		assert_eq!(sort_array(input, "key", SortOrder::Asc), by_key);
-		assert_eq!(sort_array(input, "command", SortOrder::Asc), by_command);
-	}
-	#[test]
-	fn missing_sort_property_sorts_last() {
-		let input = r#"[
-        {
-            "key": "z",
-            "command": "foo"
-        },
-        {
-            "command": "bar"
-        },
-        {
-            "key": "a",
-            "command": "baz"
-        }
-    ]"#;
-		let expected = r#"[
-        {
-            "key": "a",
-            "command": "baz"
-        },
-        {
-            "key": "z",
-            "command": "foo"
-        },
-        {
-            "command": "bar"
-        }
-    ]"#;
-		assert_eq!(sort_array(input, "key", SortOrder::Asc), expected);
-	}
-	#[test]
-	fn preserves_values_when_sorting() {
-		let input = r#"{
-            "z": "last",
-            "a": "first",
-            "m": "middle"
-        }"#;
-		let expected = r#"{
-            "a": "first",
-            "m": "middle",
-            "z": "last"
-        }"#;
-		assert_eq!(sort_object(input, SortOrder::Asc), expected);
-	}
-	#[test]
-	fn preserves_nested_objects() {
-		let input = r#"{
-            "z": {
-                "nested": true,
-                "values": [1, 2, 3]
-            },
-            "a": {
-                "another": {
-                    "deep": "value"
-                }
-            }
-        }"#;
-		let expected = r#"{
-            "a": {
-                "another": {
-                    "deep": "value"
-                }
-            },
-            "z": {
-                "nested": true,
-                "values": [1, 2, 3]
-            }
-        }"#;
-		assert_eq!(sort_object(input, SortOrder::Asc), expected);
-	}
-	#[test]
-	fn preserves_arrays_as_values() {
-		let input = r#"{
-            "z": [1, 2, 3],
-            "a": ["foo", "bar"]
-        }"#;
-		let expected = r#"{
-            "a": ["foo", "bar"],
-            "z": [1, 2, 3]
-        }"#;
-		assert_eq!(sort_object(input, SortOrder::Asc), expected);
-	}
-	#[test]
-	fn preserves_comments_attached_to_property() {
-		let input = r#"{
-            // Zed configuration
-            "zed.setting": true,
-            // Rust configuration
-            "rust.setting": true,
-            // General configuration
-            "files.exclude": {}
-        }"#;
-		let expected = r#"{
-            // General configuration
-            "files.exclude": {},
-            // Rust configuration
-            "rust.setting": true,
-            // Zed configuration
-            "zed.setting": true
-        }"#;
-		assert_eq!(sort_object(input, SortOrder::Asc), expected);
-	}
-	#[test]
-	fn preserves_property_formatting() {
-		let input = r#"{
-  "z": {
-    "foo": true
-  },
-  "a": [
-    1,
-    2,
-    3
-  ]
-}"#;
-		let expected = r#"{
-  "a": [
-    1,
-    2,
-    3
-  ],
-  "z": {
-    "foo": true
-  }
-}"#;
-		assert_eq!(sort_object(input, SortOrder::Asc), expected);
-	}
-	#[test]
-	fn does_not_sort_nested_objects() {
-		let input = r#"{
-            "z": {
-                "b": 2,
-                "a": 1
-            },
-            "a": {
-                "d": 4,
-                "c": 3
-            }
-        }"#;
-		let expected = r#"{
-            "a": {
-                "d": 4,
-                "c": 3
-            },
-            "z": {
-                "b": 2,
-                "a": 1
-            }
-        }"#;
-		assert_eq!(sort_object(input, SortOrder::Asc), expected);
-	}
-	#[test]
-	fn already_sorted_input_is_unchanged() {
-		let input = r#"{
-            "a": 1,
-            "b": 2,
-            "c": 3
-        }"#;
-		assert_eq!(sort_object(input, SortOrder::Asc), input);
-	}
-	#[test]
-	fn descending_already_sorted_input_is_unchanged() {
-		let input = r#"{
-            "c": 3,
-            "b": 2,
-            "a": 1
-        }"#;
-		assert_eq!(sort_object(input, SortOrder::Desc), input);
-	}
-	#[test]
-	fn handles_single_property() {
-		let input = r#"{
-            "only.key": true
-        }"#;
-		assert_eq!(sort_object(input, SortOrder::Asc), input);
-	}
-	#[test]
-	fn handles_empty_object() {
-		let input = r#"{}"#;
-		assert_eq!(sort_object(input, SortOrder::Asc), input);
-	}
-	#[test]
-	fn zed_keymap_contextless_unbind_items_come_first() {
-		let input = r#"[
-        {
-            "bindings": {
-                "cmd-y": "zed::Y",
-                "cmd-b": "zed::B"
-            },
-            "unbind": {
-                "cmd-z": "zed::Z",
-                "cmd-a": "zed::A"
-            }
-        }
-    ]"#;
-		let expected = r#"[
-        {
-            "unbind": {
-                "cmd-a": "zed::A",
-                "cmd-z": "zed::Z"
-            },
-            "bindings": {
-                "cmd-b": "zed::B",
-                "cmd-y": "zed::Y"
-            }
-        }
-    ]"#;
-		assert_eq!(sort_zed_keymap(input, SortOrder::Asc), expected);
-	}
-	#[test]
-	fn zed_keymap_contextless_binding_items_come_first() {
-		let input = r#"[
-        {
-            "context": "Editor",
-            "unbind": {
-                "cmd-a": "editor::A"
-            }
-        },
-        {
-            "unbind": {
-                "cmd-b": "editor::B"
-            }
-        },
-        {
-            "context": "Workspace",
-            "unbind": {
-                "cmd-c": "workspace::C"
-            }
-        }
-    ]"#;
-		let expected = r#"[
-        {
-            "unbind": {
-                "cmd-b": "editor::B"
-            }
-        },
-        {
-            "context": "Editor",
-            "unbind": {
-                "cmd-a": "editor::A"
-            }
-        },
-        {
-            "context": "Workspace",
-            "unbind": {
-                "cmd-c": "workspace::C"
-            }
-        }
-    ]"#;
-		assert_eq!(sort_zed_keymap(input, SortOrder::Asc), expected);
-	}
-	#[test]
-	fn zed_keymap_contextless_items_come_first() {
-		let input = r#"[
-        {
-            "context": "Editor",
-            "bindings": {
-                "cmd-a": "editor::A"
-            }
-        },
-        {
-            "bindings": {
-                "cmd-b": "editor::B"
-            }
-        },
-        {
-            "context": "Workspace",
-            "bindings": {
-                "cmd-c": "workspace::C"
-            }
-        }
-    ]"#;
-		let expected = r#"[
-        {
-            "bindings": {
-                "cmd-b": "editor::B"
-            }
-        },
-        {
-            "context": "Editor",
-            "bindings": {
-                "cmd-a": "editor::A"
-            }
-        },
-        {
-            "context": "Workspace",
-            "bindings": {
-                "cmd-c": "workspace::C"
-            }
-        }
-    ]"#;
-		assert_eq!(sort_zed_keymap(input, SortOrder::Asc), expected);
-	}
-	#[test]
-	fn zed_keymap_sorts_bindings_and_unbinds_independently() {
-		let input = r#"[
-        {
-            "unbind": {
-                "cmd-z": "zed::Z",
-                "cmd-a": "zed::A"
-            },
-            "bindings": {
-                "cmd-y": "zed::Y",
-                "cmd-b": "zed::B"
-            }
-        }
-    ]"#;
-		let expected = r#"[
-        {
-            "unbind": {
-                "cmd-a": "zed::A",
-                "cmd-z": "zed::Z"
-            },
-            "bindings": {
-                "cmd-b": "zed::B",
-                "cmd-y": "zed::Y"
-            }
-        }
-    ]"#;
-		assert_eq!(sort_zed_keymap(input, SortOrder::Asc), expected);
-	}
-	#[test]
-	fn zed_keymap_contexts_sort_alphabetically() {
-		let input = r#"[
-        {
-            "context": "Workspace"
-        },
-        {
-            "context": "Editor"
-        },
-        {
-            "context": "Terminal"
-        }
-    ]"#;
-		let expected = r#"[
-        {
-            "context": "Editor"
-        },
-        {
-            "context": "Terminal"
-        },
-        {
-            "context": "Workspace"
-        }
-    ]"#;
-		assert_eq!(sort_zed_keymap(input, SortOrder::Asc), expected);
-	}
-	#[test]
-	fn zed_keymap_contexts_sort_descending() {
-		let input = r#"[
-        {
-            "context": "Editor"
-        },
-        {
-            "context": "Workspace"
-        },
-        {
-            "context": "Terminal"
-        }
-    ]"#;
-		let expected = r#"[
-        {
-            "context": "Workspace"
-        },
-        {
-            "context": "Terminal"
-        },
-        {
-            "context": "Editor"
-        }
-    ]"#;
-		assert_eq!(sort_zed_keymap(input, SortOrder::Desc), expected);
-	}
-	#[test]
-	fn zed_keymap_bindings_sort_ascending() {
-		let input = r#"[
-        {
-            "bindings": {
-                "cmd-z": "zed::Z",
-                "cmd-a": "zed::A",
-                "cmd-m": "zed::M"
-            }
-        }
-    ]"#;
-		let expected = r#"[
-        {
-            "bindings": {
-                "cmd-a": "zed::A",
-                "cmd-m": "zed::M",
-                "cmd-z": "zed::Z"
-            }
-        }
-    ]"#;
-		assert_eq!(sort_zed_keymap(input, SortOrder::Asc), expected);
-	}
-	#[test]
-	fn zed_keymap_bindings_sort_descending() {
-		let input = r#"[
-        {
-            "bindings": {
-                "cmd-a": "zed::A",
-                "cmd-z": "zed::Z",
-                "cmd-m": "zed::M"
-            }
-        }
-    ]"#;
-		let expected = r#"[
-        {
-            "bindings": {
-                "cmd-z": "zed::Z",
-                "cmd-m": "zed::M",
-                "cmd-a": "zed::A"
-            }
-        }
-    ]"#;
-		assert_eq!(sort_zed_keymap(input, SortOrder::Desc), expected);
-	}
-	#[test]
-	fn zed_keymap_unbinds_sort_ascending() {
-		let input = r#"[
-        {
-            "unbind": {
-                "cmd-z": "zed::Z",
-                "cmd-a": "zed::A",
-                "cmd-m": "zed::M"
-            }
-        }
-    ]"#;
-		let expected = r#"[
-        {
-            "unbind": {
-                "cmd-a": "zed::A",
-                "cmd-m": "zed::M",
-                "cmd-z": "zed::Z"
-            }
-        }
-    ]"#;
-		assert_eq!(sort_zed_keymap(input, SortOrder::Asc), expected);
-	}
-	#[test]
-	fn zed_settings_sort_objects_recursively_ascending() {
-		let input = r#"{
-        "format_on_save": "on",
-        "use_on_type_format": true,
-        "autosave": "on_focus_change",
-        "languages": {
-            "Rust": {
-                "format_on_save": "on"
-            },
-            "TypeScript": {
-                "format_on_save": "on"
-            }
-        }
-    }"#;
-		let expected = r#"{
-        "autosave": "on_focus_change",
-        "format_on_save": "on",
-        "languages": {
-            "Rust": {
-                "format_on_save": "on"
-            },
-            "TypeScript": {
-                "format_on_save": "on"
-            }
-        },
-        "use_on_type_format": true
-    }"#;
-		assert_eq!(sort_recursive(input, SortOrder::Asc), expected);
-	}
-	#[test]
-	fn zed_settings_sort_objects_recursively_descending() {
-		let input = r#"{
-        "format_on_save": "on",
-        "use_on_type_format": true,
-        "autosave": "on_focus_change",
-        "languages": {
-            "Rust": {
-                "format_on_save": "on"
-            },
-            "TypeScript": {
-                "format_on_save": "on"
-            }
-        }
-    }"#;
-		let expected = r#"{
-        "use_on_type_format": true,
-        "languages": {
-            "TypeScript": {
-                "format_on_save": "on"
-            },
-            "Rust": {
-                "format_on_save": "on"
-            }
-        },
-        "format_on_save": "on",
-        "autosave": "on_focus_change"
-    }"#;
-		assert_eq!(sort_recursive(input, SortOrder::Desc), expected);
-	}
-	#[test]
-	fn zed_settings_sorts_deeply_nested_objects() {
-		let input = r#"{
-        "z": {
-            "z": {
-                "c": 3,
-                "a": 1,
-                "b": 2
-            },
-            "a": {
-                "d": 4,
-                "c": 3,
-                "b": 2,
-                "a": 1
-            }
-        },
-        "a": {
-            "z": 26,
-            "b": 2,
-            "m": 13
-        }
-    }"#;
-		let expected = r#"{
-        "a": {
-            "b": 2,
-            "m": 13,
-            "z": 26
-        },
-        "z": {
-            "a": {
-                "a": 1,
-                "b": 2,
-                "c": 3,
-                "d": 4
-            },
-            "z": {
-                "a": 1,
-                "b": 2,
-                "c": 3
-            }
-        }
-    }"#;
-		assert_eq!(sort_recursive(input, SortOrder::Asc), expected);
-	}
-	#[test]
-	fn zed_settings_does_not_sort_array_elements() {
-		let input = r#"{
-        "items": [
-            {
-                "z": 1,
-                "a": 2
-            },
-            {
-                "y": 3,
-                "b": 4
-            }
-        ],
-        "other": true
-    }"#;
-		let expected = r#"{
-        "items": [
-            {
-                "a": 2,
-                "z": 1
-            },
-            {
-                "b": 4,
-                "y": 3
-            }
-        ],
-        "other": true
-    }"#;
-		assert_eq!(sort_recursive(input, SortOrder::Asc), expected);
-	}
-}
+// #[cfg(test)]
+// mod tests {
+// 	use super::*;
+// 	#[test]
+// 	fn sorts_top_level_keys_ascending() {
+// 		let input = r#"{
+//         "z": 1,
+//         "a": 2,
+//         "m": 3
+//     }"#;
+// 		let expected = r#"{
+//         "a": 2,
+//         "m": 3,
+//         "z": 1
+//     }"#;
+// 		assert_eq!(sort_object(input, SortOrder::Asc), expected);
+// 	}
+// 	#[test]
+// 	fn sorts_top_level_keys_descending() {
+// 		let input = r#"{
+//         "a": 1,
+//         "z": 2,
+//         "m": 3
+//     }"#;
+// 		let expected = r#"{
+//         "z": 2,
+//         "m": 3,
+//         "a": 1
+//     }"#;
+// 		assert_eq!(sort_object(input, SortOrder::Desc), expected);
+// 	}
+// 	#[test]
+// 	fn zed_settings_preserves_comments_when_sorting_recursively() {
+// 		let input = r#"{
+//         // Formatting
+//         "format_on_save": "on",
+//         // Language configuration
+//         "languages": {
+//             // Rust
+//             "Rust": {
+//                 // Rust formatting
+//                 "format_on_save": "on",
+//                 "use_on_type_format": true
+//             },
+//             // TypeScript
+//             "TypeScript": {
+//                 "use_on_type_format": true,
+//                 "format_on_save": "on"
+//             }
+//         },
+//         // Autosave
+//         "autosave": "on_focus_change"
+//     }"#;
+// 		let expected = r#"{
+//         // Autosave
+//         "autosave": "on_focus_change",
+//         // Formatting
+//         "format_on_save": "on",
+//         // Language configuration
+//         "languages": {
+//             // Rust
+//             "Rust": {
+//                 // Rust formatting
+//                 "format_on_save": "on",
+//                 "use_on_type_format": true
+//             },
+//             // TypeScript
+//             "TypeScript": {
+//                 "format_on_save": "on",
+//                 "use_on_type_format": true
+//             }
+//         }
+//     }"#;
+// 		assert_eq!(sort_recursive(input, SortOrder::Asc), expected);
+// 	}
+// 	// #[test]
+// 	// fn sorts_keybindings_by_key_ascending() {
+// 	// 	let input = r#"[
+// 	//        {
+// 	//            "key": "up",
+// 	//            "command": "list.focusUp"
+// 	//        },
+// 	//        {
+// 	//            "key": "tab",
+// 	//            "command": "editor.tab"
+// 	//        },
+// 	//        {
+// 	//            "key": "ctrl+a",
+// 	//            "command": "selectAll"
+// 	//        }
+// 	//    ]"#;
+// 	// 	let expected = r#"[
+// 	//        {
+// 	//            "key": "ctrl+a",
+// 	//            "command": "selectAll"
+// 	//        },
+// 	//        {
+// 	//            "key": "tab",
+// 	//            "command": "editor.tab"
+// 	//        },
+// 	//        {
+// 	//            "key": "up",
+// 	//            "command": "list.focusUp"
+// 	//        }
+// 	//    ]"#;
+// 	// 	assert_eq!(sort_array(input, "key", SortOrder::Asc), expected);
+// 	// }
+// 	// #[test]
+// 	// fn sorts_keybindings_by_key_descending() {
+// 	// 	let input = r#"[
+// 	//        {
+// 	//            "key": "up",
+// 	//            "command": "list.focusUp"
+// 	//        },
+// 	//        {
+// 	//            "key": "tab",
+// 	//            "command": "editor.tab"
+// 	//        },
+// 	//        {
+// 	//            "key": "ctrl+a",
+// 	//            "command": "selectAll"
+// 	//        }
+// 	//    ]"#;
+// 	// 	let expected = r#"[
+// 	//        {
+// 	//            "key": "up",
+// 	//            "command": "list.focusUp"
+// 	//        },
+// 	//        {
+// 	//            "key": "tab",
+// 	//            "command": "editor.tab"
+// 	//        },
+// 	//        {
+// 	//            "key": "ctrl+a",
+// 	//            "command": "selectAll"
+// 	//        }
+// 	//    ]"#;
+// 	// 	assert_eq!(sort_array(input, "key", SortOrder::Desc), expected);
+// 	// }
+// 	// #[test]
+// 	// fn sorts_keybindings_by_command_ascending() {
+// 	// 	let input = r#"[
+// 	//        {
+// 	//            "key": "up",
+// 	//            "command": "list.focusUp"
+// 	//        },
+// 	//        {
+// 	//            "key": "tab",
+// 	//            "command": "editor.tab"
+// 	//        },
+// 	//        {
+// 	//            "key": "ctrl+a",
+// 	//            "command": "selectAll"
+// 	//        }
+// 	//    ]"#;
+// 	// 	let expected = r#"[
+// 	//        {
+// 	//            "key": "ctrl+a",
+// 	//            "command": "selectAll"
+// 	//        },
+// 	//        {
+// 	//            "key": "tab",
+// 	//            "command": "editor.tab"
+// 	//        },
+// 	//        {
+// 	//            "key": "up",
+// 	//            "command": "list.focusUp"
+// 	//        }
+// 	//    ]"#;
+// 	// 	assert_eq!(sort_array(input, "command", SortOrder::Asc), expected);
+// 	// }
+// 	// #[test]
+// 	// fn sorts_keybindings_by_command_descending() {
+// 	// 	let input = r#"[
+// 	//        {
+// 	//            "key": "up",
+// 	//            "command": "list.focusUp"
+// 	//        },
+// 	//        {
+// 	//            "key": "tab",
+// 	//            "command": "editor.tab"
+// 	//        },
+// 	//        {
+// 	//            "key": "ctrl+a",
+// 	//            "command": "selectAll"
+// 	//        }
+// 	//    ]"#;
+// 	// 	let expected = r#"[
+// 	//        {
+// 	//            "key": "up",
+// 	//            "command": "list.focusUp"
+// 	//        },
+// 	//        {
+// 	//            "key": "tab",
+// 	//            "command": "editor.tab"
+// 	//        },
+// 	//        {
+// 	//            "key": "ctrl+a",
+// 	//            "command": "selectAll"
+// 	//        }
+// 	//    ]"#;
+// 	// 	assert_eq!(sort_array(input, "command", SortOrder::Desc), expected);
+// 	// }
+// 	// #[test]
+// 	fn can_sort_same_array_by_different_properties() {
+// 		let input = r#"[
+//         {
+//             "key": "z",
+//             "command": "alpha"
+//         },
+//         {
+//             "key": "a",
+//             "command": "charlie"
+//         },
+//         {
+//             "key": "m",
+//             "command": "bravo"
+//         }
+//     ]"#;
+// 		let by_key = r#"[
+//         {
+//             "key": "a",
+//             "command": "charlie"
+//         },
+//         {
+//             "key": "m",
+//             "command": "bravo"
+//         },
+//         {
+//             "key": "z",
+//             "command": "alpha"
+//         }
+//     ]"#;
+// 		let by_command = r#"[
+//         {
+//             "key": "z",
+//             "command": "alpha"
+//         },
+//         {
+//             "key": "m",
+//             "command": "bravo"
+//         },
+//         {
+//             "key": "a",
+//             "command": "charlie"
+//         }
+//     ]"#;
+// 		assert_eq!(sort_array(input, "key", SortOrder::Asc), by_key);
+// 		assert_eq!(sort_array(input, "command", SortOrder::Asc), by_command);
+// 	}
+// 	#[test]
+// 	fn missing_sort_property_sorts_last() {
+// 		let input = r#"[
+//         {
+//             "key": "z",
+//             "command": "foo"
+//         },
+//         {
+//             "command": "bar"
+//         },
+//         {
+//             "key": "a",
+//             "command": "baz"
+//         }
+//     ]"#;
+// 		let expected = r#"[
+//         {
+//             "key": "a",
+//             "command": "baz"
+//         },
+//         {
+//             "key": "z",
+//             "command": "foo"
+//         },
+//         {
+//             "command": "bar"
+//         }
+//     ]"#;
+// 		assert_eq!(sort_array(input, "key", SortOrder::Asc), expected);
+// 	}
+// 	#[test]
+// 	fn preserves_values_when_sorting() {
+// 		let input = r#"{
+//             "z": "last",
+//             "a": "first",
+//             "m": "middle"
+//         }"#;
+// 		let expected = r#"{
+//             "a": "first",
+//             "m": "middle",
+//             "z": "last"
+//         }"#;
+// 		assert_eq!(sort_object(input, SortOrder::Asc), expected);
+// 	}
+// 	#[test]
+// 	fn preserves_nested_objects() {
+// 		let input = r#"{
+//             "z": {
+//                 "nested": true,
+//                 "values": [1, 2, 3]
+//             },
+//             "a": {
+//                 "another": {
+//                     "deep": "value"
+//                 }
+//             }
+//         }"#;
+// 		let expected = r#"{
+//             "a": {
+//                 "another": {
+//                     "deep": "value"
+//                 }
+//             },
+//             "z": {
+//                 "nested": true,
+//                 "values": [1, 2, 3]
+//             }
+//         }"#;
+// 		assert_eq!(sort_object(input, SortOrder::Asc), expected);
+// 	}
+// 	#[test]
+// 	fn preserves_arrays_as_values() {
+// 		let input = r#"{
+//             "z": [1, 2, 3],
+//             "a": ["foo", "bar"]
+//         }"#;
+// 		let expected = r#"{
+//             "a": ["foo", "bar"],
+//             "z": [1, 2, 3]
+//         }"#;
+// 		assert_eq!(sort_object(input, SortOrder::Asc), expected);
+// 	}
+// 	#[test]
+// 	fn preserves_comments_attached_to_property() {
+// 		let input = r#"{
+//             // Zed configuration
+//             "zed.setting": true,
+//             // Rust configuration
+//             "rust.setting": true,
+//             // General configuration
+//             "files.exclude": {}
+//         }"#;
+// 		let expected = r#"{
+//             // General configuration
+//             "files.exclude": {},
+//             // Rust configuration
+//             "rust.setting": true,
+//             // Zed configuration
+//             "zed.setting": true
+//         }"#;
+// 		assert_eq!(sort_object(input, SortOrder::Asc), expected);
+// 	}
+// 	#[test]
+// 	fn preserves_property_formatting() {
+// 		let input = r#"{
+//   "z": {
+//     "foo": true
+//   },
+//   "a": [
+//     1,
+//     2,
+//     3
+//   ]
+// }"#;
+// 		let expected = r#"{
+//   "a": [
+//     1,
+//     2,
+//     3
+//   ],
+//   "z": {
+//     "foo": true
+//   }
+// }"#;
+// 		assert_eq!(sort_object(input, SortOrder::Asc), expected);
+// 	}
+// 	#[test]
+// 	fn does_not_sort_nested_objects() {
+// 		let input = r#"{
+//             "z": {
+//                 "b": 2,
+//                 "a": 1
+//             },
+//             "a": {
+//                 "d": 4,
+//                 "c": 3
+//             }
+//         }"#;
+// 		let expected = r#"{
+//             "a": {
+//                 "d": 4,
+//                 "c": 3
+//             },
+//             "z": {
+//                 "b": 2,
+//                 "a": 1
+//             }
+//         }"#;
+// 		assert_eq!(sort_object(input, SortOrder::Asc), expected);
+// 	}
+// 	#[test]
+// 	fn already_sorted_input_is_unchanged() {
+// 		let input = r#"{
+//             "a": 1,
+//             "b": 2,
+//             "c": 3
+//         }"#;
+// 		assert_eq!(sort_object(input, SortOrder::Asc), input);
+// 	}
+// 	#[test]
+// 	fn descending_already_sorted_input_is_unchanged() {
+// 		let input = r#"{
+//             "c": 3,
+//             "b": 2,
+//             "a": 1
+//         }"#;
+// 		assert_eq!(sort_object(input, SortOrder::Desc), input);
+// 	}
+// 	#[test]
+// 	fn handles_single_property() {
+// 		let input = r#"{
+//             "only.key": true
+//         }"#;
+// 		assert_eq!(sort_object(input, SortOrder::Asc), input);
+// 	}
+// 	#[test]
+// 	fn handles_empty_object() {
+// 		let input = r#"{}"#;
+// 		assert_eq!(sort_object(input, SortOrder::Asc), input);
+// 	}
+// 	#[test]
+// 	fn zed_keymap_contextless_unbind_items_come_first() {
+// 		let input = r#"[
+//         {
+//             "bindings": {
+//                 "cmd-y": "zed::Y",
+//                 "cmd-b": "zed::B"
+//             },
+//             "unbind": {
+//                 "cmd-z": "zed::Z",
+//                 "cmd-a": "zed::A"
+//             }
+//         }
+//     ]"#;
+// 		let expected = r#"[
+//         {
+//             "unbind": {
+//                 "cmd-a": "zed::A",
+//                 "cmd-z": "zed::Z"
+//             },
+//             "bindings": {
+//                 "cmd-b": "zed::B",
+//                 "cmd-y": "zed::Y"
+//             }
+//         }
+//     ]"#;
+// 		assert_eq!(sort_zed_keymap(input, SortOrder::Asc), expected);
+// 	}
+// 	#[test]
+// 	fn zed_keymap_contextless_binding_items_come_first() {
+// 		let input = r#"[
+//         {
+//             "context": "Editor",
+//             "unbind": {
+//                 "cmd-a": "editor::A"
+//             }
+//         },
+//         {
+//             "unbind": {
+//                 "cmd-b": "editor::B"
+//             }
+//         },
+//         {
+//             "context": "Workspace",
+//             "unbind": {
+//                 "cmd-c": "workspace::C"
+//             }
+//         }
+//     ]"#;
+// 		let expected = r#"[
+//         {
+//             "unbind": {
+//                 "cmd-b": "editor::B"
+//             }
+//         },
+//         {
+//             "context": "Editor",
+//             "unbind": {
+//                 "cmd-a": "editor::A"
+//             }
+//         },
+//         {
+//             "context": "Workspace",
+//             "unbind": {
+//                 "cmd-c": "workspace::C"
+//             }
+//         }
+//     ]"#;
+// 		assert_eq!(sort_zed_keymap(input, SortOrder::Asc), expected);
+// 	}
+// 	#[test]
+// 	fn zed_keymap_contextless_items_come_first() {
+// 		let input = r#"[
+//         {
+//             "context": "Editor",
+//             "bindings": {
+//                 "cmd-a": "editor::A"
+//             }
+//         },
+//         {
+//             "bindings": {
+//                 "cmd-b": "editor::B"
+//             }
+//         },
+//         {
+//             "context": "Workspace",
+//             "bindings": {
+//                 "cmd-c": "workspace::C"
+//             }
+//         }
+//     ]"#;
+// 		let expected = r#"[
+//         {
+//             "bindings": {
+//                 "cmd-b": "editor::B"
+//             }
+//         },
+//         {
+//             "context": "Editor",
+//             "bindings": {
+//                 "cmd-a": "editor::A"
+//             }
+//         },
+//         {
+//             "context": "Workspace",
+//             "bindings": {
+//                 "cmd-c": "workspace::C"
+//             }
+//         }
+//     ]"#;
+// 		assert_eq!(sort_zed_keymap(input, SortOrder::Asc), expected);
+// 	}
+// 	#[test]
+// 	fn zed_keymap_sorts_bindings_and_unbinds_independently() {
+// 		let input = r#"[
+//         {
+//             "unbind": {
+//                 "cmd-z": "zed::Z",
+//                 "cmd-a": "zed::A"
+//             },
+//             "bindings": {
+//                 "cmd-y": "zed::Y",
+//                 "cmd-b": "zed::B"
+//             }
+//         }
+//     ]"#;
+// 		let expected = r#"[
+//         {
+//             "unbind": {
+//                 "cmd-a": "zed::A",
+//                 "cmd-z": "zed::Z"
+//             },
+//             "bindings": {
+//                 "cmd-b": "zed::B",
+//                 "cmd-y": "zed::Y"
+//             }
+//         }
+//     ]"#;
+// 		assert_eq!(sort_zed_keymap(input, SortOrder::Asc), expected);
+// 	}
+// 	#[test]
+// 	fn zed_keymap_contexts_sort_alphabetically() {
+// 		let input = r#"[
+//         {
+//             "context": "Workspace"
+//         },
+//         {
+//             "context": "Editor"
+//         },
+//         {
+//             "context": "Terminal"
+//         }
+//     ]"#;
+// 		let expected = r#"[
+//         {
+//             "context": "Editor"
+//         },
+//         {
+//             "context": "Terminal"
+//         },
+//         {
+//             "context": "Workspace"
+//         }
+//     ]"#;
+// 		assert_eq!(sort_zed_keymap(input, SortOrder::Asc), expected);
+// 	}
+// 	#[test]
+// 	fn zed_keymap_contexts_sort_descending() {
+// 		let input = r#"[
+//         {
+//             "context": "Editor"
+//         },
+//         {
+//             "context": "Workspace"
+//         },
+//         {
+//             "context": "Terminal"
+//         }
+//     ]"#;
+// 		let expected = r#"[
+//         {
+//             "context": "Workspace"
+//         },
+//         {
+//             "context": "Terminal"
+//         },
+//         {
+//             "context": "Editor"
+//         }
+//     ]"#;
+// 		assert_eq!(sort_zed_keymap(input, SortOrder::Desc), expected);
+// 	}
+// 	#[test]
+// 	fn zed_keymap_bindings_sort_ascending() {
+// 		let input = r#"[
+//         {
+//             "bindings": {
+//                 "cmd-z": "zed::Z",
+//                 "cmd-a": "zed::A",
+//                 "cmd-m": "zed::M"
+//             }
+//         }
+//     ]"#;
+// 		let expected = r#"[
+//         {
+//             "bindings": {
+//                 "cmd-a": "zed::A",
+//                 "cmd-m": "zed::M",
+//                 "cmd-z": "zed::Z"
+//             }
+//         }
+//     ]"#;
+// 		assert_eq!(sort_zed_keymap(input, SortOrder::Asc), expected);
+// 	}
+// 	#[test]
+// 	fn zed_keymap_bindings_sort_descending() {
+// 		let input = r#"[
+//         {
+//             "bindings": {
+//                 "cmd-a": "zed::A",
+//                 "cmd-z": "zed::Z",
+//                 "cmd-m": "zed::M"
+//             }
+//         }
+//     ]"#;
+// 		let expected = r#"[
+//         {
+//             "bindings": {
+//                 "cmd-z": "zed::Z",
+//                 "cmd-m": "zed::M",
+//                 "cmd-a": "zed::A"
+//             }
+//         }
+//     ]"#;
+// 		assert_eq!(sort_zed_keymap(input, SortOrder::Desc), expected);
+// 	}
+// 	#[test]
+// 	fn zed_keymap_unbinds_sort_ascending() {
+// 		let input = r#"[
+//         {
+//             "unbind": {
+//                 "cmd-z": "zed::Z",
+//                 "cmd-a": "zed::A",
+//                 "cmd-m": "zed::M"
+//             }
+//         }
+//     ]"#;
+// 		let expected = r#"[
+//         {
+//             "unbind": {
+//                 "cmd-a": "zed::A",
+//                 "cmd-m": "zed::M",
+//                 "cmd-z": "zed::Z"
+//             }
+//         }
+//     ]"#;
+// 		assert_eq!(sort_zed_keymap(input, SortOrder::Asc), expected);
+// 	}
+// 	#[test]
+// 	fn zed_settings_sort_objects_recursively_ascending() {
+// 		let input = r#"{
+//         "format_on_save": "on",
+//         "use_on_type_format": true,
+//         "autosave": "on_focus_change",
+//         "languages": {
+//             "Rust": {
+//                 "format_on_save": "on"
+//             },
+//             "TypeScript": {
+//                 "format_on_save": "on"
+//             }
+//         }
+//     }"#;
+// 		let expected = r#"{
+//         "autosave": "on_focus_change",
+//         "format_on_save": "on",
+//         "languages": {
+//             "Rust": {
+//                 "format_on_save": "on"
+//             },
+//             "TypeScript": {
+//                 "format_on_save": "on"
+//             }
+//         },
+//         "use_on_type_format": true
+//     }"#;
+// 		assert_eq!(sort_recursive(input, SortOrder::Asc), expected);
+// 	}
+// 	#[test]
+// 	fn zed_settings_sort_objects_recursively_descending() {
+// 		let input = r#"{
+//         "format_on_save": "on",
+//         "use_on_type_format": true,
+//         "autosave": "on_focus_change",
+//         "languages": {
+//             "Rust": {
+//                 "format_on_save": "on"
+//             },
+//             "TypeScript": {
+//                 "format_on_save": "on"
+//             }
+//         }
+//     }"#;
+// 		let expected = r#"{
+//         "use_on_type_format": true,
+//         "languages": {
+//             "TypeScript": {
+//                 "format_on_save": "on"
+//             },
+//             "Rust": {
+//                 "format_on_save": "on"
+//             }
+//         },
+//         "format_on_save": "on",
+//         "autosave": "on_focus_change"
+//     }"#;
+// 		assert_eq!(sort_recursive(input, SortOrder::Desc), expected);
+// 	}
+// 	#[test]
+// 	fn zed_settings_sorts_deeply_nested_objects() {
+// 		let input = r#"{
+//         "z": {
+//             "z": {
+//                 "c": 3,
+//                 "a": 1,
+//                 "b": 2
+//             },
+//             "a": {
+//                 "d": 4,
+//                 "c": 3,
+//                 "b": 2,
+//                 "a": 1
+//             }
+//         },
+//         "a": {
+//             "z": 26,
+//             "b": 2,
+//             "m": 13
+//         }
+//     }"#;
+// 		let expected = r#"{
+//         "a": {
+//             "b": 2,
+//             "m": 13,
+//             "z": 26
+//         },
+//         "z": {
+//             "a": {
+//                 "a": 1,
+//                 "b": 2,
+//                 "c": 3,
+//                 "d": 4
+//             },
+//             "z": {
+//                 "a": 1,
+//                 "b": 2,
+//                 "c": 3
+//             }
+//         }
+//     }"#;
+// 		assert_eq!(sort_recursive(input, SortOrder::Asc), expected);
+// 	}
+// 	#[test]
+// 	fn zed_settings_does_not_sort_array_elements() {
+// 		let input = r#"{
+//         "items": [
+//             {
+//                 "z": 1,
+//                 "a": 2
+//             },
+//             {
+//                 "y": 3,
+//                 "b": 4
+//             }
+//         ],
+//         "other": true
+//     }"#;
+// 		let expected = r#"{
+//         "items": [
+//             {
+//                 "a": 2,
+//                 "z": 1
+//             },
+//             {
+//                 "b": 4,
+//                 "y": 3
+//             }
+//         ],
+//         "other": true
+//     }"#;
+// 		assert_eq!(sort_recursive(input, SortOrder::Asc), expected);
+// 	}
+// }

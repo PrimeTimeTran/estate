@@ -338,7 +338,7 @@ pub trait Runtime: Clone + Sync + Send + 'static {
 
 /// ## [Resolver]
 ///
-/// 	"What does C mean?"
+/// "What does C mean?"
 ///
 /// derived structure optimized for finding that knowledge.
 ///
