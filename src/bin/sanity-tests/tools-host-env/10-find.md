@@ -1,7 +1,4 @@
-# Test: find
+Requirements:
+- Create, update, or edit files only in `00-sanity-tests/`.
 
-First command: run `mkdir -p 00-sanity-tests`.
-
-Use the `find` CLI tool to find every `.txt` source file under `00-sanity-tests`, excluding `00-sanity-tests/10-find-result.txt`.
-
-Save matching paths, one per line, to `00-sanity-tests/10-find-result.txt`. Do not modify or delete the files found.
+First run `mkdir -p` for that directory, then `cd` into it. Use `find` to list `.txt` source files here, one path per line, in `10-find-result.txt`. Exclude that result file.

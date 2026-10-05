@@ -1,14 +1,13 @@
-# Test: append
+Requirements:
+- Create, update, or edit files only in `00-sanity-tests/`.
 
-First command: run `mkdir -p 00-sanity-tests`.
-
-Create `00-sanity-tests/04-append-file.txt` with this initial content:
+First run `mkdir -p` for that directory, then `cd` into it. Create `04-append.txt` with:
 
 ```text
 foo
 ```
 
-Then use an append operation to add:
+Then append:
 
 ```text
 bar

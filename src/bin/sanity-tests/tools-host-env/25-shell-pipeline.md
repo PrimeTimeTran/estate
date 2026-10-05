@@ -1,8 +1,7 @@
-# Test: shell pipeline
+Requirements:
+- Create, update, or edit files only in `00-sanity-tests/`.
 
-First command: run `mkdir -p 00-sanity-tests`.
-
-Create `00-sanity-tests/25-pipeline-source.txt` with:
+First run `mkdir -p` for that directory, then `cd` into it. Create `25-pipeline-source.txt` with:
 
 ```text
 apple
@@ -13,14 +12,10 @@ banana
 apple
 ```
 
-Use a shell pipeline with standard CLI tools to sort the lines, count identical adjacent values, and output one line per fruit with its count.
-
-Save the result to `00-sanity-tests/25-pipeline-result.txt`. It must be exactly:
+Use a CLI pipeline to sort and count identical lines, saving `count fruit` rows to `25-pipeline-result.txt`. Expected:
 
 ```text
 3 apple
 2 banana
 1 cherry
 ```
-
-Use actual CLI tools; do not calculate the answer manually.

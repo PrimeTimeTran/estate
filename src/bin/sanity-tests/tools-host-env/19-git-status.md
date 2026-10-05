@@ -1,11 +1,10 @@
-# Test: git status
+Requirements:
+- Create, update, or edit files only in `00-sanity-tests/`.
 
-First command: run `mkdir -p 00-sanity-tests`.
-
-From the original working directory, run:
+First run `mkdir -p` for that directory, then `cd` into it. Run:
 
 ```bash
 git status --short
 ```
 
-Capture the output, then save it to `00-sanity-tests/19-git-status-result.txt`. Do not change repository files other than this required result file.
+Capture the output before saving it to `19-git-status-result.txt`.

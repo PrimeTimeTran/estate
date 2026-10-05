@@ -1,11 +1,10 @@
-# Test: git diff
+Requirements:
+- Create, update, or edit files only in `00-sanity-tests/`.
 
-First command: run `mkdir -p 00-sanity-tests`.
-
-From the original working directory, run:
+First run `mkdir -p` for that directory, then `cd` into it. Run:
 
 ```bash
 git diff
 ```
 
-Capture the output, then save it to `00-sanity-tests/20-git-diff-result.txt`. Do not change repository files other than this required result file.
+Capture the output before saving it to `20-git-diff-result.txt`.

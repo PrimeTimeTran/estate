@@ -53,12 +53,12 @@ Do not create or modify any other files.
 Do not create anything outside `./tests`.
 EOF
 
-cat > "$OUT/04-append-file.md" <<'EOF'
+cat > "$OUT/04-append.md" <<'EOF'
 Work only inside `./tests`.
 
 The file already exists:
 
-./tests/04-append-file.txt
+./tests/04-append.txt
 
 It currently contains:
 

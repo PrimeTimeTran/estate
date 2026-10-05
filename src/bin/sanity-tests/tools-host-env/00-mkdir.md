@@ -1,5 +1,4 @@
-# Test: mkdir
+Requirements:
+- Create, update, or edit files only in `00-sanity-tests/`.
 
-First command: use the `mkdir` CLI tool to run `mkdir -p 00-sanity-tests`.
-
-This completes the test. Do not create any files or other directories.
+First run `mkdir -p` for that directory. Do not create anything else.

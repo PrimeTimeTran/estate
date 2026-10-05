@@ -1,7 +1,4 @@
-# Test: Determine the current working directory
+Requirements:
+- Create, update, or edit files only in `00-sanity-tests/`.
 
-First command: run `mkdir -p 00-sanity-tests`. Do not change directories before recording the current working directory.
-
-Use an appropriate command or host mechanism to determine the execution environment's current working directory.
-
-Write the detected path to `00-sanity-tests/02-cwd.md`. The file must contain the actual current working directory.
+First run `mkdir -p` for that directory. Record `pwd`, then `cd` into it and save the path as `02-cwd.md`.

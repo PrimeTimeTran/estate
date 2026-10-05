@@ -38,7 +38,7 @@ Do not append to the existing contents.
 Do not create or modify any other files.
 EOF
 
-cat > "$OUT/04-append-file.md" <<'EOF'
+cat > "$OUT/04-append.md" <<'EOF'
 The file `hello-world.txt` already contains:
 
 foobar

@@ -1,8 +1,7 @@
-# Test: sort
+Requirements:
+- Create, update, or edit files only in `00-sanity-tests/`.
 
-First command: run `mkdir -p 00-sanity-tests`.
-
-Create `00-sanity-tests/14-sort-source.txt` with exactly:
+First run `mkdir -p` for that directory, then `cd` into it. Create `14-sort-source.txt` with:
 
 ```text
 delta
@@ -11,9 +10,7 @@ charlie
 bravo
 ```
 
-Use the `sort` CLI tool to sort the lines alphabetically. Save the result to `00-sanity-tests/14-sort-result.txt`.
-
-The result must be exactly:
+Use `sort` to save the alphabetized lines to `14-sort-result.txt`. Expected:
 
 ```text
 alpha

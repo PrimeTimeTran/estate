@@ -1,8 +1,7 @@
-# Test: head
+Requirements:
+- Create, update, or edit files only in `00-sanity-tests/`.
 
-First command: run `mkdir -p 00-sanity-tests`.
-
-Create `00-sanity-tests/12-head-source.txt` with exactly:
+First run `mkdir -p` for that directory, then `cd` into it. Create `12-head-source.txt` with:
 
 ```text
 one
@@ -12,4 +11,4 @@ four
 five
 ```
 
-Use the `head` CLI tool to extract the first two lines and save them to `00-sanity-tests/12-head-result.txt`.
+Use `head` to save the first two lines to `12-head-result.txt`.

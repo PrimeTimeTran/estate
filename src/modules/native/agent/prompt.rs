@@ -57,7 +57,7 @@ pub static ACTION_PROMPT: &str = r#"
     "command": "command and arguments"
   }
 
-  3. Finish:
+  2. Finish:
   {{
       "action": "finish",
       "message": "done"

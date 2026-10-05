@@ -1,7 +1,4 @@
-# Test: env
+Requirements:
+- Create, update, or edit files only in `00-sanity-tests/`.
 
-First command: run `mkdir -p 00-sanity-tests`.
-
-Use the `env` CLI command to capture the current process environment, then output variable names only (no values).
-
-Save the names to `00-sanity-tests/24-env-result.txt`. Do not modify environment variables.
+First run `mkdir -p` for that directory, then `cd` into it. Use `env` to save environment variable names only (no values) to `24-env-result.txt`. Do not change the environment.

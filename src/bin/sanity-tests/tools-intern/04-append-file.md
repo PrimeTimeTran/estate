@@ -2,7 +2,7 @@ Work only inside `./tests`.
 
 The file already exists:
 
-./tests/04-append-file.txt
+./tests/04-append.txt
 
 It currently contains:
 

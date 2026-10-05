@@ -1,7 +1,4 @@
-# Test: curl
+Requirements:
+- Create, update, or edit files only in `00-sanity-tests/`.
 
-First command: run `mkdir -p 00-sanity-tests`.
-
-Use `curl` to make an HTTP GET request to `https://example.com` and save the response body to `00-sanity-tests/23-curl-result.html`.
-
-Do not use a browser or modify other files.
+First run `mkdir -p` for that directory, then `cd` into it. Use `curl` (not a browser) to save the response from `https://example.com` to `23-curl-result.html`.

@@ -1,8 +1,7 @@
-# Test: tail
+Requirements:
+- Create, update, or edit files only in `00-sanity-tests/`.
 
-First command: run `mkdir -p 00-sanity-tests`.
-
-Create `00-sanity-tests/13-tail-source.txt` with exactly:
+First run `mkdir -p` for that directory, then `cd` into it. Create `13-tail-source.txt` with:
 
 ```text
 one
@@ -12,4 +11,4 @@ four
 five
 ```
 
-Use the `tail` CLI tool to extract the last two lines and save them to `00-sanity-tests/13-tail-result.txt`.
+Use `tail` to save the last two lines to `13-tail-result.txt`.

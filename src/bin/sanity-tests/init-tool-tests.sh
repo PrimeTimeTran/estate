@@ -21,8 +21,8 @@ Tests:
 
 01-mkdir
 02-touch
-03-write-file
-04-append-file
+03-write
+04-append
 05-cat
 06-cp
 07-mv
@@ -70,12 +70,12 @@ Create an empty file named:
 Do not write any content to the file.
 EOF
 
-cat > "$OUT_DIR/03-write-file.md" <<'EOF'
+cat > "$OUT_DIR/03-write.md" <<'EOF'
 # Test: write file
 
 Create a file named:
 
-`03-write-file.txt`
+`03-write.txt`
 
 with exactly this content:
 
@@ -88,13 +88,13 @@ foobar
 Do not add any additional lines or text.
 EOF
 
-cat > "$OUT_DIR/04-append-file.md" <<'EOF'
+cat > "$OUT_DIR/04-append.md" <<'EOF'
 
 # Test: append
 
 Create a file named:
 
-`04-append-file.txt`
+`04-append.txt`
 
 with this initial content:
 
@@ -126,13 +126,13 @@ Use the `cat` CLI tool.
 
 Read:
 
-`03-write-file.txt`
+`03-write.txt`
 
 Then create:
 
 `05-cat-result.txt`
 
-containing exactly the contents read from `03-write-file.txt`.
+containing exactly the contents read from `03-write.txt`.
 
 Do not use the original file as the output file.
 EOF
@@ -145,7 +145,7 @@ Use the `cp` CLI tool.
 
 Copy:
 
-`03-write-file.txt`
+`03-write.txt`
 
 to:
 
@@ -329,7 +329,7 @@ Use the `wc` CLI tool.
 
 Run `wc` against:
 
-`03-write-file.txt`
+`03-write.txt`
 
 Write the command's output to:
 

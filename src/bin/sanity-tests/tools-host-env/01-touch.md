@@ -1,6 +1,4 @@
-# Test: touch
+Requirements:
+- Create, update, or edit files only in `00-sanity-tests/`.
 
-First command: run `mkdir -p 00-sanity-tests`.
-
-Then use the `touch` CLI tool to create the empty file `00-sanity-tests/01-touched-file.txt`. Do not write content to it.
-Then use the `touch` CLI tool to create the empty file `00-sanity-tests/01-touch-for-delete.txt`. Do not write content to it.
+First run `mkdir -p` for that directory, then `cd` into it. Use `touch` to create empty `01-touched-file.txt` and `01-touch-for-delete.txt` files.
