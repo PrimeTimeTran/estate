@@ -1,3 +1,0 @@
-[submodule "app/rust-chess-types"]
-	path = app/rust-chess-types
-	url = https://github.com/PrimeTimeTran/estate
