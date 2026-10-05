@@ -225,7 +225,10 @@ async fn handle_connection(stream: UnixStream, events: EventBus) -> anyhow::Resu
 							?event,
 							"📡 Estate IPC → event"
 						);
-
+						println!(
+							"🔥 IPC SERVER → EVENT BUS EVENT: {:?}",
+							event.kind
+						);
 						let envelope = EventEnvelope {
 									id: EventId {
 										node: NodeId,

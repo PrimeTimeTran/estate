@@ -225,16 +225,37 @@ pub enum AppEvent {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum EventKind {
 	ApiError(String),
-	CacheInvalidated { reason: String },
-	CommandExecuted { command: String },
+	CacheInvalidated {
+		reason: String,
+	},
+	CommandExecuted {
+		command: String,
+	},
 	DaemonStarted,
 	DaemonStopped,
-	EstateDiscovered { inode: Inode, path: String },
-	EstateRemoved { inode: Inode, path: String },
-	FileCreated { inode: Inode, path: String },
-	FileDeleted { inode: Inode, path: String },
-	FileModified { inode: Inode, path: String },
-	IndexUpdated { files_changed: u64 },
+	EstateDiscovered {
+		inode: Inode,
+		path: String,
+	},
+	EstateRemoved {
+		inode: Inode,
+		path: String,
+	},
+	FileCreated {
+		inode: Inode,
+		path: String,
+	},
+	FileDeleted {
+		inode: Inode,
+		path: String,
+	},
+	FileModified {
+		inode: Inode,
+		path: String,
+	},
+	IndexUpdated {
+		files_changed: u64,
+	},
 	Navigate(ViewType),
 	ProblemLoaded(StoredProblem),
 	ProblemLoadFailed(String),
@@ -247,27 +268,72 @@ pub enum EventKind {
 	SampleProblemsLoaded(Vec<StoredProblem>),
 	SampleProblemsLoading,
 	SessionStart,
-	SessionStop { session: Session },
+	SessionStop {
+		session: Session,
+	},
 	StatusRequested,
-	TaskCompleted { task_id: TaskId },
-	TaskCreated { task_id: Uuid, kind: TaskKind },
-	TaskDeleted { task_id: TaskId },
-	TaskFailed { task_id: TaskId, error: String },
-	TaskRequested { request: TaskRequest },
+	TaskCompleted {
+		task_id: TaskId,
+	},
+	TaskCreated {
+		task_id: Uuid,
+		kind: TaskKind,
+	},
+	TaskDeleted {
+		task_id: TaskId,
+	},
+	TaskFailed {
+		task_id: TaskId,
+		error: String,
+	},
+	TaskRequested {
+		request: TaskRequest,
+	},
 	TasksCleared,
-	TaskStarted { task_id: TaskId },
-	TaskStopped { task_id: TaskId },
-	WorkspaceIndexed { duration: u64 },
+	TaskStarted {
+		task_id: TaskId,
+	},
+	TaskStopped {
+		task_id: TaskId,
+	},
+	WorkspaceIndexed {
+		duration: u64,
+	},
 
-	KeyDown { key_code: u16 },
-	KeyUp { key_code: u16 },
-	MouseDown { button: i64, x: f64, y: f64 },
-	MouseUp { button: i64, x: f64, y: f64 },
-	Scroll { vertical: i64, horizontal: i64 },
-	FlagsChanged { key_code: u16 },
-	ModifierChanged { modifiers: ModifierSnapshot },
+	KeyDown {
+		key_code: u16,
+	},
+	KeyUp {
+		key_code: u16,
+	},
+	MouseDown {
+		button: i64,
+		x: f64,
+		y: f64,
+	},
+	MouseUp {
+		button: i64,
+		x: f64,
+		y: f64,
+	},
+	Scroll {
+		vertical: i64,
+		horizontal: i64,
+	},
+	FlagsChanged {
+		key_code: u16,
+	},
+	ModifierChanged {
+		modifiers: ModifierSnapshot,
+	},
 	Sdlc(SdlcEvent),
 	Unknown,
+
+	ActiveAppChanged {
+		name: String,
+		bundle_id: String,
+		pid: u32,
+	},
 }
 
 /// ## [EventSource]

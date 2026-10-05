@@ -459,6 +459,14 @@ impl MacosHid {
 					"🔥 HOTKEY TRIGGERED"
 			);
 		}
+		// events.emit(event.into());
+		// Only publish native events that Estate cares about.
+		// if let Some(event) = event.into_event() {
+		// 	events.emit(event);
+		// }
+		if let Ok(event) = event.try_into() {
+			events.emit(event);
+		}
 		// let latency = received_at.saturating_sub(event.sent_at);
 		// self.log_native_event(&event);
 		// for action in self.observe_event(&event) {

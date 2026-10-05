@@ -1570,6 +1570,14 @@ if enableCGEventTap {
     type,
     event,
     userInfo in
+    // print(
+    //   "🍎 CGEVENT RAW | "
+    //     + "type=\(type.rawValue) "
+    //     + "keyCode=\(event.getIntegerValueField(.keyboardEventKeycode)) "
+    //     + "flags=0x\(String(event.flags.rawValue, radix: 16)) "
+    //     + "timestamp=\(event.timestamp)"
+    // )
+    fflush(stdout)
     let receivedAt = DispatchTime.now().uptimeNanoseconds
     let eventTimestamp = event.timestamp
     // print(
@@ -1580,6 +1588,7 @@ if enableCGEventTap {
     //     + "receivedAt=\(receivedAt)"
     // )
     fflush(stdout)
+    
     let code = event.getIntegerValueField(
       .keyboardEventKeycode
     )
@@ -1608,7 +1617,6 @@ if enableCGEventTap {
     // MARK: Modifier
 
     case .flagsChanged:
-      // Only normalize actual modifier keys.
       guard watchedKeyCodes.contains(CGKeyCode(code)) else {
         if enableEventLogging {
           print(
@@ -1646,21 +1654,18 @@ if enableCGEventTap {
           on: estateClientFD
         )
       }
-    // 54  right command
-    // 55  left command
-    // 56  left shift
-    // 57  caps lock
-    // 58  left option
-    // 59  left control
-    // 60  right shift
-    // 61  right option
-    // 62  right control
-    // 63  fn
+
     // MARK: Key Down
     case .keyDown:
-
       let name = keyName(code)
-
+      
+      // print(
+      //   "🔑 CGEVENT KEY DOWN | "
+      //     + "key=\(name) "
+      //     + "code=\(code) "
+      //     + "eventTS=\(event.timestamp) "
+      //     + "receivedAt=\(receivedAt)"
+      // )
       let nativeEvent = makeEvent(
         event,
         type: type,

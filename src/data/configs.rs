@@ -27,6 +27,7 @@ pub static INTRINSIC_FILES: [&str; 3] = ["default.settings.json", "settings.json
 pub static MARKDOWN: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/src/data/corpus.md");
 pub static PATH_PID: &str = "/tmp/estate-daemon.pid";
 pub static PATH_SOCKET: &str = "/tmp/estate-daemon.sock";
+pub static ESTATE_SOCKET: &str = "/tmp/estate.sock";
 pub static PIPELINE_DIAGRAM: &str =
 	concat!(env!("CARGO_MANIFEST_DIR"), "/estate/1-estate-diagram.md");
 
