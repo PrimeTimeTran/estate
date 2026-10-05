@@ -35,21 +35,7 @@ fn parse_args() -> Result<Args> {
 use estate::macros::*;
 #[tokio::main]
 async fn main() -> Result<()> {
-	// 1. awe! — Section arm
-	awe!("AGENT");
-
-	// 2. awe! — Debug-value arm
-	let count = 42;
-	awe!(Info, count);
-
-	// 3. awe! — Formatted-message arm
-	awe!(Info, "Agent started with {} files", count);
-
-	// 4. section! — Section macro
-	section!("WORKSPACE");
-
 	let args = parse_args()?;
-	println!("native: {}", args.native);
 	let (_bus, runtime, _event_rx) = new_agent_system();
 	let generator = LocalGenerator::new(runtime, "qwen3:8b");
 	run_prompt_files(&generator, &args.prompts).await?;

@@ -94,7 +94,7 @@ fn persist_evaluation(
 		StageStatus::NeedsRevision
 	};
 	let record = StageRecord {
-		description: Some(String::from("Evaluation done")),
+		description: Some(String::from("Evaluation Complete")),
 		actor: evaluation.actor.clone(),
 		attempt,
 		evaluation: Some(evaluation.clone()),
@@ -105,19 +105,6 @@ fn persist_evaluation(
 	};
 	let time_started = evaluation.time_started;
 	let time_completed = Utc::now();
-	// let record = StageRecord {
-	// 	stage: evaluation.stage,
-	// 	attempt: Attempt::new(),
-	// 	status,
-	// 	actor: evaluation.actor.clone(),
-	// 	description: Some("Evaluation done".into()),
-	//
-	// 	time_started: time_readable(time_started),
-	// 	time_completed: Some(time_readable(time_completed)),
-	// 	time_total: duration_readable(time_completed - time_started),
-	//
-	// 	evaluation: Some(evaluation.clone()),
-	// };
 	session.stages.push(record);
 	session.time_updated = Utc::now();
 	Ok(())
@@ -409,7 +396,6 @@ mod enums {
 			attempt: Attempt,
 			error: anyhow::Error,
 		},
-
 		EvaluationFailed {
 			execution: StageExecution,
 			error: anyhow::Error,
@@ -1417,6 +1403,18 @@ pub mod structs {
 	pub struct WorkspaceSnapshot {
 		pub git_status: String,
 	}
+	impl WorkspaceSnapshot {
+    pub fn to_markdown(&self) -> String {
+        format!(
+            "## Workspace\n\n\
+             ### Git Status\n\n\
+             ```text\n\
+             {}\n\
+             ```\n",
+            self.git_status
+        )
+    }
+	}
 	#[derive(Debug, Clone)]
 	pub struct WorkspaceChanges {
 		pub git_status: String,
@@ -2178,7 +2176,11 @@ impl ArtifactGenerator for LocalGenerator {
 	// cargo run --bin sanity-tests -- --native src/bin/sanity-tests/tools-host-env
 	async fn run_agent(&self, prompt: &str) -> Result<String> {
 		let task = AgentTask::new(prompt.to_string());
-		let result = self.runtime.run_agent(task).await?;
+		let result = self
+			.runtime
+			.run_agent(task)
+			// .run_agent_with_sdlc(task, Path::new("/Users/future/kb/project/crates/estate/log/"))
+			.await?;
 		Ok(
 			result
 				.chat
@@ -3552,7 +3554,6 @@ impl traits::Runner for SprintRunner<'_> {
 		let mut pending_input = None;
 		let mut stage = self.load_state().context("load_state")?;
 
-		println!("hi loi its going to be a ciontunej {}", stage);
 		let mut attempt_number = 0;
 		self.emit(SdlcEvent::RunStarted);
 		loop {
@@ -3630,8 +3631,7 @@ impl SprintRunner<'_> {
 		let path = SpecialFile::SdlcCurrent.path()?;
 		tracing::info!(">>> load_state path = {:?}", path);
 		tracing::info!(">>> exists = {}", path.exists());
-		let json = std::fs::read_to_string(&path)
-			.with_context(|| format!("reading {:?}", path))?;
+		let json = std::fs::read_to_string(&path).with_context(|| format!("reading {:?}", path))?;
 		tracing::info!(">>> loaded state = {}", json);
 		#[derive(serde::Deserialize)]
 		struct PersistedStage {
@@ -3673,33 +3673,6 @@ impl SprintRunner<'_> {
 		Ok(semantic.with_evaluations(structural))
 	}
 
-	async fn evaluate_execution(
-		&mut self,
-		execution: StageExecution,
-		attempt: Attempt,
-	) -> Result<StageOutcome> {
-		let stage = execution.stage;
-		self.emit(SdlcEvent::PhaseChanged {
-			phase: SdlcPhase::Evaluating,
-		});
-		self.emit(SdlcEvent::EvaluationStarted { stage });
-		match self.pipeline.evaluate(&execution).await {
-			Ok(evaluation) => {
-				self.emit(SdlcEvent::Evaluated {
-					stage,
-					score: evaluation.score,
-					confidence: evaluation.confidence,
-					passed: evaluation.passed,
-				});
-				self.pipeline.persist_evaluation(&evaluation, attempt);
-				Ok(StageOutcome::Complete {
-					execution,
-					evaluation,
-				})
-			}
-			Err(error) => Ok(StageOutcome::EvaluationFailed { execution, error }),
-		}
-	}
 	async fn stage_intent(&mut self) -> Result<StageResult> {
 		let (stage, session_dir, goal) = {
 			let session = self
@@ -3784,8 +3757,8 @@ impl SprintRunner<'_> {
 		if prompt.trim().is_empty() {
 			return Err(anyhow!("generated Plan prompt is empty"));
 		}
-		std::fs::write("/tmp/estate-plan-prompt.md", &prompt)
-			.context("writing Plan prompt debug file")?;
+		// std::fs::write("/tmp/estate-plan-prompt.md", &prompt)
+		// 	.context("writing Plan prompt debug file")?;
 		let generated = self.pipeline.generator.generate(&prompt).await?;
 		if generated.trim().is_empty() {
 			return Err(anyhow!("generated Plan artifact is empty"));
@@ -3795,63 +3768,100 @@ impl SprintRunner<'_> {
 		Ok(StageResult::Plan)
 	}
 	async fn stage_build(&mut self) -> Result<StageResult> {
-		let (stage, session_dir) = {
+		let (stage, session_dir, workspace) = {
 			let session = self
 				.pipeline
 				.session
 				.as_ref()
 				.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
 
-			(session.stage.clone(), session.dir.clone())
+			(
+				session.stage.clone(),
+				session.dir.clone(),
+				session.workspace().to_path_buf(),
+			)
 		};
+
 		if stage != Stage::Build {
 			return Err(anyhow::anyhow!(
 				"cannot execute Build stage while at {:?}",
 				stage
 			));
 		}
+
 		self.pipeline.persist_progress("Build started")?;
-		let workspace = self
-			.pipeline
-			.session
-			.as_ref()
-			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?
-			.workspace()
-			.to_path_buf();
+
+		let plan = tokio::fs::read_to_string(session_dir.join("plan.md"))
+			.await
+			.context("reading plan.md")?;
+
+		let steps = build_steps();
+
 		let workspace_before = WorkspaceSnapshot::capture(&workspace)?;
 
-		let task = AgentTask::new(
-			"Implement the software described by the SDLC intent, specification,
-			and plan.
+		for (index, instruction) in steps.iter().enumerate() {
+			let step = index + 1;
 
-			You are in the BUILD stage.
+			self.pipeline.persist_progress(&format!(
+				"Build step {}/{}: {}",
+				step,
+				steps.len(),
+				instruction
+			))?;
 
-			Inspect the workspace using the available tools before making changes.
+			// Rebuild context before EVERY agent call.
+			//
+			// This is important because the workspace has changed since
+			// the previous call.
+			let current_workspace = WorkspaceSnapshot::capture(&workspace)?;
 
-			Implement the planned functionality by:
-			- creating required files,
-			- modifying existing source files,
-			- modifying configuration when required,
-			- adding appropriate tests,
-			- running relevant formatting, compilation, linting, and test commands,
-			- fixing errors discovered during implementation.
-			- respond with CODE ONLY. Do not response with markdown wrapping code blocks like literal ```
-			- write directly to the files. Do not
+			let workspace_context = format!(
+				"CWD: {}\nFILES:\n{}",
+				workspace.display(),
+				current_workspace.to_markdown()
+			);
 
-			Do not merely describe an implementation. Perform the work in the
-			workspace.
+			let prompt = build_step_prompt(instruction, step, steps.len(), &plan, &workspace_context);
+			let task = AgentTask::new(prompt);
+			let result = self.pipeline.generator.run_agent(&task.prompt).await?;
 
-			Use the existing project structure and conventions whenever possible.
+			// Persist what happened during this build step.
+			let step_path = session_dir.join(format!("build-step-{step:02}.md"));
 
-			When implementation is complete, verify the result using the most
-			relevant available commands."
-				.into(),
-		);
+			SprintPipeline::write(
+				step_path,
+				format!(
+					"# Build Step {step}/{total}\n\n\
+                 ## Task\n\n\
+                 {instruction}\n\n\
+                 ## Result\n\n\
+                 {result:?}\n",
+					total = steps.len(),
+				),
+			)?;
 
-		let result = self.pipeline.generator.run_agent(&task.prompt).await?;
+			// Give JEV / the next iteration a fresh view of the workspace.
+			//
+			// Don't carry the original workspace snapshot forward.
+			// The agent just changed it.
+			let after_step = WorkspaceSnapshot::capture(&workspace)?;
+
+			self.pipeline.persist_progress(&format!(
+				"Build step {}/{} completed: {} file(s) changed",
+				step,
+				steps.len(),
+				after_step.diff(&workspace_before).file_count(),
+			))?;
+		}
+
 		let workspace_after = WorkspaceSnapshot::capture(&workspace)?;
 		let changes = workspace_before.diff(&workspace_after);
-		SprintPipeline::write(session_dir.join("build.md"), changes.to_markdown(&result))?;
+
+		SprintPipeline::write(
+			session_dir.join("build.md"),
+			changes.to_markdown("Build completed"),
+		)?;
+
 		self.pipeline.persist_progress(&format!(
 			"Build completed: {} file(s) changed",
 			changes.file_count()
@@ -3903,8 +3913,7 @@ impl SprintRunner<'_> {
 		self.emit(SdlcEvent::PhaseChanged {
 			phase: SdlcPhase::Evaluating,
 		});
-
-		self.evaluate_execution(execution, attempt).await
+		self.handle_evaluation(execution, attempt).await
 	}
 	async fn run_current_stage(
 		&mut self,
@@ -4148,6 +4157,40 @@ impl SprintRunner<'_> {
 
 		self.pipeline.retry(stage)?;
 		Ok(())
+	}
+	async fn handle_evaluation(
+		&mut self,
+		execution: StageExecution,
+		attempt: Attempt,
+	) -> Result<StageOutcome> {
+		let stage = execution.stage;
+		self.emit(SdlcEvent::PhaseChanged {
+			phase: SdlcPhase::Evaluating,
+		});
+		self.emit(SdlcEvent::EvaluationStarted { stage });
+		match self.pipeline.evaluate(&execution).await {
+			Ok(evaluation) => {
+				self.emit(SdlcEvent::Evaluated {
+					stage,
+					score: evaluation.score,
+					confidence: evaluation.confidence,
+					passed: evaluation.passed,
+				});
+				self.pipeline.persist_evaluation(&evaluation, attempt);
+				if evaluation.passed {
+					Ok(StageOutcome::Complete {
+						execution,
+						evaluation,
+					})
+				} else {
+					Ok(StageOutcome::NeedsRevision {
+						execution,
+						evaluation,
+					})
+				}
+			}
+			Err(error) => Ok(StageOutcome::EvaluationFailed { execution, error }),
+		}
 	}
 	async fn handle_revision(
 		&mut self,
@@ -4523,5 +4566,92 @@ impl WorkspaceSnapshot {
 		WorkspaceChanges {
 			git_status: after.git_status.clone(),
 		}
+	}
+}
+
+fn build_steps() -> Vec<&'static str> {
+	vec![
+		"Read plan.md and identify the files that must be created or modified.",
+		"Inspect the relevant existing files and repository structure for the files identified by the plan.",
+		"Create the planned files and establish their basic structure.",
+		"Implement the planned functionality in the files created or modified so far.",
+		"Inspect the implementation and compare it against the specification and plan.",
+		"Add the planned unit and integration tests.",
+		"Run the relevant tests and verification commands.",
+		"Inspect any failures and determine what implementation changes are required.",
+		"Fix the implementation or tests based on the failures and rerun verification.",
+		"Review the completed implementation against the plan and identify any remaining work.",
+	]
+}
+fn build_step_prompt(
+	instruction: &str,
+	step: usize,
+	total: usize,
+	plan: &str,
+	workspace: &str,
+) -> String {
+	format!(
+		r#"
+You are executing BUILD STEP {step}/{total}.
+
+YOUR CURRENT TASK:
+{instruction}
+
+---
+
+IMPLEMENTATION PLAN:
+{plan}
+
+---
+
+CURRENT WORKSPACE:
+{workspace}
+
+---
+
+RULES:
+
+- Perform the work directly in the workspace.
+- Inspect files before modifying them.
+- Do not merely describe what should be done.
+- Complete only the current build step.
+- Preserve existing project conventions.
+- Do not undo correct work from previous steps.
+- Use run_command when inspection, file creation, editing, or verification is required.
+- When this step is complete, stop.
+"#,
+	)
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn build_steps_are_small_and_sequential() {
+		let steps = build_steps();
+
+		assert!(!steps.is_empty());
+
+		assert!(steps[0].contains("plan.md"));
+		assert!(steps[1].contains("Inspect"));
+		assert!(steps.iter().any(|s| s.contains("tests")));
+		assert!(steps.iter().any(|s| s.contains("failures")));
+		assert!(steps.last().unwrap().contains("remaining work"));
+	}
+
+	#[test]
+	fn build_step_prompt_contains_step_and_context() {
+		let prompt = build_step_prompt(
+			"Read plan.md and identify the files that must be created or modified.",
+			1,
+			10,
+			"Plan says to create hello-world.js.",
+			"CWD: /project\nFILES:\nhello-world.js",
+		);
+
+		assert!(prompt.contains("BUILD STEP 1/10"));
+		assert!(prompt.contains("hello-world.js"));
+		assert!(prompt.contains("Plan says"));
 	}
 }

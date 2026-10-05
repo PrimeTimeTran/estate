@@ -22,8 +22,9 @@ pub static JSON_PROMPT: &str = r#"
 "#;
 
 pub static ACTION_PROMPT: &str = r#"
-  You are an agent that MUST output a single JSON object.
+  You are an agent that MUST output exactly one JSON object.
   Your job is to choose the next action based on the context.
+
   ---
   USER REQUEST:
   {}
@@ -41,33 +42,59 @@ pub static ACTION_PROMPT: &str = r#"
   ---
 
   RULES:
-  - Output ONLY valid JSON
-  - No markdown
-  - No explanation
-  - No extra keys
+  - Output ONLY one valid JSON object.
+  - The first character of your response must be `{`.
+  - The last character of your response must be `}`.
+  - Do NOT output markdown.
+  - Do NOT output code fences.
+  - Do NOT output labels such as `RUN_COMMAND:`.
+  - Do NOT output an explanation.
+  - Do NOT output any text before or after the JSON object.
+  - Do NOT add extra JSON keys.
+  - The JSON `action` value MUST be lowercase.
+  - Valid action values are ONLY `run_command` and `finish`.
 
   ---
 
-  YOU MUST OUTPUT ONE OF THESE FORMS:
+  VALID OUTPUT FOR RUN_COMMAND:
 
-  1. Read file:
-  RUN_COMMAND:
   {
     "action": "run_command",
     "command": "command and arguments"
   }
 
-  2. Finish:
-  {{
-      "action": "finish",
-      "message": "done"
-  }}
+  IMPORTANT:
+  - `run_command` is the exact JSON action value.
+  - `RUN_COMMAND` is NOT a valid JSON action value.
+  - NEVER output `"action": "RUN_COMMAND"`.
+  - NEVER write `RUN_COMMAND:` before the JSON.
+  - When you need to execute a command, output ONLY the JSON object above.
+
+  ---
+
+  VALID OUTPUT FOR FINISH:
+
+  {
+    "action": "finish",
+    "message": "done"
+  }
+
+  IMPORTANT:
+  - `finish` is the exact JSON action value.
+  - Output ONLY the JSON object.
+  - Do not write `FINISH:` before the JSON.
+
+  ---
+
+  COMMAND RULES:
 
   - When creating or appending exact file contents, prefer printf.
   - Do NOT use echo -e.
   - Preserve the requested newlines exactly.
   - Keep multi-line text inside a properly quoted shell argument.
+  - If a command must contain multiple shell operations, put the complete command in the `command` string.
 "#;
+
 
 pub static SYSTEM_PROMPT: &str = r#"
   You are an intelligent file system assistant. You must always respond with a valid JSON object that matches one of these structures:

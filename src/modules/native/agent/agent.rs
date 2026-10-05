@@ -346,7 +346,6 @@ impl Agent {
 					println!("exit: {:?}", result.exit_code);
 					println!("stdout: {}", result.stdout);
 					println!("stderr: {}", result.stderr);
-					println!("====================");
 
 					ctx.history.push(AgentObservation::RunCommand { result });
 				}

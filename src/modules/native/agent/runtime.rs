@@ -13,6 +13,17 @@ pub struct AgentRuntime {
 	pub registry: AgentRegistry,
 }
 impl AgentRuntime {
+  pub async fn run_agent_with_sdlc(
+		&self,
+		task: AgentTask,
+		sdlc_dir: impl AsRef<std::path::Path>,
+	) -> Result<TaskResult> {
+		let agent = Agent::with_cwd(sdlc_dir.as_ref().to_path_buf());
+ 
+		agent
+			.run_agent_loop(task, self.event_tx.clone())
+			.await
+	}
 	pub async fn run_agent(&self, task: AgentTask) -> Result<TaskResult> {
 		// Start completely fresh.
 		// let agent = Agent::new()
