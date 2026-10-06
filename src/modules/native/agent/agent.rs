@@ -30,117 +30,6 @@ pub enum AgentAction {
 	Context,
 }
 
-fn build_prompt(ctx: &AgentContext) -> String {
-	let workspace = format_workspace(&ctx.workspace);
-	let history = format_history(&ctx.history);
-	let prompt = build_sys_action(
-		ACTION_PROMPT_EXECUTION,
-		&[&ctx.prompt, &workspace, &history],
-	);
-	section!("BUILT PROMPT");
-	println!(
-		"prompt ({} lines, {} chars):\n{}",
-		prompt.lines().count(),
-		prompt.len(),
-		preview_lines(&prompt, PROMPT_PREVIEW_LINES)
-	);
-	prompt
-}
-
-async fn build_action(prompt: &str) -> Result<LlmAction> {
-	let client = reqwest::Client::new();
-	let system_prompt: &str = JSON_PROMPT_EXECUTION;
-	let payload = serde_json::json!({
-			"model": "qwen3:8b",
-			"system": system_prompt,
-			"prompt": prompt,
-			"stream": false,
-			"format": "json"
-	});
-	let res = client
-		.post(crate::AGENT_GEN_URL)
-		.json(&payload)
-		.send()
-		.await?
-		.json::<serde_json::Value>()
-		.await?;
-	let response = res["response"].as_str().unwrap_or("");
-	let action: serde_json::Value = serde_json::from_str(response)?;
-	println!(
-		"action choice   {}",
-		action["message"].as_str().unwrap_or("")
-	);
-	let response_text = res["response"].as_str().unwrap_or("{}");
-	let raw: LlmAction = serde_json::from_str(response_text)?;
-	Ok(raw)
-}
-pub fn format_workspace(workspace: &WorkspaceContext) -> String {
-	let mut output = String::new();
-
-	output.push_str(&format!("CWD: {}\n", workspace.cwd.to_string_lossy()));
-
-	if workspace.files.is_empty() {
-		output.push_str("FILES: none discovered\n");
-	} else {
-		output.push_str("FILES:\n");
-
-		for file in &workspace.files {
-			output.push_str(&format!("- {}\n", file.path));
-		}
-	}
-
-	output
-}
-fn format_history(history: &[AgentObservation]) -> String {
-	if history.is_empty() {
-		return "No actions have been performed yet.".into();
-	}
-
-	let mut output = String::new();
-
-	for (index, observation) in history.iter().enumerate() {
-		output.push_str(&format!("{}. {:?}\n", index + 1, observation));
-	}
-
-	output
-}
-pub async fn prompt_chat(ctx: &AgentContext) -> Result<String> {
-	let prompt = structured_prompt_chat(ctx);
-	let result = ollama_generate(&prompt, None, false).await?;
-	Ok(result)
-}
-pub async fn prompt_ollama_json<T>(prompt: &str) -> Result<T>
-where
-	T: DeserializeOwned,
-{
-	let result = ollama_generate(prompt, Some("You are a helpful assistant"), true).await?;
-	Ok(serde_json::from_str(&result)?)
-}
-pub async fn ollama_generate(prompt: &str, system: Option<&str>, json: bool) -> Result<String> {
-	let client = reqwest::Client::new();
-	let mut payload = serde_json::json!({
-			"model": "qwen3:8b",
-			"prompt": prompt,
-			"stream": false,
-	});
-	if let Some(sys_msg) = system {
-		payload["system"] = serde_json::json!(sys_msg);
-	}
-	if json {
-		payload["format"] = serde_json::json!("json");
-	}
-	let response = client
-		.post(crate::AGENT_GEN_URL)
-		.json(&payload)
-		.send()
-		.await?;
-	let res: serde_json::Value = response.json().await?;
-	res["response"]
-		.as_str()
-		.map(|s| s.to_string())
-		.ok_or_else(|| anyhow!("Failed to parse response field from Ollama"))
-}
-
 impl Agent {
 	pub fn new() -> Self {
 		Self {
@@ -158,12 +47,19 @@ impl Agent {
 	}
 	pub fn with_cwd(cwd: impl Into<PathBuf>) -> Self {
 		let workspace = WorkspaceContext::from_cwd(cwd);
-
 		Self {
 			id: uuid::Uuid::new_v4().to_string(),
 			tools: AgentTools::default(),
 			workspace: Arc::new(workspace),
 		}
+	}
+	pub fn with_ctx(ctx: AgentContext, session: &SdlcSession) -> Result<Self> {
+		let workspace = WorkspaceContext::from_sdlc_session(session)?;
+		Ok(Self {
+			id: uuid::Uuid::new_v4().to_string(),
+			tools: AgentTools::default(),
+			workspace: Arc::new(workspace),
+		})
 	}
 }
 
@@ -210,6 +106,14 @@ impl AgentContext {
 			spawned_tasks: Vec::new(),
 		})
 	}
+	// pub fn from_session(session: &SdlcSession) -> Result<Self> {
+	// let ws = WorkspaceContext::from_session(session)?;
+	// Ok(Self {
+	// id: uuid::Uuid::new_v4().to_string(),
+	// tools: AgentTools::default(),
+	// workspace: Arc::new(ws),
+	// })
+	// }
 }
 
 fn preview(value: impl std::fmt::Debug, max_len: usize) -> String {
@@ -387,9 +291,6 @@ impl Agent {
 		let action = AgentAction::try_from(raw)?;
 		Ok(action)
 	}
-	async fn from_session(session: &Session) -> Result<Agent> {
-		todo!("from_session")
-	}
 }
 impl TryFrom<LlmAction> for AgentAction {
 	type Error = Error;
@@ -455,21 +356,6 @@ pub struct LlmAction {
 #[derive(Debug, Deserialize)]
 pub struct LlmMode {
 	pub mode: String,
-}
-
-pub fn structured_prompt_chat(ctx: &AgentContext) -> String {
-	format!(
-		r#"
-			You are a helpful assistant.
-			User request:
-			{}
-			History:
-			{}
-			Respond normally. No JSON. Just text.
-		"#,
-		ctx.prompt,
-		format_history(&ctx.history)
-	)
 }
 
 pub struct AgentContextInfo {

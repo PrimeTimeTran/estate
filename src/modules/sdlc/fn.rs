@@ -1,3 +1,5 @@
+use anyhow::bail;
+
 use super::*;
 
 pub fn git_status() -> Result<String> {
@@ -138,6 +140,50 @@ where
 	}
 }
 
+pub fn _build_steps() -> Vec<BuildStep> {
+	vec![
+		BuildStep::new(
+			"Read plan.md and identify the files that must be created or modified.",
+			"All planned files and their intended locations are identified.",
+		),
+		BuildStep::new(
+			"Inspect the relevant existing files and repository structure for the files identified by the plan.",
+			"Relevant existing files have been inspected and their current state is understood.",
+		),
+		BuildStep::new(
+			"Create the planned files and establish their basic structure.",
+			"Every planned file exists at its planned path.",
+		),
+		BuildStep::new(
+			"Implement the planned functionality in the files created or modified so far.",
+			"The planned functionality is implemented in the correct files.",
+		),
+		BuildStep::new(
+			"Inspect the implementation and compare it against the specification and plan.",
+			"The implementation has been checked against the specification and plan.",
+		),
+		BuildStep::new(
+			"Add the planned unit and integration tests.",
+			"All planned tests exist at their intended paths.",
+		),
+		BuildStep::new(
+			"Run the relevant tests and verification commands.",
+			"The relevant tests and verification commands have been executed.",
+		),
+		BuildStep::new(
+			"Inspect any failures and determine what implementation changes are required.",
+			"Each failure has been understood and a corrective action has been identified.",
+		),
+		BuildStep::new(
+			"Fix the implementation or tests based on the failures and rerun verification.",
+			"Previously failing verification now passes, or the remaining failure is explicitly understood.",
+		),
+		BuildStep::new(
+			"Review the completed implementation against the plan and identify any remaining work.",
+			"No required work from the plan remains incomplete.",
+		),
+	]
+}
 pub fn build_steps() -> Vec<&'static str> {
 	vec![
 		"Read plan.md and identify the files that must be created or modified.",
@@ -189,5 +235,167 @@ pub fn build_step_prompt(
       - Use run_command when inspection, file creation, editing, or verification is required.
       - When this step is complete, stop.
     "#,
+	)
+}
+
+fn verify_created_files(plan: &BuildPlan, workspace: &WorkspaceContext) -> Result<()> {
+	for file in &plan.files {
+		let path = workspace.cwd.join(&file.path);
+
+		if !path.exists() {
+			bail!("planned file does not exist: {}", path.display());
+		}
+	}
+
+	Ok(())
+}
+
+#[derive(Debug, Clone)]
+pub struct BuildStep {
+	pub instruction: &'static str,
+	pub completion: &'static str,
+}
+
+impl BuildStep {
+	pub const fn new(instruction: &'static str, completion: &'static str) -> Self {
+		Self {
+			instruction,
+			completion,
+		}
+	}
+}
+//
+// pub fn build_step_prompt(
+// 	step: &BuildStep,
+// 	index: usize,
+// 	total: usize,
+// 	plan: &str,
+// 	workspace: &str,
+// ) -> String {
+// 	format!(
+// 		r#"
+// You are executing BUILD STEP {}/{}.
+//
+// CURRENT TASK:
+// {}
+//
+// COMPLETION CONDITION:
+// {}
+//
+// ---
+//
+// IMPLEMENTATION PLAN:
+// {}
+//
+// ---
+//
+// CURRENT WORKSPACE:
+// {}
+//
+// ---
+//
+// RULES:
+//
+// - Perform the work directly in the workspace.
+// - Inspect files before modifying them.
+// - Do not merely describe what should be done.
+// - Complete only the current build step.
+// - Preserve existing project conventions.
+// - Do not undo correct work from previous steps.
+// - Use run_command when inspection, file creation, editing, or verification is required.
+// - Before considering this step complete, verify the completion condition using actual evidence.
+// - Do not assume work succeeded because a command was issued.
+// - When this step is complete, stop.
+// "#,
+// 		index,
+// 		total,
+// 		step.instruction,
+// 		step.completion,
+// 		plan,
+// 		workspace,
+// 	)
+// }
+//
+#[derive(Debug, Clone)]
+pub struct BuildPlan {
+	pub goal: String,
+	pub files: Vec<BuildFile>,
+	pub steps: Vec<BuildStep>,
+}
+
+#[derive(Debug, Clone)]
+pub struct BuildFile {
+	pub path: PathBuf,
+	pub action: BuildFileAction,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum BuildFileAction {
+	Create,
+	Modify,
+}
+impl BuildPlan {
+	pub fn new(goal: impl Into<String>, steps: Vec<BuildStep>) -> Self {
+		Self {
+			files: vec![],
+			goal: goal.into(),
+			steps,
+		}
+	}
+	pub fn len(&self) -> usize {
+		self.steps.len()
+	}
+	pub fn is_empty(&self) -> bool {
+		self.steps.is_empty()
+	}
+	pub fn step(&self, index: usize) -> Option<&BuildStep> {
+		self.steps.get(index)
+	}
+}
+pub fn build_plan() -> BuildPlan {
+	BuildPlan::new(
+		"Implement the requested functionality according to the specification and plan.",
+		vec![
+			BuildStep::new(
+				"Read plan.md and identify the files that must be created or modified.",
+				"All planned files and their intended locations are identified.",
+			),
+			BuildStep::new(
+				"Inspect the relevant existing files and repository structure for the files identified by the plan.",
+				"The relevant existing files and repository structure have been inspected.",
+			),
+			BuildStep::new(
+				"Create the planned files and establish their basic structure.",
+				"Every planned file exists at its intended path.",
+			),
+			BuildStep::new(
+				"Implement the planned functionality in the files created or modified so far.",
+				"The planned functionality is implemented in the intended files.",
+			),
+			BuildStep::new(
+				"Inspect the implementation and compare it against the specification and plan.",
+				"The implementation has been checked against the specification and plan.",
+			),
+			BuildStep::new(
+				"Add the planned unit and integration tests.",
+				"All planned tests have been created at their intended paths.",
+			),
+			BuildStep::new(
+				"Run the relevant tests and verification commands.",
+				"The relevant tests and verification commands have actually been executed and their results are recorded.",
+			),
+			BuildStep::new(
+				"Inspect any failures and determine what implementation changes are required.",
+				"Each failure has been understood and a corrective action has been identified.",
+			),
+			BuildStep::new(
+				"Fix the implementation or tests based on the failures and rerun verification.",
+				"Previously failing verification passes, or any remaining failure is explicitly understood.",
+			),
+			BuildStep::new(
+				"Review the completed implementation against the plan and identify any remaining work.",
+				"No required work from the plan remains incomplete.",
+			),
+		],
 	)
 }

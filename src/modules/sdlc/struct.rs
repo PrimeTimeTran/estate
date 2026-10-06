@@ -144,7 +144,6 @@ pub struct SprintPipeline {
 	pub generator: Box<dyn ArtifactGenerator>,
 	pub session: SdlcSession,
 	pub state_path: PathBuf,
-	// pub event_tx: broadcast::Sender<SdlcEvent>,
 	pub event_tx: broadcast::Sender<SdlcEvent>,
 	pub stage_attempt: u32,
 }

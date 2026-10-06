@@ -23,32 +23,24 @@ pub struct FileInfo {
 impl FileInfo {
 	pub fn from_path(path: &Path) -> Result<Self> {
 		let metadata = std::fs::symlink_metadata(path)?;
-
 		let is_directory = metadata.is_dir();
-
 		let content = if metadata.is_file() {
 			std::fs::read_to_string(path).unwrap_or_default()
 		} else {
 			String::new()
 		};
-
 		let extension = path
 			.extension()
 			.and_then(|ext| ext.to_str())
 			.map(String::from);
-
 		let name = path
 			.file_name()
 			.and_then(|name| name.to_str())
 			.unwrap_or_default()
 			.to_string();
-
 		let path = path.to_string_lossy().into_owned();
-
 		let inode = metadata.ino().to_string();
-
 		let language = extension.as_deref().and_then(language_from_extension);
-
 		Ok(Self {
 			content,
 			extension,

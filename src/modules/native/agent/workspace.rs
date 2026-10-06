@@ -1,29 +1,6 @@
 use crate::native::agent::FileInfo;
 use crate::prelude::*;
 
-pub fn format_workspace(workspace: &WorkspaceContext) -> String {
-	let mut output = String::new();
-	output.push_str(&format!("CWD: {}\n", workspace.cwd.display()));
-	if workspace.files.is_empty() {
-		output.push_str("FILES: none discovered\n");
-	} else {
-		output.push_str("FILES:\n");
-		for file in &workspace.files {
-			output.push_str(&format!("- {}\n", file.path));
-		}
-	}
-	output
-}
-fn format_history(history: &[AgentObservation]) -> String {
-	if history.is_empty() {
-		return "No actions have been performed yet.".into();
-	}
-	let mut output = String::new();
-	for (index, observation) in history.iter().enumerate() {
-		output.push_str(&format!("{}. {:?}\n", index + 1, observation));
-	}
-	output
-}
 #[derive(Debug, Clone)]
 pub struct WorkspaceContext {
 	pub files: Vec<FileInfo>,
@@ -73,6 +50,23 @@ impl WorkspaceContext {
 			files,
 			cwd: session.dir.clone(),
 		})
+	}
+	pub fn from_sdlc_session(session: &SdlcSession) -> Result<Self> {
+		tracing::info!("from_sdlc_sessionfrom_sdlc_session workspace");
+		let cwd = session.dir.clone();
+		let files = [
+			SessionFile::Intent,
+			SessionFile::Spec,
+			SessionFile::Plan,
+			SessionFile::Progress,
+		]
+		.into_iter()
+		.map(|file| {
+			let path = file.path(&cwd);
+			FileInfo::from_path(&path)
+		})
+		.collect::<Result<Vec<_>>>()?;
+		Ok(Self { cwd, files })
 	}
 	pub fn load() -> anyhow::Result<Self> {
 		Ok(Self {

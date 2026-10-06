@@ -1,3 +1,11 @@
+// | Concept                         | Name           | Meaning                       |
+// | ------------------------------- | -------------- | ----------------------------- |
+// | What needs doing                | `Task`         | Logical unit of work          |
+// | An execution of it              | `Job`          | Concrete background execution |
+// | Oversees them                   | `TaskManager`  | Coordinates tasks/jobs        |
+// | Individual background execution | `Job`          | Has lifecycle/state           |
+// | UI representation               | `Task` / `Job` | Shows pending/running/etc.    |
+
 use notify::{Event, EventKind};
 
 use crate::{
@@ -6,13 +14,14 @@ use crate::{
 	sdlc::SdlcSession,
 };
 
-// | Concept                         | Name           | Meaning                       |
-// | ------------------------------- | -------------- | ----------------------------- |
-// | What needs doing                | `Task`         | Logical unit of work          |
-// | An execution of it              | `Job`          | Concrete background execution |
-// | Oversees them                   | `TaskManager`  | Coordinates tasks/jobs        |
-// | Individual background execution | `Job`          | Has lifecycle/state           |
-// | UI representation               | `Task` / `Job` | Shows pending/running/etc.    |
+mod r#const;
+use r#const::*;
+
+mod fmt;
+use fmt::*;
+
+mod r#fn;
+use r#fn::*;
 
 pub mod agent;
 #[path = "./agent-event.rs"]
@@ -27,12 +36,6 @@ pub mod system;
 pub mod tool;
 pub mod workspace;
 
-mod r#const;
-use r#const::*;
-
-
-mod r#fn;
-use r#fn::*;
 
 use crate::prelude::*;
 pub use agent::*;

@@ -10,6 +10,9 @@ impl ArtifactGenerator for ApiGenerator {
 	async fn run_agent(&self, prompt: &str) -> Result<String> {
 		todo!("API generate")
 	}
+	async fn with_session(&mut self, session: &SdlcSession, prompt: String) -> Result<TaskResult> {
+		todo!("with_session")
+	}
 	fn clone_box(&self) -> Box<dyn ArtifactGenerator> {
 		Box::new(self.clone())
 	}
@@ -62,6 +65,11 @@ impl ArtifactGenerator for LocalGenerator {
 				.or(result.summary)
 				.unwrap_or_else(|| "Agent completed".to_string()),
 		)
+	}
+	async fn with_session(&mut self, session: &SdlcSession, prompt: String) -> Result<TaskResult> {
+		let task = AgentTask::new(prompt.to_string());
+		let result = self.runtime.from_session(task, session).await?;
+		Ok(result)
 	}
 	fn clone_box(&self) -> Box<dyn ArtifactGenerator> {
 		Box::new(self.clone())
@@ -798,6 +806,30 @@ impl PipelineRuntime {
 		sleep(DEMO_COMPLETE_DELAY).await;
 		Ok(())
 	}
+	pub async fn resume_from(
+		&mut self,
+		stage: Stage,
+		input_rx: &mut UnboundedReceiver<SdlcInput>,
+	) -> Result<()> {
+		tracing::info!("resume_from pipeline runtime");
+
+		self.pipeline.resume_from(stage).await?;
+
+		let generator = self.pipeline.generator.as_mut();
+
+		generator
+			.with_session(
+				&self.pipeline.session.clone(),
+				self.pipeline.session.goal.clone(),
+			)
+			.await?;
+
+		let mut runner = SprintRunner {
+			pipeline: &mut self.pipeline,
+		};
+
+		runner.run(input_rx).await.context("SprintRunner::run")
+	}
 	pub fn view(&self) -> PipelineRuntimeView {
 		PipelineRuntimeView {
 			activity: self.activity.clone(),
@@ -1144,6 +1176,7 @@ impl SprintPipeline {
 	}
 	fn persist(&self) -> Result<()> {
 		FS::save(&self.state_path, &self.session)
+		// FS::save(SpecialFile::WriteDir.path()?, &self.session)
 	}
 	fn persist_evaluation(&mut self, evaluation: &StageEvaluation, attempt: Attempt) -> Result<()> {
 		let session = self.session()?;
@@ -1237,13 +1270,19 @@ impl SprintPipeline {
 		self.persist()?;
 		Ok(())
 	}
+	async fn resume_from(&mut self, stage: Stage) -> Result<()> {
+		tracing::info!("resume_from sprintpi pipeline");
+		self.set_stage(stage)?;
+		self.persist_progress(&format!("SDLC session resumed from {stage}"))?;
+		self.persist()?;
+		Ok(())
+	}
 	fn push_stage_record(&mut self, record: StageRecord) -> Result<()> {
 		let session = self.session()?;
 		session.stages.push(record);
 		session.time_updated = Utc::now();
 		self.persist()
 	}
-
 	async fn run_checks(&self, stage: Stage) -> Result<Vec<CheckResult>> {
 		let checks = Self::checks_for(stage);
 		let mut results = Vec::with_capacity(checks.len());
@@ -1279,10 +1318,16 @@ impl SprintPipeline {
 
 		Ok(results)
 	}
-
 	fn retry(&mut self, _stage: Stage) -> Result<()> {
 		Ok(())
 	}
+	pub fn set_stage(&mut self, stage: Stage) -> Result<()> {
+		self.session()?.stage = stage;
+		Ok(())
+	}
+	// fn session(&self) -> Result<&SdlcSession> {
+	// 	Ok(&self.session)
+	// }
 	fn session(&mut self) -> Result<&mut SdlcSession> {
 		Ok(&mut self.session)
 	}
@@ -1623,14 +1668,7 @@ impl sdlc_trait::Runner for SprintRunner<'_> {
 		self.emit(SdlcEvent::RunStarted);
 		loop {
 			let attempt = self.attempt_stage(stage)?;
-			// tracing::info!(
-			// 	stage = ?stage,
-			// 	attempt = attempt.number,
-			// 	max = attempt.max,
-			// 	">>> RUN"
-			// );
 			section!(&format!(" stage = {} , attempt = {}", stage, attempt));
-
 			// 1. Execute the current stage.
 			let outcome = self
 				.run_stage(stage, attempt, &mut pending_input)

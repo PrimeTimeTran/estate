@@ -43,14 +43,31 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 	let use_tui = std::env::var_os("SDLC_TUI").is_some();
 
+	// if !use_tui {
+	// println!(">>> starting runtime");
+	// runtime.run(&mut input_rx).await.context("runtime.run")?;
+	//
+	// println!(">>> runtime finished");
+	// return Ok(());
+	// }
+	let resume_from_build = std::env::var_os("SDLC_RESUME_BUILD").is_some();
+
 	if !use_tui {
 		println!(">>> starting runtime");
-		runtime.run(&mut input_rx).await.context("runtime.run")?;
+
+		if resume_from_build {
+			println!(">>> resuming from Build");
+			runtime
+				.resume_from(Stage::Build, &mut input_rx)
+				.await
+				.context("runtime.resume_from(Build)")?;
+		} else {
+			runtime.run(&mut input_rx).await.context("runtime.run")?;
+		}
 
 		println!(">>> runtime finished");
 		return Ok(());
 	}
-
 	let is_real_run = std::env::var_os("DRY_RUN").is_none();
 
 	let run = async {

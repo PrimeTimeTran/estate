@@ -1,9 +1,9 @@
 use super::*;
 
-const TODO: &'static str = r#"
-		- Question prompt
-		- Add progressive disclosure
-	"#;
+pub const TODO: &'static str = r#"
+	- Question prompt
+	- Add progressive disclosure
+"#;
 
 pub const INTENT_PROMPT: &str = include_str!("../../../ai/template/INITIAL_PROMPT.md");
 pub const PROMPT_FROM_USER: &str = include_str!("../../../ai/template/user.goal.md");
