@@ -109,7 +109,7 @@ impl App<Context> {
 
 		// #[cfg(not(feature = "daemon"))]
 		{
-			let mut renderer = structs::Renderer::<Context, <Context as Ctx>::AppState>::new(
+			let mut renderer = Renderer::<Context, <Context as Ctx>::AppState>::new(
 				self.host.context(),
 				self.state.clone(),
 				Arc::new(self.settings.clone()),

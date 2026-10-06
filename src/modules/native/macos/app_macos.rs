@@ -47,8 +47,8 @@ impl App<Context> {
 		self.host.api()
 	}
 	pub fn run(&mut self) -> Result<()> {
-		self.init_services()?;
-		self.run_gui()?;
+		// self.init_services()?;
+		// self.run_gui()?;
 		if self.mode == AppMode::Daemon {
 			let hid = self.host.start()?;
 			self.workers.push(hid);
@@ -68,7 +68,7 @@ impl App<Context> {
 		self.host.runtime.attach_event_proxy(proxy);
 		// #[cfg(not(feature = "daemon"))]
 		{
-			let mut renderer = structs::Renderer::<Context, <Context as Ctx>::AppState>::new(
+			let mut renderer = Renderer::<Context, <Context as Ctx>::AppState>::new(
 				self.host.context(),
 				self.state.clone(),
 				Arc::new(self.settings.clone()),

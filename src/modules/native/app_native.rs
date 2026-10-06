@@ -153,15 +153,71 @@ impl App<Context> {
 	pub fn api(&self) -> &ApiService {
 		self.host.api()
 	}
+	// pub fn run(&mut self) -> Result<()> {
+	// self.init_services()?;
+	// match self.mode {
+	// AppMode::Gui => self.run_gui(),
+	// AppMode::Tray => self.run_gui(),
+	// AppMode::Daemon => self.run_daemon_foreground(),
+	// }
+	// }
 	pub fn run(&mut self) -> Result<()> {
 		tracing::debug!("App run");
 		self.init_services()?;
-		self.run_gui()?;
-		if self.mode == AppMode::Daemon {
-			let hid = self.host.start()?;
-			self.workers.push(hid);
-			self.init_daemon();
+		match self.mode {
+			AppMode::Daemon => {
+				tracing::info!("Starting daemon mode");
+				let hid = self.host.start()?;
+				self.workers.push(hid);
+				self.init_daemon();
+				self.host.worker.wait_for_ctrl_c();
+			}
+			_ => {
+				self.run_gui()?;
+			}
 		}
+
+		Ok(())
+	}
+	fn run_daemon_foreground(&mut self) -> Result<()> {
+		tracing::debug!("run_daemon");
+		let hid = self.host.start()?;
+		self.workers.push(hid);
+		self.init_daemon();
+		self
+			.worker()
+			.block_on(async { tokio::signal::ctrl_c().await });
+		Ok(())
+	}
+
+	fn run_daemon_2(&mut self) -> Result<()> {
+		tracing::debug!("starting daemon");
+		self.init_services()?;
+		let hid = self.host.start()?;
+		self.workers.push(hid);
+		self.init_daemon();
+		// Stay alive until supervisor terminates us
+		self.host.worker.wait_for_ctrl_c();
+
+		Ok(())
+	}
+
+	pub fn run_daemon(&mut self) -> Result<()> {
+		tracing::debug!("daemon starting");
+		let hid = self.host.start()?;
+		self.workers.push(hid);
+		self.init_daemon();
+		tracing::info!("daemon is alive");
+		self.host.worker.wait_for_shutdown();
+		tracing::info!("daemon shutting down");
+		// macos_create_bg_daemon();
+		Ok(())
+	}
+
+	async fn daemon_loop(&mut self) -> Result<()> {
+		self.host.start()?;
+		self.init_daemon();
+		tokio::signal::ctrl_c().await?;
 		Ok(())
 	}
 	pub fn run_gui(&mut self) -> Result<()> {
@@ -591,3 +647,135 @@ pub struct NativeState {
 	pub menu_bar: Option<MenuBar>,
 	pub tray_clock: Option<MenuBar>,
 }
+
+fn macos_create_bg_daemon() {
+	// nohup /Users/future/kb/project/target/debug/daemon \
+	// >/tmp/estate-daemon.out \
+	// 2>/tmp/estate-daemon.err &
+
+	//
+	// future in project (main●)
+	// $ DAEMON_PID=$!
+	// echo "PID=$DAEMON_PID"
+	// PID=16229
+	//
+	// future in project (main●)
+	// $ ps -p "$DAEMON_PID" -o pid,ppid,state,command
+	// PID  PPID STAT COMMAND
+	// 16229  6760 SN   /Users/future/kb/project/target/debug/daemon
+	//
+
+	// sleep 3
+	// ps -p "$DAEMON_PID" -o pid,ppid,state,command
+
+	// kill it
+	// ps aux | grep '[d]aemon'
+
+	// - Same PID. Still alive
+	// nohup "$(pwd)/target/debug/daemon" \
+	// >/tmp/estate-daemon.out \
+	// 2>/tmp/estate-daemon.err &
+	//
+	// DAEMON_PID=$!
+	//
+	// echo "Estate PID: $DAEMON_PID"
+	// ps -p "$DAEMON_PID" -o pid,ppid,state,command
+
+	// sleep 2
+	// ps -p "$DAEMON_PID" -o pid,ppid,state,command
+
+	// - Errors
+	// cat /tmp/estate-daemon.err
+	// cat /tmp/estate-daemon.out
+
+	// ~/Library/LaunchAgents/com.estate.daemon.plist
+	// - Load It
+	// launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.estate.daemon.plist
+	// - Load It
+	// launchctl print gui/$(id -u)/com.estate.daemon
+	// $ pgrep -af estate
+
+	// $ cat /tmp/estate-daemon.err
+	// $ cat /tmp/estate-daemon.out
+
+	// $ pgrep -af estate
+
+	// launchctl bootout gui/$(id -u)/com.estate.daemon
+	// launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.estate.daemon.plist
+
+	// <?xml version="1.0" encoding="UTF-8"?>
+	// <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+	// <plist version="1.0">
+	// <dict>
+	// <key>Label</key>
+	// <string>com.estate.daemon</string>
+	//
+	// <key>ProgramArguments</key>
+	// <array>
+	// <string>/Users/future/kb/project/target/debug/estate</string>
+	// <string>--daemon</string>
+	// </array>
+	//
+	// <key>RunAtLoad</key>
+	// <true />
+	//
+	// <key>KeepAlive</key>
+	// <true />
+	//
+	// <key>StandardOutPath</key>
+	// <string>/tmp/estate-daemon.out</string>
+	//
+	// <key>StandardErrorPath</key>
+	// <string>/tmp/estate-daemon.err</string>
+	// </dict>
+	// </plist>
+	//
+
+	// CLI Commands
+	//
+	// future in estate (main●)
+	// $ launchctl bootout gui/$(id -u)/com.estate.daemon
+	//
+	//
+	// future in estate (main●)
+	// $ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.estate.daemon.plist
+	//
+	// future in estate (main●)
+	// $ launchctl print gui/$(id -u)/com.estate.daemon | grep -E 'state|active count|pid|last exit'
+	// gui/501/com.estate.daemon = {
+	// active count = 0
+	// path = /Users/future/Library/LaunchAgents/com.estate.daemon.plist
+	// state = spawn scheduled
+	// stdout path = /tmp/estate-daemon.out
+	// stderr path = /tmp/estate-daemon.err
+	// XPC_SERVICE_NAME => com.estate.daemon
+	// last exit code = 2
+	// state = active
+	// active count = 1
+	// name = com.estate.daemon
+	// state = active
+	// active count = 1
+	// name = com.estate.daemon
+	// job state = exited
+	//
+	// pgrep -af daemon
+}
+// nohup /Users/future/kb/project/target/debug/daemon \\n\t>/tmp/estate-daemon.out \\n\t2>/tmp/estate-daemon.err &
+// cat /tmp/estate-daemon.out\ncat /tmp/estate-daemon.err
+// nohup /Users/future/kb/project/target/debug/daemon \\n\t>/tmp/estate-daemon.out \\n\t2>/tmp/estate-daemon.err &
+// ps aux | grep -E '[e]state|[o]s-observer'
+// pkill -f '^/tmp/estate-os-observer$'
+// c
+// ps aux | grep -E '[e]state|[o]s-observer'
+// nohup /Users/future/kb/project/target/debug/daemon \\n\t>/tmp/estate-daemon.out \\n\t2>/tmp/estate-daemon.err &
+// ps aux | grep -E '[e]state|[o]s-observer'
+// nohup /Users/future/kb/project/target/debug/daemon \\n  >/tmp/estate-daemon.out \\n  2>/tmp/estate-daemon.err &\n\nDAEMON_PID=$!\necho "DAEMON PID=$DAEMON_PID"
+// pgrep -af '/target/debug/daemon'\npgrep -af estate-os-observer
+// ps -o pid,ppid,state,command -p "$DAEMON_PID"
+// OBSERVER_PID=$(pgrep -f '^/tmp/estate-os-observer$' | head -1)\nps -o pid,ppid,state,command -p "$OBSERVER_PID"
+// ps -o pid,ppid,state,command -p 32903
+// ps -o pid,ppid,state,command -p 32903,32995
+// ps -axo pid,ppid,state,lstart,command | grep '[e]state-os-observer'
+// ps -o pid,ppid,state,lstart,command -p 32903,34320
+// ps -o pid,ppid,state,lstart,command -p 6760,34320
+// ps -axo pid,ppid,tty,state,command | grep -E '[d]aemon|[e]state-os-observer'

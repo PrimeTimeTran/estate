@@ -1,4 +1,4 @@
-use crate::prelude::{*};
+use crate::prelude::*;
 
 pub enum CargoFeature {
 	Native,
@@ -150,6 +150,7 @@ where
 		Self {
 			runtime: Arc::new(runtime),
 			_phantom: PhantomData,
+			shutdown: CancellationToken::new(),
 		}
 	}
 	#[cfg(target_arch = "wasm32")]
@@ -164,12 +165,14 @@ impl<C> HostWorker<C>
 where
 	C: Ctx,
 {
-	#[cfg(not(feature = "web"))]
-	pub fn wait_for_ctrl_c(&self) {
-		let (tx, rx) = std::sync::mpsc::channel();
-		self.spawn_ctrl_c(tx);
-		let _ = rx.recv();
+	#[cfg(all(not(feature = "web")))]
+	pub fn block_on<F>(&self, future: F)
+	where
+		F: Future,
+	{
+		self.runtime.block_on(future);
 	}
+
 	#[cfg(all(not(feature = "web")))]
 	pub fn spawn_ctrl_c<S>(&self, sink: S)
 	where
@@ -189,12 +192,16 @@ where
 			}
 		});
 	}
-	#[cfg(all(not(feature = "web")))]
-	pub fn block_on<F>(&self, future: F)
-	where
-		F: Future,
-	{
-		self.runtime.block_on(future);
+	#[cfg(not(feature = "web"))]
+	pub fn wait_for_ctrl_c(&self) {
+		let (tx, rx) = std::sync::mpsc::channel();
+		self.spawn_ctrl_c(tx);
+		let _ = rx.recv();
+	}
+	pub fn wait_for_shutdown(&self) {
+		self.runtime.block_on(async {
+			self.shutdown.cancelled().await;
+		});
 	}
 }
 
@@ -243,6 +250,7 @@ pub struct HostWorker<C: Ctx> {
 	pub _phantom: PhantomData<C>,
 	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 	pub runtime: Arc<tokio::runtime::Runtime>,
+	pub shutdown: CancellationToken,
 }
 
 // #[tauri::command]
