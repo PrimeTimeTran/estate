@@ -21,7 +21,7 @@ mod fmt;
 use fmt::*;
 
 mod r#fn;
-use r#fn::*;
+pub use r#fn::*;
 
 pub mod agent;
 #[path = "./agent-event.rs"]

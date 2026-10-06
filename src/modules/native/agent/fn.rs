@@ -32,7 +32,7 @@ pub fn build_prompt(ctx: &AgentContext) -> String {
 	let history = format_history(&ctx.history);
 	let prompt = build_sys_action(
 		ACTION_PROMPT_EXECUTION,
-		&[&ctx.prompt, &workspace, &history],
+		&[&ctx.prompt.as_deref().unwrap_or(""), &workspace, &history],
 	);
 	section!("BUILT PROMPT");
 	println!(
@@ -41,6 +41,24 @@ pub fn build_prompt(ctx: &AgentContext) -> String {
 		prompt.len(),
 		preview_lines(&prompt, PROMPT_PREVIEW_LINES)
 	);
+	prompt
+}
+pub fn build_prompt_from_ctx(ctx: &AgentContext) -> String {
+	let workspace = format_workspace(&ctx.workspace);
+	let history = format_history(&ctx.history);
+	let prompt = build_sys_action(
+		ACTION_PROMPT_EXECUTION,
+		&[&ctx.prompt.as_deref().unwrap_or(""), &workspace, &history],
+	);
+
+	section!("BUILT PROMPT");
+	println!(
+		"prompt ({} lines, {} chars):\n{}",
+		prompt.lines().count(),
+		prompt.len(),
+		preview_lines(&prompt, PROMPT_PREVIEW_LINES)
+	);
+
 	prompt
 }
 pub fn build_sys_action(template: &str, args: &[&str]) -> String {
@@ -102,7 +120,7 @@ pub fn structured_prompt_chat(ctx: &AgentContext) -> String {
 			{}
 			Respond normally. No JSON. Just text.
 		"#,
-		ctx.prompt,
+		&ctx.prompt.as_deref().unwrap_or(""),
 		format_history(&ctx.history)
 	)
 }

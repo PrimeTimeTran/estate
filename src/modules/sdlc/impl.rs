@@ -825,7 +825,6 @@ impl LocalGenerator {
 	}
 }
 impl Metric {
-  
 	fn threshold(name: impl Into<String>, score: f64, confidence: f64, bar: f64) -> Self {
 		Self {
 			name: name.into(),
@@ -2384,51 +2383,54 @@ impl PipeRunner<'_> {
 			self.pipeline.system.runtime.workspace.files.len()
 		));
 		let steps = build_steps();
-
 		let workspace_before = WSSnapshot::capture(workspace.clone())?;
-		for (index, instruction) in steps.iter().enumerate() {
-			let step = index + 1;
-			self.persist(&format!(
-				"Build step {}/{}: {}",
-				step,
-				steps.len(),
-				instruction
-			))?;
-			let current_workspace = WSSnapshot::capture(&workspace)?;
-			let workspace_context = format!(
-				"CWD: {}\n\n{}",
-				workspace.display(),
-				current_workspace.to_markdown()
-			);
-			let prompt = build_step_prompt(instruction, step, steps.len(), &plan, &workspace_context);
-			let task = AgentTask::new(prompt);
-			let result = self.pipeline.system.runtime.run_agent(task).await?;
-			let step_path = session_dir.join(format!("build-step-{step:02}.md"));
-			Pipeline::write(
-				step_path,
-				format!(
-					"# Build Step {step}/{total}\n\n\
-          ## Task\n\n\
-          {instruction}\n\n\
-          ## Result\n\n\
-          {result:?}\n",
-					total = steps.len(),
-				),
-			)?;
-
-			// Give JEV / the next iteration a fresh view of the workspace.
-			//
-			// Don't carry the original workspace snapshot forward.
-			// The agent just changed it.
-			let after_step = WSSnapshot::capture(&workspace)?;
-
-			self.pipeline.persist_progress(&format!(
-				"Build step {}/{} completed: {} file(s) changed",
-				step,
-				steps.len(),
-				after_step.diff(&workspace_before).file_count(),
-			))?;
-		}
+		let ctx = &self.pipeline.system.ctx;
+		let prompt = agent::build_prompt_from_ctx(&ctx);
+		let task = AgentTask::new(prompt);
+		let result = self.pipeline.system.runtime.run_agent(task).await?;
+		// 		for (index, instruction) in steps.iter().enumerate() {
+		// 			let step = index + 1;
+		// 			self.persist(&format!(
+		// 				"Build step {}/{}: {}",
+		// 				step,
+		// 				steps.len(),
+		// 				instruction
+		// 			))?;
+		// 			let current_workspace = WSSnapshot::capture(&workspace)?;
+		// 			let workspace_context = format!(
+		// 				"CWD: {}\n\n{}",
+		// 				workspace.display(),
+		// 				current_workspace.to_markdown()
+		// 			);
+		// 			let prompt = build_step_prompt(instruction, step, steps.len(), &plan, &workspace_context);
+		// 			let task = AgentTask::new(prompt);
+		// 			let result = self.pipeline.system.runtime.run_agent(task).await?;
+		// 			let step_path = session_dir.join(format!("build-step-{step:02}.md"));
+		// 			Pipeline::write(
+		// 				step_path,
+		// 				format!(
+		// 					"# Build Step {step}/{total}\n\n\
+		//           ## Task\n\n\
+		//           {instruction}\n\n\
+		//           ## Result\n\n\
+		//           {result:?}\n",
+		// 					total = steps.len(),
+		// 				),
+		// 			)?;
+		//
+		// 			// Give JEV / the next iteration a fresh view of the workspace.
+		// 			//
+		// 			// Don't carry the original workspace snapshot forward.
+		// 			// The agent just changed it.
+		// 			let after_step = WSSnapshot::capture(&workspace)?;
+		//
+		// 			self.pipeline.persist_progress(&format!(
+		// 				"Build step {}/{} completed: {} file(s) changed",
+		// 				step,
+		// 				steps.len(),
+		// 				after_step.diff(&workspace_before).file_count(),
+		// 			))?;
+		// 		}
 		let workspace_after = WSSnapshot::capture(&workspace)?;
 		let changes = workspace_before.diff(&workspace_after);
 		Pipeline::write(

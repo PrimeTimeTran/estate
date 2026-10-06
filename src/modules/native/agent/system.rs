@@ -20,6 +20,7 @@ pub struct AgentSystem {
 	pub bus: AgentBus,
 	pub runtime: AgentRuntime,
 	pub event_rx: UnboundedReceiver<RuntimeEvent>,
+	pub ctx: AgentContext
 }
 impl AgentSystem {
 	pub fn new() -> Self {
@@ -38,6 +39,7 @@ impl AgentSystem {
 			bus,
 			runtime,
 			event_rx,
+			ctx: AgentContext::init()
 		}
 	}
 	pub fn cwd(&mut self, cwd: impl Into<PathBuf>) -> &mut Self {

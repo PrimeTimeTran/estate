@@ -58,11 +58,6 @@ impl Agent {
 			workspace: Arc::new(ctx.workspace),
 		})
 	}
-	// pub async fn from_session(&self, task: AgentTask, session: &AiSession) -> Result<TaskResult> {
-	// 	let ctx = AgentContext::from_session_with_workspace(&session, &self.workspace.clone())?;
-	// 	let agent = Agent::with_ctx(ctx, session)?;
-	// 	agent.run_agent_loop(task, self.event_tx.clone()).await
-	// }
 }
 
 impl Default for Agent {
@@ -73,8 +68,19 @@ impl Default for Agent {
 impl AgentContext {
 	pub fn new(user_prompt: String) -> Self {
 		Self {
-			prompt: user_prompt.clone(),
-			task: AgentTask::new(user_prompt),
+			prompt: Some(user_prompt.clone()),
+			task: Some(AgentTask::new(user_prompt)),
+			workspace: WorkspaceContext::default(),
+			history: Vec::new(),
+			artifacts: Vec::new(),
+			logs: Vec::new(),
+			spawned_tasks: Vec::new(),
+		}
+	}
+	pub fn init() -> Self {
+		Self {
+			prompt: None,
+			task: None,
 			workspace: WorkspaceContext::default(),
 			history: Vec::new(),
 			artifacts: Vec::new(),
@@ -84,8 +90,8 @@ impl AgentContext {
 	}
 	pub fn with_workspace(user_prompt: String, workspace: WorkspaceContext) -> Self {
 		Self {
-			prompt: user_prompt.clone(),
-			task: AgentTask::new(user_prompt),
+			prompt: Some(user_prompt.clone()),
+			task: Some(AgentTask::new(user_prompt)),
 			workspace,
 			history: Vec::new(),
 			artifacts: Vec::new(),
@@ -103,8 +109,8 @@ impl AgentContext {
 		workspace: &WorkspaceContext,
 	) -> Result<Self> {
 		Ok(Self {
-			prompt: session.prompt.clone(),
-			task: AgentTask::new(session.prompt.clone()),
+			prompt: Some(session.prompt.clone()),
+			task: Some(AgentTask::new(session.prompt.clone())),
 			workspace: workspace.clone(),
 			history: Vec::new(),
 			artifacts: Vec::new(),
@@ -145,11 +151,12 @@ impl Agent {
 		let max_steps = 10;
 		let mut ctx = AgentContext::with_workspace(task.prompt.clone(), (*self.workspace).clone());
 		section!("CONTEXT");
+		let prompt = ctx.prompt.as_deref().unwrap_or("");
 		println!(
 			"ctx.prompt ({} chars, {} lines):\n{}",
-			ctx.prompt.len(),
-			ctx.prompt.lines().count(),
-			preview_lines(&ctx.prompt, PROMPT_PREVIEW_LINES)
+			prompt.len(),
+			prompt.lines().count(),
+			preview_lines(prompt, PROMPT_PREVIEW_LINES)
 		);
 		println!("ctx.workspace:\n{}", ctx.workspace);
 		println!("ctx.history ({} entries):", ctx.history.len());
@@ -231,10 +238,6 @@ impl Agent {
 						task: task.clone(),
 						message: "Inspecting agent context".into(),
 					}));
-
-					// eventually:
-					// let context = self.context.inspect()?;
-
 					ctx.history.push(AgentObservation::Current {
 						message: "Agent context requested".into(),
 					});
@@ -244,39 +247,15 @@ impl Agent {
 						task: task.clone(),
 						message: "Inspecting agent context".into(),
 					}));
-
-					// eventually:
-					// let context = self.context.inspect()?;
-
 					ctx.history.push(AgentObservation::Current {
 						message: "Agent context requested".into(),
 					});
-				} // 				AgentAction::ReadFile { path } => {
-				  // 					let _ = event_tx.send(RuntimeEvent::Agent(AgentEvent::Working {
-				  // 						task: task.clone(),
-				  // 						message: format!("Reading {path}"),
-				  // 					}));
-				  // 					let content = self.tools.fs.read(&path)?;
-				  // 					ctx
-				  // 						.history
-				  // 						.push(AgentObservation::ReadFile { path, content });
-				  // 				}
-				  // 				AgentAction::WriteFile { path, content } => {
-				  // 					let _ = event_tx.send(RuntimeEvent::Agent(AgentEvent::Working {
-				  // 						task: task.clone(),
-				  // 						message: format!("Writing {path}"),
-				  // 					}));
-				  // 					self.tools.fs.write(&path, &content)?;
-				  // 					ctx.history.push(AgentObservation::WriteFile {
-				  // 						path,
-				  // 						success: true,
-				  // 					});
-				  // 				}
+				}
 			}
 		}
 	}
 	async fn pick_mode(&self, ctx: &AgentContext) -> Result<AgentMode> {
-		let prompt = build_sys_prompt(DECIDE_PROMPT, &ctx.prompt);
+		let prompt = build_sys_prompt(DECIDE_PROMPT, &ctx.prompt.as_deref().unwrap_or(""));
 		let raw: LlmMode = prompt_ollama_json(&prompt).await?;
 		Ok(match raw.mode.as_str() {
 			"tool" => AgentMode::Tool,
@@ -334,11 +313,10 @@ pub struct AgentBus {
 
 #[derive(Debug)]
 pub struct AgentContext {
-	pub prompt: String,
-	pub task: AgentTask,
+	pub prompt: Option<String>,
+	pub task: Option<AgentTask>,
 	pub workspace: WorkspaceContext,
 	pub history: Vec<AgentObservation>,
-
 	pub artifacts: Vec<Artifact>,
 	pub logs: Vec<String>,
 	pub spawned_tasks: Vec<AgentTask>,
