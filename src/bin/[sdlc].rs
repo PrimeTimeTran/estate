@@ -31,9 +31,7 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let pipeline = SprintPipeline::new(runtime, "Do the work required to build this CLI")
 		.await
 		.context("SprintPipeline::new")?;
-
 	println!(">>> pipeline created");
-
 	println!(">>> creating runtime");
 	let mut runtime = PipelineRuntime::new(pipeline);
 	println!(">>> runtime created");

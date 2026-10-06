@@ -1031,7 +1031,7 @@ impl SprintPipeline {
 		Ok(())
 	}
 	fn init_session_dir(title: &str) -> Result<PathBuf> {
-		let sessions_dir = FS::ensure_dir(SpecialFile::SessionsDir.path()?)?;
+		let sessions_dir = FS::ensure_dir(SpecialFile::WriteDir.path()?)?;
 		let date = Local::now().format("%Y-%m-%d");
 		let dir = sessions_dir.join(format!("{date}.{title}"));
 		FS::ensure_dir(&dir)?;
@@ -1062,8 +1062,8 @@ impl SprintPipeline {
 	}
 	// pub async fn new(runtime: AgentRuntime) -> anyhow::Result<Self> {
 	// 	dotenvy::dotenv().ok();
-	// 	let state_path = SpecialFile::SdlcCurrent.path()?;
-	// 	let session = match SpecialFile::SdlcCurrent
+	// 	let state_path = SpecialFile::LogFile.path()?;
+	// 	let session = match SpecialFile::LogFile
 	// 		.load::<SdlcSession>()
 	// 		.context("loading current SdlcSession")?
 	// 	{
@@ -1099,8 +1099,8 @@ impl SprintPipeline {
 	// }
 	pub async fn new(runtime: AgentRuntime, intent: impl Into<String>) -> anyhow::Result<Self> {
 		dotenvy::dotenv().ok();
-		let state_path = SpecialFile::SdlcCurrent.path()?;
-		let session = match SpecialFile::SdlcCurrent
+		let state_path = SpecialFile::WriteCurrent.path()?;
+		let session = match SpecialFile::WriteCurrent
 			.load::<SdlcSession>()
 			.context("loading current SdlcSession")?
 		{
@@ -1299,7 +1299,7 @@ impl SprintPipeline {
 		Ok(())
 	}
 	fn session_save(session: &SdlcSession) -> Result<()> {
-		FS::save(SpecialFile::SdlcCurrent.path()?, session)?;
+		FS::save(SpecialFile::WriteCurrent.path()?, session)?;
 		Ok(())
 	}
 
@@ -2413,7 +2413,7 @@ impl SprintRunner<'_> {
 	}
 
 	fn load_state(&mut self) -> Result<Stage> {
-		let path = SpecialFile::SdlcCurrent.path()?;
+		let path = SpecialFile::WriteCurrent.path()?;
 		tracing::info!(">>> load_state path = {:?}", path);
 		tracing::info!(">>> exists = {}", path.exists());
 		let json = std::fs::read_to_string(&path).with_context(|| format!("reading {:?}", path))?;
@@ -2625,24 +2625,18 @@ impl SprintRunner<'_> {
 				session.workspace.clone(),
 			)
 		};
-
 		if stage != Stage::Build {
 			return Err(anyhow::anyhow!(
 				"cannot execute Build stage while at {:?}",
 				stage
 			));
 		}
-
 		self.pipeline.persist_progress("Build started")?;
-
 		let plan = tokio::fs::read_to_string(session_dir.join("plan.md"))
 			.await
 			.context("reading plan.md")?;
-
 		let steps = build_steps();
-
 		let workspace_before = WorkspaceSnapshot::capture(&workspace)?;
-
 		for (index, instruction) in steps.iter().enumerate() {
 			let step = index + 1;
 
@@ -2697,20 +2691,16 @@ impl SprintRunner<'_> {
 				after_step.diff(&workspace_before).file_count(),
 			))?;
 		}
-
 		let workspace_after = WorkspaceSnapshot::capture(&workspace)?;
 		let changes = workspace_before.diff(&workspace_after);
-
 		SprintPipeline::write(
 			session_dir.join("build.md"),
 			changes.to_markdown("Build completed"),
 		)?;
-
 		self.pipeline.persist_progress(&format!(
 			"Build completed: {} file(s) changed",
 			changes.file_count()
 		))?;
-
 		Ok(StageResult::Build)
 	}
 	async fn stage_verify(&mut self, input: StageInput) -> Result<StageResult> {
@@ -2809,20 +2799,17 @@ impl WorkspaceChanges {
 impl WorkspaceSnapshot {
 	pub fn capture(workspace: impl AsRef<Path>) -> Result<Self> {
 		let workspace = workspace.as_ref();
-
 		let output = Command::new("git")
 			.args(["status", "--short", "--porcelain=v1"])
 			.current_dir(workspace)
 			.output()
 			.with_context(|| format!("failed to capture git status in {}", workspace.display()))?;
-
 		if !output.status.success() {
 			return Err(anyhow::anyhow!(
 				"git status failed: {}",
 				String::from_utf8_lossy(&output.stderr).trim()
 			));
 		}
-
 		Ok(Self {
 			git_status: String::from_utf8(output.stdout)
 				.context("git status output was not valid UTF-8")?,

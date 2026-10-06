@@ -23,8 +23,8 @@ pub enum SpecialFile {
 	AiTemplateDir,
 	EstateManifest,
 	HostContext,
-	SdlcCurrent,
-	SessionsDir,
+	WriteCurrent,
+	WriteDir,
 	SessionsIndex,
 }
 impl FS {
@@ -91,43 +91,32 @@ impl FS {
 		T: Serialize,
 	{
 		let path = Self::ensure_parent(path)?;
-
 		let contents = serde_json::to_string_pretty(value)?;
-
 		fs::write(&path, contents).with_context(|| format!("write {}", path.display()))?;
-
 		Ok(())
 	}
 
 	pub fn delete(path: impl AsRef<Path>) -> Result<()> {
 		let path = path.as_ref();
-
 		Self::ensure_parent(path.to_path_buf())?;
-
 		if path.exists() {
 			fs::remove_file(path)?;
 		}
-
 		Ok(())
 	}
 	pub fn ensure_parent(path: impl Into<PathBuf>) -> Result<PathBuf> {
 		let path = path.into();
-
 		if let Some(parent) = path.parent() {
 			fs::create_dir_all(parent)?;
 		}
-
 		Ok(path)
 	}
 	pub fn ensure_dir(path: impl AsRef<Path>) -> Result<PathBuf> {
 		let path = path.as_ref();
-
 		eprintln!("ensure_dir:");
 		eprintln!("  path = {path:?}");
 		eprintln!("  cwd  = {:?}", std::env::current_dir()?);
-
 		fs::create_dir_all(path)?;
-
 		Ok(path.to_path_buf())
 	}
 	pub fn exists(path: impl AsRef<Path>) -> bool {
@@ -135,22 +124,17 @@ impl FS {
 	}
 	pub fn create(path: impl Into<PathBuf>, contents: impl AsRef<[u8]>) -> Result<()> {
 		let path = path.into();
-
 		if path.exists() {
 			return Err(anyhow!("file already exists: {}", path.display()));
 		}
-
 		Self::ensure_parent(&path)?;
 		fs::write(path, contents)?;
-
 		Ok(())
 	}
 	pub fn update(path: impl Into<PathBuf>, contents: impl AsRef<[u8]>) -> Result<()> {
 		let path = path.into();
-
 		Self::ensure_parent(&path)?;
 		fs::write(path, contents)?;
-
 		Ok(())
 	}
 }
@@ -189,11 +173,10 @@ impl SpecialFile {
 	}
 	pub fn path(self) -> Result<PathBuf> {
 		let root = ws_path()?;
-
 		Ok(match self {
 			Self::AiTemplateDir => root.join("ai/template"),
-			Self::SdlcCurrent => root.join("crates/estate/log/sdlc.current.json"),
-			Self::SessionsDir => root.join("crates/estate/log"),
+			Self::WriteCurrent => root.join("crates/estate/log/sdlc.current.json"),
+			Self::WriteDir => root.join("crates/estate/log"),
 			Self::SessionsIndex => root.join("crates/estate/log/sdlc.session.index.json"),
 			Self::EstateManifest => root.join("estate.toml"),
 			Self::HostContext => crate_root().join("host.env.context.json"),
