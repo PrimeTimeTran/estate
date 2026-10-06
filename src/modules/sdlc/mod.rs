@@ -11,11 +11,9 @@ use crossterm::{
 	execute,
 	terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
-use egui_plot::Corner;
 use jev_sdk::{Choice, Noul, Question, Score, TypeSafeClient};
 use std::{io::Stdout, process::Command};
 use tokio::time::{Duration, sleep};
-use tracing::debug;
 
 use crate::{model::task::TaskResult, prelude::*};
 
@@ -60,6 +58,7 @@ use ui::*;
 // cmd+f
 // - Search in file
 
+// cargo nextest run -p estate -E 'test(/sdlc/)'
 #[cfg(test)]
 mod tests {
 	use super::*;

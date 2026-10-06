@@ -142,7 +142,7 @@ pub struct RetryPolicy {
 pub struct SprintPipeline {
 	pub evaluator: Evaluator,
 	pub generator: Box<dyn ArtifactGenerator>,
-	pub session: Option<SdlcSession>,
+	pub session: SdlcSession,
 	pub state_path: PathBuf,
 	// pub event_tx: broadcast::Sender<SdlcEvent>,
 	pub event_tx: broadcast::Sender<SdlcEvent>,
@@ -155,7 +155,7 @@ pub struct SprintRunner<'a> {
 pub struct StageError;
 #[derive(Debug)]
 pub struct StageExecution {
-	pub stage: e::Stage,
+	pub stage: Stage,
 	pub attempt: Attempt,
 	pub time_started: chrono::DateTime<Utc>,
 	pub time_completed: chrono::DateTime<Utc>,
@@ -202,7 +202,7 @@ pub struct SdlcSession {
 	pub id: Uuid,
 	pub title: String,
 	pub goal: String,
-	pub stage: e::Stage,
+	pub stage: Stage,
 	pub stages: Vec<StageRecord>,
 	pub dir: PathBuf,
 	pub time_created: DateTime<Utc>,

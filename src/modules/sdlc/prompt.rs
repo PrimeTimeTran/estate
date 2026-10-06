@@ -7,48 +7,48 @@ pub fn for_intent(user_request: &str) -> String {
 pub fn gen_intent(goal: &str) -> Result<String> {
 	Ok(format!(
 		r#"
-				You are defining the intent for an SDLC task.
-				The user's goal is authoritative.
+			You are defining the intent for an SDLC task.
+			The user's goal is authoritative.
 
-				## User Goal
-				{goal}
+			## User Goal
+			{goal}
 
-				## Instructions
-				Create `intent.md`.
-				Describe what the user is trying to accomplish and why.
+			## Instructions
+			Create `intent.md`.
+			Describe what the user is trying to accomplish and why.
 
-				The intent should:
-				- preserve the user's actual goal without changing its meaning
-				- describe the desired outcome
-				- establish the problem or need being addressed
-				- identify the important constraints explicitly stated by the user
-				- avoid inventing requirements that the user did not state
-				- remain implementation-independent where possible
+			The intent should:
+			- preserve the user's actual goal without changing its meaning
+			- describe the desired outcome
+			- establish the problem or need being addressed
+			- identify the important constraints explicitly stated by the user
+			- avoid inventing requirements that the user did not state
+			- remain implementation-independent where possible
 
-				Do not write the specification, implementation plan, or tests yet.
+			Do not write the specification, implementation plan, or tests yet.
 
-				Use this format:
+			Use this format:
 
-				# Intent <one sentence title summary for the goal>
+			# Intent <one sentence title summary for the goal>
 
-				## Goal
+			## Goal
 
-				<what the user wants to accomplish>
+			<what the user wants to accomplish>
 
-				## Why
+			## Why
 
-				<why this work is needed>
+			<why this work is needed>
 
-				## Constraints
+			## Constraints
 
-				- <constraint>
+			- <constraint>
 
-				## Outcome
+			## Outcome
 
-				<what successful completion should accomplish>
+			<what successful completion should accomplish>
 
-				Return only the contents of `intent.md`.
-				"#,
+			Return only the contents of `intent.md`.
+		"#,
 	))
 }
 pub fn gen_spec(intent: &str) -> Result<String> {
@@ -58,110 +58,110 @@ pub fn gen_spec(intent: &str) -> Result<String> {
 
 	Ok(format!(
 		r#"
-       	You are the Specification stage of an SDLC pipeline.
+			You are the Specification stage of an SDLC pipeline.
 
-       	Your job is to transform the approved Intent artifact below into a concrete,
-       	implementation-independent Specification.
+			Your job is to transform the approved Intent artifact below into a concrete,
+			implementation-independent Specification.
 
-       	You are NOT implementing the feature.
-       	You are NOT writing source code.
-       	You are NOT creating a plan.
-       	You are NOT merely summarizing the Intent.
+			You are NOT implementing the feature.
+			You are NOT writing source code.
+			You are NOT creating a plan.
+			You are NOT merely summarizing the Intent.
 
-       	You are defining WHAT must be built, the boundaries of the work, the
-       	constraints that apply, the expected system behavior, and the important
-       	architectural concerns that must be resolved before implementation.
+			You are defining WHAT must be built, the boundaries of the work, the
+			constraints that apply, the expected system behavior, and the important
+			architectural concerns that must be resolved before implementation.
 
-       	The resulting document will be written directly to:
-          spec.md
+			The resulting document will be written directly to:
+				spec.md
 
-       	Therefore, your entire response MUST be the specification document itself.
-       	Do not include commentary before or after the specification.
-       	Do not wrap the document in a Markdown code fence.
+			Therefore, your entire response MUST be the specification document itself.
+			Do not include commentary before or after the specification.
+			Do not wrap the document in a Markdown code fence.
 
-       	The Specification MUST use exactly this structure:
+			The Specification MUST use exactly this structure:
 
-       	# Specification: [Feature or Project Name]
+			# Specification: [Feature or Project Name]
 
-       	## 1. Overview & Inherited Intent
+			## 1. Overview & Inherited Intent
 
-       	- **Source Intent:** intent.md
-       	- **Core Objective:** [Brief summary of what this specification builds,
-          explicitly inheriting the approved outcome from the Intent]
+			- **Source Intent:** intent.md
+			- **Core Objective:** [Brief summary of what this specification builds,
+				explicitly inheriting the approved outcome from the Intent]
 
-       	## 2. Requirements & Functional Scope
+			## 2. Requirements & Functional Scope
 
-       	- **In-Scope:**
-          - [Core capability 1]
-          - [Core capability 2]
+			- **In-Scope:**
+				- [Core capability 1]
+				- [Core capability 2]
 
-       	- **Out-of-Scope:**
-          - [Explicit boundary / what is deferred]
+			- **Out-of-Scope:**
+				- [Explicit boundary / what is deferred]
 
-       	Requirements must describe observable or verifiable behavior where possible.
-       	Do not invent requirements that contradict the Intent.
-       	If the Intent leaves something unspecified, identify that uncertainty rather
-       	than silently inventing a product decision.
+			Requirements must describe observable or verifiable behavior where possible.
+			Do not invent requirements that contradict the Intent.
+			If the Intent leaves something unspecified, identify that uncertainty rather
+			than silently inventing a product decision.
 
-       	## 3. Policy & Governance Constraints (Applied Skills)
+			## 3. Policy & Governance Constraints (Applied Skills)
 
-       	- **Brand & UX Guidelines:** [Applicable constraints, or "None identified"]
-       	- **Security & Compliance:** [Applicable data handling, access control,
-          privacy, security, and boundary constraints, or "None identified"]
+			- **Brand & UX Guidelines:** [Applicable constraints, or "None identified"]
+			- **Security & Compliance:** [Applicable data handling, access control,
+				privacy, security, and boundary constraints, or "None identified"]
 
-       	Do not invent organizational policies.
-       	Only state constraints supported by the Intent, existing project context,
-       	or explicitly applicable system/project rules.
+			Do not invent organizational policies.
+			Only state constraints supported by the Intent, existing project context,
+			or explicitly applicable system/project rules.
 
-       	## 4. Proposed Design & Architecture
+			## 4. Proposed Design & Architecture
 
-       	- **System Impact:** [Affected components, modules, services, files,
-          persistence, APIs, integrations, or runtime boundaries]
+			- **System Impact:** [Affected components, modules, services, files,
+				persistence, APIs, integrations, or runtime boundaries]
 
-       	- **User Experience Flow:** [Expected user-visible behavior and interaction
-          flow, if applicable]
+			- **User Experience Flow:** [Expected user-visible behavior and interaction
+				flow, if applicable]
 
-       	Describe the proposed system behavior and architecture at the level needed
-       	for implementation to begin later.
+			Describe the proposed system behavior and architecture at the level needed
+			for implementation to begin later.
 
-       	Do NOT write implementation code.
-       	Do NOT turn this section into an implementation plan.
-       	Do NOT prescribe arbitrary technologies unless required by the existing
-       	project context or the Intent.
+			Do NOT write implementation code.
+			Do NOT turn this section into an implementation plan.
+			Do NOT prescribe arbitrary technologies unless required by the existing
+			project context or the Intent.
 
-       	## 5. Flagged Areas of Concern & Conflicts
+			## 5. Flagged Areas of Concern & Conflicts
 
-       	- [Potential technical, UX, security, compatibility, performance, or
-          architectural concern]
-       	- [Unresolved contradiction or product decision requiring human input]
+			- [Potential technical, UX, security, compatibility, performance, or
+				architectural concern]
+			- [Unresolved contradiction or product decision requiring human input]
 
-       	If no concerns or conflicts are identified, explicitly state:
+			If no concerns or conflicts are identified, explicitly state:
 
-       	- None identified.
+			- None identified.
 
-       	CRITICAL RULES:
+			CRITICAL RULES:
 
-       	1. The Intent is the source of truth for the desired outcome.
-       	2. Preserve the Intent's objective when converting it into requirements.
-       	3. Separate requirements from implementation details.
-       	4. Explicitly define both scope and boundaries.
-       	5. Surface ambiguity instead of inventing decisions.
-       	6. Surface conflicts instead of resolving product-policy conflicts yourself.
-       	7. The Specification must be useful to a later Plan/Build stage.
-       	8. The output must be a complete Markdown specification.
-       	9. Do not discuss this prompt or your role.
-       	10. Do not output anything except the completed specification.
+			1. The Intent is the source of truth for the desired outcome.
+			2. Preserve the Intent's objective when converting it into requirements.
+			3. Separate requirements from implementation details.
+			4. Explicitly define both scope and boundaries.
+			5. Surface ambiguity instead of inventing decisions.
+			6. Surface conflicts instead of resolving product-policy conflicts yourself.
+			7. The Specification must be useful to a later Plan/Build stage.
+			8. The output must be a complete Markdown specification.
+			9. Do not discuss this prompt or your role.
+			10. Do not output anything except the completed specification.
 
-       	Here is the approved Intent:
+			Here is the approved Intent:
 
-       	---
+			---
 
-       	{intent}
+			{intent}
 
-       	---
+			---
 
-       	Now produce the complete Specification.
-     	"#,
+			Now produce the complete Specification.
+		"#,
 	))
 }
 pub fn gen_plan(intent: &str, spec: &str) -> Result<String> {

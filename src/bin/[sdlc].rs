@@ -1,4 +1,3 @@
-
 use anyhow::Context;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use estate::prelude::*;
@@ -20,37 +19,35 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let mut config = LogConfig::load()?;
 	config.apply_cli(&cli)?;
 	logger::init_logging(&config)?;
+
 	let (_bus, runtime, _event_rx) = new_agent_system();
-	let mut pipeline = SprintPipeline::new(runtime)
+	let pipeline = SprintPipeline::new(runtime, "Do the work required to build this CLI")
 		.await
 		.context("SprintPipeline::new")?;
+
 	println!(">>> pipeline created");
-
-	if pipeline.stage().is_none() {
-		println!(">>> initializing pipeline");
-
-		pipeline
-			.init("Do the work required to build this CLI")
-			.await
-			.context("SprintPipeline::init")?;
-
-		println!(">>> pipeline initialized");
-	}
 
 	println!(">>> creating runtime");
 	let mut runtime = PipelineRuntime::new(pipeline);
 	println!(">>> runtime created");
+
 	let mut events = runtime.pipeline.subscribe();
 	let mut view = SdlcView::new(&runtime);
+
 	let (input_tx, mut input_rx) = tokio::sync::mpsc::unbounded_channel::<SdlcInput>();
+
 	let use_tui = std::env::var_os("SDLC_TUI").is_some();
+
 	if !use_tui {
 		println!(">>> starting runtime");
 		runtime.run(&mut input_rx).await.context("runtime.run")?;
+
 		println!(">>> runtime finished");
 		return Ok(());
 	}
+
 	let is_real_run = std::env::var_os("DRY_RUN").is_none();
+
 	let run = async {
 		if is_real_run {
 			runtime.run(&mut input_rx).await

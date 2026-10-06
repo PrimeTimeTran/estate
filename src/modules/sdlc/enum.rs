@@ -50,7 +50,6 @@ pub enum RunState {
 	Failed,
 	Cancelled,
 }
-
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum SdlcEvent {
 	Activity {
