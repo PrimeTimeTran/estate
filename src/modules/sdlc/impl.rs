@@ -1,6 +1,6 @@
 pub use ratatui::Frame;
 
-use super::*;
+use super::{AiSession, *};
 
 #[async_trait]
 impl ArtifactGenerator for ApiGenerator {
@@ -10,7 +10,7 @@ impl ArtifactGenerator for ApiGenerator {
 	async fn run_agent(&self, prompt: &str) -> Result<String> {
 		todo!("API generate")
 	}
-	async fn with_session(&mut self, session: &SdlcSession, prompt: String) -> Result<TaskResult> {
+	async fn with_session(&mut self, session: &AiSession, prompt: String) -> Result<TaskResult> {
 		todo!("with_session")
 	}
 	fn clone_box(&self) -> Box<dyn ArtifactGenerator> {
@@ -66,7 +66,7 @@ impl ArtifactGenerator for LocalGenerator {
 				.unwrap_or_else(|| "Agent completed".to_string()),
 		)
 	}
-	async fn with_session(&mut self, session: &SdlcSession, prompt: String) -> Result<TaskResult> {
+	async fn with_session(&mut self, session: &AiSession, prompt: String) -> Result<TaskResult> {
 		let task = AgentTask::new(prompt.to_string());
 		let result = self.runtime.from_session(task, session).await?;
 		Ok(result)
@@ -93,7 +93,7 @@ impl std::fmt::Display for Attempt {
 impl Evaluator {
 	async fn evaluate(
 		&self,
-		session: &SdlcSession,
+		session: &AiSession,
 		execution: &StageExecution,
 	) -> Result<StageEvaluation> {
 		let ctx = EvaluationContext::load(session, execution.stage)?;
@@ -679,7 +679,7 @@ impl EvaluationContext {
 				.ok_or_else(|| anyhow::anyhow!("verification artifact not loaded")),
 		}
 	}
-	fn load(session: &SdlcSession, stage: Stage) -> Result<Self> {
+	fn load(session: &AiSession, stage: Stage) -> Result<Self> {
 		let read = |file: SessionFile| -> Option<String> { file.read(&session.dir).ok() };
 		Ok(Self {
 			stage,
@@ -851,7 +851,7 @@ impl PipelineRuntime {
 	}
 }
 
-impl SdlcSession {
+impl AiSession {
 	fn create_readable(&self) -> String {
 		let current = Utc::now();
 		current.format(FMT_HUMAN_READABLE).to_string()
@@ -878,7 +878,7 @@ impl SdlcSession {
 		&self.workspace
 	}
 }
-impl crate::traits::DateableSession for SdlcSession {
+impl crate::traits::DateableSession for AiSession {
 	fn start(&self) -> Option<DateTime<Utc>> {
 		Some(self.time_created)
 	}
@@ -1056,7 +1056,7 @@ impl SprintPipeline {
 		let title = Self::summarize_title(&intent).await?;
 		let dir = Self::init_session_dir(&title)?;
 		Self::init_templates(&dir)?;
-		let session = SdlcSession::new(title, dir)?;
+		let session = AiSession::new(title, dir)?;
 		self.session = session;
 		self.stage_attempt = 1;
 		self.persist_session()?;
@@ -1096,8 +1096,8 @@ impl SprintPipeline {
 	// 	dotenvy::dotenv().ok();
 	// 	let state_path = SpecialFile::LogFile.path()?;
 	// 	let session = match SpecialFile::LogFile
-	// 		.load::<SdlcSession>()
-	// 		.context("loading current SdlcSession")?
+	// 		.load::<AiSession>()
+	// 		.context("loading current AiSession")?
 	// 	{
 	// 		Some(session) => session,
 	// 		None => {
@@ -1105,7 +1105,7 @@ impl SprintPipeline {
 	// 			let title = Self::summarize_title(intent).await?;
 	// 			let dir = Self::init_session_dir(&title)?;
 	// 			Self::init_templates(&dir)?;
-	// 			let session = SdlcSession::new(title, dir)?;
+	// 			let session = AiSession::new(title, dir)?;
 	// 			Self::session_save(&session)?;
 	// 			session
 	// 		}
@@ -1133,8 +1133,8 @@ impl SprintPipeline {
 		dotenvy::dotenv().ok();
 		let state_path = SpecialFile::WriteCurrent.path()?;
 		let session = match SpecialFile::WriteCurrent
-			.load::<SdlcSession>()
-			.context("loading current SdlcSession")?
+			.load::<AiSession>()
+			.context("loading current AiSession")?
 		{
 			Some(session) => session,
 			None => {
@@ -1142,7 +1142,7 @@ impl SprintPipeline {
 				let title = Self::summarize_title(&intent).await?;
 				let dir = Self::init_session_dir(&title)?;
 				Self::init_templates(&dir)?;
-				let session = SdlcSession::new(title, dir)?;
+				let session = AiSession::new(title, dir)?;
 				Self::session_save(&session)?;
 				session
 			}
@@ -1325,10 +1325,10 @@ impl SprintPipeline {
 		self.session()?.stage = stage;
 		Ok(())
 	}
-	// fn session(&self) -> Result<&SdlcSession> {
+	// fn session(&self) -> Result<&Session> {
 	// 	Ok(&self.session)
 	// }
-	fn session(&mut self) -> Result<&mut SdlcSession> {
+	fn session(&mut self) -> Result<&mut AiSession> {
 		Ok(&mut self.session)
 	}
 	fn session_read(&mut self, name: &str) -> Result<String> {
@@ -1337,13 +1337,13 @@ impl SprintPipeline {
 	fn session_record(&mut self) -> Result<()> {
 		let session = self.session()?;
 		let index_path = SpecialFile::SessionsIndex.path()?;
-		let mut sessions: Vec<SdlcSession> = FS::load(&index_path)?.unwrap_or_default();
+		let mut sessions: Vec<AiSession> = FS::load(&index_path)?.unwrap_or_default();
 		sessions.retain(|existing| existing.id != session.id);
 		sessions.push(session.clone());
 		FS::save(index_path, &sessions)?;
 		Ok(())
 	}
-	fn session_save(session: &SdlcSession) -> Result<()> {
+	fn session_save(session: &AiSession) -> Result<()> {
 		FS::save(SpecialFile::WriteCurrent.path()?, session)?;
 		Ok(())
 	}

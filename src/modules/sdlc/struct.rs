@@ -46,7 +46,7 @@ pub struct EvaluationContext {
 #[derive(Clone, Debug)]
 pub struct Evaluator {
 	pub jev: TypeSafeClient,
-	pub session: SdlcSession,
+	pub session: AiSession,
 }
 #[derive(Debug, Clone)]
 pub struct Evaluation {
@@ -142,7 +142,7 @@ pub struct RetryPolicy {
 pub struct SprintPipeline {
 	pub evaluator: Evaluator,
 	pub generator: Box<dyn ArtifactGenerator>,
-	pub session: SdlcSession,
+	pub session: AiSession,
 	pub state_path: PathBuf,
 	pub event_tx: broadcast::Sender<SdlcEvent>,
 	pub stage_attempt: u32,
@@ -197,7 +197,7 @@ pub struct StageRevision {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SdlcSession {
+pub struct AiSession {
 	pub id: Uuid,
 	pub title: String,
 	pub goal: String,

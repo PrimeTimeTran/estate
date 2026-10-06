@@ -53,7 +53,7 @@ impl Agent {
 			workspace: Arc::new(workspace),
 		}
 	}
-	pub fn with_ctx(ctx: AgentContext, session: &SdlcSession) -> Result<Self> {
+	pub fn with_ctx(ctx: AgentContext, session: &AiSession) -> Result<Self> {
 		let workspace = WorkspaceContext::from_sdlc_session(session)?;
 		Ok(Self {
 			id: uuid::Uuid::new_v4().to_string(),
@@ -93,7 +93,7 @@ impl AgentContext {
 		}
 	}
 
-	pub fn from_session(session: &SdlcSession) -> Result<Self> {
+	pub fn from_session(session: &AiSession) -> Result<Self> {
 		let workspace = WorkspaceContext::from_session(session)?;
 
 		Ok(Self {
@@ -106,7 +106,7 @@ impl AgentContext {
 			spawned_tasks: Vec::new(),
 		})
 	}
-	// pub fn from_session(session: &SdlcSession) -> Result<Self> {
+	// pub fn from_session(session: &AiSession) -> Result<Self> {
 	// let ws = WorkspaceContext::from_session(session)?;
 	// Ok(Self {
 	// id: uuid::Uuid::new_v4().to_string(),

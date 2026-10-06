@@ -18,7 +18,7 @@ impl AgentRuntime {
 		let agent = Agent::with_cwd(sdlc_dir.as_ref().to_path_buf());
 		agent.run_agent_loop(task, self.event_tx.clone()).await
 	}
-	pub async fn from_session(&self, task: AgentTask, session: &SdlcSession) -> Result<TaskResult> {
+	pub async fn from_session(&self, task: AgentTask, session: &AiSession) -> Result<TaskResult> {
 		let ctx = AgentContext::from_session(session)?;
 		let agent = Agent::with_ctx(ctx, session)?;
 		agent.run_agent_loop(task, self.event_tx.clone()).await

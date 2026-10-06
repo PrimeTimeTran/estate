@@ -40,7 +40,7 @@ use prompt::*;
 
 mod r#struct;
 use r#struct as s;
-pub use r#struct::*;
+pub use r#struct::{AiSession, *};
 
 #[path = "./trait.rs"]
 pub mod sdlc_trait;

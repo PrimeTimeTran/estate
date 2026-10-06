@@ -11,7 +11,7 @@ use notify::{Event, EventKind};
 use crate::{
 	model::task::TaskResult,
 	prelude::{anyhow::anyhow, *},
-	sdlc::SdlcSession,
+	sdlc::AiSession
 };
 
 mod r#const;
@@ -60,7 +60,7 @@ pub struct AgentTask {
 	pub prompt: String,
 }
 impl AgentTask {
-	pub fn from_session(session: &SdlcSession) -> Result<Self> {
+	pub fn from_session(session: &AiSession) -> Result<Self> {
 		Ok(Self {
 			id: Uuid::new_v4(),
 			prompt: session.goal.clone(),

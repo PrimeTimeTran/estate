@@ -7,7 +7,7 @@ pub struct Context {}
 pub trait ArtifactGenerator: Send + Sync + Debug {
 	async fn generate(&self, prompt: &str) -> Result<String>;
 	async fn run_agent(&self, prompt: &str) -> Result<String>;
-	async fn with_session(&mut self, session: &SdlcSession, prompt: String) -> Result<TaskResult>;
+	async fn with_session(&mut self, session: &AiSession, prompt: String) -> Result<TaskResult>;
 	fn clone_box(&self) -> Box<dyn ArtifactGenerator>;
 }
 // Steps to complete the pipeline

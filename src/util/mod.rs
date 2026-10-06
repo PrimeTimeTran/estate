@@ -1,7 +1,7 @@
 use crate::prelude::*;
 
 // #[cfg(not(target_arch = "wasm32"))]
-// use crate::sdlc::SdlcSession;
+// use crate::sdlc::AiSession;
 
 pub mod time;
 

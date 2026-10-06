@@ -55,7 +55,7 @@ pub fn slugify(input: &str) -> String {
 	}
 }
 pub fn persist_evaluation(
-	session: &mut SdlcSession,
+	session: &mut AiSession,
 	evaluation: &StageEvaluation,
 	attempt: Attempt,
 ) -> Result<()> {

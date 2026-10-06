@@ -1,5 +1,5 @@
 use crate::native::agent::FileInfo;
-use crate::prelude::*;
+use crate::prelude::{*};
 
 #[derive(Debug, Clone)]
 pub struct WorkspaceContext {
@@ -37,7 +37,7 @@ impl WorkspaceContext {
 			cwd: std::env::current_dir().unwrap_or_default(),
 		}
 	}
-	pub fn from_session(session: &SdlcSession) -> Result<Self> {
+	pub fn from_session(session: &AiSession) -> Result<Self> {
 		let mut files = Vec::new();
 		for entry in std::fs::read_dir(&session.dir)? {
 			let entry = entry?;
@@ -51,7 +51,7 @@ impl WorkspaceContext {
 			cwd: session.dir.clone(),
 		})
 	}
-	pub fn from_sdlc_session(session: &SdlcSession) -> Result<Self> {
+	pub fn from_sdlc_session(session: &AiSession) -> Result<Self> {
 		tracing::info!("from_sdlc_sessionfrom_sdlc_session workspace");
 		let cwd = session.dir.clone();
 		let files = [
