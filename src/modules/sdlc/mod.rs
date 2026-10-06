@@ -7,27 +7,17 @@ pub use ratatui::{
 use anyhow::{Context, anyhow};
 use crossterm::{
 	cursor,
-	event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
+	event::{self, Event as CrosstermEvent, KeyCode, KeyEvent, KeyEventKind},
 	execute,
 	terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use egui_plot::Corner;
 use jev_sdk::{Choice, Noul, Question, Score, TypeSafeClient};
-
 use std::{io::Stdout, process::Command};
 use tokio::time::{Duration, sleep};
 use tracing::debug;
 
-use crate::{
-	agent_event::RuntimeEvent,
-	model::{
-		AgentTask,
-		agent::{Agent, AgentContext},
-		resolver::*,
-		task::TaskResult,
-	},
-	prelude::*,
-};
+use crate::{model::task::TaskResult, prelude::*};
 
 mod r#const;
 use r#const as c;

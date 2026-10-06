@@ -1,3 +1,5 @@
+pub use ratatui::Frame;
+
 use super::*;
 
 #[async_trait]
