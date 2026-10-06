@@ -2,7 +2,7 @@ use jev_sdk::{NoulAnswer, ScoreAnswer};
 pub use ratatui::Frame;
 
 use super::{AiSession, *};
-
+const DEFAULT_NAUL_BAR: f64 = 0.40;
 impl AiSession {
 	fn create_readable(&self) -> String {
 		let current = Utc::now();
@@ -427,7 +427,7 @@ impl Evaluator {
 		let mut evaluations = Vec::with_capacity(7);
 		evaluations.push(Metric {
 			name: "smart".into(),
-			passed: smart.score >= 0.80,
+			passed: smart.score >= DEFAULT_NAUL_BAR,
 			score: smart.score,
 			confidence: smart.confidence,
 			explanation: String::new(),
@@ -825,23 +825,31 @@ impl LocalGenerator {
 	}
 }
 impl Metric {
-	fn quality(value: &ScoreAnswer) -> Self {
+  
+	fn threshold(name: impl Into<String>, score: f64, confidence: f64, bar: f64) -> Self {
 		Self {
-			name: "quality".into(),
-			passed: value.score >= 0.80,
-			score: value.score,
-			confidence: value.confidence,
+			name: name.into(),
+			passed: score >= bar,
+			score: score,
+			confidence: confidence,
 			explanation: String::new(),
 		}
 	}
+
+	fn quality(value: &ScoreAnswer) -> Self {
+		Self::threshold("quality", value.score, value.confidence, DEFAULT_NAUL_BAR)
+	}
+
 	fn meets_bar(value: &NoulAnswer) -> Self {
-		Self {
-			name: "meets_bar".into(),
-			passed: value.noul >= 0.80,
-			score: value.noul,
-			confidence: 1.0,
-			explanation: String::new(),
-		}
+		Self::threshold("meets_bar", value.noul, 1.0, DEFAULT_NAUL_BAR)
+	}
+
+	fn follows_instructions(value: &NoulAnswer) -> Self {
+		Self::threshold("follows_instructions", value.noul, 1.0, DEFAULT_NAUL_BAR)
+	}
+
+	fn language_fit(value: &NoulAnswer) -> Self {
+		Self::threshold("language_fit", value.noul, 1.0, DEFAULT_NAUL_BAR)
 	}
 }
 impl Outcome {
@@ -1435,7 +1443,7 @@ impl QACheck {
 			time_total,
 			score,
 			confidence,
-			passed: meets_bar >= 0.80 && confidence >= 0.70,
+			passed: meets_bar >= DEFAULT_NAUL_BAR && confidence >= DEFAULT_NAUL_BAR,
 			evaluations,
 		}
 	}
@@ -2371,7 +2379,10 @@ impl PipeRunner<'_> {
 		self.pipeline.system.add_file(session_dir.join("intent.md"));
 		self.pipeline.system.add_file(session_dir.join("spec.md"));
 		self.pipeline.system.add_file(session_dir.join("plan.md"));
-		section!(&format!("ctx.workspace:\n{}", self.pipeline.system.runtime.workspace.files.len()));
+		section!(&format!(
+			"ctx.workspace:\n{}",
+			self.pipeline.system.runtime.workspace.files.len()
+		));
 		let steps = build_steps();
 
 		let workspace_before = WSSnapshot::capture(workspace.clone())?;
