@@ -30,7 +30,7 @@ pub struct CheckResult {
 	pub output: Option<String>,
 }
 pub struct CommandResult {}
-
+pub struct Context {}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CriterionResult;
 

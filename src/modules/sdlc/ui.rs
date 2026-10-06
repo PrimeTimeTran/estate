@@ -7,12 +7,15 @@ use ratatui::{
 };
 
 use crate::{
-	agent_event::RuntimeEvent, model::{
+	agent_event::RuntimeEvent,
+	model::{
 		AgentTask,
 		agent::{Agent, AgentContext},
 		resolver::*,
 		task::TaskResult,
-	}, prelude::{structs as ext_structs, *}, sdlc::{format_elapsed, sdlc_struct::SdlcView},
+	},
+	prelude::{structs as ext_structs, *},
+	sdlc::{format_elapsed, r#struct::SdlcView},
 };
 
 pub fn body(chunk: Rect) -> Vec<Rect> {

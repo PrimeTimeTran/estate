@@ -1,10 +1,7 @@
 use super::*;
 
-const INTENT_PROMPT: &str = include_str!("../../../ai/template/INITIAL_PROMPT.md");
-const PROMPT_FROM_USER: &str = include_str!("../../../ai/template/user.goal.md");
-
 pub fn for_intent(user_request: &str) -> String {
-	INTENT_PROMPT.replace("{{PROMPT_FROM_USER}}", user_request)
+	c::INTENT_PROMPT.replace("{{PROMPT_FROM_USER}}", user_request)
 }
 
 pub fn gen_intent(goal: &str) -> Result<String> {

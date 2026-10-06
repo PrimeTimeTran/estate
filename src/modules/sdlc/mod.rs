@@ -26,43 +26,38 @@ use crate::{
 		resolver::*,
 		task::TaskResult,
 	},
-	prelude::{structs as ext_structs, *},
+	prelude::*,
 };
 
-#[path = "./const.rs"]
-mod sdlc_const;
-use sdlc_const as c;
-use sdlc_const::*;
+mod r#const;
+use r#const as c;
+use r#const::*;
 
 #[path = "./enum.rs"]
 mod sdlc_enum;
 use sdlc_enum as e;
 pub use sdlc_enum::*;
 
-#[path = "./fn.rs"]
-mod sdlc_fn;
-use sdlc_fn as f;
-use sdlc_fn::*;
+mod r#fn;
+use r#fn as f;
+use r#fn::*;
 
-#[path = "./prompt.rs"]
-mod sdlc_prompt;
-use sdlc_prompt as p;
-use sdlc_prompt::*;
+mod prompt;
+use prompt as p;
+use prompt::*;
 
-#[path = "./struct.rs"]
-mod sdlc_struct;
-use sdlc_struct as s;
-pub use sdlc_struct::*;
+mod r#struct;
+use r#struct as s;
+pub use r#struct::*;
 
 #[path = "./trait.rs"]
 pub mod sdlc_trait;
 use sdlc_trait as t;
 use sdlc_trait::*;
 
-#[path = "./ui.rs"]
-mod sdlc_ui;
-use sdlc_ui as u;
-use sdlc_ui::*;
+mod ui;
+use ui as u;
+use ui::*;
 
 // cmd+alt+f
 // - Search in all files overlay

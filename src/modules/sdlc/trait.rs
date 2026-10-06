@@ -1,28 +1,16 @@
-use crate::{
-	model::{
-		AgentTask,
-		agent::{Agent, AgentContext},
-		resolver::*,
-		task::TaskResult,
-	}, prelude::*, sdlc::sdlc_struct::Evaluation,
-};
-use anyhow::anyhow;
-use crossterm::{
-	cursor,
-	event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
-	execute,
-	terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
-};
-use egui_plot::Corner;
-use jev_sdk::{Choice, Noul, Question, Score, TypeSafeClient};
-
-use std::{io::Stdout, process::Command};
-use tokio::time::{Duration, sleep};
+use super::*;
 
 pub struct Context {}
 
+// Identity & Persistence
+#[async_trait::async_trait]
+pub trait ArtifactGenerator: Send + Sync + Debug {
+	async fn generate(&self, prompt: &str) -> Result<String>;
+	async fn run_agent(&self, prompt: &str) -> Result<String>;
+	fn clone_box(&self) -> Box<dyn ArtifactGenerator>;
+}
 // Steps to complete the pipeline
-pub trait Pipeline {
+trait Pipeline {
 	type Stage: Stage;
 	fn id(&self) -> &PipelineId;
 	fn state(&self) -> &PipelineState<Self::Stage>;
@@ -63,13 +51,6 @@ trait Stage {
 	}
 }
 
-// Identity & Persistence
-#[async_trait::async_trait]
-pub trait ArtifactGenerator: Send + Sync + Debug {
-	async fn generate(&self, prompt: &str) -> Result<String>;
-	async fn run_agent(&self, prompt: &str) -> Result<String>;
-	fn clone_box(&self) -> Box<dyn ArtifactGenerator>;
-}
 impl Clone for Box<dyn ArtifactGenerator> {
 	fn clone(&self) -> Self {
 		self.as_ref().clone_box()

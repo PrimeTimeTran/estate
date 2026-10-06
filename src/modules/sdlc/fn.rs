@@ -1,5 +1,4 @@
 use super::*;
-use super::{c, e, f, s, t, u};
 
 pub fn git_status() -> Result<String> {
 	let output = std::process::Command::new("git")
