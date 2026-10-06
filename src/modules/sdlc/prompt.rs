@@ -404,7 +404,7 @@ pub fn plan_gen(intent: &str, spec: &str) -> String {
 pub fn revise_spec(
 	intent: &str,
 	current_spec: &str,
-	evaluation: &StageEvaluation,
+	evaluation: &QACheck,
 ) -> Result<String> {
 	Ok(format!(
 		r#"

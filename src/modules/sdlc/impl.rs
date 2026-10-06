@@ -91,12 +91,8 @@ impl std::fmt::Display for Attempt {
 	}
 }
 impl Evaluator {
-	async fn evaluate(
-		&self,
-		session: &AiSession,
-		execution: &StageExecution,
-	) -> Result<StageEvaluation> {
-		let ctx = EvaluationContext::load(session, execution.stage)?;
+	async fn evaluate(&self, session: &AiSession, execution: &Execution) -> Result<QACheck> {
+		let ctx = CtxEvaluation::load(session, execution.stage)?;
 		let evaluation = match execution.stage {
 			Stage::Intent => self.evaluate_intent(&ctx).await,
 			Stage::Spec => self.evaluate_spec(&ctx).await,
@@ -109,7 +105,7 @@ impl Evaluator {
 		};
 		return evaluation;
 	}
-	async fn evaluate_goal(&self, goal: &str) -> Result<StageEvaluation> {
+	async fn evaluate_goal(&self, goal: &str) -> Result<QACheck> {
 		let time_started = Utc::now();
 		let state = format!(
 			"## User Goal\n\n{goal}\n\n\
@@ -229,7 +225,7 @@ impl Evaluator {
 			("timely", "timeliness"),
 		];
 		let mut evaluations = Vec::with_capacity(7);
-		evaluations.push(EvaluationResult {
+		evaluations.push(QAMetric {
 			name: "smart".into(),
 			passed: smart.score >= 0.80,
 			score: smart.score,
@@ -241,7 +237,7 @@ impl Evaluator {
 				.score(key)
 				.ok_or_else(|| anyhow::anyhow!("JEV returned no {name} score"))?;
 
-			evaluations.push(EvaluationResult {
+			evaluations.push(QAMetric {
 				name: name.into(),
 				passed: result.score >= 0.80,
 				score: result.score,
@@ -252,16 +248,15 @@ impl Evaluator {
 		let meets_bar = response
 			.noul("meets_bar")
 			.ok_or_else(|| anyhow::anyhow!("JEV returned no goal decision"))?;
-		evaluations.push(EvaluationResult {
+		evaluations.push(QAMetric {
 			name: "meets_bar".into(),
 			passed: meets_bar.noul >= 0.80,
 			score: meets_bar.noul,
 			confidence: 1.0,
 			explanation: String::new(),
 		});
-		Ok(StageEvaluation::new(
+		Ok(QACheck::new(
 			Stage::Intent,
-			StageActor::Evaluator,
 			time_started,
 			smart.score,
 			smart.confidence,
@@ -270,7 +265,7 @@ impl Evaluator {
 		))
 	}
 
-	async fn evaluate_intent(&self, ctx: &EvaluationContext) -> Result<StageEvaluation> {
+	async fn evaluate_intent(&self, ctx: &CtxEvaluation) -> Result<QACheck> {
 		let time_started = Utc::now();
 		let intent = ctx.get(SessionFile::Intent)?;
 		let response = self
@@ -308,22 +303,21 @@ impl Evaluator {
 		let meets_bar = response
 			.noul("meets_bar")
 			.ok_or_else(|| anyhow::anyhow!("JEV returned no intent decision"))?;
-		Ok(StageEvaluation::new(
+		Ok(QACheck::new(
 			Stage::Intent,
-			StageActor::Evaluator,
 			time_started,
 			quality.score,
 			quality.confidence,
 			meets_bar.noul,
 			vec![
-				EvaluationResult {
+				QAMetric {
 					name: "quality".into(),
 					passed: quality.score >= 0.80,
 					score: quality.score,
 					confidence: quality.confidence,
 					explanation: String::new(),
 				},
-				EvaluationResult {
+				QAMetric {
 					name: "meets_bar".into(),
 					passed: meets_bar.noul >= 0.80,
 					score: meets_bar.noul,
@@ -333,7 +327,7 @@ impl Evaluator {
 			],
 		))
 	}
-	async fn evaluate_spec(&self, ctx: &EvaluationContext) -> Result<StageEvaluation> {
+	async fn evaluate_spec(&self, ctx: &CtxEvaluation) -> Result<QACheck> {
 		let time_started = Utc::now();
 		let intent = ctx.get(SessionFile::Intent)?;
 		let spec = ctx.get(SessionFile::Spec)?;
@@ -378,22 +372,21 @@ impl Evaluator {
 		let meets_bar = response
 			.noul("meets_bar")
 			.ok_or_else(|| anyhow::anyhow!("JEV returned no spec decision"))?;
-		Ok(StageEvaluation::new(
+		Ok(QACheck::new(
 			Stage::Spec,
-			StageActor::Sdlc,
 			time_started,
 			quality.score,
 			quality.confidence,
 			meets_bar.noul,
 			vec![
-				EvaluationResult {
+				QAMetric {
 					name: "quality".into(),
 					passed: quality.score >= 0.80,
 					score: quality.score,
 					confidence: quality.confidence,
 					explanation: String::new(),
 				},
-				EvaluationResult {
+				QAMetric {
 					name: "meets_bar".into(),
 					passed: meets_bar.noul >= 0.80,
 					score: meets_bar.noul,
@@ -403,7 +396,7 @@ impl Evaluator {
 			],
 		))
 	}
-	async fn evaluate_plan(&self, ctx: &EvaluationContext) -> Result<StageEvaluation> {
+	async fn evaluate_plan(&self, ctx: &CtxEvaluation) -> Result<QACheck> {
 		let time_started = Utc::now();
 		let intent = ctx.get(SessionFile::Intent)?;
 		let spec = ctx.get(SessionFile::Spec)?;
@@ -451,22 +444,21 @@ impl Evaluator {
 		let meets_bar = response
 			.noul("meets_bar")
 			.ok_or_else(|| anyhow::anyhow!("JEV returned no plan decision"))?;
-		Ok(StageEvaluation::new(
+		Ok(QACheck::new(
 			Stage::Plan,
-			StageActor::Agent,
 			time_started,
 			quality.score,
 			quality.confidence,
 			meets_bar.noul,
 			vec![
-				EvaluationResult {
+				QAMetric {
 					name: "quality".into(),
 					passed: quality.score >= 0.80,
 					score: quality.score,
 					confidence: quality.confidence,
 					explanation: String::new(),
 				},
-				EvaluationResult {
+				QAMetric {
 					name: "meets_bar".into(),
 					passed: meets_bar.noul >= 0.80,
 					score: meets_bar.noul,
@@ -476,7 +468,7 @@ impl Evaluator {
 			],
 		))
 	}
-	async fn evaluate_build(&self, ctx: &EvaluationContext) -> Result<StageEvaluation> {
+	async fn evaluate_build(&self, ctx: &CtxEvaluation) -> Result<QACheck> {
 		let time_started = Utc::now();
 		let intent = ctx.get(SessionFile::Intent)?;
 		let spec = ctx.get(SessionFile::Spec)?;
@@ -541,22 +533,21 @@ impl Evaluator {
 		let meets_bar = response
 			.noul("meets_bar")
 			.ok_or_else(|| anyhow::anyhow!("JEV returned no build decision"))?;
-		Ok(StageEvaluation::new(
+		Ok(QACheck::new(
 			Stage::Build,
-			StageActor::Sdlc,
 			time_started,
 			quality.score,
 			quality.confidence,
 			meets_bar.noul,
 			vec![
-				EvaluationResult {
+				QAMetric {
 					name: "quality".into(),
 					passed: quality.score >= 0.80,
 					score: quality.score,
 					confidence: quality.confidence,
 					explanation: String::new(),
 				},
-				EvaluationResult {
+				QAMetric {
 					name: "meets_bar".into(),
 					passed: meets_bar.noul >= 0.80,
 					score: meets_bar.noul,
@@ -566,7 +557,7 @@ impl Evaluator {
 			],
 		))
 	}
-	async fn evaluate_verification(&self, ctx: &EvaluationContext) -> Result<StageEvaluation> {
+	async fn evaluate_verification(&self, ctx: &CtxEvaluation) -> Result<QACheck> {
 		let time_started = Utc::now();
 		let intent = ctx.get(SessionFile::Intent)?;
 		let spec = ctx.get(SessionFile::Spec)?;
@@ -617,22 +608,21 @@ impl Evaluator {
 		let meets_bar = response
 			.noul("meets_bar")
 			.ok_or_else(|| anyhow::anyhow!("JEV returned no verification decision"))?;
-		Ok(StageEvaluation::new(
+		Ok(QACheck::new(
 			Stage::Verify,
-			StageActor::Sdlc,
 			time_started,
 			quality.score,
 			quality.confidence,
 			meets_bar.noul,
 			vec![
-				EvaluationResult {
+				QAMetric {
 					name: "quality".into(),
 					passed: quality.score >= 0.80,
 					score: quality.score,
 					confidence: quality.confidence,
 					explanation: String::new(),
 				},
-				EvaluationResult {
+				QAMetric {
 					name: "meets_bar".into(),
 					passed: meets_bar.noul >= 0.80,
 					score: meets_bar.noul,
@@ -643,7 +633,7 @@ impl Evaluator {
 		))
 	}
 }
-impl EvaluationContext {
+impl CtxEvaluation {
 	fn get(&self, file: SessionFile) -> Result<&str> {
 		match file {
 			SessionFile::Intent => self
@@ -733,7 +723,7 @@ impl PipelineRuntime {
 			history: Vec::new(),
 			message: None,
 			passed: None,
-			phase: SdlcPhase::Starting,
+			phase: Phase::Starting,
 			score: None,
 			stage_time_started: Instant::now(),
 			time_started: Instant::now(),
@@ -774,12 +764,12 @@ impl PipelineRuntime {
 				message: format!("Dry Run · step {}/{}", index + 1, Step::ALL.len(),),
 			});
 			self.pipeline.emit(SdlcEvent::PhaseChanged {
-				phase: SdlcPhase::Executing,
+				phase: Phase::Executing,
 			});
 			sleep(DEMO_EXECUTION_TIME).await;
 			self.pipeline.emit(SdlcEvent::ExecutionComplete { stage });
 			self.pipeline.emit(SdlcEvent::PhaseChanged {
-				phase: SdlcPhase::Evaluating,
+				phase: Phase::Evaluating,
 			});
 			self.pipeline.emit(SdlcEvent::EvaluationStarted { stage });
 			sleep(DEMO_EVALUATION_TIME).await;
@@ -800,7 +790,7 @@ impl PipelineRuntime {
 			});
 		}
 		self.pipeline.emit(SdlcEvent::PhaseChanged {
-			phase: SdlcPhase::Completed,
+			phase: Phase::Completed,
 		});
 		self.pipeline.emit(SdlcEvent::Completed);
 		sleep(DEMO_COMPLETE_DELAY).await;
@@ -945,21 +935,19 @@ impl std::fmt::Display for Stage {
 		f.write_str(name)
 	}
 }
-impl StageEvaluation {
+impl QACheck {
 	fn new(
 		stage: Stage,
-		actor: StageActor,
 		time_started: DateTime<Utc>,
 		score: f64,
 		confidence: f64,
 		meets_bar: f64,
-		evaluations: Vec<EvaluationResult>,
+		evaluations: Vec<QAMetric>,
 	) -> Self {
 		let time_completed = Utc::now();
 		let time_total = time_completed - time_started;
 		Self {
 			stage,
-			actor,
 			time_started,
 			time_completed,
 			time_total,
@@ -1027,13 +1015,13 @@ impl SprintPipeline {
 		let _ = self.event_tx.send(event);
 	}
 
-	async fn evaluate(&self, execution: &StageExecution) -> Result<StageEvaluation> {
+	async fn evaluate(&self, execution: &Execution) -> Result<QACheck> {
 		self.evaluator.evaluate(&self.session, execution).await
 	}
-	fn evaluate_checks(&self, checks: &[CheckResult]) -> Vec<EvaluationResult> {
+	fn evaluate_checks(&self, checks: &[CheckResult]) -> Vec<QAMetric> {
 		checks
 			.iter()
-			.map(|check| EvaluationResult {
+			.map(|check| QAMetric {
 				name: check.name.clone(),
 				passed: check.passed,
 				score: if check.passed { 1.0 } else { 0.0 },
@@ -1088,7 +1076,7 @@ impl SprintPipeline {
 		}
 		Ok(())
 	}
-	fn is_passing(&self, checks: &[CheckResult], evaluations: &[EvaluationResult]) -> bool {
+	fn is_passing(&self, checks: &[CheckResult], evaluations: &[QAMetric]) -> bool {
 		checks.iter().all(|check| check.passed)
 			&& evaluations.iter().all(|evaluation| evaluation.passed)
 	}
@@ -1178,7 +1166,7 @@ impl SprintPipeline {
 		FS::save(&self.state_path, &self.session)
 		// FS::save(SpecialFile::WriteDir.path()?, &self.session)
 	}
-	fn persist_evaluation(&mut self, evaluation: &StageEvaluation, attempt: Attempt) -> Result<()> {
+	fn persist_evaluation(&mut self, evaluation: &QACheck, attempt: Attempt) -> Result<()> {
 		let session = self.session()?;
 		persist_evaluation(session, evaluation, attempt)?;
 		self.persist()
@@ -1205,7 +1193,7 @@ impl SprintPipeline {
 				stage: execution.stage,
 				attempt: execution.attempt,
 				status: StageStatus::Completed,
-				actor: evaluation.actor.clone(),
+				actor: StageActor::Evaluator,
 				time_started: execution.time_started,
 				time_completed: Some(execution.time_completed),
 				description: Some(format!("Stage Completed: {}", execution.stage.clone())),
@@ -1219,7 +1207,7 @@ impl SprintPipeline {
 				stage: execution.stage,
 				attempt: execution.attempt,
 				status: StageStatus::NeedsRevision,
-				actor: evaluation.actor.clone(),
+				actor: StageActor::Evaluator,
 				time_started: execution.time_started,
 				time_completed: Some(execution.time_completed),
 				description: Some(format!("Needs Revision: {}", execution.stage.clone())),
@@ -1411,7 +1399,7 @@ impl SprintPipeline {
 			reason,
 		});
 		self.emit(SdlcEvent::PhaseChanged {
-			phase: SdlcPhase::AwaitingHuman,
+			phase: Phase::AwaitingHuman,
 		});
 		let input = input_rx
 			.recv()
@@ -1471,11 +1459,11 @@ impl SprintPipeline {
 		Ok(std::fs::write(path, contents)?)
 	}
 }
-impl SdlcView {
+impl AiView {
 	pub fn apply(&mut self, event: SdlcEvent) {
 		match event {
 			SdlcEvent::RunStarted => {
-				self.runtime.phase = SdlcPhase::Starting;
+				self.runtime.phase = Phase::Starting;
 				self.runtime.time_started = Instant::now();
 				self.runtime.stage_time_started = Instant::now();
 				self.runtime.message = Some(String::from("Run started"));
@@ -1484,7 +1472,7 @@ impl SdlcView {
 			SdlcEvent::StageStarted { stage, attempt } => {
 				self.runtime.stage = stage;
 				self.runtime.attempt = attempt.number;
-				self.runtime.phase = SdlcPhase::Starting;
+				self.runtime.phase = Phase::Starting;
 				self.runtime.stage_time_started = Instant::now();
 				self.runtime.score = None;
 				self.runtime.confidence = None;
@@ -1504,12 +1492,12 @@ impl SdlcView {
 
 			SdlcEvent::PhaseChanged { phase } => {
 				self.runtime.phase = match phase {
-					SdlcPhase::Executing => SdlcPhase::Executing,
-					SdlcPhase::Evaluating => SdlcPhase::Evaluating,
-					SdlcPhase::Completed => SdlcPhase::Completed,
+					Phase::Executing => Phase::Executing,
+					Phase::Evaluating => Phase::Evaluating,
+					Phase::Completed => Phase::Completed,
 
 					// Add the remaining mappings for your actual
-					// SdlcPhase variants.
+					// Phase variants.
 					_ => self.runtime.phase,
 				};
 
@@ -1518,13 +1506,13 @@ impl SdlcView {
 
 			SdlcEvent::ExecutionComplete { stage } => {
 				self.runtime.stage = stage;
-				self.runtime.phase = SdlcPhase::Evaluating;
+				self.runtime.phase = Phase::Evaluating;
 				self.runtime.message = Some(String::from("Execution complete"));
 			}
 
 			SdlcEvent::EvaluationStarted { stage } => {
 				self.runtime.stage = stage;
-				self.runtime.phase = SdlcPhase::Evaluating;
+				self.runtime.phase = Phase::Evaluating;
 				self.runtime.message = Some(String::from("Evaluating"));
 			}
 
@@ -1544,7 +1532,7 @@ impl SdlcView {
 				));
 
 				if !passed {
-					self.runtime.phase = SdlcPhase::Failed;
+					self.runtime.phase = Phase::Failed;
 				}
 			}
 
@@ -1557,7 +1545,7 @@ impl SdlcView {
 			}
 
 			SdlcEvent::Completed => {
-				self.runtime.phase = SdlcPhase::Completed;
+				self.runtime.phase = Phase::Completed;
 				self.runtime.message = Some(String::from("SDLC complete"));
 			}
 
@@ -1566,7 +1554,7 @@ impl SdlcView {
 					self.runtime.stage = stage;
 				}
 
-				self.runtime.phase = SdlcPhase::Failed;
+				self.runtime.phase = Phase::Failed;
 				self.runtime.message = Some(error.clone());
 				self.runtime.error = Some(error);
 			}
@@ -1629,7 +1617,7 @@ impl SdlcView {
 		}
 	}
 
-	pub fn render(frame: &mut Frame<'_>, view: &SdlcView) {
+	pub fn render(frame: &mut Frame<'_>, view: &AiView) {
 		let area = frame.area();
 		frame.render_widget(Clear, area);
 		let chunks = RatatuiLayout::default()
@@ -1742,14 +1730,14 @@ impl SprintRunner<'_> {
 	async fn apply(
 		&mut self,
 		outcome: StageOutcome,
-		decision: StageDecision,
+		decision: Decision,
 		input_rx: &mut UnboundedReceiver<SdlcInput>,
 		pending_input: &mut Option<SdlcInput>,
 	) -> Result<RunControl> {
 		let stage = outcome.stage();
 		let attempt = outcome.attempt();
 		match decision {
-			StageDecision::Continue => {
+			Decision::Continue => {
 				let next = stage
 					.next()
 					.ok_or_else(|| anyhow!("Stage {stage:?} has no next stage"))?;
@@ -1760,7 +1748,7 @@ impl SprintRunner<'_> {
 				});
 				Ok(RunControl::Continue)
 			}
-			StageDecision::Retry => {
+			Decision::Retry => {
 				if attempt.number >= attempt.max {
 					tracing::warn!(
 						stage = ?stage,
@@ -1798,7 +1786,7 @@ impl SprintRunner<'_> {
 
 				Ok(RunControl::RetryStage)
 			}
-			StageDecision::Revise => {
+			Decision::Revise => {
 				self
 					.pipeline
 					.persist_progress(&format!("Revising stage {}", stage))?;
@@ -1807,9 +1795,9 @@ impl SprintRunner<'_> {
 				// 	.await?;
 				Ok(RunControl::RetryStage)
 			}
-			StageDecision::AwaitHuman => {
+			Decision::AwaitHuman => {
 				self.emit(SdlcEvent::PhaseChanged {
-					phase: SdlcPhase::AwaitingHuman,
+					phase: Phase::AwaitingHuman,
 				});
 				let intervention = self
 					.wait_for_intervention(
@@ -1848,7 +1836,7 @@ impl SprintRunner<'_> {
 					Intervention::Human(_) => Ok(RunControl::Exit),
 				}
 			}
-			StageDecision::Fail => {
+			Decision::Fail => {
 				self.emit(SdlcEvent::Failed {
 					stage: Some(stage),
 					error: format!("Stage {stage:?} failed on attempt {}", attempt.number + 1),
@@ -1858,16 +1846,16 @@ impl SprintRunner<'_> {
 					.persist_progress(&format!("{} failed", stage))?;
 				Ok(RunControl::Exit)
 			}
-			StageDecision::Exit => {
+			Decision::Exit => {
 				self.emit(SdlcEvent::Failed {
 					stage: Some(stage),
 					error: format!("Stage {stage:?} exited on attempt {}", attempt.number + 1),
 				});
 				Ok(RunControl::Exit)
 			}
-			StageDecision::Complete => {
+			Decision::Complete => {
 				self.emit(SdlcEvent::PhaseChanged {
-					phase: SdlcPhase::Completed,
+					phase: Phase::Completed,
 				});
 				self
 					.pipeline
@@ -1885,7 +1873,7 @@ impl SprintRunner<'_> {
 		pending_input: &mut Option<SdlcInput>,
 	) -> Result<RunControl> {
 		self.emit(SdlcEvent::PhaseChanged {
-			phase: SdlcPhase::AwaitingHuman,
+			phase: Phase::AwaitingHuman,
 		});
 
 		self.emit(SdlcEvent::Activity {
@@ -1948,17 +1936,17 @@ impl SprintRunner<'_> {
 	fn attempt_stage(&mut self, stage: Stage) -> Result<Attempt> {
 		self.pipeline.next_attempt(stage)
 	}
-	pub async fn decide(&self, outcome: &StageOutcome) -> Result<StageDecision> {
+	pub async fn decide(&self, outcome: &StageOutcome) -> Result<Decision> {
 		tracing::info!(">>> DECIDE");
 		// tracing::info!(">>> outcome = {outcome:#?}");
 		if std::env::var_os("SDLC_FORCE_EXIT").is_some() {
 			tracing::warn!(">>> SDLC_FORCE_EXIT=1 -> Exit");
-			return Ok(StageDecision::Exit);
+			return Ok(Decision::Exit);
 		}
 
 		if std::env::var_os("SDLC_FORCE_CONTINUE").is_some() {
 			tracing::warn!(">>> SDLC_FORCE_CONTINUE=1 -> Continue");
-			return Ok(StageDecision::Continue);
+			return Ok(Decision::Continue);
 		}
 		let decision = match outcome {
 			StageOutcome::EvaluationFailed { execution, .. } => {
@@ -1971,14 +1959,14 @@ impl SprintRunner<'_> {
 				);
 				if attempt.number < attempt.max {
 					tracing::info!(">>> attempt {}/{} -> Retry", attempt.number, attempt.max,);
-					StageDecision::Retry
+					Decision::Retry
 				} else {
 					tracing::info!(
 						">>> attempt {}/{} exhausted -> AwaitHuman",
 						attempt.number,
 						attempt.max,
 					);
-					StageDecision::AwaitHuman
+					Decision::AwaitHuman
 				}
 			}
 			StageOutcome::Complete { execution, .. } => {
@@ -1992,19 +1980,19 @@ impl SprintRunner<'_> {
 					StageResult::Verification(verification) => {
 						if verification.passed {
 							tracing::info!(">>> verification passed -> Continue");
-							StageDecision::Continue
+							Decision::Continue
 						} else {
 							tracing::info!(">>> verification failed -> Retry");
-							StageDecision::Retry
+							Decision::Retry
 						}
 					}
 					_ if execution.stage == Stage::Complete => {
 						tracing::info!(">>> final stage -> Complete");
-						StageDecision::Complete
+						Decision::Complete
 					}
 					_ => {
 						tracing::info!(">>> stage complete -> Continue");
-						StageDecision::Continue
+						Decision::Continue
 					}
 				}
 			}
@@ -2023,7 +2011,7 @@ impl SprintRunner<'_> {
 				);
 				if attempt.number < attempt.max {
 					tracing::info!(">>> attempt {}/{} -> Revise", attempt.number, attempt.max,);
-					StageDecision::Revise
+					Decision::Revise
 				} else {
 					tracing::info!(
 						">>> attempt {}/{} exhausted -> AwaitHuman",
@@ -2031,7 +2019,7 @@ impl SprintRunner<'_> {
 						attempt.max,
 					);
 
-					StageDecision::AwaitHuman
+					Decision::AwaitHuman
 				}
 			}
 			StageOutcome::ExecutionFailed { attempt, .. } => {
@@ -2043,14 +2031,14 @@ impl SprintRunner<'_> {
 				);
 				if attempt.number < attempt.max {
 					tracing::info!(">>> attempt {}/{} -> Retry", attempt.number, attempt.max,);
-					StageDecision::Retry
+					Decision::Retry
 				} else {
 					tracing::info!(
 						">>> attempt {}/{} exhausted -> AwaitHuman",
 						attempt.number,
 						attempt.max,
 					);
-					StageDecision::AwaitHuman
+					Decision::AwaitHuman
 				}
 			}
 		};
@@ -2063,7 +2051,7 @@ impl SprintRunner<'_> {
 	fn evaluate_checks(&self, checks: Vec<CheckResult>) -> Result<Vec<CheckResult>> {
 		todo!("evaluate_checks")
 	}
-	async fn evaluate(&self, execution: &StageExecution) -> Result<StageEvaluation> {
+	async fn evaluate(&self, execution: &Execution) -> Result<QACheck> {
 		let stage = execution.stage;
 		let checks = self.pipeline.run_checks(stage).await?;
 		let structural = self.evaluate_checks(checks)?;
@@ -2088,7 +2076,7 @@ impl SprintRunner<'_> {
 		});
 
 		self.emit(SdlcEvent::PhaseChanged {
-			phase: SdlcPhase::Retrying,
+			phase: Phase::Retrying,
 		});
 
 		self.pipeline.retry(stage)?;
@@ -2096,12 +2084,12 @@ impl SprintRunner<'_> {
 	}
 	async fn handle_evaluation(
 		&mut self,
-		execution: StageExecution,
+		execution: Execution,
 		attempt: Attempt,
 	) -> Result<StageOutcome> {
 		let stage = execution.stage;
 		self.emit(SdlcEvent::PhaseChanged {
-			phase: SdlcPhase::Evaluating,
+			phase: Phase::Evaluating,
 		});
 		self.emit(SdlcEvent::EvaluationStarted { stage });
 		match self.pipeline.evaluate(&execution).await {
@@ -2220,13 +2208,13 @@ impl SprintRunner<'_> {
 				number: attempt.number + 1,
 			});
 			self.emit(SdlcEvent::PhaseChanged {
-				phase: SdlcPhase::Retrying,
+				phase: Phase::Retrying,
 			});
 			self.pipeline.retry(stage)?;
 			return Ok(RunControl::Continue);
 		}
 		self.emit(SdlcEvent::PhaseChanged {
-			phase: SdlcPhase::AwaitingHuman,
+			phase: Phase::AwaitingHuman,
 		});
 
 		match self
@@ -2301,7 +2289,7 @@ impl SprintRunner<'_> {
 			});
 
 			self.emit(SdlcEvent::PhaseChanged {
-				phase: SdlcPhase::Retrying,
+				phase: Phase::Retrying,
 			});
 
 			self.pipeline.retry(stage)?;
@@ -2309,7 +2297,7 @@ impl SprintRunner<'_> {
 		}
 
 		self.emit(SdlcEvent::PhaseChanged {
-			phase: SdlcPhase::AwaitingHuman,
+			phase: Phase::AwaitingHuman,
 		});
 
 		match self
@@ -2368,7 +2356,7 @@ impl SprintRunner<'_> {
 			});
 
 			self.emit(SdlcEvent::PhaseChanged {
-				phase: SdlcPhase::Retrying,
+				phase: Phase::Retrying,
 			});
 
 			self.pipeline.retry(stage)?;
@@ -2377,7 +2365,7 @@ impl SprintRunner<'_> {
 		}
 
 		self.emit(SdlcEvent::PhaseChanged {
-			phase: SdlcPhase::AwaitingHuman,
+			phase: Phase::AwaitingHuman,
 		});
 
 		match self
@@ -2483,7 +2471,7 @@ impl SprintRunner<'_> {
 		pending_input: &mut Option<SdlcInput>,
 	) -> Result<StageOutcome> {
 		self.emit(SdlcEvent::PhaseChanged {
-			phase: SdlcPhase::Executing,
+			phase: Phase::Executing,
 		});
 
 		let input = match pending_input.take() {
@@ -2507,7 +2495,7 @@ impl SprintRunner<'_> {
 		};
 
 		self.emit(SdlcEvent::PhaseChanged {
-			phase: SdlcPhase::Evaluating,
+			phase: Phase::Evaluating,
 		});
 		self.handle_evaluation(execution, attempt).await
 	}
@@ -2516,7 +2504,7 @@ impl SprintRunner<'_> {
 		stage: Stage,
 		attempt: Attempt,
 		input: StageInput,
-	) -> Result<StageExecution> {
+	) -> Result<Execution> {
 		let time_started = Utc::now();
 
 		let result = match stage {
@@ -2535,7 +2523,7 @@ impl SprintRunner<'_> {
 			}
 		};
 
-		Ok(StageExecution {
+		Ok(Execution {
 			stage,
 			attempt,
 			time_started,
@@ -2674,7 +2662,7 @@ impl SprintRunner<'_> {
 			.await
 			.context("reading plan.md")?;
 		let steps = build_steps();
-		let workspace_before = WorkspaceSnapshot::capture(&workspace)?;
+		let workspace_before = WSSnapshot::capture(&workspace)?;
 		for (index, instruction) in steps.iter().enumerate() {
 			let step = index + 1;
 
@@ -2689,7 +2677,7 @@ impl SprintRunner<'_> {
 			//
 			// This is important because the workspace has changed since
 			// the previous call.
-			let current_workspace = WorkspaceSnapshot::capture(&workspace)?;
+			let current_workspace = WSSnapshot::capture(&workspace)?;
 
 			let workspace_context = format!(
 				"CWD: {}\n\n{}",
@@ -2720,7 +2708,7 @@ impl SprintRunner<'_> {
 			//
 			// Don't carry the original workspace snapshot forward.
 			// The agent just changed it.
-			let after_step = WorkspaceSnapshot::capture(&workspace)?;
+			let after_step = WSSnapshot::capture(&workspace)?;
 
 			self.pipeline.persist_progress(&format!(
 				"Build step {}/{} completed: {} file(s) changed",
@@ -2729,7 +2717,7 @@ impl SprintRunner<'_> {
 				after_step.diff(&workspace_before).file_count(),
 			))?;
 		}
-		let workspace_after = WorkspaceSnapshot::capture(&workspace)?;
+		let workspace_after = WSSnapshot::capture(&workspace)?;
 		let changes = workspace_before.diff(&workspace_after);
 		SprintPipeline::write(
 			session_dir.join("build.md"),
@@ -2810,7 +2798,7 @@ impl Step {
 	];
 }
 
-impl WorkspaceChanges {
+impl WSChanges {
 	pub fn file_count(&self) -> usize {
 		self
 			.git_status
@@ -2834,7 +2822,7 @@ impl WorkspaceChanges {
 		markdown
 	}
 }
-impl WorkspaceSnapshot {
+impl WSSnapshot {
 	pub fn capture(workspace: impl AsRef<Path>) -> Result<Self> {
 		let workspace = workspace.as_ref();
 		let output = Command::new("git")
@@ -2853,8 +2841,8 @@ impl WorkspaceSnapshot {
 				.context("git status output was not valid UTF-8")?,
 		})
 	}
-	pub fn diff(&self, after: &Self) -> WorkspaceChanges {
-		WorkspaceChanges {
+	pub fn diff(&self, after: &Self) -> WSChanges {
+		WSChanges {
 			git_status: after.git_status.clone(),
 		}
 	}

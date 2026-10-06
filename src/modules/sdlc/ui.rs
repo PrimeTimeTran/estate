@@ -15,7 +15,7 @@ use crate::{
 		task::TaskResult,
 	},
 	prelude::{structs as ext_structs, *},
-	sdlc::{format_elapsed, r#struct::SdlcView},
+	sdlc::{format_elapsed, r#struct::AiView},
 };
 
 pub fn body(chunk: Rect) -> Vec<Rect> {
@@ -29,7 +29,7 @@ pub fn body(chunk: Rect) -> Vec<Rect> {
 		.split(chunk)
 		.to_vec()
 }
-pub fn header(frame: &mut Frame<'_>, view: &SdlcView, area: Rect) {
+pub fn header(frame: &mut Frame<'_>, view: &AiView, area: Rect) {
 	let elapsed = format_elapsed(view.runtime.time_started.elapsed());
 	let line = Line::from(vec![
 		Span::styled(
@@ -45,7 +45,7 @@ pub fn header(frame: &mut Frame<'_>, view: &SdlcView, area: Rect) {
 
 	frame.render_widget(Paragraph::new(line), area);
 }
-pub fn stepper(frame: &mut Frame<'_>, view: &SdlcView, area: Rect) {
+pub fn stepper(frame: &mut Frame<'_>, view: &AiView, area: Rect) {
 	let stages = [
 		Stage::Intent,
 		Stage::Spec,
@@ -58,13 +58,13 @@ pub fn stepper(frame: &mut Frame<'_>, view: &SdlcView, area: Rect) {
 	let current = view.runtime.stage;
 
 	let current_style = match view.runtime.phase {
-		SdlcPhase::Failed => Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+		Phase::Failed => Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
 
-		SdlcPhase::Retrying => Style::default()
+		Phase::Retrying => Style::default()
 			.fg(Color::Yellow)
 			.add_modifier(Modifier::BOLD),
 
-		SdlcPhase::AwaitingHuman => Style::default()
+		Phase::AwaitingHuman => Style::default()
 			.fg(Color::Magenta)
 			.add_modifier(Modifier::BOLD),
 
@@ -107,7 +107,7 @@ pub fn stepper(frame: &mut Frame<'_>, view: &SdlcView, area: Rect) {
 
 	frame.render_widget(Paragraph::new(Line::from(spans)), area);
 }
-pub fn left_stage_panel(frame: &mut Frame<'_>, view: &SdlcView, area: Rect) {
+pub fn left_stage_panel(frame: &mut Frame<'_>, view: &AiView, area: Rect) {
 	let runtime = &view.runtime;
 
 	let phase_style = phase_style(runtime.phase);
@@ -139,7 +139,7 @@ pub fn left_stage_panel(frame: &mut Frame<'_>, view: &SdlcView, area: Rect) {
 	};
 
 	let status = match runtime.phase {
-		SdlcPhase::Executing => {
+		Phase::Executing => {
 			let frame = spinner(runtime.stage_time_started.elapsed());
 
 			Line::from(vec![
@@ -161,7 +161,7 @@ pub fn left_stage_panel(frame: &mut Frame<'_>, view: &SdlcView, area: Rect) {
 				),
 			])
 		}
-		SdlcPhase::Retrying => Line::from(vec![
+		Phase::Retrying => Line::from(vec![
 			Span::styled(
 				"↻ ",
 				Style::default()
@@ -179,7 +179,7 @@ pub fn left_stage_panel(frame: &mut Frame<'_>, view: &SdlcView, area: Rect) {
 				Style::default().fg(Color::Gray),
 			),
 		]),
-		SdlcPhase::Evaluating => Line::from(vec![
+		Phase::Evaluating => Line::from(vec![
 			Span::styled(
 				"◆ ",
 				Style::default()
@@ -194,7 +194,7 @@ pub fn left_stage_panel(frame: &mut Frame<'_>, view: &SdlcView, area: Rect) {
 			),
 			Span::styled("   evaluating", Style::default().fg(Color::Cyan)),
 		]),
-		SdlcPhase::AwaitingHuman => Line::from(vec![
+		Phase::AwaitingHuman => Line::from(vec![
 			Span::styled(
 				"⚠ ",
 				Style::default()
@@ -209,7 +209,7 @@ pub fn left_stage_panel(frame: &mut Frame<'_>, view: &SdlcView, area: Rect) {
 			),
 			Span::styled("  Input", Style::default().fg(Color::Gray)),
 		]),
-		SdlcPhase::Failed => Line::from(vec![
+		Phase::Failed => Line::from(vec![
 			Span::styled(
 				"✗ ",
 				Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
@@ -220,7 +220,7 @@ pub fn left_stage_panel(frame: &mut Frame<'_>, view: &SdlcView, area: Rect) {
 			),
 			Span::styled("   failed", Style::default().fg(Color::Gray)),
 		]),
-		SdlcPhase::Starting => Line::from(vec![
+		Phase::Starting => Line::from(vec![
 			Span::styled("· ", Style::default().fg(Color::Yellow)),
 			Span::styled(
 				format!("{:?}", runtime.stage),
@@ -229,7 +229,7 @@ pub fn left_stage_panel(frame: &mut Frame<'_>, view: &SdlcView, area: Rect) {
 					.add_modifier(Modifier::BOLD),
 			),
 		]),
-		SdlcPhase::Completed => Line::from(vec![
+		Phase::Completed => Line::from(vec![
 			Span::styled("✓ ", Style::default().fg(Color::Green)),
 			Span::styled(
 				format!("{:?}", runtime.stage),
@@ -284,7 +284,7 @@ pub fn left_stage_panel(frame: &mut Frame<'_>, view: &SdlcView, area: Rect) {
 		area,
 	);
 }
-pub fn right_activity_panel(frame: &mut Frame<'_>, view: &SdlcView, area: Rect) {
+pub fn right_activity_panel(frame: &mut Frame<'_>, view: &AiView, area: Rect) {
 	let runtime = &view.runtime;
 	let spinner = spinner(runtime.stage_time_started.elapsed());
 	let stage_style = Style::default()
@@ -293,13 +293,13 @@ pub fn right_activity_panel(frame: &mut Frame<'_>, view: &SdlcView, area: Rect) 
 	let attempt_style = Style::default().fg(Color::DarkGray);
 	let phase_style = phase_style(runtime.phase);
 	let phase_label = match runtime.phase {
-		SdlcPhase::Starting => "Starting",
-		SdlcPhase::Executing => "Executing",
-		SdlcPhase::Evaluating => "Evaluating",
-		SdlcPhase::Retrying => "Retrying",
-		SdlcPhase::AwaitingHuman => "Awaiting input",
-		SdlcPhase::Completed => "Completed",
-		SdlcPhase::Failed => "Failed",
+		Phase::Starting => "Starting",
+		Phase::Executing => "Executing",
+		Phase::Evaluating => "Evaluating",
+		Phase::Retrying => "Retrying",
+		Phase::AwaitingHuman => "Awaiting input",
+		Phase::Completed => "Completed",
+		Phase::Failed => "Failed",
 	};
 	let mut lines = Vec::new();
 	lines.push(Line::from(vec![
@@ -359,7 +359,7 @@ pub fn right_activity_panel(frame: &mut Frame<'_>, view: &SdlcView, area: Rect) 
 		area,
 	);
 }
-pub fn footer(frame: &mut Frame<'_>, view: &SdlcView, area: Rect) {
+pub fn footer(frame: &mut Frame<'_>, view: &AiView, area: Rect) {
 	if view.is_input_active() {
 		let input = Paragraph::new(view.input.as_str())
 			.block(
@@ -582,33 +582,33 @@ pub fn stage_style(stage: Stage, current: Stage) -> Style {
 			.add_modifier(Modifier::DIM),
 	}
 }
-pub fn phase_style(phase: SdlcPhase) -> Style {
+pub fn phase_style(phase: Phase) -> Style {
 	match phase {
-		SdlcPhase::Starting => Style::default()
+		Phase::Starting => Style::default()
 			.fg(Color::Yellow)
 			.add_modifier(Modifier::BOLD),
 
-		SdlcPhase::Executing => Style::default()
+		Phase::Executing => Style::default()
 			.fg(Color::Yellow)
 			.add_modifier(Modifier::BOLD),
 
-		SdlcPhase::Evaluating => Style::default()
+		Phase::Evaluating => Style::default()
 			.fg(Color::Cyan)
 			.add_modifier(Modifier::BOLD),
 
-		SdlcPhase::Retrying => Style::default()
+		Phase::Retrying => Style::default()
 			.fg(Color::Yellow)
 			.add_modifier(Modifier::BOLD),
 
-		SdlcPhase::AwaitingHuman => Style::default()
+		Phase::AwaitingHuman => Style::default()
 			.fg(Color::Magenta)
 			.add_modifier(Modifier::BOLD),
 
-		SdlcPhase::Completed => Style::default()
+		Phase::Completed => Style::default()
 			.fg(Color::Green)
 			.add_modifier(Modifier::BOLD),
 
-		SdlcPhase::Failed => Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+		Phase::Failed => Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
 	}
 }
 pub fn spinner(elapsed: std::time::Duration) -> &'static str {

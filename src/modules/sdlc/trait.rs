@@ -44,8 +44,8 @@ trait Stage {
 		_ctx: &Context,
 		_result: &StageResult,
 		_evaluation: Option<&Evaluation>,
-	) -> Result<StageTransition> {
-		Ok(StageTransition::Next)
+	) -> Result<Transition> {
+		Ok(Transition::Next)
 	}
 	fn cleanup(&self, _ctx: &mut Context) -> Result<()> {
 		Ok(())

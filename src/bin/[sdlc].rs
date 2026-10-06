@@ -37,7 +37,7 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	println!(">>> runtime created");
 
 	let mut events = runtime.pipeline.subscribe();
-	let mut view = SdlcView::new(&runtime);
+	let mut view = AiView::new(&runtime);
 
 	let (input_tx, mut input_rx) = tokio::sync::mpsc::unbounded_channel::<SdlcInput>();
 
@@ -94,7 +94,7 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let _guard = Guard;
 
 	terminal.draw(|frame| {
-		SdlcView::render(frame, &view);
+		AiView::render(frame, &view);
 	})?;
 
 	let mut ticker = tokio::time::interval(Duration::from_millis(100));
@@ -111,7 +111,7 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 										view.apply(event);
 
 										terminal.draw(|frame| {
-												SdlcView::render(frame, &view);
+												AiView::render(frame, &view);
 										})?;
 								}
 
@@ -122,7 +122,7 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 										});
 
 										terminal.draw(|frame| {
-												SdlcView::render(frame, &view);
+												AiView::render(frame, &view);
 										})?;
 								}
 
@@ -165,7 +165,7 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 						}
 
 						terminal.draw(|frame| {
-								SdlcView::render(frame, &view);
+								AiView::render(frame, &view);
 						})?;
 				}
 		}

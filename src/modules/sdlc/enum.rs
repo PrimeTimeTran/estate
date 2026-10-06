@@ -1,6 +1,17 @@
 use super::*;
 
 #[derive(Debug)]
+pub enum Decision {
+	Continue,
+	Retry,
+	Revise,
+	AwaitHuman,
+	Fail,
+	Complete,
+	Exit,
+}
+
+#[derive(Debug)]
 pub enum ExecutionResult {
 	Completed(TaskResult),
 	Failed(StageError),
@@ -19,7 +30,7 @@ pub enum Intervention {
 	Reviewed,
 	Abort,
 	Revise,
-	Revision { evaluation: StageEvaluation },
+	Revision { evaluation: QACheck },
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -28,6 +39,16 @@ pub enum GenerationProvider {
 	Api,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, Copy, PartialEq)]
+pub enum Phase {
+	Starting,
+	Executing,
+	Evaluating,
+	Retrying,
+	AwaitingHuman,
+	Completed,
+	Failed,
+}
 pub type PipelineId = uuid::Uuid;
 
 #[derive(Debug)]
@@ -36,20 +57,7 @@ pub enum RunControl {
 	Exit,
 	RetryStage,
 }
-pub enum RunResult {
-	Completed,
-	Failed,
-	Cancelled,
-}
-pub enum RunState {
-	Idle,
-	Running,
-	Paused,
-	AwaitingInput,
-	Completed,
-	Failed,
-	Cancelled,
-}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum SdlcEvent {
 	Activity {
@@ -96,7 +104,7 @@ pub enum SdlcEvent {
 		reason: String,
 	},
 	PhaseChanged {
-		phase: SdlcPhase,
+		phase: Phase,
 	},
 	RunStarted,
 	StageRetrying {
@@ -122,18 +130,8 @@ pub enum SdlcInput {
 	ProvideContext(String),
 	Retry,
 	Reviewed,
-	Revision { evaluation: StageEvaluation },
+	Revision { evaluation: QACheck },
 	Human(String),
-}
-#[derive(Debug, Clone, Deserialize, Serialize, Copy, PartialEq)]
-pub enum SdlcPhase {
-	Starting,
-	Executing,
-	Evaluating,
-	Retrying,
-	AwaitingHuman,
-	Completed,
-	Failed,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -165,31 +163,22 @@ pub enum StageActor {
 	Agent,
 	System,
 }
-#[derive(Debug)]
-pub enum StageDecision {
-	Continue,
-	Retry,
-	Revise,
-	AwaitHuman,
-	Fail,
-	Complete,
-	Exit,
-}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum StageInput {
 	Initial,
-	Revision { evaluation: StageEvaluation },
+	Revision { evaluation: QACheck },
 }
 
 #[derive(Debug)]
 pub enum StageOutcome {
 	Complete {
-		execution: StageExecution,
-		evaluation: StageEvaluation,
+		execution: Execution,
+		evaluation: QACheck,
 	},
 	NeedsRevision {
-		execution: StageExecution,
-		evaluation: StageEvaluation,
+		execution: Execution,
+		evaluation: QACheck,
 	},
 	ExecutionFailed {
 		stage: Stage,
@@ -197,7 +186,7 @@ pub enum StageOutcome {
 		error: anyhow::Error,
 	},
 	EvaluationFailed {
-		execution: StageExecution,
+		execution: Execution,
 		error: anyhow::Error,
 	},
 }
@@ -226,15 +215,6 @@ pub enum StageStatus {
 	InterventionNeeded,
 }
 
-pub enum StageTransition {
-	Next,
-	Repeat,
-	Goto(Stage),
-	Complete,
-	Fail,
-	AwaitHuman,
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Step {
 	Boot,
@@ -247,4 +227,13 @@ pub enum Step {
 	Deploy,
 	Maintain,
 	Complete,
+}
+
+pub enum Transition {
+	Next,
+	Repeat,
+	Goto(Stage),
+	Complete,
+	Fail,
+	AwaitHuman,
 }

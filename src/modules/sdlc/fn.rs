@@ -56,7 +56,7 @@ pub fn slugify(input: &str) -> String {
 }
 pub fn persist_evaluation(
 	session: &mut AiSession,
-	evaluation: &StageEvaluation,
+	evaluation: &QACheck,
 	attempt: Attempt,
 ) -> Result<()> {
 	let status = if evaluation.passed {
@@ -66,7 +66,7 @@ pub fn persist_evaluation(
 	};
 	let record = StageRecord {
 		description: Some(String::from("Evaluation Complete")),
-		actor: evaluation.actor.clone(),
+		actor: StageActor::Evaluator,
 		attempt,
 		evaluation: Some(evaluation.clone()),
 		stage: evaluation.stage,
