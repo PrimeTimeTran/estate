@@ -7,7 +7,7 @@ pub struct AiSession {
 	pub title: String,
 	pub goal: String,
 	pub stage: Stage,
-	pub stages: Vec<StageRecord>,
+	pub stages: Vec<StageRunRecord>,
 	pub dir: PathBuf,
 	pub time_created: DateTime<Utc>,
 	pub time_updated: DateTime<Utc>,
@@ -77,39 +77,28 @@ pub struct Evaluation {
 	pub feedback: String,
 	pub criteria: Vec<CriterionResult>,
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct QACheck {
-	pub confidence: f64,
-	pub passed: bool,
-	pub score: f64,
-	pub stage: Stage,
-	pub time_completed: DateTime<Utc>,
-	pub time_started: DateTime<Utc>,
-	pub time_total: chrono::Duration,
-	pub evaluations: Vec<QAMetric>,
-}
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct QAMetric {
-	pub name: String,
-	pub passed: bool,
-	pub score: f64,
-	pub confidence: f64,
-	pub explanation: String,
-}
+
 #[derive(Debug)]
 pub struct Execution {
 	pub stage: Stage,
 	pub attempt: Attempt,
 	pub time_started: chrono::DateTime<Utc>,
 	pub time_completed: chrono::DateTime<Utc>,
-	pub result: StageResult,
+	pub result: RunResult,
 }
 #[derive(Clone, Debug)]
 pub struct LocalGenerator {
 	pub runtime: AgentRuntime,
 	pub model: String,
 }
-
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Metric {
+	pub name: String,
+	pub passed: bool,
+	pub score: f64,
+	pub confidence: f64,
+	pub explanation: String,
+}
 #[derive(Debug, Deserialize)]
 pub struct OllamaResponse {
 	pub model: String,
@@ -141,27 +130,35 @@ pub struct PipelineRuntime {
 pub struct PipelineRuntimeView {
 	pub activity: Vec<String>,
 	pub attempt: u32,
-	pub stage: e::Stage,
-	pub time_started: Instant,
-	pub stage_time_started: Instant,
+	pub confidence: Option<f64>,
+	pub error: Option<String>,
+	pub events: Vec<SdlcEvent>,
+	pub history: Vec<SdlcEvent>,
+	pub message: Option<String>,
+	pub passed: Option<bool>,
 	pub phase: Phase,
 	pub score: Option<f64>,
-	pub confidence: Option<f64>,
-	pub passed: Option<bool>,
-	pub message: Option<String>,
-	pub error: Option<String>,
-	pub total_tokens: u64,
+	pub stage: Stage,
+	pub stage_time_started: Instant,
+	pub time_started: Instant,
 	pub total_agent_calls: u32,
-	pub history: Vec<SdlcEvent>,
-	pub events: Vec<SdlcEvent>,
+	pub total_tokens: u64,
 }
 pub struct PipelineState<S> {
 	stage: S,
 	attempt: u32,
-	status: PipelineStatus,
 }
-pub struct PipelineStatus;
-
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QACheck {
+	pub confidence: f64,
+	pub passed: bool,
+	pub score: f64,
+	pub stage: Stage,
+	pub time_completed: DateTime<Utc>,
+	pub time_started: DateTime<Utc>,
+	pub time_total: chrono::Duration,
+	pub evaluations: Vec<Metric>,
+}
 #[derive(Clone, Debug)]
 pub struct SprintPipeline {
 	pub evaluator: Evaluator,
@@ -178,7 +175,7 @@ pub struct SprintRunner<'a> {
 #[derive(Debug)]
 pub struct StageError;
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StageRecord {
+pub struct StageRunRecord {
 	pub attempt: Attempt,
 	pub description: Option<String>,
 	pub stage: Stage,
@@ -201,7 +198,7 @@ pub struct Verification {
 	pub passed: bool,
 	// pub score: u32,
 	pub checks: Vec<CheckResult>,
-	pub evaluations: Vec<QAMetric>,
+	pub evaluations: Vec<Metric>,
 }
 
 #[derive(Debug, Clone)]

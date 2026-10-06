@@ -64,7 +64,7 @@ pub fn persist_evaluation(
 	} else {
 		Status::NeedsRevision
 	};
-	let record = StageRecord {
+	let record = StageRunRecord {
 		description: Some(String::from("Evaluation Complete")),
 		actor: StageActor::Evaluator,
 		attempt,

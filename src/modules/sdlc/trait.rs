@@ -35,14 +35,14 @@ trait Stage {
 	fn prepare(&self, _ctx: &mut Context) -> Result<()> {
 		Ok(())
 	}
-	fn run(&self, ctx: &mut Context) -> Result<StageResult>;
-	fn evaluate(&self, _ctx: &Context, _result: &StageResult) -> Result<Option<Evaluation>> {
+	fn run(&self, ctx: &mut Context) -> Result<RunResult>;
+	fn evaluate(&self, _ctx: &Context, _result: &RunResult) -> Result<Option<Evaluation>> {
 		Ok(None)
 	}
 	fn transition(
 		&self,
 		_ctx: &Context,
-		_result: &StageResult,
+		_result: &RunResult,
 		_evaluation: Option<&Evaluation>,
 	) -> Result<Transition> {
 		Ok(Transition::Next)

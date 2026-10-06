@@ -141,7 +141,7 @@ pub enum Stage {
 	Plan,
 	Test,
 	Build,
-	Verify,
+	QA,
 	Deploy,
 	Maintain,
 	Complete,
@@ -196,7 +196,7 @@ pub enum StageOutcomeEvaluation {
 	FailedRuntime(Error),
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum StageResult {
+pub enum RunResult {
 	Intent,
 	Spec,
 	Plan,

@@ -51,7 +51,7 @@ pub fn stepper(frame: &mut Frame<'_>, view: &AiView, area: Rect) {
 		Stage::Spec,
 		Stage::Plan,
 		Stage::Build,
-		Stage::Verify,
+		Stage::QA,
 		Stage::Complete,
 	];
 
