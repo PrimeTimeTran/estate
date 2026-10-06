@@ -56,8 +56,27 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	if !use_tui {
 		println!(">>> starting runtime");
 
+		let status = StatusBar::new();
+
+		// Draw it once immediately.
+		status.draw()?;
+
+		// Tick independently of the pipeline.
+		let status_task = tokio::spawn(async move {
+			let mut ticker = tokio::time::interval(Duration::from_secs(1));
+
+			loop {
+				ticker.tick().await;
+
+				if status.draw().is_err() {
+					break;
+				}
+			}
+		});
+
 		if resume_from_build {
 			println!(">>> resuming from Build");
+
 			runtime
 				.resume_from(Stage::Build, &mut input_rx)
 				.await
@@ -65,9 +84,8 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 		} else {
 			runtime.run(&mut input_rx).await.context("runtime.run")?;
 		}
-
+		status_task.abort();
 		println!(">>> runtime finished");
-		return Ok(());
 	}
 	let is_real_run = std::env::var_os("DRY_RUN").is_none();
 

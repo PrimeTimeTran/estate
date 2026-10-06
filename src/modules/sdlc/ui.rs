@@ -616,3 +616,124 @@ pub fn spinner(elapsed: std::time::Duration) -> &'static str {
 	let index = (elapsed.as_millis() / 100) as usize % FRAMES.len();
 	FRAMES[index]
 }
+
+use std::{
+	io::{self, Write},
+	sync::Arc,
+	time::Duration,
+};
+
+use chrono::Local;
+use std::io::IsTerminal;
+use tokio::sync::Mutex;
+use tokio_util::sync::CancellationToken;
+
+use crossterm::{
+	cursor, execute,
+	terminal::{self, ClearType},
+};
+
+pub struct StatusBar {
+	running: bool,
+}
+
+impl StatusBar {
+	pub fn new() -> Self {
+		Self { running: true }
+	}
+
+	pub fn draw(&self) -> io::Result<()> {
+		let (_, height) = terminal::size()?;
+		let mut stdout = io::stdout();
+
+		// Save current cursor position.
+		execute!(stdout, cursor::SavePosition)?;
+
+		// Leave one blank row above the clock.
+		execute!(
+			stdout,
+			cursor::MoveTo(0, height.saturating_sub(2)),
+			terminal::Clear(ClearType::CurrentLine),
+		)?;
+
+		execute!(
+			stdout,
+			cursor::MoveTo(0, height.saturating_sub(1)),
+			terminal::Clear(ClearType::CurrentLine),
+		)?;
+
+		let time = chrono::Local::now().format("%H:%M:%S").to_string();
+
+		let width = terminal::size()?.0 as usize;
+
+		execute!(
+			stdout,
+			cursor::MoveTo(
+				width.saturating_sub(time.len()) as u16,
+				height.saturating_sub(1)
+			),
+		)?;
+
+		print!("{time}");
+
+		// Put the cursor back where normal output expects it.
+		execute!(stdout, cursor::RestorePosition)?;
+
+		stdout.flush()
+	}
+
+	pub fn clear(&self) -> io::Result<()> {
+		let (_, height) = terminal::size()?;
+		let mut stdout = io::stdout();
+
+		execute!(
+			stdout,
+			cursor::SavePosition,
+			cursor::MoveTo(0, height.saturating_sub(2)),
+			terminal::Clear(ClearType::FromCursorDown),
+			cursor::RestorePosition,
+		)?;
+
+		stdout.flush()
+	}
+}
+
+pub struct TerminalUi {
+	status: StatusBar,
+}
+
+impl TerminalUi {
+	pub fn new() -> Self {
+		Self {
+			status: StatusBar::new(),
+		}
+	}
+	pub fn println(&self, message: impl AsRef<str>) -> io::Result<()> {
+		self.status.clear()?;
+
+		println!("{}", message.as_ref());
+
+		self.status.draw()?;
+
+		Ok(())
+	}
+}
+// let ui = TerminalUi::new();
+// 
+// ui.println(">>> starting runtime")?;
+// 
+// if resume_from_build {
+//     ui.println(">>> resuming from Build")?;
+// 
+//     runtime
+//         .resume_from(Stage::Build, &mut input_rx)
+//         .await
+//         .context("runtime.resume_from(Build)")?;
+// } else {
+//     runtime
+//         .run(&mut input_rx)
+//         .await
+//         .context("runtime.run")?;
+// }
+// 
+// ui.println(">>> runtime finished")?;
