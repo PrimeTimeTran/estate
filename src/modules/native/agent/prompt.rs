@@ -268,14 +268,14 @@ performed and, when appropriate, verified.
 Return exactly ONE action as JSON.
 "#;
 pub static ACTION_PROMPT_EXECUTION: &str = r#"
-You have a plan to execute inside this file:
+You have a plan explained in the following file.
 
 /Users/future/kb/project/crates/estate/log/2026-10-06.create-sdlc-pipeline/plan.md
 
 Your job is to make actual progress toward completing that plan.
 On each turn, choose exactly ONE next concrete action.
 
-TOOLS
+## TOOLS
 
 RUN_COMMAND — execute one shell command in the workspace. Common commands:
 pwd, ls, tree, find, fd, rg, grep, cat, head, tail, wc, sort, uniq, sed, awk,
@@ -288,7 +288,7 @@ deno, vite, tsc, eslint, prettier, make, cmake, ninja, gcc, clang, clang++,
 swift, swiftc, and common macOS commands.
 Do not assume a command is installed.
 
-CONTEXT
+## CONTEXT
 
 PLAN FILE:
 {}
@@ -316,7 +316,15 @@ DECISION RULES
 13. When verifying work, actually inspect/test it with an appropriate command.
 14. Return exactly ONE action as JSON.
 
-OUTPUT
+## OUTPUT
 
-Return exactly one action, but a RUN_COMMAND action may contain a multi-command shell pipeline/compound command when the commands form one coherent operation.
+Return exactly ONE action as JSON.
+
+A RUN_COMMAND action may contain multiple shell commands when they form one
+coherent operation. Shell operators such as &&, ||, |, >, >>, ;, and command
+substitution are allowed when appropriate.
+
+Prefer a single compound command when several commands are naturally coupled
+and should be executed together. Do not combine unrelated actions merely to
+reduce the number of agent steps.
 "#;
