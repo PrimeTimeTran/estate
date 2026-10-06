@@ -26,8 +26,8 @@ pub enum AgentAction {
 	Current { message: String },
 	#[serde(rename = "run_command")]
 	RunCommand { command: String },
-	#[serde(rename = "run_command")]
-	Context,
+	#[serde(rename = "context")]
+	Context { path: Option<String> },
 }
 
 impl Agent {
@@ -38,6 +38,7 @@ impl Agent {
 			workspace: Arc::new(WorkspaceContext::default()),
 		}
 	}
+
 	pub fn with_workspace(workspace: WorkspaceContext) -> Self {
 		Self {
 			id: uuid::Uuid::new_v4().to_string(),
@@ -45,22 +46,23 @@ impl Agent {
 			workspace: Arc::new(workspace),
 		}
 	}
+
 	pub fn with_cwd(cwd: impl Into<PathBuf>) -> Self {
-		let workspace = WorkspaceContext::from_cwd(cwd);
-		Self {
-			id: uuid::Uuid::new_v4().to_string(),
-			tools: AgentTools::default(),
-			workspace: Arc::new(workspace),
-		}
+		Self::with_workspace(WorkspaceContext::from_cwd(cwd))
 	}
-	pub fn with_ctx(ctx: AgentContext, session: &AiSession) -> Result<Self> {
-		let workspace = WorkspaceContext::from_sdlc_session(session)?;
+
+	pub fn with_ctx(ctx: AgentContext, _session: &AiSession) -> Result<Self> {
 		Ok(Self {
 			id: uuid::Uuid::new_v4().to_string(),
 			tools: AgentTools::default(),
-			workspace: Arc::new(workspace),
+			workspace: Arc::new(ctx.workspace),
 		})
 	}
+	// pub async fn from_session(&self, task: AgentTask, session: &AiSession) -> Result<TaskResult> {
+	// 	let ctx = AgentContext::from_session_with_workspace(&session, &self.workspace.clone())?;
+	// 	let agent = Agent::with_ctx(ctx, session)?;
+	// 	agent.run_agent_loop(task, self.event_tx.clone()).await
+	// }
 }
 
 impl Default for Agent {
@@ -80,7 +82,6 @@ impl AgentContext {
 			spawned_tasks: Vec::new(),
 		}
 	}
-
 	pub fn with_workspace(user_prompt: String, workspace: WorkspaceContext) -> Self {
 		Self {
 			prompt: user_prompt.clone(),
@@ -92,14 +93,19 @@ impl AgentContext {
 			spawned_tasks: Vec::new(),
 		}
 	}
-
 	pub fn from_session(session: &AiSession) -> Result<Self> {
 		let workspace = WorkspaceContext::from_session(session)?;
+		Self::from_session_with_workspace(session, &workspace)
+	}
 
+	pub fn from_session_with_workspace(
+		session: &AiSession,
+		workspace: &WorkspaceContext,
+	) -> Result<Self> {
 		Ok(Self {
-			prompt: session.goal.clone(),
-			task: AgentTask::from_session(session)?,
-			workspace,
+			prompt: session.prompt.clone(),
+			task: AgentTask::new(session.prompt.clone()),
+			workspace: workspace.clone(),
 			history: Vec::new(),
 			artifacts: Vec::new(),
 			logs: Vec::new(),
@@ -137,9 +143,7 @@ impl Agent {
 	) -> Result<TaskResult> {
 		let mut steps = 0;
 		let max_steps = 10;
-		// let mut ctx = AgentContext::new(task.prompt.clone(), (*self.workspace).clone());
 		let mut ctx = AgentContext::with_workspace(task.prompt.clone(), (*self.workspace).clone());
-
 		section!("CONTEXT");
 		println!(
 			"ctx.prompt ({} chars, {} lines):\n{}",
@@ -147,9 +151,7 @@ impl Agent {
 			ctx.prompt.lines().count(),
 			preview_lines(&ctx.prompt, PROMPT_PREVIEW_LINES)
 		);
-
 		println!("ctx.workspace:\n{}", ctx.workspace);
-
 		println!("ctx.history ({} entries):", ctx.history.len());
 		for (i, entry) in ctx.history.iter().take(5).enumerate() {
 			println!("  [{}] {}", i + 1, preview(&format!("{entry:?}"), 500));
@@ -209,23 +211,19 @@ impl Agent {
 					let result = self.tools.shell.run(shell_command).await?;
 
 					section!("SHELL RESULT");
-
 					println!("exit: {:?}", result.exit_code);
-
 					println!(
 						"stdout ({} chars, {} lines):\n{}",
 						result.stdout.len(),
 						result.stdout.lines().count(),
 						preview_lines(&result.stdout, SHELL_OUTPUT_PREVIEW_LINES)
 					);
-
 					println!(
 						"stderr ({} chars, {} lines):\n{}",
 						result.stderr.len(),
 						result.stderr.lines().count(),
 						preview_lines(&result.stderr, SHELL_OUTPUT_PREVIEW_LINES)
 					);
-
 					ctx.history.push(AgentObservation::RunCommand { result });
 				}
 				AgentAction::Context { .. } => {

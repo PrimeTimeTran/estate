@@ -28,6 +28,9 @@ pub enum SpecialFile {
 	SessionsIndex,
 }
 impl FS {
+	pub fn find(scope: FW, resource: Resource) -> Result<Option<PathBuf>> {
+		todo!("FS find FW resource: Resource")
+	}
 	pub fn load<T>(path: impl AsRef<Path>) -> Result<Option<T>>
 	where
 		T: serde::de::DeserializeOwned,
@@ -85,7 +88,6 @@ impl FS {
 
 		Ok(())
 	}
-
 	pub fn save<T>(path: impl Into<PathBuf>, value: &T) -> Result<()>
 	where
 		T: Serialize,
@@ -185,3 +187,125 @@ impl SpecialFile {
 }
 
 pub struct FS;
+
+#[derive(Debug, Clone, Copy)]
+enum Platform {
+	MacOS,
+	Windows,
+	Linux,
+}
+#[derive(Debug, Clone, Copy)]
+pub enum Appp {
+	Estate,
+	VSCode,
+	Zed,
+	RustRover,
+}
+impl Appp {
+	pub fn fw(self, fw: FW) -> Result<PathBuf> {
+		match self {
+			Self::Estate => EstateFW::path(fw),
+			_ => todo!(),
+		}
+	}
+}
+#[derive(Debug, Clone, Copy)]
+pub enum FW {
+	Log,
+	Tmp,
+
+	Session,
+	AiTemplates,
+
+	Settings,
+	Keybindings,
+	Extensions,
+	Workspace,
+	Index,
+}
+#[derive(Debug, Clone, Copy)]
+pub struct Kontex {
+	platform: Platform,
+	app: Appp,
+}
+impl Kontex {
+	pub fn new(app: Appp) -> Result<Self> {
+		let platform = if cfg!(target_os = "macos") {
+			Platform::MacOS
+		} else if cfg!(target_os = "windows") {
+			Platform::Windows
+		} else if cfg!(target_os = "linux") {
+			Platform::Linux
+		} else {
+			return Err(anyhow!("unsupported platform"));
+		};
+		Ok(Self { platform, app })
+	}
+	pub fn sesion_read(&self, name: &str) -> Result<String> {
+		let path = self.path(FW::Session)?.join(name);
+		FS::read(path)
+	}
+	pub fn session_write(&self, title: &str, contents: impl AsRef<[u8]>) -> Result<PathBuf> {
+		let sessions = FS::ensure_dir(self.path(FW::Session)?)?;
+		let date = Local::now().format("%Y-%m-%d");
+		let path = sessions.join(format!("{date}.{title}"));
+		FS::write(&path, contents)?;
+		Ok(path)
+	}
+	pub fn session_load<T>(&self) -> Result<Option<T>>
+	where
+		T: serde::de::DeserializeOwned,
+	{
+		let path = self.path(FW::Log)?.join("sdlc.current.json");
+		FS::load(path)
+	}
+	pub fn session_save<T>(&self, value: &T) -> Result<()>
+	where
+		T: serde::Serialize,
+	{
+		let path = self.path(FW::Log)?.join("sdlc.current.json");
+		FS::save(path, value)
+	}
+	pub fn log_read(&self, name: &str) -> Result<String> {
+		let path = self.path(FW::Log)?.join(name);
+		FS::read(path)
+	}
+	pub fn log_write(&self, name: &str, contents: impl AsRef<[u8]>) -> Result<PathBuf> {
+		let log = FS::ensure_dir(self.path(FW::Log)?)?;
+		let path = log.join(name);
+		FS::write(&path, contents)?;
+		Ok(path)
+	}
+	pub fn path(self, fw: FW) -> Result<PathBuf> {
+		self.app.fw(fw)
+	}
+	pub fn keybindings(self, root: PathBuf) -> Result<PathBuf> {
+		match (self.platform, self.app) {
+			(Platform::MacOS, Appp::Zed) => Ok(root.join("apps/zed/keybindings")),
+			(Platform::Windows, Appp::Zed) => Ok(root.join("apps/zed/keybindings")),
+			(Platform::MacOS, Appp::VSCode) => Ok(root.join("apps/vscode/keybindings")),
+			(Platform::Windows, Appp::VSCode) => Ok(root.join("apps/vscode/keybindings")),
+			_ => Err(anyhow!(
+				"keybindings not supported for {:?} on {:?}",
+				self.app,
+				self.platform
+			)),
+		}
+	}
+}
+pub struct EstateFW;
+
+impl EstateFW {
+	fn path(fw: FW) -> Result<PathBuf> {
+		let root = PathBuf::from("/Users/future/kb/project/crates/estate/log");
+		Ok(match fw {
+			FW::Log => root.clone(),
+			FW::Tmp => root.clone(),
+			FW::Session => root.clone(),
+			FW::AiTemplates => root.clone(),
+			FW::Settings => root.clone(),
+			FW::Index => root.clone(),
+			_ => return Err(anyhow!("{fw:?} is not an Estate filesystem resource")),
+		})
+	}
+}

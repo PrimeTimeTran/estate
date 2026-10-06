@@ -8,8 +8,12 @@ pub struct AgentRegistry;
 pub struct AgentRuntime {
 	pub event_tx: UnboundedSender<RuntimeEvent>,
 	pub registry: AgentRegistry,
+	pub workspace: WorkspaceContext,
 }
 impl AgentRuntime {
+	pub fn workspace(&self) -> &WorkspaceContext {
+		&self.workspace
+	}
 	pub async fn run_agent_with_sdlc(
 		&self,
 		task: AgentTask,
@@ -19,12 +23,14 @@ impl AgentRuntime {
 		agent.run_agent_loop(task, self.event_tx.clone()).await
 	}
 	pub async fn from_session(&self, task: AgentTask, session: &AiSession) -> Result<TaskResult> {
-		let ctx = AgentContext::from_session(session)?;
+		let ctx = AgentContext::from_session_with_workspace(session, &self.workspace)?;
 		let agent = Agent::with_ctx(ctx, session)?;
 		agent.run_agent_loop(task, self.event_tx.clone()).await
 	}
 	pub async fn run_agent(&self, task: AgentTask) -> Result<TaskResult> {
-		// 		// Start completely fresh.
+		let cwd = std::env::current_dir()?;
+		let agent = Agent::with_cwd(cwd);
+		agent.run_agent_loop(task, self.event_tx.clone()).await		// 		// Start completely fresh.
 		// 		let agent = Agent::new()
 		//
 		// 		// Or explicitly scan/load a workspace.
@@ -36,9 +42,6 @@ impl AgentRuntime {
 		// 		let agent = Agent::with_workspace(workspace);
 		// 		agent.run_agent_loop(task, self.event_tx.clone()).await
 
-		let cwd = std::env::current_dir()?;
-		let agent = Agent::with_cwd(cwd);
-		agent.run_agent_loop(task, self.event_tx.clone()).await
 	}
 
 	pub async fn spawn_agent(&self, task: AgentTask) {

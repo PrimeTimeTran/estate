@@ -5,7 +5,7 @@ use ratatui::Frame;
 pub struct AiSession {
 	pub id: Uuid,
 	pub title: String,
-	pub goal: String,
+	pub prompt: String,
 	pub stage: Stage,
 	pub stages: Vec<StageRunRecord>,
 	pub dir: PathBuf,
@@ -107,7 +107,7 @@ pub struct OllamaResponse {
 	pub done_reason: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct PipelineRuntime {
 	pub activity: Vec<String>,
 	pub pipeline: Pipeline,
@@ -159,13 +159,23 @@ pub struct QACheck {
 	pub time_total: chrono::Duration,
 	pub evaluations: Vec<Metric>,
 }
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QAEvaluation {
+	pub score: f32,
+	pub confidence: f32,
+	pub passed: bool,
+	pub checks: Vec<CheckResult>,
+	pub feedback: String,
+	pub revision: Option<String>,
+}
+
+#[derive(Debug)]
 pub struct Pipeline {
+	pub kontex: Kontex,
 	pub qa: Evaluator,
+	pub system: AgentSystem,
 	pub generator: Box<dyn Generator>,
 	pub session: AiSession,
-	// pub events: broadcast::Sender<SdlcEvent>,
-	pub state_path: PathBuf,
 	pub event_tx: broadcast::Sender<SdlcEvent>,
 	pub stage_attempt: u32,
 }
@@ -187,7 +197,7 @@ pub struct StageRunRecord {
 
 	pub time_started: DateTime<Utc>,
 	pub time_completed: Option<DateTime<Utc>>,
-	
+
 	/// Semantic evaluation of the resulting artifact/work.
 	pub evaluation: Option<QACheck>,
 }
@@ -209,4 +219,3 @@ pub struct WSChanges {
 pub struct WSSnapshot {
 	pub git_status: String,
 }
-

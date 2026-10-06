@@ -219,25 +219,60 @@ pub fn build_step_prompt(
 
       ---
 
-      CURRENT WORKSPACE:
+      CURRENT AGENT CONTEXT:
       {workspace}
 
       ---
 
-      RULES:
+      EXECUTION RULES:
 
-      - Perform the work directly in the workspace.
-      - Inspect files before modifying them.
-      - Do not merely describe what should be done.
-      - Complete only the current build step.
-      - Preserve existing project conventions.
-      - Do not undo correct work from previous steps.
-      - Use run_command when inspection, file creation, editing, or verification is required.
-      - When this step is complete, stop.
+      1. Start by reasoning from the task, implementation plan, and agent context
+         already provided above. Do not retrieve information that is already
+         available to you.
+
+      2. Use the `context` action when you need to inspect the actual contents
+         of a file or artifact provided through agent context, or when you need
+         additional curated context that was not included in the prompt.
+
+      3. Use `run_command` when you need to inspect or modify the actual
+         filesystem, repository, source code, build system, tests, or other
+         external state.
+
+      4. Do not use filesystem commands merely to locate or read a file that is
+         already available through agent context. Use `context` for that.
+
+      5. Before modifying existing source files, inspect the relevant files from
+         the actual repository using `run_command` as necessary.
+
+      6. Perform the work directly in the workspace.
+
+      7. Do not merely describe what should be done. Take the concrete action.
+
+      8. Complete only the current build step.
+
+      9. Preserve existing project conventions and correct work from previous
+         build steps.
+
+      10. When this step is complete, stop and report the result.
+
+      ---
+
+      DECISION ORDER:
+
+      Information already provided
+          ↓
+      context (only if additional curated file contents are needed)
+          ↓
+      run_command (when actual repository/filesystem interaction is needed)
+          ↓
+      make the required changes
+          ↓
+      verify the result
+          ↓
+      finish
     "#,
 	)
 }
-
 fn verify_created_files(plan: &BuildPlan, workspace: &WorkspaceContext) -> Result<()> {
 	for file in &plan.files {
 		let path = workspace.cwd.join(&file.path);

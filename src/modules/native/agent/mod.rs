@@ -63,7 +63,7 @@ impl AgentTask {
 	pub fn from_session(session: &AiSession) -> Result<Self> {
 		Ok(Self {
 			id: Uuid::new_v4(),
-			prompt: session.goal.clone(),
+			prompt: session.prompt.clone(),
 		})
 	}
 }

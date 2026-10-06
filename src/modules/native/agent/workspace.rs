@@ -1,5 +1,5 @@
 use crate::native::agent::FileInfo;
-use crate::prelude::{*};
+use crate::prelude::*;
 
 #[derive(Debug, Clone)]
 pub struct WorkspaceContext {
@@ -21,11 +21,11 @@ impl fmt::Display for WorkspaceContext {
 		if self.files.is_empty() {
 			return Ok(());
 		}
-		for (i, file) in self.files.iter().take(10).enumerate() {
+		for (i, file) in self.files.iter().take(5).enumerate() {
 			writeln!(f, "  [{i}] {file:?}")?;
 		}
-		if self.files.len() > 10 {
-			writeln!(f, "  ... {} more files", self.files.len() - 10)?;
+		if self.files.len() > 5 {
+			writeln!(f, "  ... {} more files", self.files.len() - 5)?;
 		}
 		Ok(())
 	}
@@ -51,8 +51,14 @@ impl WorkspaceContext {
 			cwd: session.dir.clone(),
 		})
 	}
+	pub fn add_file(&mut self, path: impl Into<PathBuf>) -> Result<()> {
+		let path = path.into();
+		let file = FileInfo::from_path(&path)?;
+		self.files.push(file);
+		Ok(())
+	}
 	pub fn from_sdlc_session(session: &AiSession) -> Result<Self> {
-		tracing::info!("from_sdlc_sessionfrom_sdlc_session workspace");
+		tracing::info!("from_sdlc_session workspace");
 		let cwd = session.dir.clone();
 		let files = [
 			SrcArtifact::Intent,

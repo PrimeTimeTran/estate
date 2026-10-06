@@ -16,9 +16,9 @@ use estate::prelude::*;
 // SDLC_PLAIN=1 cargo run --bin sdlc --features sdlc
 // cargo -q run --bin sdlc --features sdlc
 //
-// 4.  Bypass decide
+// 4. Bypass decide
 // rm -rf log && \
-// SDLC_FORCE_CONTINUE=1 SDLC_PLAIN=1 \
+// SDLC_RESUME_BUILD=1 SDLC_FORCE_CONTINUE=1 SDLC_PLAIN=1 \
 // cargo run --bin sdlc --features sdlc
 #[tokio::main]
 pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -27,8 +27,9 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	config.apply_cli(&cli)?;
 	logger::init_logging(&config)?;
 
-	let (_bus, runtime, _event_rx) = new_agent_system();
-	let pipeline = Pipeline::new(runtime, "Do the work required to build this CLI")
+	// let (_bus, runtime, _event_rx) = new_agent_system();
+
+	let pipeline = Pipeline::new("Do the work required to build this CLI")
 		.await
 		.context("Pipeline::new")?;
 	println!(">>> pipeline created");

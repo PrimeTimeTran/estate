@@ -13,7 +13,6 @@ pub static SCHEMA_VERSION: u32 = 1;
 pub static NEXT_PROBLEM_ID: AtomicI64 = AtomicI64::new(1);
 
 pub static START_APP_CLOCK: bool = true;
-
 pub static START_VIEW: ViewType = ViewType::ProblemScreen;
 pub static START_WINDOW: WindowType = WindowType::ProblemScreen;
 pub static AGENT_GEN_URL: &str = "http://localhost:11434/api/generate";

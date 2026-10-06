@@ -1,7 +1,7 @@
 use super::*;
 
 pub fn for_intent(user_request: &str) -> String {
-	c::INTENT_PROMPT.replace("{{PROMPT_FROM_USER}}", user_request)
+	c::INTENT_PROMPT.replace("{{SDLC_GOAL}}", user_request)
 }
 
 pub fn gen_intent(goal: &str) -> Result<String> {
