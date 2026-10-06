@@ -742,7 +742,7 @@ impl PipelineRuntime {
 			events: vec![],
 		}
 	}
-	fn retry(&mut self, _stage: e::Stage) -> Result<()> {
+	fn retry(&mut self, _stage: Stage) -> Result<()> {
 		Ok(())
 	}
 	pub async fn run(&mut self, input_rx: &mut UnboundedReceiver<SdlcInput>) -> Result<()> {
@@ -807,8 +807,6 @@ impl PipelineRuntime {
 		sleep(DEMO_COMPLETE_DELAY).await;
 		Ok(())
 	}
-}
-impl PipelineRuntime {
 	pub fn view(&self) -> PipelineRuntimeView {
 		PipelineRuntimeView {
 			activity: self.activity.clone(),
@@ -829,6 +827,7 @@ impl PipelineRuntime {
 		}
 	}
 }
+
 impl SdlcSession {
 	fn create_readable(&self) -> String {
 		let current = Utc::now();
@@ -869,6 +868,7 @@ impl SdlcInput {
 		}
 	}
 }
+
 impl Stage {
 	pub fn next(&self) -> Option<Self> {
 		match self {
@@ -981,7 +981,7 @@ impl StageOutcome {
 impl SprintPipeline {
 	async fn apply(
 		&mut self,
-		stage: e::Stage,
+		stage: Stage,
 		attempt: Attempt,
 		outcome: StageOutcome,
 		decision: StageDecision,
@@ -1054,7 +1054,7 @@ impl SprintPipeline {
 							StageDecision::Retry
 						}
 					}
-					_ if execution.stage == e::Stage::Complete => {
+					_ if execution.stage == Stage::Complete => {
 						tracing::info!(">>> decision = Complete");
 						StageDecision::Complete
 					}
@@ -1387,7 +1387,7 @@ impl SprintPipeline {
 		Ok(results)
 	}
 
-	fn retry(&mut self, _stage: e::Stage) -> Result<()> {
+	fn retry(&mut self, _stage: Stage) -> Result<()> {
 		Ok(())
 	}
 
@@ -1413,7 +1413,7 @@ impl SprintPipeline {
 		FS::save(SpecialFile::SdlcCurrent.path()?, session)?;
 		Ok(())
 	}
-	
+
 	pub fn stage(&self) -> Option<Stage> {
 		self.session.as_ref().map(|session| session.stage)
 	}
@@ -1428,7 +1428,7 @@ impl SprintPipeline {
 		Ok(String::from("create-sdlc-pipeline"))
 	}
 
-	fn transition(&mut self, next: e::Stage) -> Result<()> {
+	fn transition(&mut self, next: Stage) -> Result<()> {
 		let session = self.session()?;
 		let valid = matches!(
 			(&session.stage, &next),
@@ -1459,7 +1459,7 @@ impl SprintPipeline {
 
 	async fn wait_for_intervention(
 		&mut self,
-		stage: e::Stage,
+		stage: Stage,
 		attempt: Attempt,
 		reason: String,
 		input_rx: &mut tokio::sync::mpsc::UnboundedReceiver<SdlcInput>,
@@ -2000,7 +2000,7 @@ impl SprintRunner<'_> {
 		Ok(semantic.with_evaluations(structural))
 	}
 
-	async fn handle_retry(&mut self, stage: e::Stage, attempt: Attempt) -> Result<()> {
+	async fn handle_retry(&mut self, stage: Stage, attempt: Attempt) -> Result<()> {
 		let next_attempt = Attempt {
 			stage,
 			number: attempt.number + 1,
@@ -2055,7 +2055,7 @@ impl SprintRunner<'_> {
 	}
 	async fn handle_revision(
 		&mut self,
-		stage: e::Stage,
+		stage: Stage,
 		attempt: Attempt,
 		_outcome: StageOutcome,
 		input_rx: &mut UnboundedReceiver<SdlcInput>,
@@ -2140,7 +2140,7 @@ impl SprintRunner<'_> {
 	}
 	async fn handle_failure_execution(
 		&mut self,
-		stage: e::Stage,
+		stage: Stage,
 		attempt: Attempt,
 		error: anyhow::Error,
 		input_rx: &mut tokio::sync::mpsc::UnboundedReceiver<SdlcInput>,
@@ -2220,7 +2220,7 @@ impl SprintRunner<'_> {
 	}
 	async fn handle_failure_evaluation(
 		&mut self,
-		stage: e::Stage,
+		stage: Stage,
 		attempt: Attempt,
 		error: anyhow::Error,
 		input_rx: &mut tokio::sync::mpsc::UnboundedReceiver<SdlcInput>,
@@ -2256,43 +2256,32 @@ impl SprintRunner<'_> {
 			Intervention::Human(input) => {
 				*pending_input = Some(SdlcInput::Human(input.to_string()));
 				self.pipeline.retry(stage)?;
-
 				Ok(RunControl::Continue)
 			}
-
 			Intervention::Retry => {
 				self.pipeline.retry(stage)?;
-
 				Ok(RunControl::Continue)
 			}
-
 			Intervention::ProvideContext(context) => {
 				// If ProvideContext eventually becomes stage input,
 				// this is where it should be stored.
 				let _ = context;
-
 				self.pipeline.retry(stage)?;
-
 				Ok(RunControl::Continue)
 			}
-
 			Intervention::Reviewed => {
 				self.pipeline.retry(stage)?;
-
 				Ok(RunControl::Continue)
 			}
-
 			Intervention::Abort => {
 				self.emit(SdlcEvent::Failed {
 					stage: Some(stage),
 					error: "aborted by user".into(),
 				});
-
 				Ok(RunControl::Exit)
 			}
 			Intervention::Revise => {
 				self.pipeline.retry(stage)?;
-
 				Ok(RunControl::Continue)
 			}
 			Intervention::Revision { evaluation } => {
@@ -2304,7 +2293,7 @@ impl SprintRunner<'_> {
 	}
 	async fn handle_failure_of_quality(
 		&mut self,
-		stage: e::Stage,
+		stage: Stage,
 		attempt: Attempt,
 		input_rx: &mut tokio::sync::mpsc::UnboundedReceiver<SdlcInput>,
 		pending_input: &mut Option<SdlcInput>,
@@ -2398,7 +2387,7 @@ impl SprintRunner<'_> {
 		}
 	}
 
-	fn load_state(&mut self) -> Result<e::Stage> {
+	fn load_state(&mut self) -> Result<Stage> {
 		let session = self
 			.pipeline
 			.session
@@ -2411,23 +2400,23 @@ impl SprintRunner<'_> {
 		tracing::info!(">>> loaded state = {}", json);
 		#[derive(serde::Deserialize)]
 		struct PersistedStage {
-			stage: e::Stage,
+			stage: Stage,
 		}
 		let state: PersistedStage = serde_json::from_str(&json)?;
 		let stage = match state.stage {
-			e::Stage::Verify => e::Stage::Build,
+			e::Stage::Verify => Stage::Build,
 			stage => stage,
 		};
 		session.stage = stage;
 		Ok(stage)
 	}
 
-	fn retry(&mut self, stage: e::Stage) -> Result<()> {
+	fn retry(&mut self, stage: Stage) -> Result<()> {
 		self.pipeline.retry(stage)
 	}
 	async fn run_stage(
 		&mut self,
-		stage: e::Stage,
+		stage: Stage,
 		attempt: Attempt,
 		pending_input: &mut Option<SdlcInput>,
 	) -> Result<StageOutcome> {
@@ -2462,7 +2451,7 @@ impl SprintRunner<'_> {
 	}
 	async fn run_current_stage(
 		&mut self,
-		stage: e::Stage,
+		stage: Stage,
 		attempt: Attempt,
 		input: StageInput,
 	) -> Result<StageExecution> {
@@ -2731,7 +2720,7 @@ impl SprintRunner<'_> {
 		todo!("WOW DONE!")
 	}
 
-	fn transition(&mut self, next: e::Stage) -> Result<()> {
+	fn transition(&mut self, next: Stage) -> Result<()> {
 		self.pipeline.transition(next)
 	}
 	async fn verify_stage(&mut self, stage: Stage) -> Result<Verification> {
@@ -2746,7 +2735,7 @@ impl SprintRunner<'_> {
 	}
 	async fn wait_for_intervention(
 		&mut self,
-		stage: e::Stage,
+		stage: Stage,
 		attempt: Attempt,
 		reason: String,
 		input_rx: &mut UnboundedReceiver<SdlcInput>,
