@@ -182,7 +182,7 @@ pub struct StageRecord {
 	pub attempt: Attempt,
 	pub description: Option<String>,
 	pub stage: Stage,
-	pub status: StageStatus,
+	pub status: Status,
 
 	/// What actually performed the work.
 	pub actor: StageActor,

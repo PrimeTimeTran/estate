@@ -1171,74 +1171,69 @@ impl SprintPipeline {
 		persist_evaluation(session, evaluation, attempt)?;
 		self.persist()
 	}
-	fn persist_intervention(&mut self, attempt: Attempt, reason: impl Into<String>) -> Result<()> {
-		let now = Utc::now();
-		self.push_stage_record(StageRecord {
-			stage: attempt.stage,
-			attempt,
-			status: StageStatus::InterventionNeeded,
-			actor: StageActor::Sdlc,
-			time_started: now,
-			time_completed: Some(now),
-			description: Some(reason.into()),
-			evaluation: None,
-		})
-	}
 	fn persist_outcome(&mut self, outcome: &StageOutcome) -> Result<()> {
-		let record = match outcome {
-			StageOutcome::Complete {
-				execution,
-				evaluation,
-			} => StageRecord {
-				stage: execution.stage,
-				attempt: execution.attempt,
-				status: StageStatus::Completed,
-				actor: StageActor::Evaluator,
-				time_started: execution.time_started,
-				time_completed: Some(execution.time_completed),
-				description: Some(format!("Stage Completed: {}", execution.stage.clone())),
-				evaluation: Some(evaluation.clone()),
-			},
-
-			StageOutcome::NeedsRevision {
-				execution,
-				evaluation,
-			} => StageRecord {
-				stage: execution.stage,
-				attempt: execution.attempt,
-				status: StageStatus::NeedsRevision,
-				actor: StageActor::Evaluator,
-				time_started: execution.time_started,
-				time_completed: Some(execution.time_completed),
-				description: Some(format!("Needs Revision: {}", execution.stage.clone())),
-				evaluation: Some(evaluation.clone()),
-			},
-
-			StageOutcome::ExecutionFailed {
-				stage,
-				attempt,
-				error,
-			} => StageRecord {
-				stage: *stage,
-				attempt: *attempt,
-				status: StageStatus::Failed,
-				actor: StageActor::Sdlc,
-				time_started: Utc::now(),
-				time_completed: Some(Utc::now()),
-				description: Some(error.to_string()),
-				evaluation: None,
-			},
-
-			StageOutcome::EvaluationFailed { execution, error } => StageRecord {
-				stage: execution.stage,
-				attempt: execution.attempt,
-				status: StageStatus::EvaluationFailed,
-				actor: StageActor::Sdlc,
-				time_started: execution.time_started,
-				time_completed: Some(execution.time_completed),
-				description: Some(error.to_string()),
-				evaluation: None,
-			},
+		let (stage, attempt, status, actor, time_started, time_completed, description, evaluation) =
+			match outcome {
+				StageOutcome::Complete {
+					execution,
+					evaluation,
+				} => (
+					execution.stage,
+					execution.attempt,
+					Status::Completed,
+					StageActor::Runner,
+					execution.time_started,
+					Some(execution.time_completed),
+					format!("Stage Completed: {}", execution.stage),
+					Some(evaluation.clone()),
+				),
+				StageOutcome::NeedsRevision {
+					execution,
+					evaluation,
+				} => (
+					execution.stage,
+					execution.attempt,
+					Status::NeedsRevision,
+					StageActor::Evaluator,
+					execution.time_started,
+					Some(execution.time_completed),
+					format!("Needs Revision: {}", execution.stage),
+					Some(evaluation.clone()),
+				),
+				StageOutcome::ExecutionFailed {
+					stage,
+					attempt,
+					error,
+				} => (
+					*stage,
+					*attempt,
+					Status::Failed,
+					StageActor::Runner,
+					Utc::now(),
+					Some(Utc::now()),
+					error.to_string(),
+					None,
+				),
+				StageOutcome::EvaluationFailed { execution, error } => (
+					execution.stage,
+					execution.attempt,
+					Status::EvaluationFailed,
+					StageActor::Runner,
+					execution.time_started,
+					Some(execution.time_completed),
+					error.to_string(),
+					None,
+				),
+			};
+		let record = StageRecord {
+			stage,
+			attempt,
+			status,
+			actor,
+			time_started,
+			time_completed,
+			description: Some(description),
+			evaluation,
 		};
 		self.push_stage_record(record)
 	}
@@ -1616,7 +1611,6 @@ impl AiView {
 			runtime: runtime.view(),
 		}
 	}
-
 	pub fn render(frame: &mut Frame<'_>, view: &AiView) {
 		let area = frame.area();
 		frame.render_widget(Clear, area);
@@ -1647,7 +1641,6 @@ impl sdlc_trait::Runner for SprintRunner<'_> {
 	type Context = UnboundedReceiver<SdlcInput>;
 	type Output = ();
 	/// "What happens next?"
-	///
 	/// Orchestrates the SDLC state machine:
 	/// run stage -> persist outcome -> decide -> apply -> follow control.
 	async fn run(&mut self, input_rx: &mut Self::Context) -> Result<Self::Output> {

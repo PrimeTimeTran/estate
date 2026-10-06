@@ -1,9 +1,11 @@
 use crate::{
 	model::{ProtoProblem, common::Difficulty},
-	prelude::*,
+	prelude::{*},
 	server::ProblemService as ProblemServiceTrait,
 	server::*,
 };
+
+use tonic::Status;
 
 fn problem_id(id: &str) -> Result<i64, Status> {
 	id.parse()

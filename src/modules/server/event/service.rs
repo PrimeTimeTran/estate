@@ -5,6 +5,7 @@ use crate::{
 		types as proto_types,
 	},
 };
+use tonic::Status;
 
 #[tonic::async_trait]
 impl EventServiceTrait for EventService {

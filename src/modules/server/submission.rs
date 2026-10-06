@@ -1,4 +1,5 @@
 use crate::prelude::{SubmissionService as SubmissionServiceTrait, *};
+use tonic::Status;
 
 #[tonic::async_trait]
 impl<R> SubmissionServiceTrait for SubmissionService<R>

@@ -158,7 +158,7 @@ pub enum StageAction {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum StageActor {
 	Human,
-	Sdlc,
+	Runner,
 	Evaluator,
 	Agent,
 	System,
@@ -206,7 +206,7 @@ pub enum StageResult {
 	Finalize,
 }
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub enum StageStatus {
+pub enum Status {
 	Running,
 	Completed,
 	Failed,

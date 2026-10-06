@@ -24,7 +24,7 @@ use r#const::*;
 #[path = "./enum.rs"]
 mod sdlc_enum;
 use sdlc_enum as e;
-pub use sdlc_enum::*;
+pub use sdlc_enum::{Status, *};
 
 mod r#fn;
 use r#fn as f;

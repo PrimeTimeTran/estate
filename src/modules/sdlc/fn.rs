@@ -60,9 +60,9 @@ pub fn persist_evaluation(
 	attempt: Attempt,
 ) -> Result<()> {
 	let status = if evaluation.passed {
-		StageStatus::Completed
+		Status::Completed
 	} else {
-		StageStatus::NeedsRevision
+		Status::NeedsRevision
 	};
 	let record = StageRecord {
 		description: Some(String::from("Evaluation Complete")),
