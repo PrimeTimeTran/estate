@@ -53,7 +53,6 @@ impl EventReceiver for NativeEventReceiver {
 //       └── implements Executor
 //                   │
 //                   └── Executor::spawn()
-//
 impl Executor for NativeExecutor {
 	fn spawn(&self, future: impl Future<Output = ()> + Send + 'static) {
 		println!("🔥 Executor for NativeExecutor::spawn CALLED");

@@ -1,3 +1,5 @@
+use tray_icon::{Icon, TrayIconBuilder};
+
 use crate::prelude::*;
 
 pub fn bootstrap() -> Result<(TrayMenu, TrayIcon)> {

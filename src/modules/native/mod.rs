@@ -1,17 +1,19 @@
+use std::cmp::PartialEq;
+use tray_icon::{Icon, TrayIconBuilder};
+
 use crate::prelude::*;
 
 pub mod agent;
-pub mod app;
+pub mod app_native;
 pub mod backend;
 pub mod cursor;
 pub mod daemon;
 pub mod discovery;
-pub mod job;
 pub mod monitor;
-pub mod observer;
 pub mod poc;
 #[path = "[prelude].rs"]
 pub mod prelude_native;
+pub mod renderer;
 pub mod resolver;
 pub mod router;
 pub mod runtime;
@@ -28,11 +30,10 @@ pub mod native_traits;
 pub use agent::*;
 pub use cursor::*;
 pub use prelude_native::*;
+pub use renderer::*;
 pub use util::*;
 
 pub use native_traits::*;
-
-mod gestures;
 
 // This compiles the module only if the "windows" feature is enabled AND the OS is Windows
 #[cfg(target_os = "windows")]

@@ -1,3 +1,5 @@
+use tray_icon::{Icon, TrayIconBuilder};
+
 use crate::prelude::*;
 
 // The first concrete implementation of Veable is here.
@@ -332,9 +334,7 @@ where
 	fn configure(&mut self, _layout: &mut Layout<C, S>, _ctx: &mut AppContext<'_, C, S>) {
 		// Configure the regions this screen uses.
 	}
-
 	fn update(&mut self, _layout: &mut Layout<C, S>, _ctx: &mut AppContext<'_, C, S>) {}
-
 	fn event(
 		&mut self,
 		_event: &e::Event,

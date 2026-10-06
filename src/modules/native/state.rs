@@ -10,27 +10,21 @@ impl NativeStateStore {
 impl StateStore for NativeStateStore {
 	fn load(&self) -> Result<EstateState> {
 		let path = resolver::engine_data_dir()?.join("state.json");
-
 		if !path.exists() {
 			tracing::warn!("EstateState does not exist: {:?}", path);
 			return Ok(EstateState::default());
 		}
-
 		let raw = fs::read_to_string(&path)?;
-
 		if raw.trim().is_empty() {
 			tracing::warn!("EstateState is empty: {:?}", path);
 			return Ok(EstateState::default());
 		}
-
 		Ok(serde_json::from_str(&raw)?)
 	}
 	fn save(&self, state: &EstateState) -> Result<()> {
 		let path = engine_data_dir()?.join("state.json");
-
 		let json = serde_json::to_string_pretty(state)?;
 		fs::write(path, json)?;
-
 		Ok(())
 	}
 }
@@ -45,12 +39,10 @@ impl EstateState {
 	}
 	pub fn load_from_disk() -> Result<Self> {
 		let path = Self::path()?;
-
 		if !path.exists() {
 			tracing::warn!("EstateState does not exist: {:?}", path);
 			return Ok(Self::default());
 		}
-
 		let raw = fs::read_to_string(&path)?;
 		Ok(serde_json::from_str(&raw)?)
 	}

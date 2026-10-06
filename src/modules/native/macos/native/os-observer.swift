@@ -23,15 +23,6 @@ enum EventSource: String, Codable {
   case workspace
   case accessibility
 }
-// enum Kind: String, Codable {
-//   case keyDown = "key_down"
-//   case keyUp = "key_up"
-//   case mouseDown = "mouse_down"
-//   case mouseUp = "mouse_up"
-//   case scroll = "scroll"
-//   case flagsChanged = "flags_changed"
-//   case modifierChanged = "ModifierChanged"
-// }
 
 // MARK: - Feature Flags
 let enablePrintEvent = true
@@ -93,6 +84,7 @@ var hidDevices: [Int: HIDDeviceInfo] = [:]
 var hidManager: IOHIDManager?
 var registeredHIDDevices = Set<String>()
 var hidReportContexts: [String: HIDReportContext] = [:]
+
 final class HIDReportContext {
   let name: String
   let transport: String
@@ -111,6 +103,7 @@ final class HIDReportContext {
     self.pid = pid
   }
 }
+
 struct FrontmostApp: Codable {
   let bundleID: String?
   let name: String?
@@ -272,6 +265,7 @@ struct HIDDeviceInfo {
   let productID: Int
   let transport: String
 }
+
 func modifierName(_ keyCode: Int64) -> String {
   switch keyCode {
   case 56, 60: return "SHIFT"
@@ -1588,7 +1582,7 @@ if enableCGEventTap {
     //     + "receivedAt=\(receivedAt)"
     // )
     fflush(stdout)
-    
+
     let code = event.getIntegerValueField(
       .keyboardEventKeycode
     )
@@ -1658,7 +1652,7 @@ if enableCGEventTap {
     // MARK: Key Down
     case .keyDown:
       let name = keyName(code)
-      
+
       // print(
       //   "🔑 CGEVENT KEY DOWN | "
       //     + "key=\(name) "

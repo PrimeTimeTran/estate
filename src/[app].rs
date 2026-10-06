@@ -13,7 +13,7 @@ where
 	}
 
 	pub fn init_services(&mut self) -> Result<()> {
-		tracing::info!("App init services");
+		tracing::debug!("App init services");
 		self.init_api()?;
 
 		self.host.start();
@@ -32,16 +32,16 @@ where
 			self.workers.push(handle);
 		}
 
-		tracing::info!("App init services complete");
+		tracing::debug!("App init services complete");
 		Ok(())
 	}
 	pub fn init_api(&mut self) -> Result<()> {
-		tracing::info!("Connecting API");
+		tracing::debug!("Connecting API");
 
 		let context = self.host.context();
 		let api = context.api();
 
-		tracing::info!(
+		tracing::debug!(
 			context = format_args!("{:p}", Arc::as_ptr(&context)),
 			api = format_args!("{:p}", api),
 			"API instance"

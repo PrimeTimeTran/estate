@@ -6,11 +6,6 @@ use crate::{
 		submission_service_client::SubmissionServiceClient,
 	},
 };
-use std::cmp::PartialEq;
-use tray_icon::{Icon, TrayIconBuilder};
-
-const TRAY_ICON_WIDTH: u32 = 16;
-const TRAY_ICON_HEIGHT: u32 = 16;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum AppMode {
@@ -45,7 +40,7 @@ impl Api for ApiClient {
 	async fn load_problems(&self, query: ProblemQuery) -> anyhow::Result<Vec<StoredProblem>> {
 		let request: crate::proto::types::ListProblemsRequest = query.try_into()?;
 
-		tracing::info!(?request, "Sending ListProblemsRequest");
+		tracing::debug!(?request, "Sending ListProblemsRequest");
 
 		let response = self
 			.problems
@@ -54,7 +49,7 @@ impl Api for ApiClient {
 			.await?
 			.into_inner();
 
-		tracing::info!(
+		tracing::debug!(
 			returned = response.problems.len(),
 			?response,
 			"Received ListProblemsResponse"
@@ -66,7 +61,7 @@ impl Api for ApiClient {
 			.map(StoredProblem::try_from)
 			.collect::<Result<Vec<_>, _>>()?;
 
-		tracing::info!(count = problems.len(), "Decoded problems");
+		tracing::debug!(count = problems.len(), "Decoded problems");
 
 		Ok(problems)
 	}
@@ -92,7 +87,7 @@ impl ApiClient {
 	pub async fn connect() -> anyhow::Result<Self> {
 		let endpoint = crate::GRPC_SOCKET_CLIENT;
 
-		tracing::info!(endpoint, "Connecting to gRPC server");
+		tracing::debug!(endpoint, "Connecting to gRPC server");
 
 		let chan = Channel::from_static(endpoint)
 			.connect()
@@ -101,7 +96,7 @@ impl ApiClient {
 				anyhow::anyhow!("failed to connect to gRPC endpoint {endpoint}: {error:#}")
 			})?;
 
-		tracing::info!("gRPC channel connected");
+		tracing::debug!("gRPC channel connected");
 
 		Ok(Self {
 			problems: ProblemServiceClient::new(chan.clone()),
@@ -124,7 +119,7 @@ where
 	C: Ctx,
 {
 	pub fn new(host: Host<C>) -> Result<Self> {
-		tracing::info!("App::new Native Context");
+		tracing::debug!("App::new Native Context");
 		let state = C::initial_state();
 		let (cursor_event_tx, cursor_events) = std::sync::mpsc::channel();
 		let cancel = CancellationToken::new();
@@ -147,7 +142,7 @@ where
 	}
 
 	fn init_settings() -> Result<Settings> {
-		tracing::info!("init_settings");
+		tracing::debug!("init_settings");
 		let settings = resolver::resolve_settings(resolver::source_file(file!()), "settings.json")?;
 		println!("{}", serde_json::to_string_pretty(&settings)?);
 		Ok(settings)
@@ -167,14 +162,11 @@ impl App<Context> {
 			self.workers.push(hid);
 			self.init_daemon();
 		}
-
 		Ok(())
 	}
 	pub fn run_gui(&mut self) -> Result<()> {
-		tracing::info!("run_gui");
-
+		tracing::debug!("run_gui");
 		let cancel = CancellationToken::new();
-
 		let event_loop = EventLoop::<AppEvent>::with_user_event()
 			.build()
 			.expect("failed to build GUI event loop");
@@ -187,7 +179,7 @@ impl App<Context> {
 
 		// #[cfg(not(feature = "daemon"))]
 		{
-			let mut renderer = structs::Renderer::<Context, <Context as Ctx>::AppState>::new(
+			let mut renderer = Renderer::<Context, <Context as Ctx>::AppState>::new(
 				self.host.context(),
 				self.state.clone(),
 				Arc::new(self.settings.clone()),
@@ -232,7 +224,7 @@ where
 
 							let view = TICK_ITEMS[view_idx];
 
-									// tracing::info!(
+									// tracing::debug!(
 										// "🔥 APP EVENTS TICK {:?}",
 										// view,
 									// );
@@ -260,7 +252,7 @@ where
 		Ok(handle)
 	}
 	pub fn start_cargo_watcher(&mut self) -> Result<WorkHandle<C, tokio::task::JoinHandle<()>>> {
-		tracing::info!("cargo: entered");
+		tracing::debug!("cargo: entered");
 		let watcher = CargoWatcher::new().map_err(|error| {
 			tracing::error!("Failed to create Cargo watcher: {error}");
 			error
@@ -332,7 +324,7 @@ where
 		// let sink = AppCursorSink {
 		// 	tx: self.cursor_event_tx.clone(),
 		// };
-		tracing::info!("start_cursor_watcher_from_app");
+		tracing::debug!("start_cursor_watcher_from_app");
 
 		Ok(self.worker().run_background_blocking(move |cancel| {
 			// if let Err(error) = CursorDaemon::new(sink, cancel).run() {
@@ -341,209 +333,6 @@ where
 		}))
 	}
 }
-impl<NativeCtx, S> ApplicationHandler<AppEvent> for structs::Renderer<NativeCtx, S>
-where
-	NativeCtx: Ctx + 'static,
-	S: Send + Sync + 'static,
-{
-	fn new_events(&mut self, _event_loop: &ActiveEventLoop, _cause: winit::event::StartCause) {
-		tracing::debug!("new_events")
-	}
-	fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-		#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-		if self.settings.has_tray_icon == Some(true) {
-			self.init_tray();
-		}
-
-		tracing::debug!("🔥 RESUMED");
-
-		if self.windows.is_empty() {
-			self.open_window(event_loop, crate::START_WINDOW);
-		}
-	}
-	fn user_event(&mut self, _event_loop: &ActiveEventLoop, event: AppEvent) {
-		tracing::debug!("user_event");
-		match event {
-			AppEvent::Navigate(view) => {
-				self.navigate_to(view);
-			}
-
-			AppEvent::RuntimeEvent => {
-				tracing::info!("user_event RuntimeEvent");
-				let _ctx = self.app_context();
-				Self::process_events(self);
-				self.sync_views();
-				// self.process_runtime_events();
-				// self.window.request_redraw();
-			}
-			AppEvent::Shutdown => {
-				tracing::debug!(">>> shutdown event received");
-				tracing::debug!(">>> event_loop.exit() called");
-			}
-			AppEvent::ModifiersChanged {
-				alt: _,
-				command: _,
-				ctrl: _,
-				shift: _,
-			} => {
-				tracing::info!("Modifiers Changed")
-			}
-			_ => {}
-		}
-	}
-	fn window_event(
-		&mut self,
-		_event_loop: &ActiveEventLoop,
-		window_id: WindowId,
-		event: WindowEvent,
-	) {
-		tracing::debug!("window_event: {:?}", event);
-
-		let Some(window) = self
-			.windows
-			.iter_mut()
-			.find(|window| window.window.instance.id() == window_id)
-		else {
-			return;
-		};
-
-		let response = window
-			.window
-			.gui_state
-			.on_window_event(&window.window.instance, &event);
-
-		if response.repaint {
-			window.window.instance.request_redraw();
-		}
-
-		match event {
-			WindowEvent::Resized(size) => {
-				window.window.resize(size);
-				window.window.instance.request_redraw();
-			}
-
-			WindowEvent::RedrawRequested => {
-				if window.window.occluded {
-					return;
-				}
-
-				let mut ctx = AppContext {
-					context: self.context.as_ref(),
-					state: &mut self.state,
-					event_tx: &mut self.event_tx,
-					input: IOState::default(),
-					last_revision: 0,
-				};
-
-				if let Err(e) = window.window.draw(&mut ctx) {
-					tracing::error!("DEV >>> draw failed: {e:#}");
-				}
-			}
-
-			_ => {}
-		}
-	}
-	fn device_event(
-		&mut self,
-		_event_loop: &ActiveEventLoop,
-		_device_id: winit::event::DeviceId,
-		_event: winit::event::DeviceEvent,
-	) {
-		tracing::debug!("device_event");
-	}
-	fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
-		tracing::debug!("about_to_wait");
-		// self.app.update();
-		#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-		while let Ok(event) = MenuEvent::receiver().try_recv() {
-			tracing::info!("MenuEvent::receiver");
-			println!("MenuEvent::receiver");
-			self.handle_event(event, event_loop);
-		}
-	}
-	fn suspended(&mut self, _event_loop: &ActiveEventLoop) {
-		tracing::info!("suspended")
-	}
-	fn exiting(&mut self, _event_loop: &ActiveEventLoop) {
-		tracing::debug!("exiting")
-	}
-
-	fn memory_warning(&mut self, _event_loop: &ActiveEventLoop) {
-		tracing::debug!("memory_warning")
-	}
-}
-impl<NativeCtx, S> structs::Renderer<NativeCtx, S>
-where
-	NativeCtx: Ctx,
-{
-	// #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-	fn _init_tray(&mut self) -> anyhow::Result<()> {
-		if self.tray_cursor.is_some() {
-			return Ok(());
-		}
-
-		let mut rgba = vec![0u8; (TRAY_ICON_WIDTH * TRAY_ICON_HEIGHT * 4) as usize];
-
-		for y in 0..TRAY_ICON_HEIGHT {
-			for x in 0..TRAY_ICON_WIDTH {
-				let dx = x as f32 - 7.5;
-				let dy = y as f32 - 7.5;
-
-				if dx * dx + dy * dy <= 49.0 {
-					let i = ((y * TRAY_ICON_WIDTH + x) * 4) as usize;
-					rgba[i..i + 4].copy_from_slice(&[0, 0, 0, 255]);
-				}
-			}
-		}
-
-		let icon = Icon::from_rgba(rgba, TRAY_ICON_WIDTH, TRAY_ICON_HEIGHT)?;
-
-		// let tray = TrayIconBuilder::new()
-		// 	.with_icon(icon)
-		// 	.with_icon_as_template(true)
-		// 	.with_tooltip("Estate")
-		// 	.build()?;
-
-		let tray = TrayIconBuilder::new()
-			.with_icon(icon)
-			.with_icon_as_template(true)
-			.with_tooltip("Estate")
-			.build()
-			.expect("failed to create tray icon");
-
-		self.tray_cursor = Some(tray);
-		Ok(())
-	}
-
-	fn init_tray(&mut self) -> anyhow::Result<()> {
-		if self.tray_cursor.is_some() {
-			return Ok(());
-		}
-		const TRAY_PNG: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/estate-tray.png"));
-		let image = image::load_from_memory(TRAY_PNG)?.into_rgba8();
-		let (width, height) = image.dimensions();
-		let icon = Icon::from_rgba(image.into_raw(), width, height)?;
-		let tray = TrayIconBuilder::new()
-			.with_icon(icon)
-			.with_icon_as_template(true)
-			.with_tooltip("Estate")
-			.build()?;
-
-		self.tray_cursor = Some(tray);
-
-		Ok(())
-	}
-}
-// impl Context {
-// 	fn new(state: NativeState, api: ApiService) -> Self {
-// 		Self { state, api }
-// 	}
-// }
-// impl Default for Context {
-// 	fn default() -> Self {
-// 		Self::new(NativeState::default(), ApiService::default())
-// 	}
-// }
 
 impl Ctx for Context {
 	fn api(&self) -> &Self::Api {
@@ -591,7 +380,7 @@ where
 			tokio::signal::ctrl_c()
 				.await
 				.expect("failed to listen for Ctrl+C");
-			tracing::info!("Ctrl+C received");
+			tracing::debug!("Ctrl+C received");
 		});
 	}
 
@@ -660,71 +449,6 @@ impl HostClock {
 	}
 }
 
-impl<NativeCtx, S> structs::Renderer<NativeCtx, S>
-where
-	NativeCtx: Ctx + 'static,
-	S: 'static,
-{
-	fn window_by_type(&mut self, kind: WindowType) -> Option<&mut AppWindow<NativeCtx, S>> {
-		self.windows.iter_mut().find(|window| window.kind == kind)
-	}
-	fn open_window(&mut self, event_loop: &ActiveEventLoop, kind: WindowType) {
-		tracing::info!(" open window start");
-		#[cfg(feature = "daemon")]
-		{
-			return;
-		}
-		if self.window_by_type(kind).is_some() {
-			return;
-		}
-		match Window::new(event_loop, self.view) {
-			Ok(window) => {
-				tracing::info!(" open window end, new window");
-				window.instance.set_title(self.view.name().into());
-				self.windows.push(AppWindow {
-					// runtime: self.runtime.clone(),
-					kind,
-					view: self.view,
-					window,
-				});
-			}
-			Err(error) => {
-				tracing::error!("failed to create window: {error}");
-			}
-		}
-	}
-	fn handle_event(&mut self, _event: MenuEvent, _event_loop: &ActiveEventLoop) {
-		tracing::info!("handle_event");
-
-		// match event {
-		// 	MenuEvent::Navigate(view) => {
-		// 		// self.navigate_to(view);
-		// 	} // Other menu events...
-		// 	  // MenuEvent::OpenWindow(kind) => {
-		// 	  //   self.open_window(event_loop, kind);
-		// 	  // }
-		// }
-	}
-}
-impl<NativeCtx, S> structs::Renderer<NativeCtx, S>
-where
-	NativeCtx: Ctx + 'static,
-	S: 'static,
-{
-	// fn sync_views(&mut self) {
-	// 	for window in &mut self.windows {
-	// 		window.view = self.view;
-	// 		window.window.sync_view(window.view);
-	// 		window.window.instance.set_title(self.view.name());
-	// 		window.window.instance.request_redraw();
-	// 	}
-	// }
-	// fn navigate_to(&mut self, view: ViewType) {
-	// 	tracing::debug!("navigating from {:?} to {:?}", self.view, view,);
-	// 	self.view = view;
-	// 	self.sync_views();
-	// }
-}
 impl<C> HostWorker<C>
 where
 	C: Ctx,
@@ -811,6 +535,12 @@ where
 	}
 }
 
+#[derive(Debug, Clone)]
+pub struct ApiClient {
+	pub problems: ProblemServiceClient<Channel>,
+	pub submissions: SubmissionServiceClient<Channel>,
+}
+
 /// ## [App]
 ///
 /// App's root in the native context
@@ -852,18 +582,12 @@ pub struct CursorPosition {
 }
 
 #[derive(Clone, Debug, Default)]
-pub struct NativeState {
-	pub menu_bar: Option<MenuBar>,
-	pub tray_clock: Option<MenuBar>,
-}
-#[derive(Clone, Debug, Default)]
 pub struct NativeGuiState {
 	pub menu_bar: Option<MenuBar>,
 	pub tray_clock: Option<MenuBar>,
 }
-
-#[derive(Debug, Clone)]
-pub struct ApiClient {
-	pub problems: ProblemServiceClient<Channel>,
-	pub submissions: SubmissionServiceClient<Channel>,
+#[derive(Clone, Debug, Default)]
+pub struct NativeState {
+	pub menu_bar: Option<MenuBar>,
+	pub tray_clock: Option<MenuBar>,
 }

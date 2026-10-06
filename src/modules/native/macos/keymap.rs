@@ -223,18 +223,14 @@ fn display_event(event: &NativeEventKind) -> String {
 			let key = MacosHid::key_from_code(*key_code)
 				.map(|k| k.display())
 				.unwrap_or_else(|| "?".into());
-
 			format!("KEY DOWN   code={:<3} key={:<8}", key_code, key)
 		}
-
 		NativeEventKind::KeyUp { key_code, .. } => {
 			let key = MacosHid::key_from_code(*key_code)
 				.map(|k| k.display())
 				.unwrap_or_else(|| "?".into());
-
 			format!("KEY UP     code={:<3} key={:<8}", key_code, key)
 		}
-
 		_ => String::new(),
 	}
 }
@@ -257,26 +253,20 @@ pub enum PointerTrigger {
 	Click {
 		button: MouseButton,
 	},
-
 	DoubleClick {
 		button: MouseButton,
 	},
-
 	Hold {
 		button: MouseButton,
 	},
-
 	Scroll {
 		axis: ScrollAxis,
-
 		#[serde(default)]
 		direction: Option<ScrollDirection>,
 	},
-
 	Drag {
 		button: MouseButton,
 	},
-
 	Move,
 }
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]

@@ -4,7 +4,6 @@
 //! 'pub use' enables external users of this crate to access the public dependencies.
 //! The double prelude is done to manage native dependencies in a centralized manner, allowing for easier maintenance and updates.
 //!
-
 // ============================================================
 // Native common
 // ============================================================
@@ -62,7 +61,7 @@ pub use tokio::net::{UnixListener, UnixStream};
 /// cause compilation errors or runtime issues in the native platform targets.
 pub use crate::{
 	native::{
-		app::*, daemon::*, job::*, monitor::*, resolver::*, screens::*, state, ui::*, window::*,
+		app_native::*, daemon::*, monitor::*, resolver::*, screens::*, state, ui::*, window::*,
 	},
 	server::*,
 };

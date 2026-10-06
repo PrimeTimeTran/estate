@@ -3,6 +3,7 @@ use crate::prelude::{
 	shared::Binding as OldKeyBinding,
 	*,
 };
+
 use anyhow::{Context as CtxAnyhow, Result};
 use mach2::mach_time;
 use std::process::{Child, Command, Stdio};
@@ -12,13 +13,10 @@ use std::process::{Child, Command, Stdio};
 pub enum HidMessage {
 	#[serde(rename = "ping")]
 	Ping { id: u64 },
-
 	#[serde(rename = "pong")]
 	Pong { id: u64 },
-
 	#[serde(rename = "native_event")]
 	NativeEvent { event: NativeEvent },
-
 	#[serde(rename = "action")]
 	Action { action: String },
 }
@@ -28,7 +26,6 @@ fn mach_now() -> u64 {
 }
 fn parse_message(line: &str) -> anyhow::Result<HidMessage> {
 	let value: serde_json::Value = serde_json::from_str(line)?;
-
 	Ok(serde_json::from_value(value)?)
 }
 fn key_state(active: bool, symbol: &str) -> &str {
@@ -498,7 +495,6 @@ impl MacosHid {
 	fn print_event(&mut self, event: &NativeEvent) {
 		let s = &self.state;
 		let app = display_name(&s.frontmost_app, 10);
-
 		let left = format!(
 			"{} {} {} {}",
 			key_state(s.shift_left, "⇧"),
@@ -506,7 +502,6 @@ impl MacosHid {
 			key_state(s.opt_left, "⌥"),
 			key_state(s.cmd_left, "⌘"),
 		);
-
 		let right = format!(
 			"{} {} {} {}",
 			key_state(s.shift_right, "⇧"),
@@ -514,9 +509,7 @@ impl MacosHid {
 			key_state(s.opt_right, "⌥"),
 			key_state(s.cmd_right, "⌘"),
 		);
-
 		let special = format!("{} {}", key_state(s.function, "fn"), key_state(s.caps, "⇪"),);
-
 		let event_display = match event.kind {
 			NativeEventKind::Scroll {
 				vertical,
@@ -553,12 +546,10 @@ impl MacosHid {
 				format!("{arrow} {name}")
 			}
 		};
-
 		let key_code = event
 			.key_code
 			.map(|code| code.to_string())
 			.unwrap_or_default();
-
 		println!(
 			"{:<10} | {:<17} | {:<17} | {:<7} | {:<16} | {:>5}",
 			app, left, right, special, event_display, key_code,
@@ -586,19 +577,15 @@ impl MacosHid {
 		}
 
 		let source_dir = "/Users/future/kb/project/crates/estate/src/modules/native/macos/native";
-
 		let source = format!("{source_dir}/os-observer.swift");
 		let shim = format!("{source_dir}/hid-event-shim.o");
 		let output = "/tmp/estate-os-observer";
-
 		tracing::debug!("🍎 building macOS OS observer");
-
 		let build = std::process::Command::new("swiftc")
 			.current_dir(source_dir)
 			.args([&source, &shim, "-o", output])
 			.output()
 			.context("failed to invoke swiftc")?;
-
 		if !build.status.success() {
 			anyhow::bail!(
 				"failed to build macOS OS observer:\n{}{}",
@@ -606,24 +593,19 @@ impl MacosHid {
 				String::from_utf8_lossy(&build.stderr),
 			);
 		}
-
 		tracing::debug!("🍎 macOS OS observer built: {output}");
-
 		let child = std::process::Command::new(output)
 			.stdin(std::process::Stdio::null())
 			.stdout(std::process::Stdio::inherit())
 			.stderr(std::process::Stdio::inherit())
 			.spawn()
 			.context("failed to start /tmp/estate-os-observer")?;
-
 		tracing::debug!(
 			pid = child.id(),
 			socket = %self.socket.display(),
 			"🍎 macOS OS observer started"
 		);
-
 		self.child = Some(child);
-
 		Ok(())
 	}
 	pub fn stop(&mut self) -> Result<()> {
@@ -637,41 +619,33 @@ impl MacosHid {
 	pub async fn run(mut self, events: EventBus, cancel: CancellationToken) -> Result<()> {
 		let stream = self.connect().await?;
 		let (reader, mut writer) = stream.into_split();
-
 		let mut reader = BufReader::new(reader);
 		let mut ping_interval = tokio::time::interval(std::time::Duration::from_secs(10));
-
 		let mut ping_id = 0u64;
 		let mut line = String::new();
-
 		loop {
 			tokio::select! {
 					_ = cancel.cancelled() => {
 							tracing::debug!("macOS HID cancelled");
 							return Ok(());
 					}
-
 					_ = ping_interval.tick() => {
 							ping_id += 1;
 							self.send_ping(&mut writer, ping_id).await?;
 					}
-
 					result = reader.read_line(&mut line) => {
 							let received_at = mach_now();
 							let bytes = result?;
-
 							if bytes == 0 {
 									tracing::warn!("Swift HID disconnected");
 									return Ok(());
 							}
-
 							self.handle_line(
 									line.trim_end(),
 									received_at,
 									&mut writer,
 									&events,
 							).await?;
-
 							line.clear();
 					}
 			}
@@ -730,13 +704,9 @@ impl MacosHid {
 		writer: &mut tokio::net::unix::OwnedWriteHalf,
 	) -> Result<()> {
 		// tracing::debug!(id, "🍎 Swift → Rust: PING");
-
 		let pong = HidMessage::Pong { id };
-
 		self.send_message(writer, &pong).await?;
-
 		tracing::debug!(id, "🍏 Rust → Swift: PONG");
-
 		Ok(())
 	}
 	async fn handle_line(
@@ -810,7 +780,6 @@ impl MacosHid {
 		// 		"🍎 Swift action received"
 		// );
 	}
-
 	fn log_native_event(&self, event: &NativeEvent) {
 		let now = event.sent_at;
 		let (left, right, special, event_display, flags_text, key_code) = match &event.kind {
@@ -898,7 +867,6 @@ impl MacosHid {
 				-1,
 			),
 		};
-
 		let flags: u64 = 0;
 		let session_flags: u64 = 0;
 		let source_pid: i64 = 0;
@@ -953,60 +921,42 @@ impl MacosHid {
 	}
 	fn modifier_display(&self, modifiers: &ModifierSnapshot) -> String {
 		let mut parts = Vec::new();
-
 		if modifiers.shift_left {
 			parts.push("⇧L");
 		}
 		if modifiers.shift_right {
 			parts.push("⇧R");
 		}
-
 		if modifiers.ctrl_left {
 			parts.push("⌃L");
 		}
 		if modifiers.ctrl_right {
 			parts.push("⌃R");
 		}
-
 		if modifiers.opt_left {
 			parts.push("⌥L");
 		}
 		if modifiers.opt_right {
 			parts.push("⌥R");
 		}
-
 		if modifiers.cmd_left {
 			parts.push("⌘L");
 		}
 		if modifiers.cmd_right {
 			parts.push("⌘R");
 		}
-
 		if modifiers.caps {
 			parts.push("⇪");
 		}
-
 		if modifiers.function {
 			parts.push("fn");
 		}
-
 		if parts.is_empty() {
 			"·".to_string()
 		} else {
 			parts.join(" ")
 		}
 	}
-	pub fn _observe_event(&mut self, event: &NativeEvent) -> Vec<Action> {
-		match &event.kind {
-			// NativeEventKind::FlagsChanged { .. } => self.observe_modifier(event),
-			NativeEventKind::KeyDown { .. } => self.observe_key(event),
-			NativeEventKind::KeyUp { .. } => self.observe_key(event),
-			// 			NativeEventKind::MouseDown { .. } => self.observe_mouse(event),
-			// 			NativeEventKind::MouseUp { .. } => self.observe_mouse(event),
-			_ => vec![],
-		}
-	}
-
 	fn observe_modifier(&mut self, event: &NativeEvent) -> Vec<Action> {
 		let NativeEventKind::FlagsChanged { key_code } = &event.kind else {
 			return vec![];
@@ -1051,7 +1001,6 @@ impl MacosHid {
 		// 	key_code,
 		// 	self.modifier_display(&event.modifiers),
 		// );
-
 		vec![]
 	}
 	pub fn observe_event(&mut self, event: &NativeEvent) -> Vec<Action> {
@@ -1070,7 +1019,6 @@ impl MacosHid {
 					self.modifier_display(&event.modifiers),
 				);
 			}
-
 			NativeEventKind::MouseUp { button, .. } => {
 				tracing::debug!(
 					"MOUSE UP button={} modifiers={}",
@@ -1078,10 +1026,8 @@ impl MacosHid {
 					self.modifier_display(&event.modifiers),
 				);
 			}
-
 			_ => return vec![],
 		}
-
 		vec![]
 	}
 }
@@ -1093,7 +1039,6 @@ impl MacosHid {
 	pub fn key_from_code(code: u16) -> Option<Key> {
 		key_from_code(code)
 	}
-
 	fn mouse_code(button: MouseButton) -> i64 {
 		match button {
 			MouseButton::Primary => 0,
@@ -1105,7 +1050,6 @@ impl MacosHid {
 	}
 	fn mouse_button_matches(event: &NativeEvent, button: MouseButton) -> bool {
 		let code = Self::mouse_code(button);
-
 		matches!(
 			event.kind,
 			NativeEventKind::MouseUp {
@@ -1124,69 +1068,251 @@ impl MacosHid {
 			_ => None,
 		}
 	}
-	// fn mouse_code(button: MouseButton) -> i64 {
-	// 	match button {
-	// 		MouseButton::Primary => 0,
-	// 		MouseButton::Secondary => 1,
-	// 		MouseButton::Middle => 2,
-	// 		MouseButton::Button4 => 3,
-	// 		MouseButton::Button5 => 4,
-	// 	}
-	// }
+	fn update_pressed(&mut self, event: &NativeEvent) {
+		match &event.kind {
+			NativeEventKind::KeyDown { key_code } => {
+				if let Some(key) = Self::key_from_code(*key_code) {
+					self.pressed.insert(key);
+				}
+			}
+			NativeEventKind::KeyUp { key_code } => {
+				if let Some(key) = Self::key_from_code(*key_code) {
+					self.pressed.remove(&key);
+				}
+			}
+			_ => {}
+		}
+	}
 
-	// fn mouse_button_matches(event: &NativeEvent, button: MouseButton) -> bool {
-	// 	let code = Self::mouse_code(button);
-	//
-	// 	matches!(
-	// 		event.kind,
-	// 		NativeEventKind::MouseUp {
-	// 			button: event_button,
-	// 			..
-	// 		} if event_button == code
-	// 	)
-	// }
-	//
-	// fn gesture_mouse_button(button: i64) -> Option<MouseButton> {
-	// 	match button {
-	// 		0 => Some(MouseButton::Primary),
-	// 		1 => Some(MouseButton::Secondary),
-	// 		2 => Some(MouseButton::Middle),
-	// 		3 => Some(MouseButton::Button4),
-	// 		4 => Some(MouseButton::Button5),
-	// 		_ => None,
-	// 	}
-	// }
+	fn gesture_event(event: &NativeEvent) -> Option<GestureEvent> {
+		match &event.kind {
+			NativeEventKind::KeyDown { key_code } => {
+				Self::key_from_code(*key_code).map(GestureEvent::Down)
+			}
+			NativeEventKind::FlagsChanged { .. } => None,
+			NativeEventKind::KeyUp { key_code } => Self::key_from_code(*key_code).map(GestureEvent::Up),
+			NativeEventKind::MouseDown { button, .. } => {
+				Self::gesture_mouse_button(*button).map(GestureEvent::MouseDown)
+			}
+			NativeEventKind::MouseUp { button, .. } => {
+				Self::gesture_mouse_button(*button).map(GestureEvent::MouseUp)
+			}
+			NativeEventKind::Scroll {
+				vertical,
+				horizontal,
+			} => Some(GestureEvent::Scroll {
+				vertical: *vertical,
+				horizontal: *horizontal,
+			}),
+			_ => None,
+		}
+	}
+	fn gesture_matches(expected: &GestureEvent, actual: &GestureEvent) -> bool {
+		match (expected, actual) {
+			(GestureEvent::Down(a), GestureEvent::Down(b)) => a == b,
+			(GestureEvent::Up(a), GestureEvent::Up(b)) => a == b,
+			(GestureEvent::Tap(a), GestureEvent::Tap(b)) => a == b,
+			(GestureEvent::MouseDown(a), GestureEvent::MouseDown(b)) => a == b,
+			(GestureEvent::MouseUp(a), GestureEvent::MouseUp(b)) => a == b,
+			(
+				GestureEvent::Scroll {
+					vertical: av,
+					horizontal: ah,
+				},
+				GestureEvent::Scroll {
+					vertical: bv,
+					horizontal: bh,
+				},
+			) => av == bv && ah == bh,
+			_ => false,
+		}
+	}
+	fn event_key(event: &NativeEvent) -> Option<Key> {
+		match event.kind {
+			NativeEventKind::KeyDown { key_code } | NativeEventKind::KeyUp { key_code } => {
+				Self::key_from_code(key_code)
+			}
+			_ => None,
+		}
+	}
 
+	fn write_hid_trace(event: &NativeEvent, action: Option<&Action>) -> std::io::Result<()> {
+		let path = std::env::current_dir()?.join("estate-hid-smoke.log");
+		let mut file = OpenOptions::new().create(true).append(true).open(path)?;
+		let event_name = match &event.kind {
+			NativeEventKind::KeyDown { .. } => "↓",
+			NativeEventKind::KeyUp { .. } => "↑",
+			NativeEventKind::MouseDown { .. } => "M↓",
+			NativeEventKind::MouseUp { .. } => "M↑",
+			NativeEventKind::Scroll { .. } => "SCROLL",
+			NativeEventKind::FlagsChanged { .. } => "⇄",
+			_ => "UNKNOWN",
+		};
+		writeln!(
+			file,
+			"{:<19} | {:<24} | {:<24}",
+			format_timestamp(event.sent_at as f64),
+			event_name,
+			action
+				.map(|a| format!("{} ({})", a.name, a.code))
+				.unwrap_or_default(),
+		)?;
+		Ok(())
+	}
+	fn init_hid_smoke_log() -> std::io::Result<()> {
+		let path = std::env::current_dir()?.join("estate-hid-smoke.log");
+		let mut file = std::fs::File::create(path)?;
+		writeln!(
+			file,
+			"TIME          LS LC LO LM | RS RC RO RM | FN CP | EVENT              FLAGS"
+		)?;
+		writeln!(
+			file,
+			"              -- --------- | --------- | -- -- | ------------------ ----------------"
+		)?;
+		writeln!(
+			file,
+			"Columns: LS LC LO LM = left modifiers, RS RC RO RM = right modifiers, FN CP = Fn/Caps"
+		)?;
+		writeln!(
+			file,
+			"Event flags are aggregate CoreGraphics state; left/right state is reconstructed from keycodes"
+		)?;
+		writeln!(file)?;
+		Ok(())
+	}
+	fn handle_modifier_event(&mut self, event: &SwiftNativeEvent) {
+		if event.kind != "flags_changed" {
+			return;
+		}
+		let Some(key_code) = event.key_code else {
+			tracing::warn!(
+				name = ?event.name,
+				"🍎 MODIFIER EVENT missing key code"
+			);
+			return;
+		};
+		let key = MacosHid::key_from_code(key_code);
+		tracing::debug!(
+			name = ?event.name,
+			key_code,
+			key = ?key.map(|k| k.display()),
+			direction = ?event.direction,
+			modifiers = ?event.modifiers,
+			"🍎 MODIFIER EVENT"
+		);
+	}
+}
+impl MacosHid {
+	fn key_side_display(key: Option<&Key>, modifiers: &ModifierSnapshot) -> (String, String, String) {
+		let left = match key {
+			Some(Key::ShiftLeft) | Some(Key::ControlLeft) | Some(Key::AltLeft) | Some(Key::MetaLeft) => {
+				key.unwrap().display()
+			}
+			_ => {
+				let mut parts = Vec::new();
+				if modifiers.shift_left {
+					parts.push("⇧");
+				}
+				if modifiers.ctrl_left {
+					parts.push("⌃");
+				}
+				if modifiers.opt_left {
+					parts.push("⌥");
+				}
+				if modifiers.cmd_left {
+					parts.push("⌘");
+				}
+				if parts.is_empty() {
+					"·".into()
+				} else {
+					parts.join("")
+				}
+			}
+		};
+		let right = match key {
+			Some(Key::ShiftRight)
+			| Some(Key::ControlRight)
+			| Some(Key::AltRight)
+			| Some(Key::MetaRight) => key.unwrap().display(),
+			_ => {
+				let mut parts = Vec::new();
+				if modifiers.shift_right {
+					parts.push("⇧");
+				}
+				if modifiers.ctrl_right {
+					parts.push("⌃");
+				}
+				if modifiers.opt_right {
+					parts.push("⌥");
+				}
+				if modifiers.cmd_right {
+					parts.push("⌘");
+				}
+				if parts.is_empty() {
+					"·".into()
+				} else {
+					parts.join("")
+				}
+			}
+		};
+		let mut special_parts = Vec::new();
+		if modifiers.caps {
+			special_parts.push("⇪");
+		}
+		if modifiers.function {
+			special_parts.push("fn");
+		}
+		let special = if special_parts.is_empty() {
+			"·".into()
+		} else {
+			special_parts.join(" ")
+		};
+		(left, right, special)
+	}
+	fn modifier_is_down(key: Option<&Key>, modifiers: &ModifierSnapshot) -> bool {
+		match key {
+			Some(Key::ShiftLeft) => modifiers.shift_left,
+			Some(Key::ShiftRight) => modifiers.shift_right,
+
+			Some(Key::ControlLeft) => modifiers.ctrl_left,
+			Some(Key::ControlRight) => modifiers.ctrl_right,
+
+			Some(Key::AltLeft) => modifiers.opt_left,
+			Some(Key::AltRight) => modifiers.opt_right,
+
+			Some(Key::MetaLeft) => modifiers.cmd_left,
+			Some(Key::MetaRight) => modifiers.cmd_right,
+
+			Some(Key::CapsLock) => modifiers.caps,
+			Some(Key::Function) => modifiers.function,
+			_ => false,
+		}
+	}
+}
+
+impl MacosHid {
 	fn matches(&mut self, trigger: &Trigger, event: &NativeEvent) -> bool {
 		match trigger {
 			Trigger::Chord { keys } => self.matches_chord(keys, event),
-
 			Trigger::Tap { key } => self.matches_tap(key, event),
-
 			Trigger::Repeat {
 				key,
 				count,
 				max_interval_ms,
 			} => self.matches_repeat(key, *count, *max_interval_ms, event),
-
 			Trigger::Sequence { steps, timeout_ms } => self.matches_sequence(steps, *timeout_ms, event),
-
 			Trigger::HoldThen { held, then } => self.matches_hold_then(held, then, event),
-
 			Trigger::WhileHeld { key, trigger } => self.matches_while_held(key, trigger, event),
-
 			Trigger::Ordered { events } => self.matches_ordered(events, event),
-
 			Trigger::Pointer { trigger } => self.matches_pointer(trigger, event),
 		}
 	}
 	fn matches_chord(&mut self, keys: &[Key], event: &NativeEvent) -> bool {
 		self.update_pressed(event);
-
 		let Some(key) = Self::event_key(event) else {
 			return false;
 		};
-
 		matches!(event.kind, NativeEventKind::KeyDown { .. })
 			&& keys.contains(&key)
 			&& keys.iter().all(|key| self.pressed.contains(key))
@@ -1195,17 +1321,13 @@ impl MacosHid {
 		let NativeEventKind::KeyUp { key_code } = event.kind else {
 			return false;
 		};
-
 		let Some(event_key) = Self::key_from_code(key_code) else {
 			return false;
 		};
-
 		if &event_key != key {
 			return false;
 		}
-
 		self.last_tap.insert(key.clone(), std::time::Instant::now());
-
 		true
 	}
 	fn matches_repeat(
@@ -1218,17 +1340,13 @@ impl MacosHid {
 		let NativeEventKind::KeyUp { key_code } = event.kind else {
 			return false;
 		};
-
 		let Some(event_key) = Self::key_from_code(key_code) else {
 			return false;
 		};
-
 		if &event_key != key {
 			return false;
 		}
-
 		let now = std::time::Instant::now();
-
 		let within_window = self
 			.last_tap
 			.get(key)
@@ -1359,7 +1477,6 @@ impl MacosHid {
 	fn matches_pointer(&mut self, trigger: &PointerTrigger, event: &NativeEvent) -> bool {
 		match trigger {
 			PointerTrigger::Click { button } => Self::matches_mouse_up(event, *button),
-
 			PointerTrigger::DoubleClick { button } => {
 				if !Self::matches_mouse_up(event, *button) {
 					return false;
@@ -1441,351 +1558,9 @@ impl MacosHid {
 			} if *event_button == Self::mouse_code(button)
 		)
 	}
-
-	fn update_pressed(&mut self, event: &NativeEvent) {
-		match &event.kind {
-			NativeEventKind::KeyDown { key_code } => {
-				if let Some(key) = Self::key_from_code(*key_code) {
-					self.pressed.insert(key);
-				}
-			}
-			NativeEventKind::KeyUp { key_code } => {
-				if let Some(key) = Self::key_from_code(*key_code) {
-					self.pressed.remove(&key);
-				}
-			}
-			_ => {}
-		}
-	}
-
-	fn gesture_event(event: &NativeEvent) -> Option<GestureEvent> {
-		match &event.kind {
-			NativeEventKind::KeyDown { key_code } => {
-				Self::key_from_code(*key_code).map(GestureEvent::Down)
-			}
-
-			NativeEventKind::FlagsChanged { .. } => None,
-
-			NativeEventKind::KeyUp { key_code } => Self::key_from_code(*key_code).map(GestureEvent::Up),
-
-			NativeEventKind::MouseDown { button, .. } => {
-				Self::gesture_mouse_button(*button).map(GestureEvent::MouseDown)
-			}
-
-			NativeEventKind::MouseUp { button, .. } => {
-				Self::gesture_mouse_button(*button).map(GestureEvent::MouseUp)
-			}
-
-			NativeEventKind::Scroll {
-				vertical,
-				horizontal,
-			} => Some(GestureEvent::Scroll {
-				vertical: *vertical,
-				horizontal: *horizontal,
-			}),
-
-			_ => None,
-		}
-	}
-	fn gesture_matches(expected: &GestureEvent, actual: &GestureEvent) -> bool {
-		match (expected, actual) {
-			(GestureEvent::Down(a), GestureEvent::Down(b)) => a == b,
-			(GestureEvent::Up(a), GestureEvent::Up(b)) => a == b,
-			(GestureEvent::Tap(a), GestureEvent::Tap(b)) => a == b,
-			(GestureEvent::MouseDown(a), GestureEvent::MouseDown(b)) => a == b,
-			(GestureEvent::MouseUp(a), GestureEvent::MouseUp(b)) => a == b,
-			(
-				GestureEvent::Scroll {
-					vertical: av,
-					horizontal: ah,
-				},
-				GestureEvent::Scroll {
-					vertical: bv,
-					horizontal: bh,
-				},
-			) => av == bv && ah == bh,
-
-			_ => false,
-		}
-	}
-	fn event_key(event: &NativeEvent) -> Option<Key> {
-		match event.kind {
-			NativeEventKind::KeyDown { key_code } | NativeEventKind::KeyUp { key_code } => {
-				Self::key_from_code(key_code)
-			}
-
-			_ => None,
-		}
-	}
-
-	fn write_hid_trace(event: &NativeEvent, action: Option<&Action>) -> std::io::Result<()> {
-		let path = std::env::current_dir()?.join("estate-hid-smoke.log");
-
-		let mut file = OpenOptions::new().create(true).append(true).open(path)?;
-
-		let event_name = match &event.kind {
-			NativeEventKind::KeyDown { .. } => "↓",
-			NativeEventKind::KeyUp { .. } => "↑",
-			NativeEventKind::MouseDown { .. } => "M↓",
-			NativeEventKind::MouseUp { .. } => "M↑",
-			NativeEventKind::Scroll { .. } => "SCROLL",
-			NativeEventKind::FlagsChanged { .. } => "⇄",
-			_ => "UNKNOWN",
-		};
-
-		writeln!(
-			file,
-			"{:<19} | {:<24} | {:<24}",
-			format_timestamp(event.sent_at as f64),
-			event_name,
-			action
-				.map(|a| format!("{} ({})", a.name, a.code))
-				.unwrap_or_default(),
-		)?;
-
-		Ok(())
-	}
-
-	fn init_hid_smoke_log() -> std::io::Result<()> {
-		let path = std::env::current_dir()?.join("estate-hid-smoke.log");
-
-		let mut file = std::fs::File::create(path)?;
-
-		writeln!(
-			file,
-			"TIME          LS LC LO LM | RS RC RO RM | FN CP | EVENT              FLAGS"
-		)?;
-		writeln!(
-			file,
-			"              -- --------- | --------- | -- -- | ------------------ ----------------"
-		)?;
-		writeln!(
-			file,
-			"Columns: LS LC LO LM = left modifiers, RS RC RO RM = right modifiers, FN CP = Fn/Caps"
-		)?;
-		writeln!(
-			file,
-			"Event flags are aggregate CoreGraphics state; left/right state is reconstructed from keycodes"
-		)?;
-		writeln!(file)?;
-
-		Ok(())
-	}
-	fn handle_modifier_event(&mut self, event: &SwiftNativeEvent) {
-		if event.kind != "flags_changed" {
-			return;
-		}
-
-		let Some(key_code) = event.key_code else {
-			tracing::warn!(
-				name = ?event.name,
-				"🍎 MODIFIER EVENT missing key code"
-			);
-			return;
-		};
-
-		let key = MacosHid::key_from_code(key_code);
-
-		tracing::debug!(
-			name = ?event.name,
-			key_code,
-			key = ?key.map(|k| k.display()),
-			direction = ?event.direction,
-			modifiers = ?event.modifiers,
-			"🍎 MODIFIER EVENT"
-		);
-	}
 }
-impl MacosHid {
-	fn key_side_display(key: Option<&Key>, modifiers: &ModifierSnapshot) -> (String, String, String) {
-		let left = match key {
-			Some(Key::ShiftLeft) | Some(Key::ControlLeft) | Some(Key::AltLeft) | Some(Key::MetaLeft) => {
-				key.unwrap().display()
-			}
-
-			_ => {
-				let mut parts = Vec::new();
-
-				if modifiers.shift_left {
-					parts.push("⇧");
-				}
-				if modifiers.ctrl_left {
-					parts.push("⌃");
-				}
-				if modifiers.opt_left {
-					parts.push("⌥");
-				}
-				if modifiers.cmd_left {
-					parts.push("⌘");
-				}
-
-				if parts.is_empty() {
-					"·".into()
-				} else {
-					parts.join("")
-				}
-			}
-		};
-
-		let right = match key {
-			Some(Key::ShiftRight)
-			| Some(Key::ControlRight)
-			| Some(Key::AltRight)
-			| Some(Key::MetaRight) => key.unwrap().display(),
-
-			_ => {
-				let mut parts = Vec::new();
-
-				if modifiers.shift_right {
-					parts.push("⇧");
-				}
-				if modifiers.ctrl_right {
-					parts.push("⌃");
-				}
-				if modifiers.opt_right {
-					parts.push("⌥");
-				}
-				if modifiers.cmd_right {
-					parts.push("⌘");
-				}
-
-				if parts.is_empty() {
-					"·".into()
-				} else {
-					parts.join("")
-				}
-			}
-		};
-
-		let mut special_parts = Vec::new();
-
-		if modifiers.caps {
-			special_parts.push("⇪");
-		}
-
-		if modifiers.function {
-			special_parts.push("fn");
-		}
-
-		let special = if special_parts.is_empty() {
-			"·".into()
-		} else {
-			special_parts.join(" ")
-		};
-
-		(left, right, special)
-	}
-	fn modifier_is_down(key: Option<&Key>, modifiers: &ModifierSnapshot) -> bool {
-		match key {
-			Some(Key::ShiftLeft) => modifiers.shift_left,
-			Some(Key::ShiftRight) => modifiers.shift_right,
-
-			Some(Key::ControlLeft) => modifiers.ctrl_left,
-			Some(Key::ControlRight) => modifiers.ctrl_right,
-
-			Some(Key::AltLeft) => modifiers.opt_left,
-			Some(Key::AltRight) => modifiers.opt_right,
-
-			Some(Key::MetaLeft) => modifiers.cmd_left,
-			Some(Key::MetaRight) => modifiers.cmd_right,
-
-			Some(Key::CapsLock) => modifiers.caps,
-			Some(Key::Function) => modifiers.function,
-
-			_ => false,
-		}
-	}
-}
-impl SwiftNativeEvent {
-	fn into_native_event(self) -> Option<NativeEvent> {
-		let kind = match self.kind.as_str() {
-			"key_down" => NativeEventKind::KeyDown {
-				key_code: self.key_code?,
-			},
-			"key_up" => NativeEventKind::KeyUp {
-				key_code: self.key_code?,
-			},
-			"flags_changed" => NativeEventKind::FlagsChanged {
-				key_code: self.key_code?,
-			},
-
-			"frontmost_app" => {
-				let app = self.frontmost_app.as_ref()?;
-				NativeEventKind::FrontmostApp {
-					name: app.name.clone(),
-					bundle_id: app.bundle_id.clone(),
-					pid: app.pid,
-				}
-			}
-
-			"mouse_down" => NativeEventKind::MouseDown {
-				button: self.button?,
-				x: self.x?,
-				y: self.y?,
-			},
-
-			"mouse_up" => NativeEventKind::MouseUp {
-				button: self.button?,
-				x: self.x?,
-				y: self.y?,
-			},
-
-			"scroll" => NativeEventKind::Scroll {
-				vertical: self.vertical?,
-				horizontal: self.horizontal?,
-			},
-
-			_ => return None,
-		};
-
-		let modifiers = self.modifiers.unwrap_or_default();
-		let scroll_x = Some(self.horizontal.unwrap_or(0) as f64);
-		let scroll_y = Some(self.vertical.unwrap_or(0) as f64);
-
-		Some(NativeEvent {
-			scroll_x,
-			scroll_y,
-			sent_at: self.sent_at.or(self.timestamp).unwrap_or_default(),
-			frontmost_app: self.frontmost_app.map(|app| FrontmostApp {
-				name: app.name,
-				bundle_id: app.bundle_id,
-				pid: app.pid,
-			}),
-			kind,
-			source: Some(self.source),
-			timestamp: self.timestamp,
-			key_code: self.key_code,
-			name: self.name,
-			direction: self
-				.direction
-				.and_then(|direction| match direction.as_str() {
-					"down" => Some(keymap::KeyDirection::Down),
-					"up" => Some(keymap::KeyDirection::Up),
-					_ => None,
-				}),
-
-			modifiers: ModifierSnapshot {
-				shift_left: modifiers.shift_left,
-				shift_right: modifiers.shift_right,
-
-				ctrl_left: modifiers.ctrl_left,
-				ctrl_right: modifiers.ctrl_right,
-
-				opt_left: modifiers.opt_left,
-				opt_right: modifiers.opt_right,
-
-				cmd_left: modifiers.cmd_left,
-				cmd_right: modifiers.cmd_right,
-
-				caps: modifiers.caps,
-				function: modifiers.function,
-			},
-		})
-	}
-}
-
 #[derive(Debug, Default, Clone)]
-struct HidState {
+pub struct HidState {
 	shift_left: bool,
 	shift_right: bool,
 
@@ -1861,156 +1636,6 @@ pub struct Modifiers {
 	pub fn_key: bool,
 
 	pub caps: bool,
-}
-#[derive(Debug, Clone, Copy, Default, Deserialize)]
-struct SwiftModifiers {
-	#[serde(rename = "shift_left", default)]
-	shift_left: bool,
-
-	#[serde(rename = "shift_right", default)]
-	shift_right: bool,
-
-	#[serde(rename = "ctrl_left", default)]
-	ctrl_left: bool,
-
-	#[serde(rename = "ctrl_right", default)]
-	ctrl_right: bool,
-
-	#[serde(rename = "opt_left", default)]
-	opt_left: bool,
-
-	#[serde(rename = "opt_right", default)]
-	opt_right: bool,
-
-	#[serde(rename = "cmd_left", default)]
-	cmd_left: bool,
-
-	#[serde(rename = "cmd_right", default)]
-	cmd_right: bool,
-
-	#[serde(rename = "caps", default)]
-	caps: bool,
-
-	#[serde(rename = "function", default)]
-	function: bool,
-}
-#[derive(Debug, Clone, Copy, Deserialize)]
-pub struct SwiftCgEvent {
-	#[serde(rename = "keyCode")]
-	pub key_code: u16,
-
-	#[serde(rename = "type")]
-	pub event_type: u32,
-
-	#[serde(rename = "flags")]
-	pub flags: u64,
-
-	#[serde(rename = "sessionFlags")]
-	pub session_flags: u64,
-
-	#[serde(rename = "sourcePID")]
-	pub source_pid: i32,
-
-	#[serde(rename = "sourceUserData")]
-	pub source_user_data: u64,
-}
-#[derive(Debug, Clone, Deserialize)]
-pub struct SwiftNativeEvent {
-	pub source: String,
-	pub kind: String,
-
-	#[serde(default)]
-	pub direction: Option<String>,
-
-	#[serde(default)]
-	pub name: Option<String>,
-
-	#[serde(default)]
-	pub timestamp: Option<u64>,
-
-	#[serde(default)]
-	pub sent_at: Option<u64>,
-
-	#[serde(default)]
-	pub key_code: Option<u16>,
-
-	#[serde(default)]
-	pub button: Option<i64>,
-
-	#[serde(default)]
-	pub x: Option<f64>,
-
-	#[serde(default)]
-	pub y: Option<f64>,
-
-	#[serde(default)]
-	pub vertical: Option<i64>,
-
-	#[serde(default)]
-	pub horizontal: Option<i64>,
-
-	#[serde(default)]
-	pub modifiers: Option<SwiftModifiers>,
-
-	#[serde(rename = "frontmostApp", default)]
-	pub frontmost_app: Option<SwiftFrontmostApp>,
-}
-#[derive(Debug, Clone, Deserialize)]
-struct SwiftFrontmostApp {
-	#[serde(rename = "bundleID")]
-	bundle_id: String,
-	name: String,
-	pid: i64,
-}
-#[derive(Debug, Deserialize)]
-struct SwiftRawKeyEvent {
-	kind: String,
-
-	#[serde(default)]
-	timestamp: u64,
-
-	#[serde(default)]
-	modifiers: Option<SwiftRawModifiers>,
-
-	#[serde(default)]
-	event: Option<SwiftRawCgEvent>,
-}
-#[derive(Debug, Deserialize)]
-struct SwiftRawCgEvent {
-	#[serde(rename = "keyCode")]
-	key_code: u16,
-}
-#[derive(Debug, Deserialize, Default)]
-struct SwiftRawModifiers {
-	#[serde(rename = "leftShift", default)]
-	shift_left: bool,
-
-	#[serde(rename = "rightShift", default)]
-	shift_right: bool,
-
-	#[serde(rename = "leftCtrl", default)]
-	ctrl_left: bool,
-
-	#[serde(rename = "rightCtrl", default)]
-	ctrl_right: bool,
-
-	#[serde(rename = "leftOpt", default)]
-	opt_left: bool,
-
-	#[serde(rename = "rightOpt", default)]
-	opt_right: bool,
-
-	#[serde(rename = "leftCmd", default)]
-	cmd_left: bool,
-
-	#[serde(rename = "rightCmd", default)]
-	cmd_right: bool,
-
-	#[serde(rename = "caps", default)]
-	caps: bool,
-
-	#[serde(rename = "fn", default)]
-	function: bool,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FrontmostApp {

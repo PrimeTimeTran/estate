@@ -78,27 +78,7 @@ pub struct ProblemState {
 	pub loading: bool,
 	pub value: Option<StoredProblem>,
 }
-pub struct Renderer<C, S>
-where
-	C: Ctx,
-{
-	pub context: Arc<C>,
-	pub state: S,
-	pub view: ViewType,
-	pub cancel: CancellationToken,
-	pub event_rx: C::EventReceiver,
-	pub event_tx: C::EventSender,
-	pub settings: Arc<Settings>,
 
-	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-	pub windows: Vec<AppWindow<C, S>>,
-	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-	pub menu_bar: Option<MenuBar>,
-	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-	pub tray_clock: Option<MenuBar>,
-	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-	pub tray_cursor: Option<TrayIcon>,
-}
 /// ## [S]
 ///
 /// Typestate placeholder for state.

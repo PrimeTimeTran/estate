@@ -19,7 +19,6 @@ impl TaskManager {
 		};
 		let mut manager = Self { state, runtime };
 		manager.reload();
-
 		Ok(manager)
 	}
 	pub fn reload(&mut self) {

@@ -11,8 +11,8 @@ pub use core_graphics::{
 pub use mach2::mach_time;
 pub use winit::platform::macos::{ActivationPolicy, EventLoopBuilderExtMacOS};
 
-pub mod macos_app;
-pub use macos_app::*;
+pub mod app_macos;
+pub use app_macos::*;
 
 pub use host::*;
 mod host;
