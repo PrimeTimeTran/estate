@@ -1,81 +1,230 @@
+use jev_sdk::{NoulAnswer, ScoreAnswer};
 pub use ratatui::Frame;
 
 use super::{AiSession, *};
 
-#[async_trait]
-impl ArtifactGenerator for ApiGenerator {
-	async fn generate(&self, prompt: &str) -> Result<String> {
-		todo!("API generate")
+impl AiSession {
+	fn create_readable(&self) -> String {
+		let current = Utc::now();
+		current.format(FMT_HUMAN_READABLE).to_string()
 	}
-	async fn run_agent(&self, prompt: &str) -> Result<String> {
-		todo!("API generate")
+	fn empty() -> Result<()> {
+		Ok(())
 	}
-	async fn with_session(&mut self, session: &AiSession, prompt: String) -> Result<TaskResult> {
-		todo!("with_session")
+	pub fn new(title: impl Into<String>, dir: PathBuf) -> Result<Self> {
+		let now = Utc::now();
+		let goal = include_str!("../../../ai/template/user.goal.md").to_string();
+		Ok(Self {
+			workspace: dir.clone(),
+			goal,
+			id: uuid::Uuid::new_v4(),
+			title: title.into(),
+			stage: Stage::Intent,
+			stages: Vec::new(),
+			dir,
+			time_created: now,
+			time_updated: now,
+		})
 	}
-	fn clone_box(&self) -> Box<dyn ArtifactGenerator> {
-		Box::new(self.clone())
+	pub fn workspace(&self) -> &Path {
+		&self.workspace
 	}
-}
-#[async_trait]
-impl ArtifactGenerator for LocalGenerator {
-	async fn generate(&self, prompt: &str) -> Result<String> {
-		let request = serde_json::json!({
-			"model": self.model,
-			"prompt": prompt,
-			"stream": false,
-		});
-		std::fs::write(
-			"/tmp/estate-ollama-request.json",
-			serde_json::to_string_pretty(&request)?,
-		)?;
-		let response = reqwest::Client::new()
-			.post("http://localhost:11434/api/generate")
-			.json(&request)
-			.send()
-			.await?
-			.error_for_status()?;
-		let body = response.text().await?;
-		std::fs::write("/tmp/estate-ollama-response.json", &body)?;
-		let response: OllamaResponse =
-			serde_json::from_str(&body).context("invalid Ollama response")?;
-		let artifact = response.response.trim();
-		if artifact.is_empty() {
-			return Err(anyhow!(
-				"Ollama returned an empty artifact \
-				 (model={}, done_reason={:?})",
-				self.model,
-				response.done_reason,
-			));
-		}
-		Ok(artifact.to_string())
-	}
-	// cargo run --bin sanity-tests -- --native src/bin/sanity-tests/tools-intern
-	// cargo run --bin sanity-tests -- --native src/bin/sanity-tests/tools-host-env
-	async fn run_agent(&self, prompt: &str) -> Result<String> {
-		let task = AgentTask::new(prompt.to_string());
-		let result = self
-			.runtime
-			.run_agent(task)
-			// .run_agent_with_sdlc(task, Path::new("/Users/future/kb/project/crates/estate/log/"))
-			.await?;
-		Ok(
-			result
-				.chat
-				.or(result.summary)
-				.unwrap_or_else(|| "Agent completed".to_string()),
-		)
-	}
-	async fn with_session(&mut self, session: &AiSession, prompt: String) -> Result<TaskResult> {
-		let task = AgentTask::new(prompt.to_string());
-		let result = self.runtime.from_session(task, session).await?;
-		Ok(result)
-	}
-	fn clone_box(&self) -> Box<dyn ArtifactGenerator> {
-		Box::new(self.clone())
+
+	pub fn workspace_owned(&self) -> PathBuf {
+		self.workspace.clone()
 	}
 }
 
+impl crate::traits::DateableSession for AiSession {
+	fn start(&self) -> Option<DateTime<Utc>> {
+		Some(self.time_created)
+	}
+	fn end(&self) -> Option<DateTime<Utc>> {
+		Some(self.time_updated)
+	}
+}
+impl AiView {
+	pub fn apply(&mut self, event: SdlcEvent) {
+		match event {
+			SdlcEvent::RunStarted => {
+				self.runtime.phase = Phase::Starting;
+				self.runtime.time_started = Instant::now();
+				self.runtime.stage_time_started = Instant::now();
+				self.runtime.message = Some(String::from("Run started"));
+			}
+
+			SdlcEvent::StageStarted { stage, attempt } => {
+				self.runtime.stage = stage;
+				self.runtime.attempt = attempt.number;
+				self.runtime.phase = Phase::Starting;
+				self.runtime.stage_time_started = Instant::now();
+				self.runtime.score = None;
+				self.runtime.confidence = None;
+				self.runtime.error = None;
+				self.runtime.message = Some(format!("{stage:?}"));
+			}
+
+			SdlcEvent::Activity {
+				stage,
+				attempt,
+				message,
+			} => {
+				self.runtime.stage = stage;
+				self.runtime.attempt = attempt.number;
+				self.runtime.message = Some(message);
+			}
+
+			SdlcEvent::PhaseChanged { phase } => {
+				self.runtime.phase = match phase {
+					Phase::Executing => Phase::Executing,
+					Phase::Evaluating => Phase::Evaluating,
+					Phase::Completed => Phase::Completed,
+
+					// Add the remaining mappings for your actual
+					// Phase variants.
+					_ => self.runtime.phase,
+				};
+
+				self.runtime.message = Some(format!("{phase:?}"));
+			}
+
+			SdlcEvent::ExecutionComplete { stage } => {
+				self.runtime.stage = stage;
+				self.runtime.phase = Phase::Evaluating;
+				self.runtime.message = Some(String::from("Execution complete"));
+			}
+
+			SdlcEvent::EvaluationStarted { stage } => {
+				self.runtime.stage = stage;
+				self.runtime.phase = Phase::Evaluating;
+				self.runtime.message = Some(String::from("Evaluating"));
+			}
+
+			SdlcEvent::Evaluated {
+				stage,
+				score,
+				confidence,
+				passed,
+			} => {
+				self.runtime.stage = stage;
+				self.runtime.score = Some(score);
+				self.runtime.confidence = Some(confidence);
+
+				self.runtime.message = Some(format!(
+					"Evaluation: {:.2} (confidence {:.2})",
+					score, confidence
+				));
+
+				if !passed {
+					self.runtime.phase = Phase::Failed;
+				}
+			}
+
+			SdlcEvent::StageTransitioned { from: _, to } => {
+				self.runtime.stage = to;
+				self.runtime.stage_time_started = Instant::now();
+				self.runtime.score = None;
+				self.runtime.confidence = None;
+				self.runtime.message = Some(format!("Starting {to:?}"));
+			}
+
+			SdlcEvent::Completed => {
+				self.runtime.phase = Phase::Completed;
+				self.runtime.message = Some(String::from("SDLC complete"));
+			}
+
+			SdlcEvent::Failed { stage, error } => {
+				if let Some(stage) = stage {
+					self.runtime.stage = stage;
+				}
+
+				self.runtime.phase = Phase::Failed;
+				self.runtime.message = Some(error.clone());
+				self.runtime.error = Some(error);
+			}
+
+			event => {
+				self.runtime.events.push(event);
+			}
+		}
+	}
+	pub fn handle_input_key(
+		&mut self,
+		key: crossterm::event::KeyEvent,
+		input_tx: &UnboundedSender<SdlcInput>,
+	) -> anyhow::Result<()> {
+		use crossterm::event::KeyCode;
+		match key.code {
+			KeyCode::Char(c) => {
+				self.input.push(c);
+			}
+
+			KeyCode::Backspace => {
+				self.input.pop();
+			}
+			KeyCode::Enter => {
+				let input = std::mem::take(&mut self.input);
+				input_tx.send(SdlcInput::Human(input))?;
+				self.input_active = false;
+			}
+
+			KeyCode::Esc => {
+				self.input_active = false;
+				self.input.clear();
+			}
+
+			_ => {}
+		}
+
+		Ok(())
+	}
+
+	pub fn begin_input(&mut self) {
+		self.input_active = true;
+		self.input.clear();
+	}
+	pub fn end_input(&mut self) {
+		self.input_active = false;
+		self.input.clear();
+	}
+	pub fn is_input_active(&self) -> bool {
+		self.input_active
+	}
+	pub fn new(runtime: &PipelineRuntime) -> Self {
+		Self {
+			input_active: false,
+			input: String::new(),
+			paused: false,
+			show_logs: false,
+			events: vec![],
+			runtime: runtime.view(),
+		}
+	}
+	pub fn render(frame: &mut Frame<'_>, view: &AiView) {
+		let area = frame.area();
+		frame.render_widget(Clear, area);
+		let chunks = RatatuiLayout::default()
+			.direction(Direction::Vertical)
+			.constraints([
+				Constraint::Length(2),
+				Constraint::Length(3),
+				Constraint::Min(8),
+				Constraint::Length(3),
+			])
+			.split(area);
+		stepper(frame, view, chunks[1]);
+		let body = body(chunks[2]);
+		left_stage_panel(frame, view, body[0]);
+		right_activity_panel(frame, view, body[2]);
+		footer(frame, view, chunks[3]);
+	}
+	pub fn toggle_pause(&mut self) {
+		self.paused = !self.paused;
+	}
+	pub fn toggle_logs(&mut self) {
+		self.show_logs = !self.show_logs;
+	}
+}
 impl Attempt {
 	pub fn new() -> Self {
 		Self {
@@ -90,22 +239,89 @@ impl std::fmt::Display for Attempt {
 		write!(f, "{} attempt {}", self.stage, self.number)
 	}
 }
+
+impl CtxEvaluation {
+	fn get(&self, file: SrcArtifact) -> Result<&str> {
+		match file {
+			SrcArtifact::Intent => self
+				.intent
+				.as_deref()
+				.ok_or_else(|| anyhow::anyhow!("intent artifact not loaded")),
+			SrcArtifact::Spec => self
+				.spec
+				.as_deref()
+				.ok_or_else(|| anyhow::anyhow!("spec artifact not loaded")),
+			SrcArtifact::Plan => self
+				.plan
+				.as_deref()
+				.ok_or_else(|| anyhow::anyhow!("plan artifact not loaded")),
+			SrcArtifact::Test => self
+				.tests
+				.as_deref()
+				.ok_or_else(|| anyhow::anyhow!("tests artifact not loaded")),
+			SrcArtifact::Build => self
+				.tests
+				.as_deref()
+				.ok_or_else(|| anyhow::anyhow!("build artifact not loaded")),
+			SrcArtifact::Progress => self
+				.progress
+				.as_deref()
+				.ok_or_else(|| anyhow::anyhow!("progress artifact not loaded")),
+			SrcArtifact::QA => self
+				.verification
+				.as_deref()
+				.ok_or_else(|| anyhow::anyhow!("verification artifact not loaded")),
+		}
+	}
+	fn load(session: &AiSession, stage: Stage) -> Result<Self> {
+		let read = |file: SrcArtifact| -> Option<String> { file.read(&session.dir).ok() };
+		Ok(Self {
+			stage,
+			intent: match stage {
+				Stage::Intent | Stage::Spec | Stage::Plan | Stage::Build | Stage::QA => {
+					read(SrcArtifact::Intent)
+				}
+				_ => None,
+			},
+			spec: match stage {
+				Stage::Spec | Stage::Plan | Stage::Build | Stage::QA => read(SrcArtifact::Spec),
+				_ => None,
+			},
+			plan: match stage {
+				Stage::Plan | Stage::Build | Stage::QA => read(SrcArtifact::Plan),
+				_ => None,
+			},
+			tests: match stage {
+				Stage::Plan | Stage::Build | Stage::QA => read(SrcArtifact::Test),
+				_ => None,
+			},
+			progress: match stage {
+				Stage::Build | Stage::QA => read(SrcArtifact::Progress),
+				_ => None,
+			},
+			verification: match stage {
+				Stage::QA => read(SrcArtifact::QA),
+				_ => None,
+			},
+		})
+	}
+}
+
 impl Evaluator {
-	async fn evaluate(&self, session: &AiSession, execution: &Execution) -> Result<QACheck> {
-		let ctx = CtxEvaluation::load(session, execution.stage)?;
-		let evaluation = match execution.stage {
-			Stage::Intent => self.evaluate_intent(&ctx).await,
-			Stage::Spec => self.evaluate_spec(&ctx).await,
-			Stage::Plan => self.evaluate_plan(&ctx).await,
-			Stage::Build => self.evaluate_build(&ctx).await,
-			Stage::QA => self.evaluate_verification(&ctx).await,
+	async fn evaluate(&self, execution: &Execution) -> Result<QACheck> {
+		let ctx = CtxEvaluation::load(&self.session, execution.stage)?;
+		match execution.stage {
+			Stage::Intent => self.intent(&ctx).await,
+			Stage::Spec => self.spec(&ctx).await,
+			Stage::Plan => self.plan(&ctx).await,
+			Stage::Build => self.build(&ctx).await,
+			Stage::QA => self.qa(&ctx).await,
 			stage => Err(anyhow::anyhow!(
 				"stage {stage:?} does not support evaluation"
 			)),
-		};
-		return evaluation;
+		}
 	}
-	async fn evaluate_goal(&self, goal: &str) -> Result<QACheck> {
+	async fn goal(&self, goal: &str) -> Result<QACheck> {
 		let time_started = Utc::now();
 		let state = format!(
 			"## User Goal\n\n{goal}\n\n\
@@ -236,25 +452,12 @@ impl Evaluator {
 			let result = response
 				.score(key)
 				.ok_or_else(|| anyhow::anyhow!("JEV returned no {name} score"))?;
-
-			evaluations.push(Metric {
-				name: name.into(),
-				passed: result.score >= 0.80,
-				score: result.score,
-				confidence: result.confidence,
-				explanation: String::new(),
-			});
+			evaluations.push(Metric::quality(result));
 		}
 		let meets_bar = response
 			.noul("meets_bar")
 			.ok_or_else(|| anyhow::anyhow!("JEV returned no goal decision"))?;
-		evaluations.push(Metric {
-			name: "meets_bar".into(),
-			passed: meets_bar.noul >= 0.80,
-			score: meets_bar.noul,
-			confidence: 1.0,
-			explanation: String::new(),
-		});
+		evaluations.push(Metric::meets_bar(meets_bar));
 		Ok(QACheck::new(
 			Stage::Intent,
 			time_started,
@@ -265,9 +468,9 @@ impl Evaluator {
 		))
 	}
 
-	async fn evaluate_intent(&self, ctx: &CtxEvaluation) -> Result<QACheck> {
+	async fn intent(&self, ctx: &CtxEvaluation) -> Result<QACheck> {
 		let time_started = Utc::now();
-		let intent = ctx.get(SessionFile::Intent)?;
+		let intent = ctx.get(SrcArtifact::Intent)?;
 		let response = self
 			.jev
 			.system_one(
@@ -309,28 +512,13 @@ impl Evaluator {
 			quality.score,
 			quality.confidence,
 			meets_bar.noul,
-			vec![
-				Metric {
-					name: "quality".into(),
-					passed: quality.score >= 0.80,
-					score: quality.score,
-					confidence: quality.confidence,
-					explanation: String::new(),
-				},
-				Metric {
-					name: "meets_bar".into(),
-					passed: meets_bar.noul >= 0.80,
-					score: meets_bar.noul,
-					confidence: 1.0,
-					explanation: String::new(),
-				},
-			],
+			vec![Metric::quality(quality), Metric::meets_bar(meets_bar)],
 		))
 	}
-	async fn evaluate_spec(&self, ctx: &CtxEvaluation) -> Result<QACheck> {
+	async fn spec(&self, ctx: &CtxEvaluation) -> Result<QACheck> {
 		let time_started = Utc::now();
-		let intent = ctx.get(SessionFile::Intent)?;
-		let spec = ctx.get(SessionFile::Spec)?;
+		let intent = ctx.get(SrcArtifact::Intent)?;
+		let spec = ctx.get(SrcArtifact::Spec)?;
 		let state = format!(
 			"## User Intent\n\n{intent}\n\n\
         ## Specification\n\n{spec}"
@@ -378,29 +566,14 @@ impl Evaluator {
 			quality.score,
 			quality.confidence,
 			meets_bar.noul,
-			vec![
-				Metric {
-					name: "quality".into(),
-					passed: quality.score >= 0.80,
-					score: quality.score,
-					confidence: quality.confidence,
-					explanation: String::new(),
-				},
-				Metric {
-					name: "meets_bar".into(),
-					passed: meets_bar.noul >= 0.80,
-					score: meets_bar.noul,
-					confidence: 1.0,
-					explanation: String::new(),
-				},
-			],
+			vec![Metric::quality(quality), Metric::meets_bar(meets_bar)],
 		))
 	}
-	async fn evaluate_plan(&self, ctx: &CtxEvaluation) -> Result<QACheck> {
+	async fn plan(&self, ctx: &CtxEvaluation) -> Result<QACheck> {
 		let time_started = Utc::now();
-		let intent = ctx.get(SessionFile::Intent)?;
-		let spec = ctx.get(SessionFile::Spec)?;
-		let plan = ctx.get(SessionFile::Plan)?;
+		let intent = ctx.get(SrcArtifact::Intent)?;
+		let spec = ctx.get(SrcArtifact::Spec)?;
+		let plan = ctx.get(SrcArtifact::Plan)?;
 		let state = format!(
 			"## User Intent\n\n{intent}\n\n\
          ## Specification\n\n{spec}\n\n\
@@ -450,30 +623,14 @@ impl Evaluator {
 			quality.score,
 			quality.confidence,
 			meets_bar.noul,
-			vec![
-				Metric {
-					name: "quality".into(),
-					passed: quality.score >= 0.80,
-					score: quality.score,
-					confidence: quality.confidence,
-					explanation: String::new(),
-				},
-				Metric {
-					name: "meets_bar".into(),
-					passed: meets_bar.noul >= 0.80,
-					score: meets_bar.noul,
-					confidence: 1.0,
-					explanation: String::new(),
-				},
-			],
+			vec![Metric::quality(quality), Metric::meets_bar(meets_bar)],
 		))
 	}
-	async fn evaluate_build(&self, ctx: &CtxEvaluation) -> Result<QACheck> {
+	async fn build(&self, ctx: &CtxEvaluation) -> Result<QACheck> {
 		let time_started = Utc::now();
-		let intent = ctx.get(SessionFile::Intent)?;
-		let spec = ctx.get(SessionFile::Spec)?;
-		let plan = ctx.get(SessionFile::Plan)?;
-		// let tests = ctx.get(SessionFile::Test)?;
+		let intent = ctx.get(SrcArtifact::Intent)?;
+		let spec = ctx.get(SrcArtifact::Spec)?;
+		let plan = ctx.get(SrcArtifact::Plan)?;
 		let implementation = std::fs::read_dir(&self.session.dir)?
 			.filter_map(|entry| entry.ok())
 			.filter_map(|entry| {
@@ -539,31 +696,16 @@ impl Evaluator {
 			quality.score,
 			quality.confidence,
 			meets_bar.noul,
-			vec![
-				Metric {
-					name: "quality".into(),
-					passed: quality.score >= 0.80,
-					score: quality.score,
-					confidence: quality.confidence,
-					explanation: String::new(),
-				},
-				Metric {
-					name: "meets_bar".into(),
-					passed: meets_bar.noul >= 0.80,
-					score: meets_bar.noul,
-					confidence: 1.0,
-					explanation: String::new(),
-				},
-			],
+			vec![Metric::quality(quality), Metric::meets_bar(meets_bar)],
 		))
 	}
-	async fn evaluate_verification(&self, ctx: &CtxEvaluation) -> Result<QACheck> {
+	async fn qa(&self, ctx: &CtxEvaluation) -> Result<QACheck> {
 		let time_started = Utc::now();
-		let intent = ctx.get(SessionFile::Intent)?;
-		let spec = ctx.get(SessionFile::Spec)?;
-		// let tests = ctx.get(SessionFile::Test)?;
+		let intent = ctx.get(SrcArtifact::Intent)?;
+		let spec = ctx.get(SrcArtifact::Spec)?;
+		// let tests = ctx.get(SrcArtifact::Test)?;
 		let evidence = ctx
-			.get(SessionFile::Verification)
+			.get(SrcArtifact::QA)
 			.unwrap_or("No verification evidence was recorded.");
 		let state = format!(
 			"## User Intent\n\n{intent}\n\n\
@@ -614,92 +756,81 @@ impl Evaluator {
 			quality.score,
 			quality.confidence,
 			meets_bar.noul,
-			vec![
-				Metric {
-					name: "quality".into(),
-					passed: quality.score >= 0.80,
-					score: quality.score,
-					confidence: quality.confidence,
-					explanation: String::new(),
-				},
-				Metric {
-					name: "meets_bar".into(),
-					passed: meets_bar.noul >= 0.80,
-					score: meets_bar.noul,
-					confidence: 1.0,
-					explanation: String::new(),
-				},
-			],
+			vec![Metric::quality(quality), Metric::meets_bar(meets_bar)],
 		))
 	}
 }
-impl CtxEvaluation {
-	fn get(&self, file: SessionFile) -> Result<&str> {
-		match file {
-			SessionFile::Intent => self
-				.intent
-				.as_deref()
-				.ok_or_else(|| anyhow::anyhow!("intent artifact not loaded")),
-			SessionFile::Spec => self
-				.spec
-				.as_deref()
-				.ok_or_else(|| anyhow::anyhow!("spec artifact not loaded")),
-
-			SessionFile::Plan => self
-				.plan
-				.as_deref()
-				.ok_or_else(|| anyhow::anyhow!("plan artifact not loaded")),
-			SessionFile::Test => self
-				.tests
-				.as_deref()
-				.ok_or_else(|| anyhow::anyhow!("tests artifact not loaded")),
-			SessionFile::Build => self
-				.tests
-				.as_deref()
-				.ok_or_else(|| anyhow::anyhow!("build artifact not loaded")),
-
-			SessionFile::Progress => self
-				.progress
-				.as_deref()
-				.ok_or_else(|| anyhow::anyhow!("progress artifact not loaded")),
-
-			SessionFile::Verification => self
-				.verification
-				.as_deref()
-				.ok_or_else(|| anyhow::anyhow!("verification artifact not loaded")),
-		}
+#[async_trait]
+impl Generator for ApiGenerator {
+	async fn generate(&self, prompt: &str) -> Result<String> {
+		todo!("API generate")
 	}
-	fn load(session: &AiSession, stage: Stage) -> Result<Self> {
-		let read = |file: SessionFile| -> Option<String> { file.read(&session.dir).ok() };
-		Ok(Self {
-			stage,
-			intent: match stage {
-				Stage::Intent | Stage::Spec | Stage::Plan | Stage::Build | Stage::QA => {
-					read(SessionFile::Intent)
-				}
-				_ => None,
-			},
-			spec: match stage {
-				Stage::Spec | Stage::Plan | Stage::Build | Stage::QA => read(SessionFile::Spec),
-				_ => None,
-			},
-			plan: match stage {
-				Stage::Plan | Stage::Build | Stage::QA => read(SessionFile::Plan),
-				_ => None,
-			},
-			tests: match stage {
-				Stage::Plan | Stage::Build | Stage::QA => read(SessionFile::Test),
-				_ => None,
-			},
-			progress: match stage {
-				Stage::Build | Stage::QA => read(SessionFile::Progress),
-				_ => None,
-			},
-			verification: match stage {
-				Stage::QA => read(SessionFile::Verification),
-				_ => None,
-			},
-		})
+	async fn run_agent(&self, prompt: &str) -> Result<String> {
+		todo!("API generate")
+	}
+	async fn with_session(&mut self, session: &AiSession, prompt: String) -> Result<TaskResult> {
+		todo!("with_session")
+	}
+	fn clone_box(&self) -> Box<dyn Generator> {
+		Box::new(self.clone())
+	}
+}
+#[async_trait]
+impl Generator for LocalGenerator {
+	async fn generate(&self, prompt: &str) -> Result<String> {
+		let request = serde_json::json!({
+			"model": self.model,
+			"prompt": prompt,
+			"stream": false,
+		});
+		std::fs::write(
+			"/tmp/estate-ollama-request.json",
+			serde_json::to_string_pretty(&request)?,
+		)?;
+		let response = reqwest::Client::new()
+			.post("http://localhost:11434/api/generate")
+			.json(&request)
+			.send()
+			.await?
+			.error_for_status()?;
+		let body = response.text().await?;
+		std::fs::write("/tmp/estate-ollama-response.json", &body)?;
+		let response: OllamaResponse =
+			serde_json::from_str(&body).context("invalid Ollama response")?;
+		let artifact = response.response.trim();
+		if artifact.is_empty() {
+			return Err(anyhow!(
+				"Ollama returned an empty artifact \
+				 (model={}, done_reason={:?})",
+				self.model,
+				response.done_reason,
+			));
+		}
+		Ok(artifact.to_string())
+	}
+	// cargo run --bin sanity-tests -- --native src/bin/sanity-tests/tools-intern
+	// cargo run --bin sanity-tests -- --native src/bin/sanity-tests/tools-host-env
+	async fn run_agent(&self, prompt: &str) -> Result<String> {
+		let task = AgentTask::new(prompt.to_string());
+		let result = self
+			.runtime
+			.run_agent(task)
+			// .run_agent_with_sdlc(task, Path::new("/Users/future/kb/project/crates/estate/log/"))
+			.await?;
+		Ok(
+			result
+				.chat
+				.or(result.summary)
+				.unwrap_or_else(|| "Agent completed".to_string()),
+		)
+	}
+	async fn with_session(&mut self, session: &AiSession, prompt: String) -> Result<TaskResult> {
+		let task = AgentTask::new(prompt.to_string());
+		let result = self.runtime.from_session(task, session).await?;
+		Ok(result)
+	}
+	fn clone_box(&self) -> Box<dyn Generator> {
+		Box::new(self.clone())
 	}
 }
 
@@ -711,277 +842,32 @@ impl LocalGenerator {
 		}
 	}
 }
-impl PipelineRuntime {
-	pub fn new(pipeline: SprintPipeline) -> Self {
-		let stage = pipeline.stage().clone();
+impl Metric {
+	fn quality(value: &ScoreAnswer) -> Self {
 		Self {
-			stage,
-			pipeline,
-			activity: vec![],
-			attempt: 0,
-			confidence: None,
-			history: Vec::new(),
-			message: None,
-			passed: None,
-			phase: Phase::Starting,
-			score: None,
-			stage_time_started: Instant::now(),
-			time_started: Instant::now(),
-			total_agent_calls: 0,
-			total_tokens: 0,
-			error: None,
-			events: vec![],
+			name: "quality".into(),
+			passed: value.score >= 0.80,
+			score: value.score,
+			confidence: value.confidence,
+			explanation: String::new(),
 		}
 	}
-	fn retry(&mut self, _stage: Stage) -> Result<()> {
-		Ok(())
-	}
-	pub async fn run(&mut self, input_rx: &mut UnboundedReceiver<SdlcInput>) -> Result<()> {
-		let mut runner = SprintRunner {
-			pipeline: &mut self.pipeline,
-		};
-		runner.run(input_rx).await.context("SprintRunner::run")
-	}
-	pub async fn run_simulated(
-		&mut self,
-		_input_rx: &mut UnboundedReceiver<SdlcInput>,
-	) -> Result<()> {
-		self.pipeline.emit(SdlcEvent::RunStarted);
-		for (index, step) in Step::ALL.iter().enumerate() {
-			if *step == Step::Complete {
-				break;
-			}
-			let Some(stage) = step.stage() else {
-				continue;
-			};
-			let attempt = self.pipeline.next_attempt(stage)?;
-			self
-				.pipeline
-				.emit(SdlcEvent::StageStarted { stage, attempt });
-			self.pipeline.emit(SdlcEvent::Activity {
-				stage,
-				attempt,
-				message: format!("Dry Run · step {}/{}", index + 1, Step::ALL.len(),),
-			});
-			self.pipeline.emit(SdlcEvent::PhaseChanged {
-				phase: Phase::Executing,
-			});
-			sleep(DEMO_EXECUTION_TIME).await;
-			self.pipeline.emit(SdlcEvent::ExecutionComplete { stage });
-			self.pipeline.emit(SdlcEvent::PhaseChanged {
-				phase: Phase::Evaluating,
-			});
-			self.pipeline.emit(SdlcEvent::EvaluationStarted { stage });
-			sleep(DEMO_EVALUATION_TIME).await;
-			self.pipeline.emit(SdlcEvent::Evaluated {
-				stage,
-				score: 0.91,
-				confidence: 0.94,
-				passed: true,
-			});
-			let Some(next) = stage.next() else {
-				break;
-			};
-			self.pipeline.transition(next)?;
-			log_step_transition(stage, next)?;
-			self.pipeline.emit(SdlcEvent::StageTransitioned {
-				from: stage,
-				to: next,
-			});
-		}
-		self.pipeline.emit(SdlcEvent::PhaseChanged {
-			phase: Phase::Completed,
-		});
-		self.pipeline.emit(SdlcEvent::Completed);
-		sleep(DEMO_COMPLETE_DELAY).await;
-		Ok(())
-	}
-	pub async fn resume_from(
-		&mut self,
-		stage: Stage,
-		input_rx: &mut UnboundedReceiver<SdlcInput>,
-	) -> Result<()> {
-		tracing::info!("resume_from pipeline runtime");
-
-		self.pipeline.resume_from(stage).await?;
-
-		let generator = self.pipeline.generator.as_mut();
-
-		generator
-			.with_session(
-				&self.pipeline.session.clone(),
-				self.pipeline.session.goal.clone(),
-			)
-			.await?;
-
-		let mut runner = SprintRunner {
-			pipeline: &mut self.pipeline,
-		};
-
-		runner.run(input_rx).await.context("SprintRunner::run")
-	}
-	pub fn view(&self) -> PipelineRuntimeView {
-		PipelineRuntimeView {
-			activity: self.activity.clone(),
-			attempt: self.attempt,
-			stage: self.stage,
-			time_started: self.time_started,
-			stage_time_started: self.stage_time_started,
-			phase: self.phase,
-			score: self.score,
-			confidence: self.confidence,
-			passed: self.passed,
-			message: self.message.clone(),
-			error: self.error.clone(),
-			total_tokens: self.total_tokens,
-			total_agent_calls: self.total_agent_calls,
-			history: self.history.clone(),
-			events: self.events.clone(),
-		}
-	}
-}
-
-impl AiSession {
-	fn create_readable(&self) -> String {
-		let current = Utc::now();
-		current.format(FMT_HUMAN_READABLE).to_string()
-	}
-	fn empty() -> Result<()> {
-		Ok(())
-	}
-	pub fn new(title: impl Into<String>, dir: PathBuf) -> Result<Self> {
-		let now = Utc::now();
-		let goal = include_str!("../../../ai/template/user.goal.md").to_string();
-		Ok(Self {
-			workspace: dir.clone(),
-			goal,
-			id: uuid::Uuid::new_v4(),
-			title: title.into(),
-			stage: Stage::Intent,
-			stages: Vec::new(),
-			dir,
-			time_created: now,
-			time_updated: now,
-		})
-	}
-	pub fn workspace(&self) -> &Path {
-		&self.workspace
-	}
-
-	pub fn workspace_owned(&self) -> PathBuf {
-		self.workspace.clone()
-	}
-}
-impl crate::traits::DateableSession for AiSession {
-	fn start(&self) -> Option<DateTime<Utc>> {
-		Some(self.time_created)
-	}
-	fn end(&self) -> Option<DateTime<Utc>> {
-		Some(self.time_updated)
-	}
-}
-impl SdlcInput {
-	pub fn text(&self) -> Option<&str> {
-		match self {
-			Self::Human(value) | Self::ProvideContext(value) => Some(value),
-			Self::Abort | Self::Retry | Self::Reviewed | Self::Revision { .. } => None,
-		}
-	}
-}
-
-impl Stage {
-	pub fn next(&self) -> Option<Self> {
-		match self {
-			Self::Intent => Some(Self::Spec),
-			Self::Spec => Some(Self::Plan),
-			// Self::Plan => Some(Self::Test),
-			Self::Plan => Some(Self::Build),
-			Self::Test => Some(Self::Build),
-			Self::Build => Some(Self::QA),
-			Self::QA => Some(Self::Complete),
-			Self::Deploy => Some(Self::Maintain),
-			Self::Maintain => Some(Self::Complete),
-			Self::Complete => None,
-			Self::Finalize => None,
-		}
-	}
-	pub fn is_before(self, other: Stage) -> bool {
-		let rank = |stage: Stage| match stage {
-			Stage::Intent => 0,
-			Stage::Spec => 1,
-			Stage::Plan => 2,
-			Stage::Test => 3,
-			Stage::Build => 4,
-			Stage::QA => 5,
-			Stage::Deploy => 6,
-			Stage::Maintain => 7,
-			Stage::Complete => 8,
-			Stage::Finalize => 100,
-		};
-		rank(self) < rank(other)
-	}
-}
-impl std::fmt::Display for Stage {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		let name = match self {
-			Self::Intent => "Intent",
-			Self::Spec => "Spec",
-			Self::Plan => "Plan",
-			Self::Test => "Test",
-			Self::Build => "Build",
-			Self::QA => "QA",
-			Self::Deploy => "Deploy",
-			Self::Maintain => "Maintain",
-			Self::Complete => "Complete",
-			Self::Finalize => "Finalize Sprint",
-		};
-
-		f.write_str(name)
-	}
-}
-impl QACheck {
-	fn new(
-		stage: Stage,
-		time_started: DateTime<Utc>,
-		score: f64,
-		confidence: f64,
-		meets_bar: f64,
-		evaluations: Vec<Metric>,
-	) -> Self {
-		let time_completed = Utc::now();
-		let time_total = time_completed - time_started;
+	fn meets_bar(value: &NoulAnswer) -> Self {
 		Self {
-			stage,
-			time_started,
-			time_completed,
-			time_total,
-			score,
-			confidence,
-			passed: meets_bar >= 0.80 && confidence >= 0.70,
-			evaluations,
+			name: "meets_bar".into(),
+			passed: value.noul >= 0.80,
+			score: value.noul,
+			confidence: 1.0,
+			explanation: String::new(),
 		}
 	}
-	pub fn time_total_readable(&self) -> String {
-		duration_readable(self.time_total)
-	}
-	pub fn start_readable(&self) -> String {
-		time_readable(self.time_started)
-	}
-
-	pub fn end_readable(&self) -> String {
-		time_readable(self.time_completed)
-	}
-	pub fn with_evaluations(&self, checks: Vec<CheckResult>) -> Self {
-		todo!("with_evaluations")
-	}
 }
-impl StageOutcome {
+impl Outcome {
 	pub fn attempt(&self) -> Attempt {
 		match self {
 			Self::Complete { execution, .. }
 			| Self::NeedsRevision { execution, .. }
 			| Self::EvaluationFailed { execution, .. } => execution.attempt,
-
 			Self::ExecutionFailed { attempt, .. } => *attempt,
 		}
 	}
@@ -990,13 +876,11 @@ impl StageOutcome {
 			Self::Complete { execution, .. }
 			| Self::NeedsRevision { execution, .. }
 			| Self::EvaluationFailed { execution, .. } => execution.stage,
-
 			Self::ExecutionFailed { stage, .. } => *stage,
 		}
 	}
 }
-
-impl SprintPipeline {
+impl Pipeline {
 	fn checks_for(stage: Stage) -> Vec<(&'static str, Vec<&'static str>)> {
 		match stage {
 			Stage::Intent | Stage::Spec | Stage::Plan => Vec::new(),
@@ -1018,9 +902,8 @@ impl SprintPipeline {
 	fn emit(&self, event: SdlcEvent) {
 		let _ = self.event_tx.send(event);
 	}
-
 	async fn evaluate(&self, execution: &Execution) -> Result<QACheck> {
-		self.evaluator.evaluate(&self.session, execution).await
+		self.qa.evaluate(execution).await
 	}
 	fn evaluate_checks(&self, checks: &[CheckResult]) -> Vec<Metric> {
 		checks
@@ -1064,10 +947,10 @@ impl SprintPipeline {
 	fn init_templates(dir: &Path) -> Result<()> {
 		let template_dir = SpecialFile::AiTemplateDir.path()?;
 		for file in [
-			SessionFile::Intent,
-			SessionFile::Spec,
-			SessionFile::Plan,
-			SessionFile::Progress,
+			SrcArtifact::Intent,
+			SrcArtifact::Spec,
+			SrcArtifact::Plan,
+			SrcArtifact::Progress,
 		] {
 			let source = template_dir.join(file.name());
 			let destination = file.path(dir);
@@ -1139,14 +1022,14 @@ impl SprintPipeline {
 				session
 			}
 		};
-		let evaluator = Evaluator {
+		let qa = Evaluator {
 			session: session.clone(),
 			jev: TypeSafeClient::from_env()?,
 		};
 		let generator = Box::new(LocalGenerator::new(runtime.clone(), "qwen3:8b"));
 		let (event_tx, _event_rx) = tokio::sync::broadcast::channel::<SdlcEvent>(256);
 		Ok(Self {
-			evaluator,
+			qa,
 			generator,
 			session,
 			state_path,
@@ -1175,10 +1058,10 @@ impl SprintPipeline {
 		persist_evaluation(session, evaluation, attempt)?;
 		self.persist()
 	}
-	fn persist_outcome(&mut self, outcome: &StageOutcome) -> Result<()> {
+	fn persist_outcome(&mut self, outcome: &Outcome) -> Result<()> {
 		let (stage, attempt, status, actor, time_started, time_completed, description, evaluation) =
 			match outcome {
-				StageOutcome::Complete {
+				Outcome::Complete {
 					execution,
 					evaluation,
 				} => (
@@ -1191,7 +1074,7 @@ impl SprintPipeline {
 					format!("Stage Completed: {}", execution.stage),
 					Some(evaluation.clone()),
 				),
-				StageOutcome::NeedsRevision {
+				Outcome::NeedsRevision {
 					execution,
 					evaluation,
 				} => (
@@ -1204,7 +1087,7 @@ impl SprintPipeline {
 					format!("Needs Revision: {}", execution.stage),
 					Some(evaluation.clone()),
 				),
-				StageOutcome::ExecutionFailed {
+				Outcome::ExecutionFailed {
 					stage,
 					attempt,
 					error,
@@ -1218,7 +1101,7 @@ impl SprintPipeline {
 					error.to_string(),
 					None,
 				),
-				StageOutcome::EvaluationFailed { execution, error } => (
+				Outcome::EvaluationFailed { execution, error } => (
 					execution.stage,
 					execution.attempt,
 					Status::EvaluationFailed,
@@ -1245,7 +1128,7 @@ impl SprintPipeline {
 		let session = self.session()?;
 		let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S");
 		let entry = format!("\n## {timestamp}\n\n{message}\n");
-		SessionFile::Progress.append(&session.dir, entry)?;
+		SrcArtifact::Progress.append(&session.dir, entry)?;
 		Ok(())
 	}
 	fn persist_session(&mut self) -> Result<()> {
@@ -1452,186 +1335,172 @@ impl SprintPipeline {
 		Ok(std::fs::write(path, contents)?)
 	}
 }
-impl AiView {
-	pub fn apply(&mut self, event: SdlcEvent) {
-		match event {
-			SdlcEvent::RunStarted => {
-				self.runtime.phase = Phase::Starting;
-				self.runtime.time_started = Instant::now();
-				self.runtime.stage_time_started = Instant::now();
-				self.runtime.message = Some(String::from("Run started"));
-			}
-
-			SdlcEvent::StageStarted { stage, attempt } => {
-				self.runtime.stage = stage;
-				self.runtime.attempt = attempt.number;
-				self.runtime.phase = Phase::Starting;
-				self.runtime.stage_time_started = Instant::now();
-				self.runtime.score = None;
-				self.runtime.confidence = None;
-				self.runtime.error = None;
-				self.runtime.message = Some(format!("{stage:?}"));
-			}
-
-			SdlcEvent::Activity {
-				stage,
-				attempt,
-				message,
-			} => {
-				self.runtime.stage = stage;
-				self.runtime.attempt = attempt.number;
-				self.runtime.message = Some(message);
-			}
-
-			SdlcEvent::PhaseChanged { phase } => {
-				self.runtime.phase = match phase {
-					Phase::Executing => Phase::Executing,
-					Phase::Evaluating => Phase::Evaluating,
-					Phase::Completed => Phase::Completed,
-
-					// Add the remaining mappings for your actual
-					// Phase variants.
-					_ => self.runtime.phase,
-				};
-
-				self.runtime.message = Some(format!("{phase:?}"));
-			}
-
-			SdlcEvent::ExecutionComplete { stage } => {
-				self.runtime.stage = stage;
-				self.runtime.phase = Phase::Evaluating;
-				self.runtime.message = Some(String::from("Execution complete"));
-			}
-
-			SdlcEvent::EvaluationStarted { stage } => {
-				self.runtime.stage = stage;
-				self.runtime.phase = Phase::Evaluating;
-				self.runtime.message = Some(String::from("Evaluating"));
-			}
-
-			SdlcEvent::Evaluated {
-				stage,
-				score,
-				confidence,
-				passed,
-			} => {
-				self.runtime.stage = stage;
-				self.runtime.score = Some(score);
-				self.runtime.confidence = Some(confidence);
-
-				self.runtime.message = Some(format!(
-					"Evaluation: {:.2} (confidence {:.2})",
-					score, confidence
-				));
-
-				if !passed {
-					self.runtime.phase = Phase::Failed;
-				}
-			}
-
-			SdlcEvent::StageTransitioned { from: _, to } => {
-				self.runtime.stage = to;
-				self.runtime.stage_time_started = Instant::now();
-				self.runtime.score = None;
-				self.runtime.confidence = None;
-				self.runtime.message = Some(format!("Starting {to:?}"));
-			}
-
-			SdlcEvent::Completed => {
-				self.runtime.phase = Phase::Completed;
-				self.runtime.message = Some(String::from("SDLC complete"));
-			}
-
-			SdlcEvent::Failed { stage, error } => {
-				if let Some(stage) = stage {
-					self.runtime.stage = stage;
-				}
-
-				self.runtime.phase = Phase::Failed;
-				self.runtime.message = Some(error.clone());
-				self.runtime.error = Some(error);
-			}
-
-			event => {
-				self.runtime.events.push(event);
-			}
+impl PipelineRuntime {
+	pub fn new(pipeline: Pipeline) -> Self {
+		let stage = pipeline.stage().clone();
+		Self {
+			stage,
+			pipeline,
+			activity: vec![],
+			attempt: 0,
+			confidence: None,
+			history: Vec::new(),
+			message: None,
+			passed: None,
+			phase: Phase::Starting,
+			score: None,
+			stage_time_started: Instant::now(),
+			time_started: Instant::now(),
+			total_agent_calls: 0,
+			total_tokens: 0,
+			error: None,
+			events: vec![],
 		}
 	}
-	pub fn handle_input_key(
-		&mut self,
-		key: crossterm::event::KeyEvent,
-		input_tx: &UnboundedSender<SdlcInput>,
-	) -> anyhow::Result<()> {
-		use crossterm::event::KeyCode;
-		match key.code {
-			KeyCode::Char(c) => {
-				self.input.push(c);
-			}
-
-			KeyCode::Backspace => {
-				self.input.pop();
-			}
-			KeyCode::Enter => {
-				let input = std::mem::take(&mut self.input);
-				input_tx.send(SdlcInput::Human(input))?;
-				self.input_active = false;
-			}
-
-			KeyCode::Esc => {
-				self.input_active = false;
-				self.input.clear();
-			}
-
-			_ => {}
-		}
-
+	fn retry(&mut self, _stage: Stage) -> Result<()> {
 		Ok(())
 	}
-
-	pub fn begin_input(&mut self) {
-		self.input_active = true;
-		self.input.clear();
+	pub async fn run(&mut self, input_rx: &mut UnboundedReceiver<SdlcInput>) -> Result<()> {
+		let mut runner = SprintRunner {
+			pipeline: &mut self.pipeline,
+		};
+		runner.run(input_rx).await.context("SprintRunner::run")
 	}
-	pub fn end_input(&mut self) {
-		self.input_active = false;
-		self.input.clear();
+	pub async fn run_simulated(
+		&mut self,
+		_input_rx: &mut UnboundedReceiver<SdlcInput>,
+	) -> Result<()> {
+		self.pipeline.emit(SdlcEvent::RunStarted);
+		for (index, step) in Step::ALL.iter().enumerate() {
+			if *step == Step::Complete {
+				break;
+			}
+			let Some(stage) = step.stage() else {
+				continue;
+			};
+			let attempt = self.pipeline.next_attempt(stage)?;
+			self
+				.pipeline
+				.emit(SdlcEvent::StageStarted { stage, attempt });
+			self.pipeline.emit(SdlcEvent::Activity {
+				stage,
+				attempt,
+				message: format!("Dry Run · step {}/{}", index + 1, Step::ALL.len(),),
+			});
+			self.pipeline.emit(SdlcEvent::PhaseChanged {
+				phase: Phase::Executing,
+			});
+			sleep(DEMO_EXECUTION_TIME).await;
+			self.pipeline.emit(SdlcEvent::ExecutionComplete { stage });
+			self.pipeline.emit(SdlcEvent::PhaseChanged {
+				phase: Phase::Evaluating,
+			});
+			self.pipeline.emit(SdlcEvent::EvaluationStarted { stage });
+			sleep(DEMO_EVALUATION_TIME).await;
+			self.pipeline.emit(SdlcEvent::Evaluated {
+				stage,
+				score: 0.91,
+				confidence: 0.94,
+				passed: true,
+			});
+			let Some(next) = stage.next() else {
+				break;
+			};
+			self.pipeline.transition(next)?;
+			log_step_transition(stage, next)?;
+			self.pipeline.emit(SdlcEvent::StageTransitioned {
+				from: stage,
+				to: next,
+			});
+		}
+		self.pipeline.emit(SdlcEvent::PhaseChanged {
+			phase: Phase::Completed,
+		});
+		self.pipeline.emit(SdlcEvent::Completed);
+		sleep(DEMO_COMPLETE_DELAY).await;
+		Ok(())
 	}
-	pub fn is_input_active(&self) -> bool {
-		self.input_active
+	pub async fn resume_from(
+		&mut self,
+		stage: Stage,
+		input_rx: &mut UnboundedReceiver<SdlcInput>,
+	) -> Result<()> {
+		tracing::info!("resume_from pipeline runtime");
+		self.pipeline.resume_from(stage).await?;
+		let generator = self.pipeline.generator.as_mut();
+		generator
+			.with_session(
+				&self.pipeline.session.clone(),
+				self.pipeline.session.goal.clone(),
+			)
+			.await?;
+		let mut runner = SprintRunner {
+			pipeline: &mut self.pipeline,
+		};
+		runner.run(input_rx).await.context("SprintRunner::run")
 	}
-	pub fn new(runtime: &PipelineRuntime) -> Self {
-		Self {
-			input_active: false,
-			input: String::new(),
-			paused: false,
-			show_logs: false,
-			events: vec![],
-			runtime: runtime.view(),
+	pub fn view(&self) -> PipelineRuntimeView {
+		PipelineRuntimeView {
+			activity: self.activity.clone(),
+			attempt: self.attempt,
+			stage: self.stage,
+			time_started: self.time_started,
+			stage_time_started: self.stage_time_started,
+			phase: self.phase,
+			score: self.score,
+			confidence: self.confidence,
+			passed: self.passed,
+			message: self.message.clone(),
+			error: self.error.clone(),
+			total_tokens: self.total_tokens,
+			total_agent_calls: self.total_agent_calls,
+			history: self.history.clone(),
+			events: self.events.clone(),
 		}
 	}
-	pub fn render(frame: &mut Frame<'_>, view: &AiView) {
-		let area = frame.area();
-		frame.render_widget(Clear, area);
-		let chunks = RatatuiLayout::default()
-			.direction(Direction::Vertical)
-			.constraints([
-				Constraint::Length(2),
-				Constraint::Length(3),
-				Constraint::Min(8),
-				Constraint::Length(3),
-			])
-			.split(area);
-		stepper(frame, view, chunks[1]);
-		let body = body(chunks[2]);
-		left_stage_panel(frame, view, body[0]);
-		right_activity_panel(frame, view, body[2]);
-		footer(frame, view, chunks[3]);
+}
+impl QACheck {
+	fn new(
+		stage: Stage,
+		time_started: DateTime<Utc>,
+		score: f64,
+		confidence: f64,
+		meets_bar: f64,
+		evaluations: Vec<Metric>,
+	) -> Self {
+		let time_completed = Utc::now();
+		let time_total = time_completed - time_started;
+		Self {
+			stage,
+			time_started,
+			time_completed,
+			time_total,
+			score,
+			confidence,
+			passed: meets_bar >= 0.80 && confidence >= 0.70,
+			evaluations,
+		}
 	}
-	pub fn toggle_pause(&mut self) {
-		self.paused = !self.paused;
+	pub fn time_total_readable(&self) -> String {
+		duration_readable(self.time_total)
 	}
-	pub fn toggle_logs(&mut self) {
-		self.show_logs = !self.show_logs;
+	pub fn start_readable(&self) -> String {
+		time_readable(self.time_started)
+	}
+	pub fn end_readable(&self) -> String {
+		time_readable(self.time_completed)
+	}
+	pub fn with_evaluations(&self, checks: Vec<CheckResult>) -> Self {
+		todo!("with_evaluations")
+	}
+}
+
+impl SdlcInput {
+	pub fn text(&self) -> Option<&str> {
+		match self {
+			Self::Human(value) | Self::ProvideContext(value) => Some(value),
+			Self::Abort | Self::Retry | Self::Reviewed | Self::Revision { .. } => None,
+		}
 	}
 }
 #[async_trait::async_trait]
@@ -1720,7 +1589,7 @@ impl SprintRunner<'_> {
 	/// to the outer run loop.
 	async fn apply(
 		&mut self,
-		outcome: StageOutcome,
+		outcome: Outcome,
 		decision: Decision,
 		input_rx: &mut UnboundedReceiver<SdlcInput>,
 		pending_input: &mut Option<SdlcInput>,
@@ -1927,7 +1796,7 @@ impl SprintRunner<'_> {
 	fn next_attempt(&mut self, stage: Stage) -> Result<Attempt> {
 		self.pipeline.next_attempt(stage)
 	}
-	async fn decide(&self, outcome: &StageOutcome) -> Result<Decision> {
+	async fn decide(&self, outcome: &Outcome) -> Result<Decision> {
 		tracing::info!(">>> DECIDE");
 		// tracing::info!(">>> outcome = {outcome:#?}");
 		if std::env::var_os("SDLC_FORCE_EXIT").is_some() {
@@ -1939,7 +1808,7 @@ impl SprintRunner<'_> {
 			return Ok(Decision::Continue);
 		}
 		let decision = match outcome {
-			StageOutcome::EvaluationFailed { execution, .. } => {
+			Outcome::EvaluationFailed { execution, .. } => {
 				let attempt = execution.attempt;
 				tracing::info!(
 					">>> EvaluationFailed: stage={:?} attempt={}/{}",
@@ -1959,7 +1828,7 @@ impl SprintRunner<'_> {
 					Decision::AwaitHuman
 				}
 			}
-			StageOutcome::Complete { execution, .. } => {
+			Outcome::Complete { execution, .. } => {
 				tracing::info!(
 					">>> Complete: stage={:?} attempt={}/{}",
 					execution.stage,
@@ -1986,7 +1855,7 @@ impl SprintRunner<'_> {
 					}
 				}
 			}
-			StageOutcome::NeedsRevision {
+			Outcome::NeedsRevision {
 				execution,
 				evaluation,
 			} => {
@@ -2012,7 +1881,7 @@ impl SprintRunner<'_> {
 					Decision::AwaitHuman
 				}
 			}
-			StageOutcome::ExecutionFailed { attempt, .. } => {
+			Outcome::ExecutionFailed { attempt, .. } => {
 				tracing::info!(
 					">>> ExecutionFailed: stage={:?} attempt={}/{}",
 					attempt.stage,
@@ -2035,7 +1904,7 @@ impl SprintRunner<'_> {
 		tracing::info!(">>> FINAL DECISION = {:?}", decision);
 		Ok(decision)
 	}
-	
+
 	fn emit(&self, event: SdlcEvent) {
 		let _ = self.pipeline.event_tx.send(event);
 	}
@@ -2046,11 +1915,7 @@ impl SprintRunner<'_> {
 		let stage = execution.stage;
 		let checks = self.pipeline.run_checks(stage).await?;
 		let structural = self.evaluate_checks(checks)?;
-		let semantic = self
-			.pipeline
-			.evaluator
-			.evaluate(&self.pipeline.session, &execution)
-			.await?;
+		let semantic = self.pipeline.qa.evaluate(&execution).await?;
 		Ok(semantic.with_evaluations(structural))
 	}
 	async fn execute(
@@ -2058,7 +1923,7 @@ impl SprintRunner<'_> {
 		stage: Stage,
 		attempt: Attempt,
 		pending_input: &mut Option<SdlcInput>,
-	) -> Result<StageOutcome> {
+	) -> Result<Outcome> {
 		self.emit(SdlcEvent::PhaseChanged {
 			phase: Phase::Executing,
 		});
@@ -2073,7 +1938,7 @@ impl SprintRunner<'_> {
 		let execution = match self.route_execution(stage, attempt, input).await {
 			Ok(execution) => execution,
 			Err(error) => {
-				return Ok(StageOutcome::ExecutionFailed {
+				return Ok(Outcome::ExecutionFailed {
 					stage,
 					attempt,
 					error,
@@ -2101,11 +1966,7 @@ impl SprintRunner<'_> {
 		self.pipeline.retry(stage)?;
 		Ok(())
 	}
-	async fn handle_evaluation(
-		&mut self,
-		execution: Execution,
-		attempt: Attempt,
-	) -> Result<StageOutcome> {
+	async fn handle_evaluation(&mut self, execution: Execution, attempt: Attempt) -> Result<Outcome> {
 		let stage = execution.stage;
 		self.emit(SdlcEvent::PhaseChanged {
 			phase: Phase::Evaluating,
@@ -2121,25 +1982,25 @@ impl SprintRunner<'_> {
 				});
 				self.pipeline.persist_evaluation(&evaluation, attempt);
 				if evaluation.passed {
-					Ok(StageOutcome::Complete {
+					Ok(Outcome::Complete {
 						execution,
 						evaluation,
 					})
 				} else {
-					Ok(StageOutcome::NeedsRevision {
+					Ok(Outcome::NeedsRevision {
 						execution,
 						evaluation,
 					})
 				}
 			}
-			Err(error) => Ok(StageOutcome::EvaluationFailed { execution, error }),
+			Err(error) => Ok(Outcome::EvaluationFailed { execution, error }),
 		}
 	}
 	async fn handle_revision(
 		&mut self,
 		stage: Stage,
 		attempt: Attempt,
-		_outcome: StageOutcome,
+		_outcome: Outcome,
 		input_rx: &mut UnboundedReceiver<SdlcInput>,
 		pending_input: &mut Option<SdlcInput>,
 	) -> Result<()> {
@@ -2488,7 +2349,7 @@ impl SprintRunner<'_> {
 		if generated.trim().is_empty() {
 			return Err(anyhow!("generated Intent artifact is empty"));
 		}
-		SprintPipeline::write(session_dir.join("intent.md"), generated)?;
+		Pipeline::write(session_dir.join("intent.md"), generated)?;
 		self.pipeline.persist_progress("Intent stage completed")?;
 		Ok(RunResult::Intent)
 	}
@@ -2519,7 +2380,7 @@ impl SprintRunner<'_> {
 		if generated.trim().is_empty() {
 			return Err(anyhow!("generated Spec artifact is empty"));
 		}
-		SprintPipeline::write(session_dir.join("spec.md"), generated)?;
+		Pipeline::write(session_dir.join("spec.md"), generated)?;
 		self.pipeline.persist_progress(if is_revision {
 			"Spec revision completed"
 		} else {
@@ -2550,7 +2411,7 @@ impl SprintRunner<'_> {
 		if generated.trim().is_empty() {
 			return Err(anyhow!("generated Plan artifact is empty"));
 		}
-		SprintPipeline::write(session_dir.join("plan.md"), generated)?;
+		Pipeline::write(session_dir.join("plan.md"), generated)?;
 		self.pipeline.persist_progress("Plan stage completed")?;
 		Ok(RunResult::Plan)
 	}
@@ -2598,7 +2459,7 @@ impl SprintRunner<'_> {
 			// Persist what happened during this build step.
 			let step_path = session_dir.join(format!("build-step-{step:02}.md"));
 
-			SprintPipeline::write(
+			Pipeline::write(
 				step_path,
 				format!(
 					"# Build Step {step}/{total}\n\n\
@@ -2625,7 +2486,7 @@ impl SprintRunner<'_> {
 		}
 		let workspace_after = WSSnapshot::capture(&workspace)?;
 		let changes = workspace_before.diff(&workspace_after);
-		SprintPipeline::write(
+		Pipeline::write(
 			session_dir.join("build.md"),
 			changes.to_markdown("Build completed"),
 		)?;
@@ -2724,6 +2585,58 @@ impl SprintRunner<'_> {
 			.await
 	}
 }
+
+impl Stage {
+	pub fn next(&self) -> Option<Self> {
+		match self {
+			Self::Intent => Some(Self::Spec),
+			Self::Spec => Some(Self::Plan),
+			// Self::Plan => Some(Self::Test),
+			Self::Plan => Some(Self::Build),
+			Self::Test => Some(Self::Build),
+			Self::Build => Some(Self::QA),
+			Self::QA => Some(Self::Complete),
+			Self::Deploy => Some(Self::Maintain),
+			Self::Maintain => Some(Self::Complete),
+			Self::Complete => None,
+			Self::Finalize => None,
+		}
+	}
+	pub fn is_before(self, other: Stage) -> bool {
+		let rank = |stage: Stage| match stage {
+			Stage::Intent => 0,
+			Stage::Spec => 1,
+			Stage::Plan => 2,
+			Stage::Test => 3,
+			Stage::Build => 4,
+			Stage::QA => 5,
+			Stage::Deploy => 6,
+			Stage::Maintain => 7,
+			Stage::Complete => 8,
+			Stage::Finalize => 100,
+		};
+		rank(self) < rank(other)
+	}
+}
+impl std::fmt::Display for Stage {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		let name = match self {
+			Self::Intent => "Intent",
+			Self::Spec => "Spec",
+			Self::Plan => "Plan",
+			Self::Test => "Test",
+			Self::Build => "Build",
+			Self::QA => "QA",
+			Self::Deploy => "Deploy",
+			Self::Maintain => "Maintain",
+			Self::Complete => "Complete",
+			Self::Finalize => "Finalize Sprint",
+		};
+
+		f.write_str(name)
+	}
+}
+
 impl Step {
 	pub fn stage(self) -> Option<Stage> {
 		match self {

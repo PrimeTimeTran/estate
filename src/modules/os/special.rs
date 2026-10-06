@@ -8,13 +8,13 @@ use anyhow::{Context, Result, anyhow};
 use serde::{Serialize, de::DeserializeOwned};
 
 #[derive(Debug, Clone, Copy)]
-pub enum SessionFile {
+pub enum SrcArtifact {
 	Intent,
 	Spec,
 	Plan,
 	Test,
 	Build,
-	Verification,
+	QA,
 	Progress,
 }
 
@@ -139,7 +139,7 @@ impl FS {
 	}
 }
 
-impl SessionFile {
+impl SrcArtifact {
 	pub fn name(self) -> &'static str {
 		match self {
 			Self::Intent => "intent.md",
@@ -147,7 +147,7 @@ impl SessionFile {
 			Self::Plan => "plan.md",
 			Self::Test => "tests.md",
 			Self::Build => "build.md",
-			Self::Verification => "verification.md",
+			Self::QA => "verification.md",
 			Self::Progress => "progress.md",
 		}
 	}

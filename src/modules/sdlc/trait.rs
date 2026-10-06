@@ -4,11 +4,11 @@ pub struct Context {}
 
 // Identity & Persistence
 #[async_trait::async_trait]
-pub trait ArtifactGenerator: Send + Sync + Debug {
+pub trait Generator: Send + Sync + Debug {
 	async fn generate(&self, prompt: &str) -> Result<String>;
 	async fn run_agent(&self, prompt: &str) -> Result<String>;
 	async fn with_session(&mut self, session: &AiSession, prompt: String) -> Result<TaskResult>;
-	fn clone_box(&self) -> Box<dyn ArtifactGenerator>;
+	fn clone_box(&self) -> Box<dyn Generator>;
 }
 // Steps to complete the pipeline
 trait Pipeline {
@@ -52,7 +52,7 @@ trait Stage {
 	}
 }
 
-impl Clone for Box<dyn ArtifactGenerator> {
+impl Clone for Box<dyn Generator> {
 	fn clone(&self) -> Self {
 		self.as_ref().clone_box()
 	}

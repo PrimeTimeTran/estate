@@ -110,7 +110,7 @@ pub struct OllamaResponse {
 #[derive(Debug, Clone)]
 pub struct PipelineRuntime {
 	pub activity: Vec<String>,
-	pub pipeline: SprintPipeline,
+	pub pipeline: Pipeline,
 	pub attempt: u32,
 	pub stage: e::Stage,
 	pub time_started: Instant,
@@ -160,16 +160,16 @@ pub struct QACheck {
 	pub evaluations: Vec<Metric>,
 }
 #[derive(Clone, Debug)]
-pub struct SprintPipeline {
-	pub evaluator: Evaluator,
-	pub generator: Box<dyn ArtifactGenerator>,
+pub struct Pipeline {
+	pub qa: Evaluator,
+	pub generator: Box<dyn Generator>,
 	pub session: AiSession,
 	pub state_path: PathBuf,
 	pub event_tx: broadcast::Sender<SdlcEvent>,
 	pub stage_attempt: u32,
 }
 pub struct SprintRunner<'a> {
-	pub pipeline: &'a mut SprintPipeline,
+	pub pipeline: &'a mut Pipeline,
 }
 
 #[derive(Debug)]

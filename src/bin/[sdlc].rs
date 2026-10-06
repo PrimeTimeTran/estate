@@ -28,9 +28,9 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	logger::init_logging(&config)?;
 
 	let (_bus, runtime, _event_rx) = new_agent_system();
-	let pipeline = SprintPipeline::new(runtime, "Do the work required to build this CLI")
+	let pipeline = Pipeline::new(runtime, "Do the work required to build this CLI")
 		.await
-		.context("SprintPipeline::new")?;
+		.context("Pipeline::new")?;
 	println!(">>> pipeline created");
 	println!(">>> creating runtime");
 	let mut runtime = PipelineRuntime::new(pipeline);

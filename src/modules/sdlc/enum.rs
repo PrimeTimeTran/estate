@@ -171,7 +171,7 @@ pub enum StageInput {
 }
 
 #[derive(Debug)]
-pub enum StageOutcome {
+pub enum Outcome {
 	Complete {
 		execution: Execution,
 		evaluation: QACheck,

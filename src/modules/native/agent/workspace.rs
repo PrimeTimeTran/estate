@@ -55,10 +55,10 @@ impl WorkspaceContext {
 		tracing::info!("from_sdlc_sessionfrom_sdlc_session workspace");
 		let cwd = session.dir.clone();
 		let files = [
-			SessionFile::Intent,
-			SessionFile::Spec,
-			SessionFile::Plan,
-			SessionFile::Progress,
+			SrcArtifact::Intent,
+			SrcArtifact::Spec,
+			SrcArtifact::Plan,
+			SrcArtifact::Progress,
 		]
 		.into_iter()
 		.map(|file| {
