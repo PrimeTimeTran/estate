@@ -1,9 +1,5 @@
-use super::{
-	AgentBus,
-	agent_event::{AgentEvent, RuntimeEvent},
-	agent_runtime::{AgentRegistry, AgentRuntime},
-};
-use crate::{model::task::TaskResult, prelude::*};
+use super::*;
+use crate::{prelude::*};
 
 #[derive(Debug, Clone)]
 pub enum SystemEvent {
@@ -23,17 +19,14 @@ pub enum SystemEvent {
 pub fn new_agent_system() -> (AgentBus, AgentRuntime, UnboundedReceiver<RuntimeEvent>) {
 	let (cmd_tx, cmd_rx) = unbounded_channel::<AgentEvent>();
 	let (event_tx, event_rx) = unbounded_channel::<RuntimeEvent>();
-
 	let bus = AgentBus {
 		tx: cmd_tx,
 		event_tx: event_tx.clone(),
 	};
-
 	let runtime = AgentRuntime {
 		event_tx,
 		registry: AgentRegistry::default(),
 	};
-
 	(bus, runtime, event_rx)
 }
 

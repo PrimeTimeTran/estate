@@ -1,42 +1,3 @@
-pub fn preview_lines(text: &str, max_lines: usize) -> String {
-	let lines: Vec<&str> = text.lines().collect();
-	let (lines, truncated) = if lines.len() <= max_lines {
-		(lines.as_slice(), 0)
-	} else {
-		(&lines[..max_lines], lines.len() - max_lines)
-	};
-	let mut output = String::new();
-	// Dim prompt + indent every line.
-	for line in lines {
-		output.push_str("\x1b[2m  ");
-		output.push_str(line);
-		output.push_str("\x1b[0m\n");
-	}
-	if truncated > 0 {
-	  output.push_str("\n");
-		output.push_str(&format!(
-			"\x1b[2m  ... {} more lines truncated\x1b[0m\n",
-			truncated
-		));
-	}
-	output
-}
-pub fn build_sys_action(template: &str, args: &[&str]) -> String {
-	let mut prompt = template.to_string();
-
-	for arg in args {
-		if let Some((before, after)) = prompt.split_once("{}") {
-			prompt = format!("{before}{arg}{after}");
-		}
-	}
-
-	prompt
-}
-
-pub fn build_sys_prompt(template: &str, prompt: &str) -> String {
-	template.replace("{}", prompt)
-}
-
 pub static JSON_PROMPT: &str = r#"
   You are a strict JSON generator.
   You must output ONLY valid JSON.
@@ -44,7 +5,6 @@ pub static JSON_PROMPT: &str = r#"
   No explanation.
   No extra text.
 "#;
-
 pub static ACTION_PROMPT: &str = r#"
   You are an agent that MUST output exactly one JSON object.
   Your job is to choose the next action based on the context.
@@ -118,7 +78,6 @@ pub static ACTION_PROMPT: &str = r#"
   - Keep multi-line text inside a properly quoted shell argument.
   - If a command must contain multiple shell operations, put the complete command in the `command` string.
 "#;
-
 pub static SYSTEM_PROMPT: &str = r#"
   You are an intelligent file system assistant. You must always respond with a valid JSON object that matches one of these structures:
 
@@ -140,7 +99,6 @@ pub static SYSTEM_PROMPT: &str = r#"
     - Preserve the requested newlines exactly.
     - Keep multi-line text inside a properly quoted shell argument.
 "#;
-
 pub static DECIDE_PROMPT: &str = r#"
   You are a request router.
 

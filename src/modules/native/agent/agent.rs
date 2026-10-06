@@ -1,22 +1,4 @@
-use crate::{
-	model::task::TaskResult,
-	prelude::{anyhow::anyhow, *},
-	sdlc::SdlcSession,
-};
-
-use super::{
-	AgentTools, DECIDE_PROMPT, WorkspaceContext,
-	agent_event::{AgentEvent, RuntimeEvent},
-	build_sys_action, build_sys_prompt,
-};
-
-const FILE_PREVIEW_COUNT: usize = 5;
-const FILE_PREVIEW_LEN: usize = 300;
-const HISTORY_PREVIEW_LEN: usize = 5;
-const PROMPT_PREVIEW_LEN: usize = 500;
-const PROMPT_PREVIEW_LINES: usize = 5;
-const SHELL_OUTPUT_PREVIEW_LEN: usize = 2000;
-const SHELL_OUTPUT_PREVIEW_LINES: usize = 5;
+use super::*;
 
 #[derive(Debug)]
 pub enum AgentMode {

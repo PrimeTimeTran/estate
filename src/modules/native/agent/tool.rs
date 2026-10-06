@@ -4,6 +4,10 @@ use crate::{
 };
 use Error;
 use std::os::unix::fs::MetadataExt;
+
+use super::*;
+use crate::prelude::*;
+
 #[derive(Debug, Default, Clone)]
 pub struct FileInfo {
 	pub content: String,

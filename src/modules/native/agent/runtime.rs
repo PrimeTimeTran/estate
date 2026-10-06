@@ -1,8 +1,5 @@
-use super::{
-	Agent, SystemEvent,
-	agent_event::{AgentEvent, RuntimeEvent},
-};
-use crate::{model::task::TaskResult, native::job, prelude::*};
+use super::*;
+use crate::prelude::*;
 
 #[derive(Clone, Debug, Default)]
 pub struct AgentRegistry;
@@ -36,7 +33,6 @@ impl AgentRuntime {
 
 		let cwd = std::env::current_dir()?;
 		let agent = Agent::with_cwd(cwd);
-
 		agent.run_agent_loop(task, self.event_tx.clone()).await
 	}
 
