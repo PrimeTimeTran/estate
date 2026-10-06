@@ -20,7 +20,7 @@ pub struct AgentSystem {
 	pub bus: AgentBus,
 	pub runtime: AgentRuntime,
 	pub event_rx: UnboundedReceiver<RuntimeEvent>,
-	pub ctx: AgentContext
+	pub ctx: AgentContext,
 }
 impl AgentSystem {
 	pub fn new() -> Self {
@@ -39,16 +39,16 @@ impl AgentSystem {
 			bus,
 			runtime,
 			event_rx,
-			ctx: AgentContext::init()
+			ctx: AgentContext::init(),
 		}
 	}
 	pub fn cwd(&mut self, cwd: impl Into<PathBuf>) -> &mut Self {
 		self.runtime.workspace.cwd = cwd.into();
 		self
 	}
-		pub fn add_file(&mut self, path: impl Into<PathBuf>) -> Result<()> {
-			self.runtime.workspace.add_file(path)
-		}
+	pub fn add_file(&mut self, path: impl Into<PathBuf>) -> Result<()> {
+		self.runtime.workspace.add_file(path)
+	}
 	pub fn add_session(&mut self, session: &AiSession) -> Result<&mut Self> {
 		// self.runtime.add_session(session)?;
 		Ok(self)

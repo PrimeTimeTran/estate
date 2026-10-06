@@ -761,7 +761,6 @@ impl t::Generator for ApiGenerator {
 	}
 }
 #[async_trait]
-
 impl t::Generator for LocalGenerator {
 	async fn generate(&self, prompt: &str) -> Result<String> {
 		let request = serde_json::json!({
@@ -1113,7 +1112,17 @@ impl Pipeline {
 		self.persist()
 	}
 	async fn run_task(&mut self, prompt: &str) -> Result<String> {
-		Ok(self.generator.generate(prompt).await?)
+		self
+			.system
+			.runtime
+			.run_agent(AgentTask::new(prompt.into()))
+			.await
+			.map(|result| {
+				result
+					.chat
+					.or(result.summary)
+					.unwrap_or_else(|| "Agent completed".to_string())
+			})
 	}
 	async fn run_checks(&self, stage: Stage) -> Result<Vec<CheckResult>> {
 		let checks = Self::checks_for(stage);

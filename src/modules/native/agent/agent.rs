@@ -150,7 +150,7 @@ impl Agent {
 		let mut steps = 0;
 		let max_steps = 10;
 		let mut ctx = AgentContext::with_workspace(task.prompt.clone(), (*self.workspace).clone());
-		section!("CONTEXT");
+		section!("AGENT run_agent_loop CONTEXT");
 		let prompt = ctx.prompt.as_deref().unwrap_or("");
 		println!(
 			"ctx.prompt ({} chars, {} lines):\n{}",

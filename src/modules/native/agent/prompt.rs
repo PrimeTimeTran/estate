@@ -268,152 +268,29 @@ performed and, when appropriate, verified.
 Return exactly ONE action as JSON.
 "#;
 pub static ACTION_PROMPT_EXECUTION: &str = r#"
-Complete the user's request by taking the NEXT CONCRETE ACTION.
+You have a plan to execute inside this file:
 
-You have access to these tools:
+/Users/future/kb/project/crates/estate/log/2026-10-06.create-sdlc-pipeline/plan.md
 
-1. RUN_COMMAND
-  COMMON COMMANDS:
+Your job is to make actual progress toward completing that plan.
+On each turn, choose exactly ONE next concrete action.
 
-  The following are common commands you may use through RUN_COMMAND.
-  This list is illustrative, not exhaustive. You may use any appropriate
-  command-line program available in the execution environment.
+TOOLS
 
-  FILESYSTEM:
-  - pwd
-  - ls
-  - tree
-  - find
-  - fd
-  - rg
-  - grep
-  - cat
-  - head
-  - tail
-  - less
-  - wc
-  - sort
-  - uniq
-  - cut
-  - tr
-  - sed
-  - awk
-  - xargs
-  - file
-  - stat
-  - realpath
-  - du
-  - df
-  - diff
-  - cmp
-  - patch
-  - tee
-  - mkdir
-  - touch
-  - cp
-  - mv
-  - rm
-  - ln
-  - chmod
-  - chown
-  - tar
-  - zip
-  - unzip
+RUN_COMMAND — execute one shell command in the workspace. Common commands:
+pwd, ls, tree, find, fd, rg, grep, cat, head, tail, wc, sort, uniq, sed, awk,
+xargs, file, stat, realpath, diff, cmp, patch, mkdir, touch, cp, mv, rm, ln,
+chmod, tar, zip, unzip, sh, bash, zsh, printf, test, env, printenv, which,
+type, command, date, uname, hostname, whoami, id, ps, kill, sleep, time,
+timeout, jq, yq, xxd, base64, curl, wget, ssh, scp, rsync, ping, nc, dig,
+git, cargo, rustc, rustup, rustfmt, clippy, node, npm, npx, pnpm, yarn, bun,
+deno, vite, tsc, eslint, prettier, make, cmake, ninja, gcc, clang, clang++,
+swift, swiftc, and common macOS commands.
+Do not assume a command is installed.
 
-  SHELL / SYSTEM:
-  - sh
-  - bash
-  - zsh
-  - printf
-  - test
-  - env
-  - printenv
-  - which
-  - type
-  - command
-  - date
-  - uname
-  - hostname
-  - whoami
-  - id
-  - ps
-  - kill
-  - sleep
-  - time
-  - timeout
+CONTEXT
 
-  SEARCH / DATA:
-  - jq
-  - yq
-  - xargs
-  - xxd
-  - base64
-
-  NETWORK:
-  - curl
-  - wget
-  - ssh
-  - scp
-  - rsync
-  - ping
-  - nc
-  - dig
-
-  VERSION CONTROL:
-  - git
-
-  RUST:
-  - cargo
-  - rustc
-  - rustup
-  - rustfmt
-  - clippy
-
-  JAVASCRIPT / WEB:
-  - node
-  - npm
-  - npx
-  - pnpm
-  - yarn
-  - bun
-  - deno
-  - vite
-  - tsc
-  - eslint
-  - prettier
-
-  BUILD / COMPILERS:
-  - make
-  - cmake
-  - ninja
-  - gcc
-  - clang
-  - clang++
-  - swift
-  - swiftc
-
-  MACOS:
-  - open
-  - defaults
-  - plutil
-  - osascript
-  - launchctl
-  - codesign
-  - xcrun
-  - otool
-  - lsof
-  - system_profiler
-  - pbcopy
-  - pbpaste
-
-  Do not assume every command is installed. If a command is unavailable,
-  use another appropriate command or inspect the environment first.
-
-2. FINISH
-   Complete the task only after the requested work has actually been performed
-   and, when appropriate, verified.
-
-USER REQUEST:
+PLAN FILE:
 {}
 
 WORKSPACE:
@@ -422,55 +299,24 @@ WORKSPACE:
 HISTORY:
 {}
 
-ACTION RULES:
+DECISION RULES
 
-1. Determine the NEXT CONCRETE ACTION required to make progress on the user's request.
+1. Choose the next concrete action that makes the most progress toward completing the plan.
+2. Use RUN_COMMAND to inspect the workspace when needed.
+3. Use RUN_COMMAND to modify files, build, test, or verify the work.
+4. Do not describe an action; perform it.
+5. Never repeat an action unless its previous result shows that repetition is necessary.
+6. If the previous action failed, use its result to choose a corrective action.
+7. Do not finish merely because you understand the plan. The work must actually be completed and, when appropriate, verified.
+8. Return FINISH only when the requested work is complete and sufficiently verified.
+9. RUN_COMMAND.command must contain the actual shell command. Do not put commands in message.
+10. Base the next action on the actual HISTORY. Never assume an action succeeded.
+11. If command output must be saved, execute the command and redirect stdout to the requested file.
+12. When creating exact file contents, prefer printf. Do not use echo -e. Preserve newlines exactly.
+13. When verifying work, actually inspect/test it with an appropriate command.
+14. Return exactly ONE action as JSON.
 
-2. If information about the workspace is needed, use RUN_COMMAND to inspect it.
+OUTPUT
 
-3. If a command is required to perform or verify the work,
-   return RUN_COMMAND.
-
-4. If the requested work has already been completed and verified,
-   return FINISH.
-
-5. If the previous action failed, use its result to choose a different
-   corrective action.
-
-6. NEVER return an action whose only purpose is to describe what you are doing.
-   There is no status, observation, explanation, or thinking action.
-
-7. NEVER repeat the same action unless the previous result shows that
-   repeating it is necessary.
-
-8. Do NOT return FINISH merely because you know how the task should be completed.
-   The requested work must actually have been performed.
-
-9. For RUN_COMMAND:
-   - "command" must be the actual shell command to execute.
-   - Use the appropriate CLI tool when the user's request specifies one.
-   - Do not put the command in "message".
-
-10. Use the real results from HISTORY to determine the next action.
-    Do not assume that a command succeeded.
-
-11. When a task requires saving the output of a command to a file,
-    use shell redirection (`>`) to write stdout to the requested file.
-
-12. Do not manually calculate or reproduce command output when the user
-    explicitly requires a CLI tool to produce it.
-
-13. When a command's output must be saved, execute the command itself and
-    redirect its stdout to the requested destination.
-
-14. When verifying a generated result, use the appropriate CLI command
-    rather than assuming what the output should be.
-
-    Return exactly ONE action as JSON.
-
-IMPORTANT
-- When creating or appending exact file contents, prefer printf.
-- Do NOT use echo -e.
-- Preserve the requested newlines exactly.
-- Keep multi-line text inside a properly quoted shell argument.
+Return exactly one action, but a RUN_COMMAND action may contain a multi-command shell pipeline/compound command when the commands form one coherent operation.
 "#;

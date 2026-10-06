@@ -34,7 +34,7 @@ pub fn build_prompt(ctx: &AgentContext) -> String {
 		ACTION_PROMPT_EXECUTION,
 		&[&ctx.prompt.as_deref().unwrap_or(""), &workspace, &history],
 	);
-	section!("BUILT PROMPT");
+	section!("build_prompt");
 	println!(
 		"prompt ({} lines, {} chars):\n{}",
 		prompt.lines().count(),
@@ -51,7 +51,8 @@ pub fn build_prompt_from_ctx(ctx: &AgentContext) -> String {
 		&[&ctx.prompt.as_deref().unwrap_or(""), &workspace, &history],
 	);
 
-	section!("BUILT PROMPT");
+	section!("build_prompt_from_ctx");
+	println!("ctx.history ({} entries):", ctx.history.len());
 	println!(
 		"prompt ({} lines, {} chars):\n{}",
 		prompt.lines().count(),
