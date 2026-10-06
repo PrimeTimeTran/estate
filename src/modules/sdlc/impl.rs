@@ -84,13 +84,30 @@ impl Attempt {
 		}
 	}
 }
-
 impl std::fmt::Display for Attempt {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		write!(f, "{} attempt {}", self.stage, self.number)
 	}
 }
 impl Evaluator {
+	async fn evaluate(
+		&self,
+		session: &SdlcSession,
+		execution: &StageExecution,
+	) -> Result<StageEvaluation> {
+		let ctx = EvaluationContext::load(session, execution.stage)?;
+		let evaluation = match execution.stage {
+			Stage::Intent => self.evaluate_intent(&ctx).await,
+			Stage::Spec => self.evaluate_spec(&ctx).await,
+			Stage::Plan => self.evaluate_plan(&ctx).await,
+			Stage::Build => self.evaluate_build(&ctx).await,
+			Stage::Verify => self.evaluate_verification(&ctx).await,
+			stage => Err(anyhow::anyhow!(
+				"stage {stage:?} does not support evaluation"
+			)),
+		};
+		return evaluation;
+	}
 	async fn evaluate_goal(&self, goal: &str) -> Result<StageEvaluation> {
 		let time_started = Utc::now();
 		let state = format!(
@@ -251,24 +268,7 @@ impl Evaluator {
 			evaluations,
 		))
 	}
-	async fn evaluate(
-		&self,
-		session: &SdlcSession,
-		execution: &StageExecution,
-	) -> Result<StageEvaluation> {
-		let ctx = EvaluationContext::load(session, execution.stage)?;
-		let evaluation = match execution.stage {
-			Stage::Intent => self.evaluate_intent(&ctx).await,
-			Stage::Spec => self.evaluate_spec(&ctx).await,
-			Stage::Plan => self.evaluate_plan(&ctx).await,
-			Stage::Build => self.evaluate_build(&ctx).await,
-			Stage::Verify => self.evaluate_verification(&ctx).await,
-			stage => Err(anyhow::anyhow!(
-				"stage {stage:?} does not support evaluation"
-			)),
-		};
-		return evaluation;
-	}
+
 	async fn evaluate_intent(&self, ctx: &EvaluationContext) -> Result<StageEvaluation> {
 		let time_started = Utc::now();
 		let intent = ctx.get(SessionFile::Intent)?;
@@ -829,8 +829,11 @@ impl PipelineRuntime {
 		}
 	}
 }
-
 impl SdlcSession {
+	fn create_readable(&self) -> String {
+		let current = Utc::now();
+		current.format(FMT_HUMAN_READABLE).to_string()
+	}
 	pub fn new(title: impl Into<String>, dir: PathBuf) -> Result<Self> {
 		let now = Utc::now();
 		let goal = include_str!("../../../ai/template/user.goal.md").to_string();
@@ -845,10 +848,6 @@ impl SdlcSession {
 			time_created: now,
 			time_updated: now,
 		})
-	}
-	fn create_readable(&self) -> String {
-		let current = Utc::now();
-		current.format(FMT_HUMAN_READABLE).to_string()
 	}
 	pub fn workspace(&self) -> &Path {
 		&self.workspace
@@ -870,7 +869,6 @@ impl SdlcInput {
 		}
 	}
 }
-
 impl Stage {
 	pub fn next(&self) -> Option<Self> {
 		match self {
@@ -960,15 +958,6 @@ impl StageEvaluation {
 	}
 }
 impl StageOutcome {
-	pub fn stage(&self) -> Stage {
-		match self {
-			Self::Complete { execution, .. }
-			| Self::NeedsRevision { execution, .. }
-			| Self::EvaluationFailed { execution, .. } => execution.stage,
-
-			Self::ExecutionFailed { stage, .. } => *stage,
-		}
-	}
 	pub fn attempt(&self) -> Attempt {
 		match self {
 			Self::Complete { execution, .. }
@@ -978,107 +967,72 @@ impl StageOutcome {
 			Self::ExecutionFailed { attempt, .. } => *attempt,
 		}
 	}
+	pub fn stage(&self) -> Stage {
+		match self {
+			Self::Complete { execution, .. }
+			| Self::NeedsRevision { execution, .. }
+			| Self::EvaluationFailed { execution, .. } => execution.stage,
+
+			Self::ExecutionFailed { stage, .. } => *stage,
+		}
+	}
 }
 
 impl SprintPipeline {
-	pub async fn new(runtime: AgentRuntime) -> anyhow::Result<Self> {
-		dotenvy::dotenv().ok();
-		let state_path = SpecialFile::SdlcCurrent.path()?;
-		let session = match SpecialFile::SdlcCurrent
-			.load::<SdlcSession>()
-			.context("loading current SdlcSession")?
-		{
-			Some(session) => session,
-			None => {
-				let intent = "Do the work required to build this CLI";
-				let title = Self::summarize_title(intent).await?;
-				let dir = Self::init_session_dir(&title)?;
-				Self::init_templates(&dir)?;
-				let session = SdlcSession::new(title, dir)?;
-				Self::session_save(&session)?;
-				session
+	async fn apply(
+		&mut self,
+		stage: e::Stage,
+		attempt: Attempt,
+		outcome: StageOutcome,
+		decision: StageDecision,
+		input_rx: &mut tokio::sync::mpsc::UnboundedReceiver<SdlcInput>,
+		pending_input: &mut Option<SdlcInput>,
+	) -> Result<RunControl> {
+		match decision {
+			StageDecision::Exit => Ok(RunControl::Exit),
+			StageDecision::Continue => {
+				let next = stage
+					.next()
+					.ok_or_else(|| anyhow!("Stage {stage:?} has no next stage"))?;
+				// self.transition(next)?;
+				self.emit(SdlcEvent::StageTransitioned {
+					from: stage,
+					to: next,
+				});
+				Ok(RunControl::Continue)
 			}
-		};
-
-		if !state_path.exists() {
-			Self::session_save(&session)?;
+			StageDecision::Retry => Ok(RunControl::Continue),
+			StageDecision::Revise => Ok(RunControl::Continue),
+			StageDecision::AwaitHuman => {
+				self
+					.wait_for_intervention(stage, attempt, String::from("Evaluator Decision"), input_rx)
+					.await?;
+				Ok(RunControl::Continue)
+			}
+			StageDecision::Complete => {
+				self.transition(e::Stage::Finalize)?;
+				Ok(RunControl::Exit)
+			}
+			StageDecision::Fail => Ok(RunControl::Exit),
 		}
-		println!("last stage: {:?}", session.stages.last());
-
-		let evaluator = Evaluator {
-			session: session.clone(),
-			jev: TypeSafeClient::from_env()?,
-		};
-
-		let generator = Box::new(LocalGenerator::new(runtime.clone(), "qwen3:8b"));
-
-		let (event_tx, _event_rx) = tokio::sync::broadcast::channel::<SdlcEvent>(256);
-
-		Ok(Self {
-			evaluator,
-			generator,
-			session: Some(session),
-			state_path,
-			event_tx,
-			stage_attempt: 1,
-		})
 	}
-	pub async fn init(&mut self, intent: impl Into<String>) -> Result<()> {
-		let intent = intent.into();
-		let title = Self::summarize_title(&intent).await?;
-		let dir = Self::init_session_dir(&title)?;
-		Self::init_templates(&dir)?;
-		let session = SdlcSession::new(title, dir)?;
-		self.session = Some(session);
-		self.stage_attempt = 0;
-		self.persist_session()?;
-		Ok(())
-	}
-	fn init_session_dir(title: &str) -> Result<PathBuf> {
-		let sessions_dir = FS::ensure_dir(SpecialFile::SessionsDir.path()?)?;
-		let date = Local::now().format("%Y-%m-%d");
-		let dir = sessions_dir.join(format!("{date}.{title}"));
-		FS::ensure_dir(&dir)?;
-		Ok(dir)
-	}
-	fn init_templates(dir: &Path) -> Result<()> {
-		let template_dir = SpecialFile::AiTemplateDir.path()?;
-		for file in [
-			SessionFile::Intent,
-			SessionFile::Spec,
-			SessionFile::Plan,
-			SessionFile::Progress,
-		] {
-			let source = template_dir.join(file.name());
-			let destination = file.path(dir);
-			let contents = if FS::exists(&source) {
-				FS::read(source)?
-			} else {
-				format!("# {}\n\n", file.name())
-			};
-			FS::write(destination, contents)?;
+	fn checks_for(stage: Stage) -> Vec<(&'static str, Vec<&'static str>)> {
+		match stage {
+			Stage::Intent | Stage::Spec | Stage::Plan => Vec::new(),
+			Stage::Complete | Stage::Finalize => Vec::new(),
+			Stage::Deploy | Stage::Maintain => Vec::new(),
+			Stage::Build | Stage::Verify => vec![
+				("cargo check", vec!["cargo", "check"]),
+				("cargo test", vec!["cargo", "test"]),
+				(
+					"cargo clippy",
+					vec!["cargo", "clippy", "--", "-D", "warnings"],
+				),
+				("cargo fmt", vec!["cargo", "fmt", "--", "--check"]),
+			],
+			_ => Vec::new(),
 		}
-		Ok(())
 	}
-	pub fn subscribe(&self) -> broadcast::Receiver<SdlcEvent> {
-		self.event_tx.subscribe()
-	}
-	async fn summarize_title(intent: &str) -> Result<String> {
-		Ok(String::from("create-sdlc-pipeline"))
-	}
-
-	fn is_passing(&self, checks: &[CheckResult], evaluations: &[EvaluationResult]) -> bool {
-		checks.iter().all(|check| check.passed)
-			&& evaluations.iter().all(|evaluation| evaluation.passed)
-	}
-	pub fn stage(&self) -> Option<Stage> {
-		self.session.as_ref().map(|session| session.stage)
-	}
-
-	fn stage_attempt(&self) -> u32 {
-		self.stage_attempt
-	}
-
 	pub fn decide(&self, outcome: &StageOutcome) -> Result<StageDecision> {
 		tracing::info!(">>> DECIDE");
 		tracing::info!(">>> outcome = {outcome:#?}");
@@ -1161,110 +1115,123 @@ impl SprintPipeline {
 		tracing::info!(">>> FINAL DECISION = {decision:?}");
 		Ok(decision)
 	}
-	async fn apply(
-		&mut self,
-		stage: e::Stage,
-		attempt: Attempt,
-		outcome: StageOutcome,
-		decision: StageDecision,
-		input_rx: &mut tokio::sync::mpsc::UnboundedReceiver<SdlcInput>,
-		pending_input: &mut Option<SdlcInput>,
-	) -> Result<RunControl> {
-		match decision {
-			StageDecision::Exit => Ok(RunControl::Exit),
-			StageDecision::Continue => {
-				let next = stage
-					.next()
-					.ok_or_else(|| anyhow!("Stage {stage:?} has no next stage"))?;
-				// self.transition(next)?;
-				self.emit(SdlcEvent::StageTransitioned {
-					from: stage,
-					to: next,
-				});
-				Ok(RunControl::Continue)
-			}
-			StageDecision::Retry => Ok(RunControl::Continue),
-			StageDecision::Revise => Ok(RunControl::Continue),
-			StageDecision::AwaitHuman => {
-				self
-					.wait_for_intervention(stage, attempt, String::from("Evaluator Decision"), input_rx)
-					.await?;
-				Ok(RunControl::Continue)
-			}
-			StageDecision::Complete => {
-				self.transition(e::Stage::Finalize)?;
-				Ok(RunControl::Exit)
-			}
-			StageDecision::Fail => Ok(RunControl::Exit),
-		}
+
+	fn emit(&self, event: SdlcEvent) {
+		let _ = self.event_tx.send(event);
 	}
-	async fn wait_for_intervention(
-		&mut self,
-		stage: e::Stage,
-		attempt: Attempt,
-		reason: String,
-		input_rx: &mut tokio::sync::mpsc::UnboundedReceiver<SdlcInput>,
-	) -> Result<Intervention> {
-		self.emit(SdlcEvent::InterventionRequired {
-			stage,
-			attempt,
-			reason,
-		});
-		self.emit(SdlcEvent::PhaseChanged {
-			phase: SdlcPhase::AwaitingHuman,
-		});
-		let input = input_rx
-			.recv()
+
+	async fn evaluate(&self, execution: &StageExecution) -> Result<StageEvaluation> {
+		self
+			.evaluator
+			.evaluate(&self.session.as_ref().unwrap(), execution)
 			.await
-			.ok_or_else(|| anyhow!("SDLC input channel closed"))?;
-		match input {
-			SdlcInput::Human(string) => {
-				self.emit(SdlcEvent::HumanInput {
-					stage,
-					input: string.clone(),
-				});
-				self.emit(SdlcEvent::InterventionResolved {
-					stage,
-					action: "human input provided".into(),
-				});
-				Ok(Intervention::Human(string))
-			}
-			SdlcInput::Retry => {
-				self.emit(SdlcEvent::InterventionResolved {
-					stage,
-					action: "retry".into(),
-				});
-				Ok(Intervention::Retry)
-			}
-			SdlcInput::ProvideContext(context) => {
-				self.emit(SdlcEvent::InterventionResolved {
-					stage,
-					action: "context provided".into(),
-				});
-				Ok(Intervention::ProvideContext(context))
-			}
-			SdlcInput::Reviewed => {
-				self.emit(SdlcEvent::InterventionResolved {
-					stage,
-					action: "reviewed".into(),
-				});
-				Ok(Intervention::Reviewed)
-			}
-			SdlcInput::Abort => {
-				self.emit(SdlcEvent::InterventionResolved {
-					stage,
-					action: "abort".into(),
-				});
-				Ok(Intervention::Abort)
-			}
-			SdlcInput::Revision { evaluation } => {
-				self.emit(SdlcEvent::InterventionResolved {
-					stage,
-					action: "revision".into(),
-				});
-				Ok(Intervention::Revision { evaluation })
-			}
+	}
+	fn evaluate_checks(&self, checks: &[CheckResult]) -> Vec<EvaluationResult> {
+		checks
+			.iter()
+			.map(|check| EvaluationResult {
+				name: check.name.clone(),
+				passed: check.passed,
+				score: if check.passed { 1.0 } else { 0.0 },
+				confidence: 1.0,
+				explanation: match &check.output {
+					Some(output) if !output.is_empty() => output.clone(),
+					_ => {
+						if check.passed {
+							"Check passed.".into()
+						} else {
+							"Check failed.".into()
+						}
+					}
+				},
+			})
+			.collect()
+	}
+
+	pub async fn init(&mut self, intent: impl Into<String>) -> Result<()> {
+		let intent = intent.into();
+		let title = Self::summarize_title(&intent).await?;
+		let dir = Self::init_session_dir(&title)?;
+		Self::init_templates(&dir)?;
+		let session = SdlcSession::new(title, dir)?;
+		self.session = Some(session);
+		self.stage_attempt = 0;
+		self.persist_session()?;
+		Ok(())
+	}
+	fn init_session_dir(title: &str) -> Result<PathBuf> {
+		let sessions_dir = FS::ensure_dir(SpecialFile::SessionsDir.path()?)?;
+		let date = Local::now().format("%Y-%m-%d");
+		let dir = sessions_dir.join(format!("{date}.{title}"));
+		FS::ensure_dir(&dir)?;
+		Ok(dir)
+	}
+	fn init_templates(dir: &Path) -> Result<()> {
+		let template_dir = SpecialFile::AiTemplateDir.path()?;
+		for file in [
+			SessionFile::Intent,
+			SessionFile::Spec,
+			SessionFile::Plan,
+			SessionFile::Progress,
+		] {
+			let source = template_dir.join(file.name());
+			let destination = file.path(dir);
+			let contents = if FS::exists(&source) {
+				FS::read(source)?
+			} else {
+				format!("# {}\n\n", file.name())
+			};
+			FS::write(destination, contents)?;
 		}
+		Ok(())
+	}
+
+	fn is_passing(&self, checks: &[CheckResult], evaluations: &[EvaluationResult]) -> bool {
+		checks.iter().all(|check| check.passed)
+			&& evaluations.iter().all(|evaluation| evaluation.passed)
+	}
+
+	pub async fn new(runtime: AgentRuntime) -> anyhow::Result<Self> {
+		dotenvy::dotenv().ok();
+		let state_path = SpecialFile::SdlcCurrent.path()?;
+		let session = match SpecialFile::SdlcCurrent
+			.load::<SdlcSession>()
+			.context("loading current SdlcSession")?
+		{
+			Some(session) => session,
+			None => {
+				let intent = "Do the work required to build this CLI";
+				let title = Self::summarize_title(intent).await?;
+				let dir = Self::init_session_dir(&title)?;
+				Self::init_templates(&dir)?;
+				let session = SdlcSession::new(title, dir)?;
+				Self::session_save(&session)?;
+				session
+			}
+		};
+
+		if !state_path.exists() {
+			Self::session_save(&session)?;
+		}
+		println!("last stage: {:?}", session.stages.last());
+
+		let evaluator = Evaluator {
+			session: session.clone(),
+			jev: TypeSafeClient::from_env()?,
+		};
+
+		let generator = Box::new(LocalGenerator::new(runtime.clone(), "qwen3:8b"));
+
+		let (event_tx, _event_rx) = tokio::sync::broadcast::channel::<SdlcEvent>(256);
+
+		Ok(Self {
+			evaluator,
+			generator,
+			session: Some(session),
+			state_path,
+			event_tx,
+			stage_attempt: 1,
+		})
 	}
 	fn next_attempt(&mut self, stage: Stage) -> Result<Attempt> {
 		let session = self.session()?;
@@ -1279,37 +1246,6 @@ impl SprintPipeline {
 		Ok(Attempt { stage, number, max })
 	}
 
-	fn emit(&self, event: SdlcEvent) {
-		let _ = self.event_tx.send(event);
-	}
-	async fn evaluate(&self, execution: &StageExecution) -> Result<StageEvaluation> {
-		self
-			.evaluator
-			.evaluate(&self.session.as_ref().unwrap(), execution)
-			.await
-	}
-	fn session(&mut self) -> Result<&mut SdlcSession> {
-		self
-			.session
-			.as_mut()
-			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))
-	}
-	fn session_read(&mut self, name: &str) -> Result<String> {
-		read_from_session(name, self.session()?)
-	}
-	fn session_record(&mut self) -> Result<()> {
-		let session = self.session()?;
-		let index_path = SpecialFile::SessionsIndex.path()?;
-		let mut sessions: Vec<SdlcSession> = FS::load(&index_path)?.unwrap_or_default();
-		sessions.retain(|existing| existing.id != session.id);
-		sessions.push(session.clone());
-		FS::save(index_path, &sessions)?;
-		Ok(())
-	}
-	fn session_save(session: &SdlcSession) -> Result<()> {
-		FS::save(SpecialFile::SdlcCurrent.path()?, session)?;
-		Ok(())
-	}
 	fn persist(&self) -> Result<()> {
 		FS::save(&self.state_path, &self.session)
 	}
@@ -1414,26 +1350,7 @@ impl SprintPipeline {
 		session.time_updated = Utc::now();
 		self.persist()
 	}
-	fn retry(&mut self, _stage: e::Stage) -> Result<()> {
-		Ok(())
-	}
-	fn checks_for(stage: Stage) -> Vec<(&'static str, Vec<&'static str>)> {
-		match stage {
-			Stage::Intent | Stage::Spec | Stage::Plan => Vec::new(),
-			Stage::Complete | Stage::Finalize => Vec::new(),
-			Stage::Deploy | Stage::Maintain => Vec::new(),
-			Stage::Build | Stage::Verify => vec![
-				("cargo check", vec!["cargo", "check"]),
-				("cargo test", vec!["cargo", "test"]),
-				(
-					"cargo clippy",
-					vec!["cargo", "clippy", "--", "-D", "warnings"],
-				),
-				("cargo fmt", vec!["cargo", "fmt", "--", "--check"]),
-			],
-			_ => Vec::new(),
-		}
-	}
+
 	async fn run_checks(&self, stage: Stage) -> Result<Vec<CheckResult>> {
 		let checks = Self::checks_for(stage);
 		let mut results = Vec::with_capacity(checks.len());
@@ -1469,6 +1386,48 @@ impl SprintPipeline {
 
 		Ok(results)
 	}
+
+	fn retry(&mut self, _stage: e::Stage) -> Result<()> {
+		Ok(())
+	}
+
+	fn session(&mut self) -> Result<&mut SdlcSession> {
+		self
+			.session
+			.as_mut()
+			.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))
+	}
+	fn session_read(&mut self, name: &str) -> Result<String> {
+		read_from_session(name, self.session()?)
+	}
+	fn session_record(&mut self) -> Result<()> {
+		let session = self.session()?;
+		let index_path = SpecialFile::SessionsIndex.path()?;
+		let mut sessions: Vec<SdlcSession> = FS::load(&index_path)?.unwrap_or_default();
+		sessions.retain(|existing| existing.id != session.id);
+		sessions.push(session.clone());
+		FS::save(index_path, &sessions)?;
+		Ok(())
+	}
+	fn session_save(session: &SdlcSession) -> Result<()> {
+		FS::save(SpecialFile::SdlcCurrent.path()?, session)?;
+		Ok(())
+	}
+	
+	pub fn stage(&self) -> Option<Stage> {
+		self.session.as_ref().map(|session| session.stage)
+	}
+	fn stage_attempt(&self) -> u32 {
+		self.stage_attempt
+	}
+
+	pub fn subscribe(&self) -> broadcast::Receiver<SdlcEvent> {
+		self.event_tx.subscribe()
+	}
+	async fn summarize_title(intent: &str) -> Result<String> {
+		Ok(String::from("create-sdlc-pipeline"))
+	}
+
 	fn transition(&mut self, next: e::Stage) -> Result<()> {
 		let session = self.session()?;
 		let valid = matches!(
@@ -1498,107 +1457,80 @@ impl SprintPipeline {
 		Ok(())
 	}
 
-	fn evaluate_checks(&self, checks: &[CheckResult]) -> Vec<EvaluationResult> {
-		checks
-			.iter()
-			.map(|check| EvaluationResult {
-				name: check.name.clone(),
-				passed: check.passed,
-				score: if check.passed { 1.0 } else { 0.0 },
-				confidence: 1.0,
-				explanation: match &check.output {
-					Some(output) if !output.is_empty() => output.clone(),
-					_ => {
-						if check.passed {
-							"Check passed.".into()
-						} else {
-							"Check failed.".into()
-						}
-					}
-				},
-			})
-			.collect()
+	async fn wait_for_intervention(
+		&mut self,
+		stage: e::Stage,
+		attempt: Attempt,
+		reason: String,
+		input_rx: &mut tokio::sync::mpsc::UnboundedReceiver<SdlcInput>,
+	) -> Result<Intervention> {
+		self.emit(SdlcEvent::InterventionRequired {
+			stage,
+			attempt,
+			reason,
+		});
+		self.emit(SdlcEvent::PhaseChanged {
+			phase: SdlcPhase::AwaitingHuman,
+		});
+		let input = input_rx
+			.recv()
+			.await
+			.ok_or_else(|| anyhow!("SDLC input channel closed"))?;
+		match input {
+			SdlcInput::Human(string) => {
+				self.emit(SdlcEvent::HumanInput {
+					stage,
+					input: string.clone(),
+				});
+				self.emit(SdlcEvent::InterventionResolved {
+					stage,
+					action: "human input provided".into(),
+				});
+				Ok(Intervention::Human(string))
+			}
+			SdlcInput::Retry => {
+				self.emit(SdlcEvent::InterventionResolved {
+					stage,
+					action: "retry".into(),
+				});
+				Ok(Intervention::Retry)
+			}
+			SdlcInput::ProvideContext(context) => {
+				self.emit(SdlcEvent::InterventionResolved {
+					stage,
+					action: "context provided".into(),
+				});
+				Ok(Intervention::ProvideContext(context))
+			}
+			SdlcInput::Reviewed => {
+				self.emit(SdlcEvent::InterventionResolved {
+					stage,
+					action: "reviewed".into(),
+				});
+				Ok(Intervention::Reviewed)
+			}
+			SdlcInput::Abort => {
+				self.emit(SdlcEvent::InterventionResolved {
+					stage,
+					action: "abort".into(),
+				});
+				Ok(Intervention::Abort)
+			}
+			SdlcInput::Revision { evaluation } => {
+				self.emit(SdlcEvent::InterventionResolved {
+					stage,
+					action: "revision".into(),
+				});
+				Ok(Intervention::Revision { evaluation })
+			}
+		}
 	}
+
 	fn write(path: PathBuf, contents: String) -> Result<()> {
 		Ok(std::fs::write(path, contents)?)
 	}
 }
 impl SdlcView {
-	pub fn new(runtime: &PipelineRuntime) -> Self {
-		Self {
-			input_active: false,
-			input: String::new(),
-			paused: false,
-			show_logs: false,
-			events: vec![],
-			runtime: runtime.view(),
-		}
-	}
-	pub fn begin_input(&mut self) {
-		self.input_active = true;
-		self.input.clear();
-	}
-	pub fn end_input(&mut self) {
-		self.input_active = false;
-		self.input.clear();
-	}
-	pub fn is_input_active(&self) -> bool {
-		self.input_active
-	}
-	pub fn toggle_pause(&mut self) {
-		self.paused = !self.paused;
-	}
-	pub fn toggle_logs(&mut self) {
-		self.show_logs = !self.show_logs;
-	}
-	pub fn handle_input_key(
-		&mut self,
-		key: crossterm::event::KeyEvent,
-		input_tx: &UnboundedSender<SdlcInput>,
-	) -> anyhow::Result<()> {
-		use crossterm::event::KeyCode;
-		match key.code {
-			KeyCode::Char(c) => {
-				self.input.push(c);
-			}
-
-			KeyCode::Backspace => {
-				self.input.pop();
-			}
-			KeyCode::Enter => {
-				let input = std::mem::take(&mut self.input);
-				input_tx.send(SdlcInput::Human(input))?;
-				self.input_active = false;
-			}
-
-			KeyCode::Esc => {
-				self.input_active = false;
-				self.input.clear();
-			}
-
-			_ => {}
-		}
-
-		Ok(())
-	}
-	pub fn render(frame: &mut Frame<'_>, view: &SdlcView) {
-		let area = frame.area();
-		frame.render_widget(Clear, area);
-		let chunks = RatatuiLayout::default()
-			.direction(Direction::Vertical)
-			.constraints([
-				Constraint::Length(2),
-				Constraint::Length(3),
-				Constraint::Min(8),
-				Constraint::Length(3),
-			])
-			.split(area);
-		stepper(frame, view, chunks[1]);
-		let body = body(chunks[2]);
-		left_stage_panel(frame, view, body[0]);
-		right_activity_panel(frame, view, body[2]);
-		footer(frame, view, chunks[3]);
-	}
 	pub fn apply(&mut self, event: SdlcEvent) {
 		match event {
 			SdlcEvent::RunStarted => {
@@ -1703,6 +1635,83 @@ impl SdlcView {
 			}
 		}
 	}
+	pub fn handle_input_key(
+		&mut self,
+		key: crossterm::event::KeyEvent,
+		input_tx: &UnboundedSender<SdlcInput>,
+	) -> anyhow::Result<()> {
+		use crossterm::event::KeyCode;
+		match key.code {
+			KeyCode::Char(c) => {
+				self.input.push(c);
+			}
+
+			KeyCode::Backspace => {
+				self.input.pop();
+			}
+			KeyCode::Enter => {
+				let input = std::mem::take(&mut self.input);
+				input_tx.send(SdlcInput::Human(input))?;
+				self.input_active = false;
+			}
+
+			KeyCode::Esc => {
+				self.input_active = false;
+				self.input.clear();
+			}
+
+			_ => {}
+		}
+
+		Ok(())
+	}
+
+	pub fn begin_input(&mut self) {
+		self.input_active = true;
+		self.input.clear();
+	}
+	pub fn end_input(&mut self) {
+		self.input_active = false;
+		self.input.clear();
+	}
+	pub fn is_input_active(&self) -> bool {
+		self.input_active
+	}
+	pub fn new(runtime: &PipelineRuntime) -> Self {
+		Self {
+			input_active: false,
+			input: String::new(),
+			paused: false,
+			show_logs: false,
+			events: vec![],
+			runtime: runtime.view(),
+		}
+	}
+
+	pub fn render(frame: &mut Frame<'_>, view: &SdlcView) {
+		let area = frame.area();
+		frame.render_widget(Clear, area);
+		let chunks = RatatuiLayout::default()
+			.direction(Direction::Vertical)
+			.constraints([
+				Constraint::Length(2),
+				Constraint::Length(3),
+				Constraint::Min(8),
+				Constraint::Length(3),
+			])
+			.split(area);
+		stepper(frame, view, chunks[1]);
+		let body = body(chunks[2]);
+		left_stage_panel(frame, view, body[0]);
+		right_activity_panel(frame, view, body[2]);
+		footer(frame, view, chunks[3]);
+	}
+	pub fn toggle_pause(&mut self) {
+		self.paused = !self.paused;
+	}
+	pub fn toggle_logs(&mut self) {
+		self.show_logs = !self.show_logs;
+	}
 }
 #[async_trait::async_trait]
 impl sdlc_trait::Runner for SprintRunner<'_> {
@@ -1788,387 +1797,6 @@ impl sdlc_trait::Runner for SprintRunner<'_> {
 	}
 }
 impl SprintRunner<'_> {
-	fn load_state(&mut self) -> Result<e::Stage> {
-		let session = self
-			.pipeline
-			.session
-			.as_mut()
-			.ok_or_else(|| anyhow::anyhow!("no SDLC session loaded"))?;
-		let path = SpecialFile::SdlcCurrent.path()?;
-		tracing::info!(">>> load_state path = {:?}", path);
-		tracing::info!(">>> exists = {}", path.exists());
-		let json = std::fs::read_to_string(&path).with_context(|| format!("reading {:?}", path))?;
-		tracing::info!(">>> loaded state = {}", json);
-		#[derive(serde::Deserialize)]
-		struct PersistedStage {
-			stage: e::Stage,
-		}
-		let state: PersistedStage = serde_json::from_str(&json)?;
-		let stage = match state.stage {
-			e::Stage::Verify => e::Stage::Build,
-			stage => stage,
-		};
-		session.stage = stage;
-		Ok(stage)
-	}
-	fn emit(&self, event: SdlcEvent) {
-		let _ = self.pipeline.event_tx.send(event);
-	}
-	fn begin_attempt(&mut self, stage: Stage) -> Result<Attempt> {
-		self.pipeline.next_attempt(stage)
-	}
-	fn transition(&mut self, next: e::Stage) -> Result<()> {
-		self.pipeline.transition(next)
-	}
-	fn retry(&mut self, stage: e::Stage) -> Result<()> {
-		self.pipeline.retry(stage)
-	}
-
-	fn evaluate_checks(&self, checks: Vec<CheckResult>) -> Result<Vec<CheckResult>> {
-		todo!("evaluate_checks")
-	}
-	async fn evaluate(&self, execution: &StageExecution) -> Result<StageEvaluation> {
-		let stage = execution.stage;
-		let checks = self.pipeline.run_checks(stage).await?;
-		let structural = self.evaluate_checks(checks)?;
-		let semantic = self
-			.pipeline
-			.evaluator
-			.evaluate(&self.pipeline.session.as_ref().unwrap(), &execution)
-			.await?;
-		Ok(semantic.with_evaluations(structural))
-	}
-
-	async fn stage_intent(&mut self, input: StageInput) -> Result<StageResult> {
-		let (stage, session_dir, goal) = {
-			let session = self
-				.pipeline
-				.session
-				.as_ref()
-				.ok_or_else(|| anyhow!("no active SDLC session"))?;
-			(session.stage, session.dir.clone(), session.goal.clone())
-		};
-		if stage != Stage::Intent {
-			return Err(anyhow!("cannot execute Intent stage while at {stage:?}"));
-		}
-		if goal.trim().is_empty() {
-			return Err(anyhow!("SDLC session goal is empty"));
-		}
-		let prompt = p::gen_intent(&goal)?;
-		std::fs::write("/tmp/estate-intent-prompt.md", &prompt)
-			.context("writing Intent prompt debug file")?;
-		if prompt.trim().is_empty() {
-			return Err(anyhow!("generated Intent prompt is empty"));
-		}
-		let generated = self.pipeline.generator.generate(&prompt).await?;
-		if generated.trim().is_empty() {
-			return Err(anyhow!("generated Intent artifact is empty"));
-		}
-		SprintPipeline::write(session_dir.join("intent.md"), generated)?;
-		self.pipeline.persist_progress("Intent stage completed")?;
-		Ok(StageResult::Intent)
-	}
-	async fn stage_spec(&mut self, input: StageInput) -> Result<StageResult> {
-		let (stage, session_dir) = {
-			let session = self
-				.pipeline
-				.session
-				.as_ref()
-				.ok_or_else(|| anyhow!("no active SDLC session"))?;
-
-			(session.stage, session.dir.clone())
-		};
-
-		if stage != Stage::Spec {
-			return Err(anyhow!("cannot execute Spec stage while at {stage:?}"));
-		}
-
-		let intent = self.pipeline.session_read("intent.md")?;
-
-		if intent.trim().is_empty() {
-			return Err(anyhow!("Intent artifact is empty"));
-		}
-
-		let is_revision = matches!(input, StageInput::Revision { .. });
-
-		let prompt = match input {
-			StageInput::Initial => p::gen_spec(&intent)?,
-			StageInput::Revision { evaluation } => {
-				let spec = self.pipeline.session_read("spec.md")?;
-				p::revise_spec(&intent, &spec, &evaluation)?
-			}
-		};
-
-		if prompt.trim().is_empty() {
-			return Err(anyhow!("generated Spec prompt is empty"));
-		}
-
-		std::fs::write("/tmp/estate-spec-prompt.md", &prompt)
-			.context("writing Spec prompt debug file")?;
-
-		let generated = self.pipeline.generator.generate(&prompt).await?;
-
-		if generated.trim().is_empty() {
-			return Err(anyhow!("generated Spec artifact is empty"));
-		}
-
-		SprintPipeline::write(session_dir.join("spec.md"), generated)?;
-
-		self.pipeline.persist_progress(if is_revision {
-			"Spec revision completed"
-		} else {
-			"Spec stage completed"
-		})?;
-
-		Ok(StageResult::Spec)
-	}
-	async fn stage_plan(&mut self, input: StageInput) -> Result<StageResult> {
-		let (stage, session_dir) = {
-			let session = self
-				.pipeline
-				.session
-				.as_ref()
-				.ok_or_else(|| anyhow!("no active SDLC session"))?;
-
-			(session.stage, session.dir.clone())
-		};
-		if stage != Stage::Plan {
-			return Err(anyhow!("cannot execute Plan stage while at {stage:?}"));
-		}
-		let intent = self.pipeline.session_read("intent.md")?;
-		let spec = self.pipeline.session_read("spec.md")?;
-		if intent.trim().is_empty() {
-			return Err(anyhow!("Intent artifact is empty"));
-		}
-		if spec.trim().is_empty() {
-			return Err(anyhow!("Spec artifact is empty"));
-		}
-		let prompt = p::gen_plan(&intent, &spec)?;
-		if prompt.trim().is_empty() {
-			return Err(anyhow!("generated Plan prompt is empty"));
-		}
-		// std::fs::write("/tmp/estate-plan-prompt.md", &prompt)
-		// 	.context("writing Plan prompt debug file")?;
-		let generated = self.pipeline.generator.generate(&prompt).await?;
-		if generated.trim().is_empty() {
-			return Err(anyhow!("generated Plan artifact is empty"));
-		}
-		SprintPipeline::write(session_dir.join("plan.md"), generated)?;
-		self.pipeline.persist_progress("Plan stage completed")?;
-		Ok(StageResult::Plan)
-	}
-	async fn stage_build(&mut self, input: StageInput) -> Result<StageResult> {
-		let (stage, session_dir, workspace) = {
-			let session = self
-				.pipeline
-				.session
-				.as_ref()
-				.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
-
-			(
-				session.stage.clone(),
-				session.dir.clone(),
-				session.workspace().to_path_buf(),
-			)
-		};
-
-		if stage != Stage::Build {
-			return Err(anyhow::anyhow!(
-				"cannot execute Build stage while at {:?}",
-				stage
-			));
-		}
-
-		self.pipeline.persist_progress("Build started")?;
-
-		let plan = tokio::fs::read_to_string(session_dir.join("plan.md"))
-			.await
-			.context("reading plan.md")?;
-
-		let steps = build_steps();
-
-		let workspace_before = WorkspaceSnapshot::capture(&workspace)?;
-
-		for (index, instruction) in steps.iter().enumerate() {
-			let step = index + 1;
-
-			self.pipeline.persist_progress(&format!(
-				"Build step {}/{}: {}",
-				step,
-				steps.len(),
-				instruction
-			))?;
-
-			// Rebuild context before EVERY agent call.
-			//
-			// This is important because the workspace has changed since
-			// the previous call.
-			let current_workspace = WorkspaceSnapshot::capture(&workspace)?;
-
-			let workspace_context = format!(
-				"CWD: {}\n\n{}",
-				workspace.display(),
-				current_workspace.to_markdown()
-			);
-
-			let prompt = build_step_prompt(instruction, step, steps.len(), &plan, &workspace_context);
-			let task = AgentTask::new(prompt);
-			let result = self.pipeline.generator.run_agent(&task.prompt).await?;
-
-			// Persist what happened during this build step.
-			let step_path = session_dir.join(format!("build-step-{step:02}.md"));
-
-			SprintPipeline::write(
-				step_path,
-				format!(
-					"# Build Step {step}/{total}\n\n\
-                 ## Task\n\n\
-                 {instruction}\n\n\
-                 ## Result\n\n\
-                 {result:?}\n",
-					total = steps.len(),
-				),
-			)?;
-
-			// Give JEV / the next iteration a fresh view of the workspace.
-			//
-			// Don't carry the original workspace snapshot forward.
-			// The agent just changed it.
-			let after_step = WorkspaceSnapshot::capture(&workspace)?;
-
-			self.pipeline.persist_progress(&format!(
-				"Build step {}/{} completed: {} file(s) changed",
-				step,
-				steps.len(),
-				after_step.diff(&workspace_before).file_count(),
-			))?;
-		}
-
-		let workspace_after = WorkspaceSnapshot::capture(&workspace)?;
-		let changes = workspace_before.diff(&workspace_after);
-
-		SprintPipeline::write(
-			session_dir.join("build.md"),
-			changes.to_markdown("Build completed"),
-		)?;
-
-		self.pipeline.persist_progress(&format!(
-			"Build completed: {} file(s) changed",
-			changes.file_count()
-		))?;
-
-		Ok(StageResult::Build)
-	}
-	async fn stage_verify(&mut self, input: StageInput) -> Result<StageResult> {
-		let verification = self.verify_stage(self.pipeline.stage().unwrap()).await?;
-		self.pipeline.persist_progress(&format!(
-			"Verification completed: passed={}",
-			verification.passed
-		))?;
-		Ok(StageResult::Verification(verification))
-	}
-	async fn stage_deploy(&mut self) -> Result<()> {
-		todo!("sdlc deploy")
-	}
-	async fn stage_maintain(&mut self) -> Result<()> {
-		todo!("sdlc maintain")
-	}
-	async fn stage_complete(&mut self) -> Result<RunControl> {
-		todo!("WOW DONE!")
-	}
-	async fn run_stage(
-		&mut self,
-		stage: e::Stage,
-		attempt: Attempt,
-		pending_input: &mut Option<SdlcInput>,
-	) -> Result<StageOutcome> {
-		self.emit(SdlcEvent::PhaseChanged {
-			phase: SdlcPhase::Executing,
-		});
-
-		let input = match pending_input.take() {
-			Some(SdlcInput::Revision { evaluation }) => StageInput::Revision { evaluation },
-			Some(input) => {
-				*pending_input = Some(input);
-				StageInput::Initial
-			}
-			None => StageInput::Initial,
-		};
-
-		let execution = match self.run_current_stage(stage, attempt, input).await {
-			Ok(execution) => execution,
-			Err(error) => {
-				return Ok(StageOutcome::ExecutionFailed {
-					stage,
-					attempt,
-					error,
-				});
-			}
-		};
-
-		self.emit(SdlcEvent::PhaseChanged {
-			phase: SdlcPhase::Evaluating,
-		});
-		self.handle_evaluation(execution, attempt).await
-	}
-	async fn run_current_stage(
-		&mut self,
-		stage: e::Stage,
-		attempt: Attempt,
-		input: StageInput,
-	) -> Result<StageExecution> {
-		let time_started = Utc::now();
-
-		let result = match stage {
-			Stage::Intent => self.stage_intent(input).await?,
-			Stage::Spec => self.stage_spec(input).await?,
-			Stage::Plan => self.stage_plan(input).await?,
-			Stage::Build => self.stage_build(input).await?,
-			Stage::Verify => self.stage_verify(input).await?,
-			Stage::Complete => StageResult::Complete,
-			Stage::Finalize => StageResult::Finalize,
-			Stage::Deploy | Stage::Maintain => {
-				return Err(anyhow!("stage {stage:?} not implemented"));
-			}
-			_ => {
-				todo!("run_current_stage")
-			}
-		};
-
-		Ok(StageExecution {
-			stage,
-			attempt,
-			time_started,
-			time_completed: Utc::now(),
-			result,
-		})
-	}
-	async fn verify_stage(&mut self, stage: Stage) -> Result<Verification> {
-		let checks = self.pipeline.run_checks(stage).await?;
-		let evaluations = self.pipeline.evaluate_checks(&checks);
-		let passed = self.pipeline.is_passing(&checks, &evaluations);
-		Ok(Verification {
-			passed,
-			checks,
-			evaluations,
-		})
-	}
-	async fn decide(&mut self, outcome: &StageOutcome) -> Result<StageDecision> {
-		self.pipeline.decide(outcome)
-	}
-
-	async fn wait_for_intervention(
-		&mut self,
-		stage: e::Stage,
-		attempt: Attempt,
-		reason: String,
-		input_rx: &mut UnboundedReceiver<SdlcInput>,
-	) -> Result<Intervention> {
-		self
-			.pipeline
-			.wait_for_intervention(stage, attempt, reason, input_rx)
-			.await
-	}
 	async fn apply(
 		&mut self,
 		outcome: StageOutcome,
@@ -2346,6 +1974,32 @@ impl SprintRunner<'_> {
 			}
 		}
 	}
+
+	fn begin_attempt(&mut self, stage: Stage) -> Result<Attempt> {
+		self.pipeline.next_attempt(stage)
+	}
+	async fn decide(&mut self, outcome: &StageOutcome) -> Result<StageDecision> {
+		self.pipeline.decide(outcome)
+	}
+
+	fn emit(&self, event: SdlcEvent) {
+		let _ = self.pipeline.event_tx.send(event);
+	}
+	fn evaluate_checks(&self, checks: Vec<CheckResult>) -> Result<Vec<CheckResult>> {
+		todo!("evaluate_checks")
+	}
+	async fn evaluate(&self, execution: &StageExecution) -> Result<StageEvaluation> {
+		let stage = execution.stage;
+		let checks = self.pipeline.run_checks(stage).await?;
+		let structural = self.evaluate_checks(checks)?;
+		let semantic = self
+			.pipeline
+			.evaluator
+			.evaluate(&self.pipeline.session.as_ref().unwrap(), &execution)
+			.await?;
+		Ok(semantic.with_evaluations(structural))
+	}
+
 	async fn handle_retry(&mut self, stage: e::Stage, attempt: Attempt) -> Result<()> {
 		let next_attempt = Attempt {
 			stage,
@@ -2743,6 +2397,365 @@ impl SprintRunner<'_> {
 			}
 		}
 	}
+
+	fn load_state(&mut self) -> Result<e::Stage> {
+		let session = self
+			.pipeline
+			.session
+			.as_mut()
+			.ok_or_else(|| anyhow::anyhow!("no SDLC session loaded"))?;
+		let path = SpecialFile::SdlcCurrent.path()?;
+		tracing::info!(">>> load_state path = {:?}", path);
+		tracing::info!(">>> exists = {}", path.exists());
+		let json = std::fs::read_to_string(&path).with_context(|| format!("reading {:?}", path))?;
+		tracing::info!(">>> loaded state = {}", json);
+		#[derive(serde::Deserialize)]
+		struct PersistedStage {
+			stage: e::Stage,
+		}
+		let state: PersistedStage = serde_json::from_str(&json)?;
+		let stage = match state.stage {
+			e::Stage::Verify => e::Stage::Build,
+			stage => stage,
+		};
+		session.stage = stage;
+		Ok(stage)
+	}
+
+	fn retry(&mut self, stage: e::Stage) -> Result<()> {
+		self.pipeline.retry(stage)
+	}
+	async fn run_stage(
+		&mut self,
+		stage: e::Stage,
+		attempt: Attempt,
+		pending_input: &mut Option<SdlcInput>,
+	) -> Result<StageOutcome> {
+		self.emit(SdlcEvent::PhaseChanged {
+			phase: SdlcPhase::Executing,
+		});
+
+		let input = match pending_input.take() {
+			Some(SdlcInput::Revision { evaluation }) => StageInput::Revision { evaluation },
+			Some(input) => {
+				*pending_input = Some(input);
+				StageInput::Initial
+			}
+			None => StageInput::Initial,
+		};
+
+		let execution = match self.run_current_stage(stage, attempt, input).await {
+			Ok(execution) => execution,
+			Err(error) => {
+				return Ok(StageOutcome::ExecutionFailed {
+					stage,
+					attempt,
+					error,
+				});
+			}
+		};
+
+		self.emit(SdlcEvent::PhaseChanged {
+			phase: SdlcPhase::Evaluating,
+		});
+		self.handle_evaluation(execution, attempt).await
+	}
+	async fn run_current_stage(
+		&mut self,
+		stage: e::Stage,
+		attempt: Attempt,
+		input: StageInput,
+	) -> Result<StageExecution> {
+		let time_started = Utc::now();
+
+		let result = match stage {
+			Stage::Intent => self.stage_intent(input).await?,
+			Stage::Spec => self.stage_spec(input).await?,
+			Stage::Plan => self.stage_plan(input).await?,
+			Stage::Build => self.stage_build(input).await?,
+			Stage::Verify => self.stage_verify(input).await?,
+			Stage::Complete => StageResult::Complete,
+			Stage::Finalize => StageResult::Finalize,
+			Stage::Deploy | Stage::Maintain => {
+				return Err(anyhow!("stage {stage:?} not implemented"));
+			}
+			_ => {
+				todo!("run_current_stage")
+			}
+		};
+
+		Ok(StageExecution {
+			stage,
+			attempt,
+			time_started,
+			time_completed: Utc::now(),
+			result,
+		})
+	}
+
+	async fn stage_intent(&mut self, input: StageInput) -> Result<StageResult> {
+		let (stage, session_dir, goal) = {
+			let session = self
+				.pipeline
+				.session
+				.as_ref()
+				.ok_or_else(|| anyhow!("no active SDLC session"))?;
+			(session.stage, session.dir.clone(), session.goal.clone())
+		};
+		if stage != Stage::Intent {
+			return Err(anyhow!("cannot execute Intent stage while at {stage:?}"));
+		}
+		if goal.trim().is_empty() {
+			return Err(anyhow!("SDLC session goal is empty"));
+		}
+		let prompt = p::gen_intent(&goal)?;
+		std::fs::write("/tmp/estate-intent-prompt.md", &prompt)
+			.context("writing Intent prompt debug file")?;
+		if prompt.trim().is_empty() {
+			return Err(anyhow!("generated Intent prompt is empty"));
+		}
+		let generated = self.pipeline.generator.generate(&prompt).await?;
+		if generated.trim().is_empty() {
+			return Err(anyhow!("generated Intent artifact is empty"));
+		}
+		SprintPipeline::write(session_dir.join("intent.md"), generated)?;
+		self.pipeline.persist_progress("Intent stage completed")?;
+		Ok(StageResult::Intent)
+	}
+	async fn stage_spec(&mut self, input: StageInput) -> Result<StageResult> {
+		let (stage, session_dir) = {
+			let session = self
+				.pipeline
+				.session
+				.as_ref()
+				.ok_or_else(|| anyhow!("no active SDLC session"))?;
+
+			(session.stage, session.dir.clone())
+		};
+
+		if stage != Stage::Spec {
+			return Err(anyhow!("cannot execute Spec stage while at {stage:?}"));
+		}
+
+		let intent = self.pipeline.session_read("intent.md")?;
+
+		if intent.trim().is_empty() {
+			return Err(anyhow!("Intent artifact is empty"));
+		}
+
+		let is_revision = matches!(input, StageInput::Revision { .. });
+
+		let prompt = match input {
+			StageInput::Initial => p::gen_spec(&intent)?,
+			StageInput::Revision { evaluation } => {
+				let spec = self.pipeline.session_read("spec.md")?;
+				p::revise_spec(&intent, &spec, &evaluation)?
+			}
+		};
+
+		if prompt.trim().is_empty() {
+			return Err(anyhow!("generated Spec prompt is empty"));
+		}
+
+		std::fs::write("/tmp/estate-spec-prompt.md", &prompt)
+			.context("writing Spec prompt debug file")?;
+
+		let generated = self.pipeline.generator.generate(&prompt).await?;
+
+		if generated.trim().is_empty() {
+			return Err(anyhow!("generated Spec artifact is empty"));
+		}
+
+		SprintPipeline::write(session_dir.join("spec.md"), generated)?;
+
+		self.pipeline.persist_progress(if is_revision {
+			"Spec revision completed"
+		} else {
+			"Spec stage completed"
+		})?;
+
+		Ok(StageResult::Spec)
+	}
+	async fn stage_plan(&mut self, input: StageInput) -> Result<StageResult> {
+		let (stage, session_dir) = {
+			let session = self
+				.pipeline
+				.session
+				.as_ref()
+				.ok_or_else(|| anyhow!("no active SDLC session"))?;
+
+			(session.stage, session.dir.clone())
+		};
+		if stage != Stage::Plan {
+			return Err(anyhow!("cannot execute Plan stage while at {stage:?}"));
+		}
+		let intent = self.pipeline.session_read("intent.md")?;
+		let spec = self.pipeline.session_read("spec.md")?;
+		if intent.trim().is_empty() {
+			return Err(anyhow!("Intent artifact is empty"));
+		}
+		if spec.trim().is_empty() {
+			return Err(anyhow!("Spec artifact is empty"));
+		}
+		let prompt = p::gen_plan(&intent, &spec)?;
+		if prompt.trim().is_empty() {
+			return Err(anyhow!("generated Plan prompt is empty"));
+		}
+		// std::fs::write("/tmp/estate-plan-prompt.md", &prompt)
+		// 	.context("writing Plan prompt debug file")?;
+		let generated = self.pipeline.generator.generate(&prompt).await?;
+		if generated.trim().is_empty() {
+			return Err(anyhow!("generated Plan artifact is empty"));
+		}
+		SprintPipeline::write(session_dir.join("plan.md"), generated)?;
+		self.pipeline.persist_progress("Plan stage completed")?;
+		Ok(StageResult::Plan)
+	}
+	async fn stage_build(&mut self, input: StageInput) -> Result<StageResult> {
+		let (stage, session_dir, workspace) = {
+			let session = self
+				.pipeline
+				.session
+				.as_ref()
+				.ok_or_else(|| anyhow::anyhow!("no active SDLC session"))?;
+
+			(
+				session.stage.clone(),
+				session.dir.clone(),
+				session.workspace().to_path_buf(),
+			)
+		};
+
+		if stage != Stage::Build {
+			return Err(anyhow::anyhow!(
+				"cannot execute Build stage while at {:?}",
+				stage
+			));
+		}
+
+		self.pipeline.persist_progress("Build started")?;
+
+		let plan = tokio::fs::read_to_string(session_dir.join("plan.md"))
+			.await
+			.context("reading plan.md")?;
+
+		let steps = build_steps();
+
+		let workspace_before = WorkspaceSnapshot::capture(&workspace)?;
+
+		for (index, instruction) in steps.iter().enumerate() {
+			let step = index + 1;
+
+			self.pipeline.persist_progress(&format!(
+				"Build step {}/{}: {}",
+				step,
+				steps.len(),
+				instruction
+			))?;
+
+			// Rebuild context before EVERY agent call.
+			//
+			// This is important because the workspace has changed since
+			// the previous call.
+			let current_workspace = WorkspaceSnapshot::capture(&workspace)?;
+
+			let workspace_context = format!(
+				"CWD: {}\n\n{}",
+				workspace.display(),
+				current_workspace.to_markdown()
+			);
+
+			let prompt = build_step_prompt(instruction, step, steps.len(), &plan, &workspace_context);
+			let task = AgentTask::new(prompt);
+			let result = self.pipeline.generator.run_agent(&task.prompt).await?;
+
+			// Persist what happened during this build step.
+			let step_path = session_dir.join(format!("build-step-{step:02}.md"));
+
+			SprintPipeline::write(
+				step_path,
+				format!(
+					"# Build Step {step}/{total}\n\n\
+                 ## Task\n\n\
+                 {instruction}\n\n\
+                 ## Result\n\n\
+                 {result:?}\n",
+					total = steps.len(),
+				),
+			)?;
+
+			// Give JEV / the next iteration a fresh view of the workspace.
+			//
+			// Don't carry the original workspace snapshot forward.
+			// The agent just changed it.
+			let after_step = WorkspaceSnapshot::capture(&workspace)?;
+
+			self.pipeline.persist_progress(&format!(
+				"Build step {}/{} completed: {} file(s) changed",
+				step,
+				steps.len(),
+				after_step.diff(&workspace_before).file_count(),
+			))?;
+		}
+
+		let workspace_after = WorkspaceSnapshot::capture(&workspace)?;
+		let changes = workspace_before.diff(&workspace_after);
+
+		SprintPipeline::write(
+			session_dir.join("build.md"),
+			changes.to_markdown("Build completed"),
+		)?;
+
+		self.pipeline.persist_progress(&format!(
+			"Build completed: {} file(s) changed",
+			changes.file_count()
+		))?;
+
+		Ok(StageResult::Build)
+	}
+	async fn stage_verify(&mut self, input: StageInput) -> Result<StageResult> {
+		let verification = self.verify_stage(self.pipeline.stage().unwrap()).await?;
+		self.pipeline.persist_progress(&format!(
+			"Verification completed: passed={}",
+			verification.passed
+		))?;
+		Ok(StageResult::Verification(verification))
+	}
+	async fn stage_deploy(&mut self) -> Result<()> {
+		todo!("sdlc deploy")
+	}
+	async fn stage_maintain(&mut self) -> Result<()> {
+		todo!("sdlc maintain")
+	}
+	async fn stage_complete(&mut self) -> Result<RunControl> {
+		todo!("WOW DONE!")
+	}
+
+	fn transition(&mut self, next: e::Stage) -> Result<()> {
+		self.pipeline.transition(next)
+	}
+	async fn verify_stage(&mut self, stage: Stage) -> Result<Verification> {
+		let checks = self.pipeline.run_checks(stage).await?;
+		let evaluations = self.pipeline.evaluate_checks(&checks);
+		let passed = self.pipeline.is_passing(&checks, &evaluations);
+		Ok(Verification {
+			passed,
+			checks,
+			evaluations,
+		})
+	}
+	async fn wait_for_intervention(
+		&mut self,
+		stage: e::Stage,
+		attempt: Attempt,
+		reason: String,
+		input_rx: &mut UnboundedReceiver<SdlcInput>,
+	) -> Result<Intervention> {
+		self
+			.pipeline
+			.wait_for_intervention(stage, attempt, reason, input_rx)
+			.await
+	}
 }
 impl Step {
 	pub fn stage(self) -> Option<Stage> {
@@ -2820,8 +2833,6 @@ impl WorkspaceSnapshot {
 			git_status: after.git_status.clone(),
 		}
 	}
-}
-impl WorkspaceSnapshot {
 	pub fn to_markdown(&self) -> String {
 		format!(
 			"## Workspace State\n\n\
