@@ -13,6 +13,7 @@ pub fn preview_lines(text: &str, max_lines: usize) -> String {
 		output.push_str("\x1b[0m\n");
 	}
 	if truncated > 0 {
+	  output.push_str("\n");
 		output.push_str(&format!(
 			"\x1b[2m  ... {} more lines truncated\x1b[0m\n",
 			truncated

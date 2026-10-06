@@ -10,11 +10,13 @@ use super::{
 	build_sys_action, build_sys_prompt,
 };
 
-const PROMPT_PREVIEW_LEN: usize = 500;
-const FILE_PREVIEW_COUNT: usize = 10;
-const HISTORY_PREVIEW_LEN: usize = 5;
+const FILE_PREVIEW_COUNT: usize = 5;
 const FILE_PREVIEW_LEN: usize = 300;
+const HISTORY_PREVIEW_LEN: usize = 5;
+const PROMPT_PREVIEW_LEN: usize = 500;
+const PROMPT_PREVIEW_LINES: usize = 5;
 const SHELL_OUTPUT_PREVIEW_LEN: usize = 2000;
+const SHELL_OUTPUT_PREVIEW_LINES: usize = 5;
 
 #[derive(Debug)]
 pub enum AgentMode {
@@ -30,28 +32,18 @@ pub enum AgentStatus {
 }
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub enum AgentObservation {
-	// ReadFile { path: String, content: String },
-	// WriteFile { path: String, success: bool },
 	Current { message: String },
 	RunCommand { result: ShellResult },
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "action")]
 pub enum AgentAction {
-	// 	#[serde(rename = "read_file")]
-	// 	ReadFile { path: String },
-	//
-	// 	#[serde(rename = "write_file")]
-	// 	WriteFile { path: String, content: String },
-	//
 	#[serde(rename = "finish")]
 	Finish { message: String },
-	//
 	#[serde(rename = "current")]
 	Current { message: String },
 	#[serde(rename = "run_command")]
 	RunCommand { command: String },
-
 	#[serde(rename = "run_command")]
 	Context,
 }
@@ -64,7 +56,6 @@ fn build_prompt(ctx: &AgentContext) -> String {
 		&[&ctx.prompt, &workspace, &history],
 	);
 	section!("BUILT PROMPT");
-	const PROMPT_PREVIEW_LINES: usize = 15;
 	println!(
 		"prompt ({} lines, {} chars):\n{}",
 		prompt.lines().count(),
@@ -262,13 +253,17 @@ impl Agent {
 		let max_steps = 10;
 		// let mut ctx = AgentContext::new(task.prompt.clone(), (*self.workspace).clone());
 		let mut ctx = AgentContext::with_workspace(task.prompt.clone(), (*self.workspace).clone());
+
 		section!("CONTEXT");
 		println!(
-			"ctx.prompt ({} chars):\n{}",
+			"ctx.prompt ({} chars, {} lines):\n{}",
 			ctx.prompt.len(),
-			preview(&ctx.prompt, PROMPT_PREVIEW_LEN)
+			ctx.prompt.lines().count(),
+			preview_lines(&ctx.prompt, PROMPT_PREVIEW_LINES)
 		);
+
 		println!("ctx.workspace:\n{}", ctx.workspace);
+
 		println!("ctx.history ({} entries):", ctx.history.len());
 		for (i, entry) in ctx.history.iter().take(5).enumerate() {
 			println!("  [{}] {}", i + 1, preview(&format!("{entry:?}"), 500));
@@ -326,18 +321,25 @@ impl Agent {
 				AgentAction::RunCommand { command } => {
 					let shell_command = ShellCommand::shell(command.clone());
 					let result = self.tools.shell.run(shell_command).await?;
+
 					section!("SHELL RESULT");
+
 					println!("exit: {:?}", result.exit_code);
+
 					println!(
-						"stdout ({} chars): {}",
+						"stdout ({} chars, {} lines):\n{}",
 						result.stdout.len(),
-						preview(&result.stdout, SHELL_OUTPUT_PREVIEW_LEN)
+						result.stdout.lines().count(),
+						preview_lines(&result.stdout, SHELL_OUTPUT_PREVIEW_LINES)
 					);
+
 					println!(
-						"stderr ({} chars): {}",
+						"stderr ({} chars, {} lines):\n{}",
 						result.stderr.len(),
-						preview(&result.stderr, SHELL_OUTPUT_PREVIEW_LEN)
+						result.stderr.lines().count(),
+						preview_lines(&result.stderr, SHELL_OUTPUT_PREVIEW_LINES)
 					);
+
 					ctx.history.push(AgentObservation::RunCommand { result });
 				}
 				AgentAction::Context { .. } => {
