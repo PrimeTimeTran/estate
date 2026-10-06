@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use estate::{
 	new_agent_system,
-	sdlc::{traits::ArtifactGenerator, *},
+	sdlc::{sdlc_trait::ArtifactGenerator, *},
 };
 
 #[derive(Debug)]
