@@ -1,5 +1,28 @@
+pub fn preview_lines(text: &str, max_lines: usize) -> String {
+	let lines: Vec<&str> = text.lines().collect();
+	let (lines, truncated) = if lines.len() <= max_lines {
+		(lines.as_slice(), 0)
+	} else {
+		(&lines[..max_lines], lines.len() - max_lines)
+	};
+	let mut output = String::new();
+	// Dim prompt + indent every line.
+	for line in lines {
+		output.push_str("\x1b[2m  ");
+		output.push_str(line);
+		output.push_str("\x1b[0m\n");
+	}
+	if truncated > 0 {
+		output.push_str(&format!(
+			"\x1b[2m  ... {} more lines truncated\x1b[0m\n",
+			truncated
+		));
+	}
+	output
+}
 pub fn build_sys_action(template: &str, args: &[&str]) -> String {
 	let mut prompt = template.to_string();
+
 	for arg in args {
 		if let Some((before, after)) = prompt.split_once("{}") {
 			prompt = format!("{before}{arg}{after}");
@@ -94,7 +117,6 @@ pub static ACTION_PROMPT: &str = r#"
   - Keep multi-line text inside a properly quoted shell argument.
   - If a command must contain multiple shell operations, put the complete command in the `command` string.
 "#;
-
 
 pub static SYSTEM_PROMPT: &str = r#"
   You are an intelligent file system assistant. You must always respond with a valid JSON object that matches one of these structures:
@@ -293,11 +315,11 @@ You have access to these tools:
 
 1. RUN_COMMAND
   COMMON COMMANDS:
-  
+
   The following are common commands you may use through RUN_COMMAND.
   This list is illustrative, not exhaustive. You may use any appropriate
   command-line program available in the execution environment.
-  
+
   FILESYSTEM:
   - pwd
   - ls
@@ -338,7 +360,7 @@ You have access to these tools:
   - tar
   - zip
   - unzip
-  
+
   SHELL / SYSTEM:
   - sh
   - bash
@@ -360,14 +382,14 @@ You have access to these tools:
   - sleep
   - time
   - timeout
-  
+
   SEARCH / DATA:
   - jq
   - yq
   - xargs
   - xxd
   - base64
-  
+
   NETWORK:
   - curl
   - wget
@@ -377,17 +399,17 @@ You have access to these tools:
   - ping
   - nc
   - dig
-  
+
   VERSION CONTROL:
   - git
-  
+
   RUST:
   - cargo
   - rustc
   - rustup
   - rustfmt
   - clippy
-  
+
   JAVASCRIPT / WEB:
   - node
   - npm
@@ -400,7 +422,7 @@ You have access to these tools:
   - tsc
   - eslint
   - prettier
-  
+
   BUILD / COMPILERS:
   - make
   - cmake
@@ -410,7 +432,7 @@ You have access to these tools:
   - clang++
   - swift
   - swiftc
-  
+
   MACOS:
   - open
   - defaults
@@ -424,7 +446,7 @@ You have access to these tools:
   - system_profiler
   - pbcopy
   - pbpaste
-  
+
   Do not assume every command is installed. If a command is unavailable,
   use another appropriate command or inspect the environment first.
 
@@ -472,7 +494,7 @@ ACTION RULES:
 
 10. Use the real results from HISTORY to determine the next action.
     Do not assume that a command succeeded.
-    
+
 11. When a task requires saving the output of a command to a file,
     use shell redirection (`>`) to write stdout to the requested file.
 

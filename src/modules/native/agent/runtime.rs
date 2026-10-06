@@ -13,21 +13,18 @@ pub struct AgentRuntime {
 	pub registry: AgentRegistry,
 }
 impl AgentRuntime {
-  pub async fn run_agent_with_sdlc(
+	pub async fn run_agent_with_sdlc(
 		&self,
 		task: AgentTask,
 		sdlc_dir: impl AsRef<std::path::Path>,
 	) -> Result<TaskResult> {
 		let agent = Agent::with_cwd(sdlc_dir.as_ref().to_path_buf());
- 
-		agent
-			.run_agent_loop(task, self.event_tx.clone())
-			.await
+		agent.run_agent_loop(task, self.event_tx.clone()).await
 	}
 	pub async fn run_agent(&self, task: AgentTask) -> Result<TaskResult> {
-		// Start completely fresh.
-		// let agent = Agent::new()
-
+		// 		// Start completely fresh.
+		// 		let agent = Agent::new()
+		//
 		// 		// Or explicitly scan/load a workspace.
 		// 		let workspace = WorkspaceContext::load()?;
 		// 		let agent = Agent::with_workspace(workspace);
@@ -47,20 +44,16 @@ impl AgentRuntime {
 		let event_tx = self.event_tx.clone();
 		tokio::spawn(async move {
 			let agent = Agent::new();
-
 			let result = agent.run_agent_loop(task.clone(), event_tx.clone()).await;
-
 			match result {
 				Ok(result) => {
 					let _ = event_tx.send(RuntimeEvent::System(SystemEvent::TaskCompleted {
 						result: result.clone(),
 					}));
-
 					for task in result.spawned_tasks {
 						let _ = event_tx.send(RuntimeEvent::System(SystemEvent::TaskSpawned { task }));
 					}
 				}
-
 				Err(e) => {
 					let _ = event_tx.send(RuntimeEvent::System(SystemEvent::TaskFailed {
 						task_id: task.id.to_string(),

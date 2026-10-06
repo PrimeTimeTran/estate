@@ -10,6 +10,12 @@ use super::{
 	build_sys_action, build_sys_prompt,
 };
 
+const PROMPT_PREVIEW_LEN: usize = 500;
+const FILE_PREVIEW_COUNT: usize = 10;
+const HISTORY_PREVIEW_LEN: usize = 5;
+const FILE_PREVIEW_LEN: usize = 300;
+const SHELL_OUTPUT_PREVIEW_LEN: usize = 2000;
+
 #[derive(Debug)]
 pub enum AgentMode {
 	Chat,
@@ -53,16 +59,21 @@ pub enum AgentAction {
 fn build_prompt(ctx: &AgentContext) -> String {
 	let workspace = format_workspace(&ctx.workspace);
 	let history = format_history(&ctx.history);
-
-	section!("FORMATTED CONTEXT");
-	println!("workspace = {:?}", workspace);
-	println!("history = {:?}", history);
-
-	build_sys_action(
+	let prompt = build_sys_action(
 		ACTION_PROMPT_EXECUTION,
 		&[&ctx.prompt, &workspace, &history],
-	)
+	);
+	section!("BUILT PROMPT");
+	const PROMPT_PREVIEW_LINES: usize = 15;
+	println!(
+		"prompt ({} lines, {} chars):\n{}",
+		prompt.lines().count(),
+		prompt.len(),
+		preview_lines(&prompt, PROMPT_PREVIEW_LINES)
+	);
+	prompt
 }
+
 async fn build_action(prompt: &str) -> Result<LlmAction> {
 	let client = reqwest::Client::new();
 	let system_prompt: &str = JSON_PROMPT_EXECUTION;
@@ -251,27 +262,24 @@ impl Agent {
 		let max_steps = 10;
 		// let mut ctx = AgentContext::new(task.prompt.clone(), (*self.workspace).clone());
 		let mut ctx = AgentContext::with_workspace(task.prompt.clone(), (*self.workspace).clone());
-
 		section!("CONTEXT");
-		println!("ctx.prompt = {}", preview(&ctx.prompt, 500));
-		println!("ctx.workspace = {:?}", ctx.workspace);
-		const HISTORY_PREVIEW_LEN: usize = 5;
-
-		if ctx.history.len() > HISTORY_PREVIEW_LEN {
-			println!(
-				"ctx.history = {:?}... [{} more entries, total={}]",
-				&ctx.history[..HISTORY_PREVIEW_LEN],
-				ctx.history.len() - HISTORY_PREVIEW_LEN,
-				ctx.history.len()
-			);
-		} else {
-			println!("ctx.history = {:?}", ctx.history);
+		println!(
+			"ctx.prompt ({} chars):\n{}",
+			ctx.prompt.len(),
+			preview(&ctx.prompt, PROMPT_PREVIEW_LEN)
+		);
+		println!("ctx.workspace:\n{}", ctx.workspace);
+		println!("ctx.history ({} entries):", ctx.history.len());
+		for (i, entry) in ctx.history.iter().take(5).enumerate() {
+			println!("  [{}] {}", i + 1, preview(&format!("{entry:?}"), 500));
 		}
-
+		if ctx.history.len() > 5 {
+			println!("  ... {} more entries", ctx.history.len() - 5);
+		}
 		let _ = event_tx.send(RuntimeEvent::Agent(AgentEvent::Thinking {
 			task: task.clone(),
 		}));
-		let mode: AgentMode = self.decide_mode(&ctx).await?;
+		let mode: AgentMode = self.pick_mode(&ctx).await?;
 		if matches!(mode, AgentMode::Chat) {
 			let response = prompt_chat(&ctx).await?;
 			let result = TaskResult::completed_chat(task.id, ctx, response);
@@ -290,11 +298,10 @@ impl Agent {
 					Some("Agent exceeded maximum reasoning steps".into()),
 				));
 			}
-			let action = self.decide_next_action(&ctx).await?;
+			let action = self.pick_action(&ctx).await?;
 			match action {
 				AgentAction::Current { message } => {
 					let now = chrono::Local::now().format("%Y-%m-%d").to_string();
-
 					let response = format!("Context update: The current date is {}. {}", now, message);
 					let _ = event_tx.send(RuntimeEvent::Agent(AgentEvent::Working {
 						task: task.clone(),
@@ -304,27 +311,6 @@ impl Agent {
 						.history
 						.push(AgentObservation::Current { message: response });
 				}
-				// 				AgentAction::ReadFile { path } => {
-				// 					let _ = event_tx.send(RuntimeEvent::Agent(AgentEvent::Working {
-				// 						task: task.clone(),
-				// 						message: format!("Reading {path}"),
-				// 					}));
-				// 					let content = self.tools.fs.read(&path)?;
-				// 					ctx
-				// 						.history
-				// 						.push(AgentObservation::ReadFile { path, content });
-				// 				}
-				// 				AgentAction::WriteFile { path, content } => {
-				// 					let _ = event_tx.send(RuntimeEvent::Agent(AgentEvent::Working {
-				// 						task: task.clone(),
-				// 						message: format!("Writing {path}"),
-				// 					}));
-				// 					self.tools.fs.write(&path, &content)?;
-				// 					ctx.history.push(AgentObservation::WriteFile {
-				// 						path,
-				// 						success: true,
-				// 					});
-				// 				}
 				AgentAction::Finish { message } => {
 					if ctx.history.is_empty() {
 						return Err(anyhow!(
@@ -338,18 +324,22 @@ impl Agent {
 					return Ok(result);
 				}
 				AgentAction::RunCommand { command } => {
-					// println!("commandcommand {}", command);
 					let shell_command = ShellCommand::shell(command.clone());
 					let result = self.tools.shell.run(shell_command).await?;
-
 					section!("SHELL RESULT");
 					println!("exit: {:?}", result.exit_code);
-					println!("stdout: {}", result.stdout);
-					println!("stderr: {}", result.stderr);
-
+					println!(
+						"stdout ({} chars): {}",
+						result.stdout.len(),
+						preview(&result.stdout, SHELL_OUTPUT_PREVIEW_LEN)
+					);
+					println!(
+						"stderr ({} chars): {}",
+						result.stderr.len(),
+						preview(&result.stderr, SHELL_OUTPUT_PREVIEW_LEN)
+					);
 					ctx.history.push(AgentObservation::RunCommand { result });
 				}
-
 				AgentAction::Context { .. } => {
 					let _ = event_tx.send(RuntimeEvent::Agent(AgentEvent::Working {
 						task: task.clone(),
@@ -375,11 +365,31 @@ impl Agent {
 					ctx.history.push(AgentObservation::Current {
 						message: "Agent context requested".into(),
 					});
-				}
+				} // 				AgentAction::ReadFile { path } => {
+				  // 					let _ = event_tx.send(RuntimeEvent::Agent(AgentEvent::Working {
+				  // 						task: task.clone(),
+				  // 						message: format!("Reading {path}"),
+				  // 					}));
+				  // 					let content = self.tools.fs.read(&path)?;
+				  // 					ctx
+				  // 						.history
+				  // 						.push(AgentObservation::ReadFile { path, content });
+				  // 				}
+				  // 				AgentAction::WriteFile { path, content } => {
+				  // 					let _ = event_tx.send(RuntimeEvent::Agent(AgentEvent::Working {
+				  // 						task: task.clone(),
+				  // 						message: format!("Writing {path}"),
+				  // 					}));
+				  // 					self.tools.fs.write(&path, &content)?;
+				  // 					ctx.history.push(AgentObservation::WriteFile {
+				  // 						path,
+				  // 						success: true,
+				  // 					});
+				  // 				}
 			}
 		}
 	}
-	async fn decide_mode(&self, ctx: &AgentContext) -> Result<AgentMode> {
+	async fn pick_mode(&self, ctx: &AgentContext) -> Result<AgentMode> {
 		let prompt = build_sys_prompt(DECIDE_PROMPT, &ctx.prompt);
 		let raw: LlmMode = prompt_ollama_json(&prompt).await?;
 		Ok(match raw.mode.as_str() {
@@ -387,18 +397,12 @@ impl Agent {
 			_ => AgentMode::Chat,
 		})
 	}
-	async fn decide_next_action(&self, ctx: &AgentContext) -> Result<AgentAction> {
+	async fn pick_action(&self, ctx: &AgentContext) -> Result<AgentAction> {
 		let prompt = build_prompt(ctx);
-
-		// println!("\n========== AGENT PROMPT ==========");
-		// println!("{prompt}");
-		// println!("==================================\n");
-
 		let raw = build_action(&prompt).await?;
 		let action = AgentAction::try_from(raw)?;
 		Ok(action)
 	}
-
 	async fn from_session(session: &Session) -> Result<Agent> {
 		todo!("from_session")
 	}

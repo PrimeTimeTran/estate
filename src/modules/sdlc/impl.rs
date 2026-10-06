@@ -22,28 +22,21 @@ impl ArtifactGenerator for LocalGenerator {
 			"prompt": prompt,
 			"stream": false,
 		});
-
 		std::fs::write(
 			"/tmp/estate-ollama-request.json",
 			serde_json::to_string_pretty(&request)?,
 		)?;
-
 		let response = reqwest::Client::new()
 			.post("http://localhost:11434/api/generate")
 			.json(&request)
 			.send()
 			.await?
 			.error_for_status()?;
-
 		let body = response.text().await?;
-
 		std::fs::write("/tmp/estate-ollama-response.json", &body)?;
-
 		let response: OllamaResponse =
 			serde_json::from_str(&body).context("invalid Ollama response")?;
-
 		let artifact = response.response.trim();
-
 		if artifact.is_empty() {
 			return Err(anyhow!(
 				"Ollama returned an empty artifact \
@@ -52,7 +45,6 @@ impl ArtifactGenerator for LocalGenerator {
 				response.done_reason,
 			));
 		}
-
 		Ok(artifact.to_string())
 	}
 	// cargo run --bin sanity-tests -- --native src/bin/sanity-tests/tools-intern
@@ -1747,7 +1739,7 @@ impl SprintRunner<'_> {
 						),
 					});
 
-					self.persist(&format!(
+					self.pipeline.persist_progress(&format!(
 						"{} exhausted maximum attempts ({})",
 						stage, attempt.max
 					))?;
@@ -1757,7 +1749,7 @@ impl SprintRunner<'_> {
 
 				let next_attempt = attempt.number + 1;
 
-				self.persist(&format!(
+				self.pipeline.persist_progress(&format!(
 					"Retrying stage {} (attempt {}/{})",
 					stage, next_attempt, attempt.max,
 				))?;
@@ -1921,7 +1913,36 @@ impl SprintRunner<'_> {
 	pub async fn decide(&self, outcome: &StageOutcome) -> Result<StageDecision> {
 		tracing::info!(">>> DECIDE");
 		// tracing::info!(">>> outcome = {outcome:#?}");
+		if std::env::var_os("SDLC_FORCE_EXIT").is_some() {
+			tracing::warn!(">>> SDLC_FORCE_EXIT=1 -> Exit");
+			return Ok(StageDecision::Exit);
+		}
+
+		if std::env::var_os("SDLC_FORCE_CONTINUE").is_some() {
+			tracing::warn!(">>> SDLC_FORCE_CONTINUE=1 -> Continue");
+			return Ok(StageDecision::Continue);
+		}
 		let decision = match outcome {
+			StageOutcome::EvaluationFailed { execution, .. } => {
+				let attempt = execution.attempt;
+				tracing::info!(
+					">>> EvaluationFailed: stage={:?} attempt={}/{}",
+					attempt.stage,
+					attempt.number,
+					attempt.max,
+				);
+				if attempt.number < attempt.max {
+					tracing::info!(">>> attempt {}/{} -> Retry", attempt.number, attempt.max,);
+					StageDecision::Retry
+				} else {
+					tracing::info!(
+						">>> attempt {}/{} exhausted -> AwaitHuman",
+						attempt.number,
+						attempt.max,
+					);
+					StageDecision::AwaitHuman
+				}
+			}
 			StageOutcome::Complete { execution, .. } => {
 				tracing::info!(
 					">>> Complete: stage={:?} attempt={}/{}",
@@ -1978,26 +1999,6 @@ impl SprintRunner<'_> {
 			StageOutcome::ExecutionFailed { attempt, .. } => {
 				tracing::info!(
 					">>> ExecutionFailed: stage={:?} attempt={}/{}",
-					attempt.stage,
-					attempt.number,
-					attempt.max,
-				);
-				if attempt.number < attempt.max {
-					tracing::info!(">>> attempt {}/{} -> Retry", attempt.number, attempt.max,);
-					StageDecision::Retry
-				} else {
-					tracing::info!(
-						">>> attempt {}/{} exhausted -> AwaitHuman",
-						attempt.number,
-						attempt.max,
-					);
-					StageDecision::AwaitHuman
-				}
-			}
-			StageOutcome::EvaluationFailed { execution, .. } => {
-				let attempt = execution.attempt;
-				tracing::info!(
-					">>> EvaluationFailed: stage={:?} attempt={}/{}",
 					attempt.stage,
 					attempt.number,
 					attempt.max,
@@ -2431,7 +2432,7 @@ impl SprintRunner<'_> {
 	}
 
 	fn persist(&mut self, msg: &str) -> Result<()> {
-		self.persist(msg)?;
+		self.pipeline.persist_progress(msg)?;
 		Ok(())
 	}
 	fn retry(&mut self, stage: Stage) -> Result<()> {
@@ -2532,7 +2533,7 @@ impl SprintRunner<'_> {
 		}
 
 		SprintPipeline::write(session_dir.join("intent.md"), generated)?;
-		self.persist("Intent stage completed")?;
+		self.pipeline.persist_progress("Intent stage completed")?;
 
 		Ok(StageResult::Intent)
 	}
@@ -2577,7 +2578,7 @@ impl SprintRunner<'_> {
 
 		SprintPipeline::write(session_dir.join("spec.md"), generated)?;
 
-		self.persist(if is_revision {
+		self.pipeline.persist_progress(if is_revision {
 			"Spec revision completed"
 		} else {
 			"Spec stage completed"
@@ -2612,7 +2613,7 @@ impl SprintRunner<'_> {
 			return Err(anyhow!("generated Plan artifact is empty"));
 		}
 		SprintPipeline::write(session_dir.join("plan.md"), generated)?;
-		self.persist("Plan stage completed")?;
+		self.pipeline.persist_progress("Plan stage completed")?;
 		Ok(StageResult::Plan)
 	}
 	async fn stage_build(&mut self, input: StageInput) -> Result<StageResult> {
@@ -2632,7 +2633,7 @@ impl SprintRunner<'_> {
 			));
 		}
 
-		self.persist("Build started")?;
+		self.pipeline.persist_progress("Build started")?;
 
 		let plan = tokio::fs::read_to_string(session_dir.join("plan.md"))
 			.await
@@ -2689,7 +2690,7 @@ impl SprintRunner<'_> {
 			// The agent just changed it.
 			let after_step = WorkspaceSnapshot::capture(&workspace)?;
 
-			self.persist(&format!(
+			self.pipeline.persist_progress(&format!(
 				"Build step {}/{} completed: {} file(s) changed",
 				step,
 				steps.len(),
@@ -2705,7 +2706,7 @@ impl SprintRunner<'_> {
 			changes.to_markdown("Build completed"),
 		)?;
 
-		self.persist(&format!(
+		self.pipeline.persist_progress(&format!(
 			"Build completed: {} file(s) changed",
 			changes.file_count()
 		))?;
@@ -2714,7 +2715,7 @@ impl SprintRunner<'_> {
 	}
 	async fn stage_verify(&mut self, input: StageInput) -> Result<StageResult> {
 		let verification = self.verify_stage(self.pipeline.stage()).await?;
-		self.persist(&format!(
+		self.pipeline.persist_progress(&format!(
 			"Verification completed: passed={}",
 			verification.passed
 		))?;

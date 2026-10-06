@@ -1,7 +1,9 @@
 use anyhow::Context;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
-use estate::prelude::*;
 use std::io::IsTerminal;
+
+use estate::prelude::*;
+
 // 1. Normal run
 // cargo -q run --bin sdlc --features sdlc
 //
@@ -13,6 +15,11 @@ use std::io::IsTerminal;
 // 3. Disable TUI
 // SDLC_PLAIN=1 cargo run --bin sdlc --features sdlc
 // cargo -q run --bin sdlc --features sdlc
+//
+// 4.  Bypass decide
+// rm -rf log && \
+// SDLC_FORCE_CONTINUE=1 SDLC_PLAIN=1 \
+// cargo run --bin sdlc --features sdlc
 #[tokio::main]
 pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let cli = cli::context::parse();

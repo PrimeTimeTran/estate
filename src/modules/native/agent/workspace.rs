@@ -12,20 +12,16 @@ pub fn format_workspace(workspace: &WorkspaceContext) -> String {
 			output.push_str(&format!("- {}\n", file.path));
 		}
 	}
-
 	output
 }
 fn format_history(history: &[AgentObservation]) -> String {
 	if history.is_empty() {
 		return "No actions have been performed yet.".into();
 	}
-
 	let mut output = String::new();
-
 	for (index, observation) in history.iter().enumerate() {
 		output.push_str(&format!("{}. {:?}\n", index + 1, observation));
 	}
-
 	output
 }
 #[derive(Debug, Clone)]
@@ -33,7 +29,6 @@ pub struct WorkspaceContext {
 	pub files: Vec<FileInfo>,
 	pub cwd: PathBuf,
 }
-
 impl Default for WorkspaceContext {
 	fn default() -> Self {
 		Self {
@@ -42,7 +37,22 @@ impl Default for WorkspaceContext {
 		}
 	}
 }
-
+impl fmt::Display for WorkspaceContext {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		writeln!(f, "CWD: {}", self.cwd.display())?;
+		writeln!(f, "FILES: {}", self.files.len())?;
+		if self.files.is_empty() {
+			return Ok(());
+		}
+		for (i, file) in self.files.iter().take(10).enumerate() {
+			writeln!(f, "  [{i}] {file:?}")?;
+		}
+		if self.files.len() > 10 {
+			writeln!(f, "  ... {} more files", self.files.len() - 10)?;
+		}
+		Ok(())
+	}
+}
 impl WorkspaceContext {
 	pub fn new(files: Vec<FileInfo>) -> Self {
 		Self {
@@ -50,32 +60,26 @@ impl WorkspaceContext {
 			cwd: std::env::current_dir().unwrap_or_default(),
 		}
 	}
-
 	pub fn from_session(session: &SdlcSession) -> Result<Self> {
 		let mut files = Vec::new();
-
 		for entry in std::fs::read_dir(&session.dir)? {
 			let entry = entry?;
 			let path = entry.path();
-
 			if path.is_file() {
 				files.push(FileInfo::from_path(&path)?);
 			}
 		}
-
 		Ok(Self {
 			files,
 			cwd: session.dir.clone(),
 		})
 	}
-
 	pub fn load() -> anyhow::Result<Self> {
 		Ok(Self {
 			files: Vec::new(),
 			cwd: std::env::current_dir()?,
 		})
 	}
-
 	pub fn from_cwd(cwd: impl Into<PathBuf>) -> Self {
 		Self {
 			cwd: cwd.into(),
