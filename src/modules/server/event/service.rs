@@ -1,9 +1,6 @@
 use crate::{
 	prelude::*,
-	proto::{
-		event_service_server::{EventService as EventServiceTrait, },
-		types as proto_types,
-	},
+	proto::{event_service_server::EventService as EventServiceTrait, types as proto_types},
 };
 use tonic::Status;
 

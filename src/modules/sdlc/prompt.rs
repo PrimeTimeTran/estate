@@ -401,11 +401,7 @@ pub fn plan_gen(intent: &str, spec: &str) -> String {
 			"#,
 	)
 }
-pub fn revise_spec(
-	intent: &str,
-	current_spec: &str,
-	evaluation: &QACheck,
-) -> Result<String> {
+pub fn revise_spec(intent: &str, current_spec: &str, evaluation: &QACheck) -> Result<String> {
 	Ok(format!(
 		r#"
 	Revise the existing specification so that it meets the requirements

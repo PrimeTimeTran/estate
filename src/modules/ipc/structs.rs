@@ -182,13 +182,8 @@ where
 	E: Serialize + for<'de> Deserialize<'de> + Send,
 {
 	async fn connect(&mut self) -> anyhow::Result<()>;
-	async fn send(
-		&mut self,
-		message: &IpcMessage<E>,
-	) -> anyhow::Result<()>;
-	async fn receive(
-		&mut self,
-	) -> anyhow::Result<IpcMessage<E>>;
+	async fn send(&mut self, message: &IpcMessage<E>) -> anyhow::Result<()>;
+	async fn receive(&mut self) -> anyhow::Result<IpcMessage<E>>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

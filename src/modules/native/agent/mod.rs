@@ -11,7 +11,7 @@ use notify::{Event, EventKind};
 use crate::{
 	model::task::TaskResult,
 	prelude::{anyhow::anyhow, *},
-	sdlc::AiSession
+	sdlc::AiSession,
 };
 
 mod r#const;
@@ -35,7 +35,6 @@ pub mod agent_runtime;
 pub mod system;
 pub mod tool;
 pub mod workspace;
-
 
 use crate::prelude::*;
 pub use agent::*;

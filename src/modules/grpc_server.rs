@@ -1,9 +1,7 @@
 use crate::{
 	e::{EventBus, EventService},
 	prelude::*,
-	proto::{
-		event_service_server::EventServiceServer
-	},
+	proto::event_service_server::EventServiceServer,
 };
 
 pub async fn run_server(cancel: CancellationToken) -> anyhow::Result<()> {
@@ -40,9 +38,7 @@ pub struct ServerBuilder {
 
 impl ServerBuilder {
 	pub fn new() -> Self {
-		Self {
-			events: None,
-		}
+		Self { events: None }
 	}
 
 	pub fn events(mut self, events: EventBus) -> Self {

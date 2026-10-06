@@ -208,7 +208,7 @@ impl App<Context> {
 		self.workers.push(hid);
 		self.init_daemon();
 		tracing::info!("daemon is alive");
-		self.host.worker.wait_for_shutdown();
+		// self.host.worker.wait_for_shutdown();
 		tracing::info!("daemon shutting down");
 		// macos_create_bg_daemon();
 		Ok(())
@@ -342,7 +342,6 @@ where
 							notify::EventKind::Modify(_) | notify::EventKind::Create(_)
 						) {
 							tracing::debug!("Cargo.toml changed");
-
 							if let Err(error) = watcher.run_once_sync() {
 								tracing::error!("Failed to process Cargo.toml: {error}");
 							}

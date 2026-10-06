@@ -1,6 +1,6 @@
 use crate::{
 	model::{ProtoProblem, common::Difficulty},
-	prelude::{*},
+	prelude::*,
 	server::ProblemService as ProblemServiceTrait,
 	server::*,
 };

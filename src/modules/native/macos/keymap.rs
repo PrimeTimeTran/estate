@@ -305,6 +305,6 @@ pub enum ModifierKey {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum KeyDirection {
-  Down,
-  Up
+	Down,
+	Up,
 }

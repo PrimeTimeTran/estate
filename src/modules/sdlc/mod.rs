@@ -12,9 +12,9 @@ use crossterm::{
 	terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use jev_sdk::{Choice, Noul, Question, Score, TypeSafeClient};
+use std::path::{Path, PathBuf};
 use std::{io::Stdout, process::Command};
 use tokio::time::{Duration, sleep};
-use std::path::{Path, PathBuf};
 
 use crate::{model::task::TaskResult, prelude::*};
 
@@ -51,7 +51,6 @@ use sdlc_trait::*;
 mod ui;
 use ui as u;
 pub use ui::*;
-
 
 #[derive(Debug, Clone)]
 pub struct RequiredFile {
