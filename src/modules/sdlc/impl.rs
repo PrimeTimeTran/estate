@@ -898,9 +898,31 @@ impl Pipeline {
 			_ => Vec::new(),
 		}
 	}
-
 	fn emit(&self, event: SdlcEvent) {
-		let _ = self.event_tx.send(event);
+		let _ = self.event_tx.send(event.clone());
+		let path = self.session.dir.join("events.jsonl");
+		if let Ok(mut file) = std::fs::OpenOptions::new()
+			.create(true)
+			.append(true)
+			.open(path)
+		{
+			let _ = serde_json::to_writer(&mut file, &event);
+			let _ = writeln!(file);
+		}
+	}
+	
+	fn append_event(&self, event: &SdlcEvent) -> anyhow::Result<()> {
+		let path = self.session.dir.join("events.jsonl");
+	
+		let mut file = OpenOptions::new()
+			.create(true)
+			.append(true)
+			.open(path)?;
+	
+		serde_json::to_writer(&mut file, event)?;
+		writeln!(file)?;
+	
+		Ok(())
 	}
 	async fn evaluate(&self, execution: &Execution) -> Result<QACheck> {
 		self.qa.evaluate(execution).await
@@ -1361,10 +1383,10 @@ impl PipelineRuntime {
 		Ok(())
 	}
 	pub async fn run(&mut self, input_rx: &mut UnboundedReceiver<SdlcInput>) -> Result<()> {
-		let mut runner = SprintRunner {
+		let mut runner = PipeRunner {
 			pipeline: &mut self.pipeline,
 		};
-		runner.run(input_rx).await.context("SprintRunner::run")
+		runner.run(input_rx).await.context("PipeRunner::run")
 	}
 	pub async fn run_simulated(
 		&mut self,
@@ -1434,10 +1456,10 @@ impl PipelineRuntime {
 				self.pipeline.session.goal.clone(),
 			)
 			.await?;
-		let mut runner = SprintRunner {
+		let mut runner = PipeRunner {
 			pipeline: &mut self.pipeline,
 		};
-		runner.run(input_rx).await.context("SprintRunner::run")
+		runner.run(input_rx).await.context("PipeRunner::run")
 	}
 	pub fn view(&self) -> PipelineRuntimeView {
 		PipelineRuntimeView {
@@ -1504,7 +1526,7 @@ impl SdlcInput {
 	}
 }
 #[async_trait::async_trait]
-impl sdlc_trait::Runner for SprintRunner<'_> {
+impl sdlc_trait::Runner for PipeRunner<'_> {
 	type Context = UnboundedReceiver<SdlcInput>;
 	type Output = ();
 	/// "What happens next?"
@@ -1582,7 +1604,7 @@ impl sdlc_trait::Runner for SprintRunner<'_> {
 		}
 	}
 }
-impl SprintRunner<'_> {
+impl PipeRunner<'_> {
 	/// "Given this decision, what actions/state changes must happen?"
 	///
 	/// Applies the decision to the pipeline/session and returns control
@@ -1838,19 +1860,19 @@ impl SprintRunner<'_> {
 				match &execution.result {
 					RunResult::Verification(verification) => {
 						if verification.passed {
-							tracing::info!(">>> verification passed -> Continue");
+							tracing::info!(">>> QA passed -> Continue");
 							Decision::Continue
 						} else {
-							tracing::info!(">>> verification failed -> Retry");
+							tracing::info!(">>> QA failed -> Retry");
 							Decision::Retry
 						}
 					}
 					_ if execution.stage == Stage::Complete => {
-						tracing::info!(">>> final stage -> Complete");
+						tracing::info!(">>> Execution -> Complete");
 						Decision::Complete
 					}
 					_ => {
-						tracing::info!(">>> stage complete -> Continue");
+						tracing::info!(">>> Execution -> Continue");
 						Decision::Continue
 					}
 				}

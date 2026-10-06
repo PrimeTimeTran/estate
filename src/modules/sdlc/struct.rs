@@ -164,11 +164,12 @@ pub struct Pipeline {
 	pub qa: Evaluator,
 	pub generator: Box<dyn Generator>,
 	pub session: AiSession,
+	// pub events: broadcast::Sender<SdlcEvent>,
 	pub state_path: PathBuf,
 	pub event_tx: broadcast::Sender<SdlcEvent>,
 	pub stage_attempt: u32,
 }
-pub struct SprintRunner<'a> {
+pub struct PipeRunner<'a> {
 	pub pipeline: &'a mut Pipeline,
 }
 
