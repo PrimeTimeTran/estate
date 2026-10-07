@@ -12,6 +12,7 @@ use tray_icon::{Icon, TrayIconBuilder};
 const TRAY_ICON_WIDTH: u32 = 16;
 const TRAY_ICON_HEIGHT: u32 = 16;
 
+// #[cfg(not(feature = "daemon"))]
 impl<NativeCtx, S> ApplicationHandler<AppEvent> for Renderer<NativeCtx, S>
 where
 	NativeCtx: Ctx + 'static,
@@ -201,38 +202,6 @@ where
 
 			None => {
 				tracing::info!("RENDERER GOT NO EVENT");
-			}
-		}
-	}
-	pub fn _process_events(&mut self) {
-		tracing::info!("renderer process_events");
-		// loop {
-		match self.event_rx.try_recv() {
-			Some(event) => {
-				tracing::info!(?event, "RENDERER GOT EVENT");
-
-				let mut ctx = AppContext {
-					context: self.context.as_ref(),
-					state: &mut self.state,
-					event_tx: &mut self.event_tx,
-					// event_rx: &mut self.event_rx,
-					input: IOState::default(),
-					last_revision: 0,
-				};
-
-				#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-				tracing::info!("windows: {}", self.windows.len());
-				#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-				for window in &mut self.windows {
-					tracing::info!("dispatching event to screen");
-					window.window.screen.event(&event, &mut ctx);
-				}
-			}
-
-			None => {
-				tracing::info!("RENDERER GOT NO EVENT");
-				// break;
-				// }
 			}
 		}
 	}

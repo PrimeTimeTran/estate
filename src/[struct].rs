@@ -145,6 +145,7 @@ impl BroadcastSender<e::Event> {
 
 impl SendsEvents for BroadcastSender<e::Event> {
 	fn send(&self, event: e::Event) {
+		tracing::info!(event = ?event, "🚌 EventBus SEND");
 		let _ = self.tx.send(event);
 	}
 }

@@ -9,8 +9,7 @@ impl Default for EventBus {
 impl EventBus {
 	pub fn new() -> Self {
 		let (tx, _) = broadcast::channel(256);
-		tracing::info!("EventBus CREATED");
-
+		tracing::info!("🚌 EventBus CREATED");
 		Self { tx }
 	}
 
@@ -23,9 +22,7 @@ impl EventBus {
 	/// Application-level event receiver.
 	pub fn subscribe_broadcast(&self, owner: &'static str) -> BroadcastReceiver<e::Event> {
 		let id = NEXT_RECEIVER_ID.fetch_add(1, Ordering::Relaxed);
-
 		tracing::info!(id, owner, "EventBus creating broadcast receiver");
-
 		BroadcastReceiver {
 			id,
 			owner,

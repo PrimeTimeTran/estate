@@ -69,7 +69,7 @@ impl Host<Context> {
 
 		let mut context = Context::default();
 
-		#[cfg(not(feature = "daemon"))]
+		// #[cfg(not(feature = "daemon"))] 
 		{
 			tokio
 				.block_on(context.api_mut().connect())

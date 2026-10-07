@@ -447,7 +447,6 @@ impl MacosHid {
 	fn handle_event(&mut self, event: NativeEvent, received_at: u64, events: &EventBus) {
 		self.state_update(&event);
 		let latency = received_at.saturating_sub(event.sent_at);
-
 		for action in self.observe_event(&event) {
 			tracing::debug!(
 					action = %action.name,
@@ -476,6 +475,7 @@ impl MacosHid {
 		// events.emit(event.into());
 	}
 	fn state_update(&mut self, event: &NativeEvent) {
+	  tracing::info!("MacosHid state_update");
 		let m = &event.modifiers;
 		self.state.shift_left = m.shift_left;
 		self.state.shift_right = m.shift_right;
@@ -562,7 +562,7 @@ impl MacosHid {
 		let enabled = true;
 		Ok(Self {
 			state: HidState::default(),
-			socket: PathBuf::from("/tmp/estate-hid.sock"),
+			socket: PathBuf::from(HID_SOCKET),
 			child: None,
 			bindings: default_bindings(),
 			pressed: HashSet::new(),
@@ -575,7 +575,6 @@ impl MacosHid {
 			tracing::debug!("🍎 macOS OS observer already running");
 			return Ok(());
 		}
-
 		let source_dir = "/Users/future/kb/project/crates/estate/src/modules/native/macos/native";
 		let source = format!("{source_dir}/os-observer.swift");
 		let shim = format!("{source_dir}/hid-event-shim.o");
@@ -617,6 +616,7 @@ impl MacosHid {
 		Ok(())
 	}
 	pub async fn run(mut self, events: EventBus, cancel: CancellationToken) -> Result<()> {
+		tracing::info!("MacHid runrunrunrunrun");
 		let stream = self.connect().await?;
 		let (reader, mut writer) = stream.into_split();
 		let mut reader = BufReader::new(reader);
@@ -1160,7 +1160,7 @@ impl MacosHid {
 		Ok(())
 	}
 	fn init_hid_smoke_log() -> std::io::Result<()> {
-		let path = std::env::current_dir()?.join("estate-hid-smoke.log");
+		let path = std::env::current_dir()?.join(ESTATE_HID_SMOKE_LOG);
 		let mut file = std::fs::File::create(path)?;
 		writeln!(
 			file,

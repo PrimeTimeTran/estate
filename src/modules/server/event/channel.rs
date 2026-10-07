@@ -47,7 +47,16 @@ impl<T> EventReceiver<T> {
 }
 
 impl<T> EventSender<T> {
-	pub async fn send(&self, event: T) -> Result<(), SendError<T>> {
+	pub async fn send(&self, event: T) -> Result<(), SendError<T>>
+	where
+		T: std::fmt::Debug,
+	{
+		tracing::info!(
+			event = ?event,
+			receivers = self.tx.weak_count(),
+			"🚌 EventBus SEND",
+		);
+
 		self.tx.send(event).await
 	}
 	pub fn try_send(&self, event: T) -> Result<(), TrySendError<T>> {

@@ -3,22 +3,16 @@ use crate::{
 	prelude::*,
 	proto::event_service_server::EventServiceServer,
 };
-
 pub async fn run_server(cancel: CancellationToken) -> anyhow::Result<()> {
 	tracing::info!("🚀 Estate gRPC server starting");
-
 	let builder = ServerBuilder::new();
 	let server = builder.build().await?;
-
 	let addr = crate::data::GRPC_SOCKET.parse::<std::net::SocketAddr>()?;
-
 	tracing::info!(%addr, "🌐 Estate gRPC server listening");
-
 	tokio::select! {
 		result = server.run() => {
 			result?;
 		}
-
 		_ = cancel.cancelled() => {
 			tracing::info!("🛑 Estate gRPC server cancellation requested");
 		}
@@ -28,7 +22,6 @@ pub async fn run_server(cancel: CancellationToken) -> anyhow::Result<()> {
 }
 pub struct Server {
 	pub event_service: EventService,
-
 	pub events: EventBus,
 }
 

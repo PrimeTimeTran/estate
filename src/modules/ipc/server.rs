@@ -369,13 +369,11 @@ impl IpcServer {
 		let listener = UnixListener::bind(&self.socket)?;
 		tracing::info!(
 			socket = %self.socket.display(),
-			"Estate IPC listening"
+			"🛜 Estate IPC listening"
 		);
 		loop {
 			let (stream, _) = listener.accept().await?;
-
 			let events = self.events.clone();
-
 			tokio::spawn(async move {
 				if let Err(error) = handle_connection(stream, events).await {
 					tracing::debug!(

@@ -12,7 +12,6 @@ impl EstateClient {
 			socket: PathBuf::from(ESTATE_SOCKET),
 		}
 	}
-
 	pub async fn connect(&self) -> anyhow::Result<EstateConnection> {
 		let stream = UnixStream::connect(&self.socket).await?;
 		let (read_half, mut write_half) = stream.into_split();

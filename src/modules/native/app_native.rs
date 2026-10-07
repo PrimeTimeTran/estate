@@ -162,7 +162,7 @@ impl App<Context> {
 	// }
 	// }
 	pub fn run(&mut self) -> Result<()> {
-		tracing::debug!("App run");
+		tracing::info!("app native app ru");
 		self.init_services()?;
 		match self.mode {
 			AppMode::Daemon => {
@@ -198,18 +198,14 @@ impl App<Context> {
 		self.init_daemon();
 		// Stay alive until supervisor terminates us
 		self.host.worker.wait_for_ctrl_c();
-
 		Ok(())
 	}
 
 	pub fn run_daemon(&mut self) -> Result<()> {
-		tracing::debug!("daemon starting");
 		let hid = self.host.start()?;
 		self.workers.push(hid);
 		self.init_daemon();
-		tracing::info!("daemon is alive");
 		// self.host.worker.wait_for_shutdown();
-		tracing::info!("daemon shutting down");
 		// macos_create_bg_daemon();
 		Ok(())
 	}
@@ -221,7 +217,7 @@ impl App<Context> {
 		Ok(())
 	}
 	pub fn run_gui(&mut self) -> Result<()> {
-		tracing::debug!("run_gui");
+		tracing::info!("app native app run_gui");
 		let cancel = CancellationToken::new();
 		let event_loop = EventLoop::<AppEvent>::with_user_event()
 			.build()
@@ -232,7 +228,7 @@ impl App<Context> {
 		let event_rx = self.host.event_bus.subscribe_broadcast("app");
 		let event_tx = self.host.event_bus.sender();
 		self.host.runtime.attach_event_proxy(proxy);
-
+		tracing::info!("app native ");
 		// #[cfg(not(feature = "daemon"))]
 		{
 			let mut renderer = Renderer::<Context, <Context as Ctx>::AppState>::new(
@@ -463,7 +459,7 @@ where
 //
 // 		// Daemon may not need this
 // 		// This requires server access
-// 		#[cfg(not(feature = "daemon"))]
+// #[cfg(not(feature = "daemon"))]
 // 		{
 // 			// Connect using the same runtime that Host will retain.
 // 			tokio.block_on(context.api_mut().connect())?;

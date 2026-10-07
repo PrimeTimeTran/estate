@@ -47,8 +47,8 @@ impl App<Context> {
 		self.host.api()
 	}
 	pub fn run(&mut self) -> Result<()> {
-		// self.init_services()?;
-		// self.run_gui()?;
+		self.init_services()?;
+		self.run_gui()?;
 		if self.mode == AppMode::Daemon {
 			let hid = self.host.start()?;
 			self.workers.push(hid);
@@ -66,6 +66,7 @@ impl App<Context> {
 		let event_rx = self.host.event_bus.subscribe_broadcast("app");
 		let event_tx = self.host.event_bus.sender();
 		self.host.runtime.attach_event_proxy(proxy);
+		tracing::info!("app macos");
 		// #[cfg(not(feature = "daemon"))]
 		{
 			let mut renderer = Renderer::<Context, <Context as Ctx>::AppState>::new(
@@ -82,6 +83,12 @@ impl App<Context> {
 		}
 		Ok(())
 	}
+	// pub async fn run_daemon(&mut self) -> Result<()> {
+	// 	let ipc = IpcServer::new(ESTATE_SOCKET, self.host.event_bus.clone());
+	// 	let _handle = tokio::spawn(async move { ipc.start().await });
+	// 	// self.workers.push(handle);
+	// 	Ok(())
+	// }
 }
 impl Context {
 	fn new(state: NativeState, api: ApiService) -> Self {
@@ -115,6 +122,7 @@ impl Default for Context {
 }
 impl Host<Context> {
 	pub fn init() -> anyhow::Result<Self> {
+		tracing::info!("app_macos Host init");
 		let parsed = cli::context::parse();
 
 		let mut config = LogConfig::load()?;
@@ -199,6 +207,12 @@ impl TryFrom<NativeEvent> for e::Event {
 			timestamp: native.sent_at,
 		})
 	}
+}
+
+pub struct AppEventBridge {
+	rx: BroadcastReceiver<AppEvent>,
+	tx: EventSender<AppEvent>,
+	proxy: EventLoopProxy<AppEvent>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
