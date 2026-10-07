@@ -53,7 +53,6 @@ impl<T> EventSender<T> {
 	{
 		tracing::info!(
 			event = ?event,
-			receivers = self.tx.weak_count(),
 			"🚌 EventBus SEND",
 		);
 

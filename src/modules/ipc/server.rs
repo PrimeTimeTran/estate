@@ -3,16 +3,29 @@ use crate::prelude::{shared::Binding as OldKeyBinding, *};
 use anyhow::{Context as CtxAnyhow, Result};
 
 async fn handle_connection(stream: UnixStream, events: EventBus) -> anyhow::Result<()> {
+	tracing::info!("🔥 IPC HANDLE CONNECTION");
 	let connection_id = Uuid::new_v4();
 
 	let (read_half, mut write_half) = stream.into_split();
 	let mut reader = BufReader::new(read_half);
 
+	tracing::info!("🔥 IPC WAITING FOR CLIENT MESSAGE");
 	let hello = read_hello(&mut reader, &mut write_half).await?;
+
+	tracing::info!(
+		connection = %connection_id,
+		hello = ?hello,
+		"🔥 IPC HELLO RECEIVED"
+	);
 
 	log_client_connected(connection_id, &hello);
 
 	send_hello_ack(&mut write_half, connection_id).await?;
+
+	tracing::info!(
+		connection = %connection_id,
+		"🔥 IPC HELLO ACK SENT"
+	);
 
 	let mut event_rx = events.tx.subscribe();
 	let mut line = String::new();
@@ -126,12 +139,14 @@ async fn run_connection_loop(
 	event_rx: &mut tokio::sync::broadcast::Receiver<Event>,
 	line: &mut String,
 ) -> anyhow::Result<()> {
+	tracing::info!("🔥 run_connection_loop HID RAW ← Swift: {}", line);
 	loop {
 		tokio::select! {
 			/*
 			 * Tauri → Estate
 			 */
 			result = reader.read_line(line) => {
+			tracing::info!("🔥 run_connection_loop HID RAW ← Swift: {}", line);
 				if !handle_client_input(
 					connection_id,
 					result?,
@@ -373,6 +388,7 @@ impl IpcServer {
 		);
 		loop {
 			let (stream, _) = listener.accept().await?;
+			tracing::info!("🔥 IPC ACCEPTED connection");
 			let events = self.events.clone();
 			tokio::spawn(async move {
 				if let Err(error) = handle_connection(stream, events).await {

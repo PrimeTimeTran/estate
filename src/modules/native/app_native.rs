@@ -162,7 +162,7 @@ impl App<Context> {
 	// }
 	// }
 	pub fn run(&mut self) -> Result<()> {
-		tracing::info!("app native app ru");
+		tracing::info!("app native app run");
 		self.init_services()?;
 		match self.mode {
 			AppMode::Daemon => {

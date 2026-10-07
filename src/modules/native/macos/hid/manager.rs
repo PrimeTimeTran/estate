@@ -475,7 +475,7 @@ impl MacosHid {
 		// events.emit(event.into());
 	}
 	fn state_update(&mut self, event: &NativeEvent) {
-	  tracing::info!("MacosHid state_update");
+		tracing::info!("MacosHid state_update");
 		let m = &event.modifiers;
 		self.state.shift_left = m.shift_left;
 		self.state.shift_right = m.shift_right;
@@ -575,16 +575,36 @@ impl MacosHid {
 			tracing::debug!("🍎 macOS OS observer already running");
 			return Ok(());
 		}
+
+		// Remove any socket left behind by a previous observer.
+		if self.socket.exists() {
+			tracing::info!(
+				socket = %self.socket.display(),
+				"🍎 removing stale macOS HID socket"
+			);
+
+			std::fs::remove_file(&self.socket).with_context(|| {
+				format!(
+					"failed to remove stale macOS HID socket: {}",
+					self.socket.display()
+				)
+			})?;
+		}
+
 		let source_dir = "/Users/future/kb/project/crates/estate/src/modules/native/macos/native";
+
 		let source = format!("{source_dir}/os-observer.swift");
 		let shim = format!("{source_dir}/hid-event-shim.o");
 		let output = "/tmp/estate-os-observer";
+
 		tracing::debug!("🍎 building macOS OS observer");
+
 		let build = std::process::Command::new("swiftc")
 			.current_dir(source_dir)
 			.args([&source, &shim, "-o", output])
 			.output()
 			.context("failed to invoke swiftc")?;
+
 		if !build.status.success() {
 			anyhow::bail!(
 				"failed to build macOS OS observer:\n{}{}",
@@ -592,19 +612,24 @@ impl MacosHid {
 				String::from_utf8_lossy(&build.stderr),
 			);
 		}
+
 		tracing::debug!("🍎 macOS OS observer built: {output}");
+
 		let child = std::process::Command::new(output)
 			.stdin(std::process::Stdio::null())
 			.stdout(std::process::Stdio::inherit())
 			.stderr(std::process::Stdio::inherit())
 			.spawn()
 			.context("failed to start /tmp/estate-os-observer")?;
-		tracing::debug!(
+
+		tracing::info!(
 			pid = child.id(),
 			socket = %self.socket.display(),
 			"🍎 macOS OS observer started"
 		);
+
 		self.child = Some(child);
+
 		Ok(())
 	}
 	pub fn stop(&mut self) -> Result<()> {
@@ -618,37 +643,68 @@ impl MacosHid {
 	pub async fn run(mut self, events: EventBus, cancel: CancellationToken) -> Result<()> {
 		tracing::info!("MacHid runrunrunrunrun");
 		let stream = self.connect().await?;
+
+		tracing::info!("🔥 RUST GOT UNIX STREAM");
+
 		let (reader, mut writer) = stream.into_split();
+
+		tracing::info!("🔥 RUST ENTERING HID LOOP");
 		let mut reader = BufReader::new(reader);
 		let mut ping_interval = tokio::time::interval(std::time::Duration::from_secs(10));
 		let mut ping_id = 0u64;
 		let mut line = String::new();
 		loop {
 			tokio::select! {
-					_ = cancel.cancelled() => {
-							tracing::debug!("macOS HID cancelled");
-							return Ok(());
-					}
-					_ = ping_interval.tick() => {
-							ping_id += 1;
-							self.send_ping(&mut writer, ping_id).await?;
-					}
-					result = reader.read_line(&mut line) => {
-							let received_at = mach_now();
-							let bytes = result?;
-							if bytes == 0 {
-									tracing::warn!("Swift HID disconnected");
+							_ = cancel.cancelled() => {
+									tracing::debug!("macOS HID cancelled");
 									return Ok(());
 							}
-							self.handle_line(
-									line.trim_end(),
-									received_at,
-									&mut writer,
-									&events,
-							).await?;
-							line.clear();
+							_ = ping_interval.tick() => {
+									ping_id += 1;
+									self.send_ping(&mut writer, ping_id).await?;
+							}
+							result = reader.read_line(&mut line) => {
+			tracing::info!("🔥 RUST READ COMPLETED");
+
+			let received_at = mach_now();
+
+			let bytes = match result {
+					Ok(bytes) => {
+							tracing::info!(bytes, "🔥 RUST READ RESULT");
+							bytes
 					}
+
+					Err(error) => {
+							tracing::error!(
+									%error,
+									"🔥 RUST READ ERROR"
+							);
+							return Err(error.into());
+					}
+			};
+
+			if bytes == 0 {
+					tracing::warn!(
+							"🔥 RUST READ EOF — Swift HID disconnected"
+					);
+					return Ok(());
 			}
+
+			tracing::info!(
+					line = %line.trim_end(),
+					"🔥 RUST RECEIVED HID"
+			);
+
+			self.handle_line(
+					line.trim_end(),
+					received_at,
+					&mut writer,
+					&events,
+			).await?;
+
+			line.clear();
+							}
+					}
 		}
 	}
 	async fn connect(&self) -> Result<UnixStream> {

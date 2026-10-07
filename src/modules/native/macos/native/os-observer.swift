@@ -1021,11 +1021,23 @@ func handleEstateConnection(
       count: 4096
     )
 
+    print("🔥 SWIFT WAITING FOR RUST")
+    fflush(stdout)
+
+    swiftLog("🔥 SWIFT WAITING FOR RUST fd=\(clientFD)")
+
     let count = read(
       clientFD,
       &buffer,
       buffer.count
     )
+
+    swiftLog(
+      "🔥 SWIFT READ RETURNED count=\(count) fd=\(clientFD)"
+    )
+
+    print("🔥 SWIFT READ RETURNED \(count)")
+    fflush(stdout)
 
     if count <= 0 {
       print(
@@ -1099,7 +1111,12 @@ func emitForegroundApp(_ app: FrontmostApp) {
     on: estateClientFD
   )
 }
+func swiftLog(_ message: String) {
+  fputs(message + "\n", stderr)
+  fflush(stderr)
+}
 func startEstateSocket() {
+
   func startSwiftPingLoop(
     _ clientFD: Int32
   ) {
@@ -1175,37 +1192,49 @@ func startEstateSocket() {
       "failed to listen: " + "\(String(cString: strerror(errno)))"
     )
   }
+
+  print("🔥 SWIFT SOCKET READY path=\(socketPath) fd=\(serverFD)")
+  fflush(stdout)
+
+  swiftLog("🚀 Starting Estate socket...")
+
+  // after bind
+  swiftLog("🔥 SWIFT SOCKET READY path=\(socketPath) fd=\(serverFD)")
+
   while true {
+    print("🔥 SWIFT WAITING FOR RUST ACCEPT")
+    fflush(stdout)
+    swiftLog("🔥 SWIFT WAITING FOR RUST ACCEPT")
+
     let clientFD = accept(
       serverFD,
       nil,
       nil
     )
+
+    swiftLog("🔥 SWIFT ACCEPT RETURNED fd=\(clientFD)")
+
     guard clientFD >= 0 else {
-      print(
-        "accept failed: "
-          + "\(String(cString: strerror(errno)))"
+      swiftLog(
+        "❌ accept failed: \(String(cString: strerror(errno)))"
       )
       continue
     }
 
     estateClientFD = clientFD
 
-    print(
-      "🔥 ESTATE RUST CONNECTED fd=\(clientFD)"
-    )
+    swiftLog("🔥 SWIFT ACCEPTED RUST fd=\(clientFD)")
+    swiftLog("🔥 SWIFT → handleEstateConnection fd=\(clientFD)")
 
     handleEstateConnection(clientFD)
+
+    swiftLog("🔥 SWIFT ← handleEstateConnection fd=\(clientFD)")
 
     close(clientFD)
 
     estateClientFD = -1
-    print("🔌 ESTATE RUST DISCONNECTED")
 
-    handleEstateConnection(
-      estateClientFD
-    )
-    // startSwiftPingLoop(clientFD)
+    swiftLog("🔌 SWIFT CLOSED RUST fd=\(clientFD)")
   }
 }
 func frontmostApplication() -> FrontmostApp {

@@ -30,18 +30,25 @@ impl<C: Ctx> Host<C> {
 		Ok(())
 	}
 	pub fn start_hid_bridge(&self) -> Result<WorkHandle<C, tokio::task::JoinHandle<()>>> {
+		tracing::info!("start_hid_bridge");
+
 		let mut hid = MacosHid::new()?;
-		let _result = hid.start();
+
+		hid.start()?;
+
 		let events = self.event_bus.clone();
+
 		let handle = self.worker.run_background(move |cancel| async move {
 			if let Err(error) = hid.run(events, cancel).await {
 				tracing::error!(%error, "macOS HID stopped");
 			}
 		});
+
 		Ok(handle)
 	}
 
 	pub fn new(context: Arc<C>, tokio: tokio::runtime::Runtime) -> anyhow::Result<Self> {
+		tracing::info!("macos host new");
 		// ## TODO:
 		//
 		// - [ ] Read settings.json using settings_resolver
