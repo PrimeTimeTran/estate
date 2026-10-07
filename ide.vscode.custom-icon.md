@@ -28,14 +28,16 @@ Because directories animate when clicked, vscode-icons expects two unique graphi
 
 Now that your local files are sitting in the target system directory, add this configuration block to your global settings file: [2, 4]
 
+```json
 "vsicons.associations.folders": [
-{
-"icon": "rustacean",
-"extensions": ["rustacean"],
-"filename": true,
-"format": "svg"
-}
+  {
+    "icon": "rustacean",
+    "extensions": ["rustacean"],
+    "filename": true,
+    "format": "svg"
+  }
 ]
+```
 
 (Notice how we dropped the folder_type_ prefix here. The extension handles the prefix attachment logic automatically behind the scenes). [2, 4]
 
@@ -49,10 +51,8 @@ Force an index refresh to register your custom file insertions: [5]
 Your editor workspace tree will instantly update with your custom folder assets!
 If you run into issues finding or saving the SVGs, let me know:
 
--
 - What operating system are you running on?
 - Would you like me to map multiple folder names to this same custom icon asset?
--
 
 [1] [https://github.com](https://github.com/vscode-icons/vscode-icons/wiki/FineTuning)
 [2] [https://github.com](https://github.com/vscode-icons/vscode-icons/wiki/Custom)

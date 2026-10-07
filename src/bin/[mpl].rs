@@ -134,7 +134,6 @@ fn post_process(path: &Path) -> Result<()> {
 	fn refresh_quicklook(_path: &Path) -> Result<()> {
 		todo!("refresh_quicklook");
 	}
-
 	println!("Post-processing: {}", path.display());
 
 	// Step 1: Validate the file exists and isn't empty.
@@ -148,6 +147,5 @@ fn post_process(path: &Path) -> Result<()> {
 
 	// Step 4: Ask macOS Quick Look to generate / refresh its preview.
 	refresh_quicklook(path)?;
-
 	Ok(())
 }

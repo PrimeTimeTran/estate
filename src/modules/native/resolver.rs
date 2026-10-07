@@ -14,9 +14,7 @@ pub fn filesystem_root(path: &Path) -> PathBuf {
 	path.ancestors().last().unwrap().to_path_buf()
 }
 
-const PRECEDENCE: &[&str] = &["default", "profile", "project", "workspace"];
-
-pub fn resolve_settings(file: impl AsRef<Path>, filename: &str) -> Result<Settings> {
+pub fn settings(file: impl AsRef<Path>, filename: &str) -> Result<Settings> {
 	let walker = FsWalker::new_from_ref(file);
 
 	let files = walker
@@ -122,3 +120,5 @@ pub fn engine_cache_dir() -> Result<PathBuf> {
 pub fn engine_state_file() -> Result<PathBuf> {
 	Ok(engine_data_dir()?.join("state.json"))
 }
+
+const PRECEDENCE: &[&str] = &["default", "profile", "project", "workspace"];

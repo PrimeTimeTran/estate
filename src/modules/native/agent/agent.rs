@@ -284,7 +284,7 @@ pub struct AgentCtx {
 	pub logs: Vec<String>,
 	pub spawned_tasks: Vec<AgentTask>,
 }
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AgentTask {
 	pub id: Uuid,
 	pub prompt: String,

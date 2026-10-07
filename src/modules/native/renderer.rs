@@ -335,16 +335,6 @@ where
 		Ok(())
 	}
 }
-// impl Context {
-// 	fn new(state: NativeState, api: ApiService) -> Self {
-// 		Self { state, api }
-// 	}
-// }
-// impl Default for Context {
-// 	fn default() -> Self {
-// 		Self::new(NativeState::default(), ApiService::default())
-// 	}
-// }
 
 pub struct Renderer<C, S>
 where

@@ -512,8 +512,8 @@ impl MacosHid {
 		let special = format!("{} {}", key_state(s.function, "fn"), key_state(s.caps, "⇪"),);
 		let event_display = match event.kind {
 			NativeEventKind::Scroll {
-				vertical,
-				horizontal,
+				vertical: _,
+				horizontal: _,
 			} => {
 				let x = event.scroll_x.unwrap_or(0.0);
 				let y = event.scroll_y.unwrap_or(0.0);
@@ -541,16 +541,14 @@ impl MacosHid {
 					Some(keymap::KeyDirection::Up) => "↑",
 					None => " ",
 				};
-
-				let name = event.name.as_deref().unwrap_or("");
-				format!("{arrow} {name}")
+				let name = event.name.as_deref().unwrap_or("·");
+				format!("{arrow} {name:?}")
 			}
 		};
 		let key_code = event
 			.key_code
 			.map(|code| code.to_string())
 			.unwrap_or_default();
-
 		if app == "Zed" {
 			tracing::info!("Zed Focused");
 		}
@@ -576,17 +574,15 @@ impl MacosHid {
 	}
 	pub fn start(&mut self) -> Result<()> {
 		if self.child.is_some() {
-			tracing::debug!("🍎 macOS OS observer already running");
+			tracing::info!("🍎 macOS OS observer already running");
 			return Ok(());
 		}
-
 		// Remove any socket left behind by a previous observer.
 		if self.socket.exists() {
 			tracing::info!(
 				socket = %self.socket.display(),
 				"🍎 removing stale macOS HID socket"
 			);
-
 			std::fs::remove_file(&self.socket).with_context(|| {
 				format!(
 					"failed to remove stale macOS HID socket: {}",
@@ -594,14 +590,12 @@ impl MacosHid {
 				)
 			})?;
 		}
-
 		let source_dir = "/Users/future/kb/project/crates/estate/src/modules/native/macos/native";
-
 		let source = format!("{source_dir}/os-observer.swift");
 		let shim = format!("{source_dir}/hid-event-shim.o");
 		let output = "/tmp/estate-os-observer";
 
-		tracing::debug!("🍎 building macOS OS observer");
+		tracing::info!("🍎 building macOS OS observer");
 
 		let build = std::process::Command::new("swiftc")
 			.current_dir(source_dir)
@@ -645,70 +639,70 @@ impl MacosHid {
 		Ok(())
 	}
 	pub async fn run(mut self, events: EventBus, cancel: CancellationToken) -> Result<()> {
-		tracing::info!("MacHid runrunrunrunrun");
+		tracing::info!("⌨️ MacOSHID Manager run");
 		let stream = self.connect().await?;
 
 		// tracing::info!("🔥 RUST GOT UNIX STREAM");
 
 		let (reader, mut writer) = stream.into_split();
 
-		tracing::info!("🔥 RUST ENTERING HID LOOP");
+		// tracing::info!("🔥 RUST ENTERING HID LOOP");
+
 		let mut reader = BufReader::new(reader);
 		let mut ping_interval = tokio::time::interval(std::time::Duration::from_secs(10));
 		let mut ping_id = 0u64;
 		let mut line = String::new();
 		loop {
 			tokio::select! {
-				_ = cancel.cancelled() => {
-						tracing::debug!("macOS HID cancelled");
-						return Ok(());
-				}
-				_ = ping_interval.tick() => {
-						ping_id += 1;
-						self.send_ping(&mut writer, ping_id).await?;
-				}
-				result = reader.read_line(&mut line) => {
-				 // tracing::info!("🔥 RUST READ COMPLETED");
-
-				 let received_at = mach_now();
-
-				 let bytes = match result {
-				Ok(bytes) => {
-						// tracing::info!(bytes, "🔥 RUST READ RESULT");
-						bytes
-				}
-
-				Err(error) => {
-						tracing::error!(
-								%error,
-								"🔥 RUST READ ERROR"
-						);
-						return Err(error.into());
-				}
-			};
-
-			if bytes == 0 {
-				tracing::warn!(
-						"🔥 RUST READ EOF — Swift HID disconnected"
-				);
-				return Ok(());
-			}
-
-			// tracing::info!(
-			// 		line = %line.trim_end(),
-			// 		"🔥 RUST RECEIVED HID"
-			// );
-
-			self.handle_line(
-					line.trim_end(),
-					received_at,
-					&mut writer,
-					&events,
-			).await?;
-
-			line.clear();
-							}
+					_ = cancel.cancelled() => {
+							tracing::debug!("macOS HID cancelled");
+							return Ok(());
 					}
+					_ = ping_interval.tick() => {
+							ping_id += 1;
+							self.send_ping(&mut writer, ping_id).await?;
+					}
+					result = reader.read_line(&mut line) => {
+					 // tracing::info!("🔥 RUST READ COMPLETED");
+
+					 let received_at = mach_now();
+
+					 let bytes = match result {
+					Ok(bytes) => {
+							// tracing::info!(bytes, "🔥 RUST READ RESULT");
+							bytes
+					}
+
+					Err(error) => {
+							tracing::error!(
+									%error,
+									"🔥 RUST READ ERROR"
+							);
+							return Err(error.into());
+					}
+				};
+
+				if bytes == 0 {
+					tracing::warn!(
+							"🔥 RUST READ EOF — Swift HID disconnected"
+					);
+					return Ok(());
+				}
+
+				// tracing::info!(
+				// 		line = %line.trim_end(),
+				// 		"🔥 RUST RECEIVED HID"
+				// );
+
+				self.handle_line(
+						line.trim_end(),
+						received_at,
+						&mut writer,
+						&events,
+				).await?;
+				line.clear();
+				}
+			}
 		}
 	}
 	async fn connect(&self) -> Result<UnixStream> {
@@ -716,7 +710,6 @@ impl MacosHid {
 				socket = %self.socket.display(),
 				"🍎 connecting to macOS HID"
 		);
-
 		loop {
 			match UnixStream::connect(&self.socket).await {
 				Ok(stream) => {
@@ -1698,9 +1691,7 @@ pub struct Modifiers {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FrontmostApp {
 	pub pid: i64,
-
 	#[serde(rename = "bundleID")]
 	pub bundle_id: String,
-
 	pub name: String,
 }

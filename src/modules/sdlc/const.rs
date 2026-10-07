@@ -4,7 +4,7 @@ pub const TODO: &'static str = r#"
 	- Question prompt
 	- Add progressive disclosure
 "#;
-
+pub static DEFAULT_NAUL_BAR: f64 = 0.40;
 pub static DEFAULT_MODEL: &str = "qwen3:8b";
 pub static SDLC_GOAL: &str =
 	include_str!("/Users/future/kb/project/crates/estate/ai/template/user.goal.md");

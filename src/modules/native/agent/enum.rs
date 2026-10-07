@@ -13,7 +13,7 @@ pub enum AgentAction {
 	Context { path: Option<String> },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum AgentEvent {
 	NewTask { task: AgentTask },
 	Thinking { task: AgentTask },
@@ -40,7 +40,7 @@ pub enum AgentObservation {
 	RunCommand { result: ShellResult },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum Artifact {
 	FileRead { path: String, content: String },
 	FileWrite { path: String },
@@ -69,7 +69,7 @@ pub enum SystemEvent {
 	AllIdle,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum TaskEvent {
 	Thinking,
 	Started,

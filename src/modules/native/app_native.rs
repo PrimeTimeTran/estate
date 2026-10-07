@@ -143,7 +143,7 @@ where
 
 	fn init_settings() -> Result<Settings> {
 		tracing::debug!("init_settings");
-		let settings = resolver::resolve_settings(resolver::source_file(file!()), "settings.json")?;
+		let settings = resolver::settings(resolver::source_file(file!()), "settings.json")?;
 		println!("{}", serde_json::to_string_pretty(&settings)?);
 		Ok(settings)
 	}
@@ -431,10 +431,9 @@ where
 			tokio::signal::ctrl_c()
 				.await
 				.expect("failed to listen for Ctrl+C");
-			tracing::debug!("Ctrl+C received");
+			tracing::info!("Ctrl+C received");
 		});
 	}
-
 	pub fn worker(&self) -> &HostWorker<Context> {
 		&self.worker
 	}
@@ -519,17 +518,6 @@ impl<C> traits::Worker<C> for HostWorker<C>
 where
 	C: Ctx,
 {
-	type Handle = WorkHandle<C, tokio::task::JoinHandle<()>>;
-
-	fn run_foreground<F>(&self, task: F)
-	where
-		F: Fn() + Send + 'static,
-	{
-		loop {
-			task();
-		}
-	}
-
 	fn run_background<F, Fut>(&self, task: F) -> Self::Handle
 	where
 		F: FnOnce(CancellationToken) -> Fut + Send + 'static,
@@ -569,6 +557,15 @@ where
 		WorkHandle::new(cancel, join)
 	}
 
+	fn run_foreground<F>(&self, task: F)
+	where
+		F: Fn() + Send + 'static,
+	{
+		loop {
+			task();
+		}
+	}
+
 	fn spawn<F, Fut>(&self, task: F) -> Self::Handle
 	where
 		F: FnOnce() -> Fut + Send + 'static,
@@ -580,6 +577,8 @@ where
 		});
 		WorkHandle::new(cancel, join)
 	}
+
+	type Handle = WorkHandle<C, tokio::task::JoinHandle<()>>;
 }
 
 #[derive(Debug, Clone)]

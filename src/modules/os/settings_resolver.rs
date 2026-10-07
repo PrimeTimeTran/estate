@@ -90,7 +90,7 @@ impl FsWalker {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::native::resolver::resolve_settings;
+	use crate::native::resolver::settings;
 	use crate::prelude::*;
 	use ::macros::vow;
 	use serde_json::{Value, json};
@@ -185,7 +185,7 @@ mod tests {
 		}
 
 		fn resolve(&self) -> anyhow::Result<Value> {
-			let settings = resolve_settings(&self.target, SETTINGS_FILENAME)?;
+			let settings = settings(&self.target, SETTINGS_FILENAME)?;
 			Ok(serde_json::to_value(settings)?)
 		}
 	}
@@ -340,7 +340,7 @@ mod tests {
 
 		// Serialize the typed Settings directly.
 		// Converting to Value first can reorder map keys.
-		let settings = resolve_settings(&fixture.target, SETTINGS_FILENAME).unwrap();
+		let settings = settings(&fixture.target, SETTINGS_FILENAME).unwrap();
 
 		let output = serde_json::to_string_pretty(&settings).unwrap();
 

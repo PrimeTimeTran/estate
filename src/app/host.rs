@@ -144,18 +144,14 @@ impl<C> HostWorker<C>
 where
 	C: Ctx,
 {
-	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 	pub fn new() -> Self {
-		let runtime = tokio::runtime::Runtime::new().unwrap();
 		Self {
-			runtime: Arc::new(runtime),
-			_phantom: PhantomData,
+			#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
+			runtime: Arc::new(tokio::runtime::Runtime::new().unwrap()),
+
+			#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 			shutdown: CancellationToken::new(),
-		}
-	}
-	#[cfg(target_arch = "wasm32")]
-	pub fn new() -> Self {
-		Self {
+
 			_phantom: PhantomData,
 		}
 	}
@@ -250,6 +246,7 @@ pub struct HostWorker<C: Ctx> {
 	pub _phantom: PhantomData<C>,
 	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 	pub runtime: Arc<tokio::runtime::Runtime>,
+	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 	pub shutdown: CancellationToken,
 }
 

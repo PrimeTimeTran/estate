@@ -16,7 +16,6 @@ impl SwiftNativeEvent {
 			"flags_changed" => NativeEventKind::FlagsChanged {
 				key_code: self.key_code?,
 			},
-
 			"frontmost_app" => {
 				let app = self.frontmost_app.as_ref()?;
 				NativeEventKind::FrontmostApp {
@@ -25,31 +24,25 @@ impl SwiftNativeEvent {
 					pid: app.pid,
 				}
 			}
-
 			"mouse_down" => NativeEventKind::MouseDown {
 				button: self.button?,
 				x: self.x?,
 				y: self.y?,
 			},
-
 			"mouse_up" => NativeEventKind::MouseUp {
 				button: self.button?,
 				x: self.x?,
 				y: self.y?,
 			},
-
 			"scroll" => NativeEventKind::Scroll {
 				vertical: self.vertical?,
 				horizontal: self.horizontal?,
 			},
-
 			_ => return None,
 		};
-
 		let modifiers = self.modifiers.unwrap_or_default();
 		let scroll_x = Some(self.horizontal.unwrap_or(0) as f64);
 		let scroll_y = Some(self.vertical.unwrap_or(0) as f64);
-
 		Some(NativeEvent {
 			scroll_x,
 			scroll_y,
@@ -71,7 +64,6 @@ impl SwiftNativeEvent {
 					"up" => Some(keymap::KeyDirection::Up),
 					_ => None,
 				}),
-
 			modifiers: ModifierSnapshot {
 				shift_left: modifiers.shift_left,
 				shift_right: modifiers.shift_right,

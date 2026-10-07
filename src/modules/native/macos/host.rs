@@ -5,7 +5,7 @@ where
 	C: Ctx,
 {
 	pub fn init_daemon(&mut self) -> Result<()> {
-		tracing::info!("init_daemon");
+		tracing::info!("🕋 init_daemon");
 		Ok(())
 	}
 }
@@ -30,7 +30,7 @@ impl<C: Ctx> Host<C> {
 		Ok(())
 	}
 	pub fn start_hid_bridge(&self) -> Result<WorkHandle<C, tokio::task::JoinHandle<()>>> {
-		tracing::info!("start_hid_bridge");
+		tracing::info!("🕋 MacOS HOST start_hid_bridge");
 
 		let mut hid = MacosHid::new()?;
 
@@ -48,7 +48,7 @@ impl<C: Ctx> Host<C> {
 	}
 
 	pub fn new(context: Arc<C>, tokio: tokio::runtime::Runtime) -> anyhow::Result<Self> {
-		tracing::info!("macos host new");
+		tracing::info!("🕋 MacOS Host new");
 		// ## TODO:
 		//
 		// - [ ] Read settings.json using settings_resolver

@@ -189,7 +189,7 @@ pub struct TaskManagerRuntime {
 	pub watcher: notify::RecommendedWatcher,
 	pub rx: tokio::sync::mpsc::Receiver<()>,
 }
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct TaskResult {
 	pub artifacts: Vec<Artifact>,
 	pub chat: Option<String>,

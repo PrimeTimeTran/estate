@@ -37,7 +37,6 @@ impl EstateClient {
 				anyhow::bail!("unexpected Estate IPC response: {other:?}");
 			}
 		};
-
 		Ok(EstateConnection {
 			reader,
 			writer: write_half,
@@ -45,45 +44,11 @@ impl EstateClient {
 		})
 	}
 }
-impl EstateConnection {
-	pub async fn git_status(
-		&mut self,
-		path: impl Into<String>,
-	) -> anyhow::Result<EstateCommandResult> {
-		self
-			.run_command(EstateCommand::GitStatus { path: path.into() })
-			.await
-	}
-	pub async fn git_diff(&mut self, path: impl Into<String>) -> anyhow::Result<EstateCommandResult> {
-		self
-			.run_command(EstateCommand::GitDiff { path: path.into() })
-			.await
-	}
-	pub async fn git_log(&mut self, path: impl Into<String>) -> anyhow::Result<EstateCommandResult> {
-		self
-			.run_command(EstateCommand::GitLog { path: path.into() })
-			.await
-	}
-	pub async fn git_show(
-		&mut self,
-		revision: impl Into<String>,
-		path: Option<String>,
-	) -> anyhow::Result<EstateCommandResult> {
-		self
-			.run_command(EstateCommand::GitShow {
-				revision: revision.into(),
-				path,
-			})
-			.await
-	}
-}
+
 impl EstateConnection {
 	pub fn connection_id(&self) -> uuid::Uuid {
 		self.ack.connection_id
 	}
-	// ─────────────────────────────────────────────
-	// Transport
-	// ─────────────────────────────────────────────
 	async fn send(&mut self, message: IpcMessage<EventKind>) -> anyhow::Result<()> {
 		let json = serde_json::to_string(&message)?;
 		self.writer.write_all(json.as_bytes()).await?;
@@ -100,9 +65,6 @@ impl EstateConnection {
 		let message = serde_json::from_str::<IpcMessage<EventKind>>(&line)?;
 		Ok(message)
 	}
-	// ─────────────────────────────────────────────
-	// Ping
-	// ─────────────────────────────────────────────
 	pub async fn ping(&mut self, id: u64) -> anyhow::Result<()> {
 		self.send(IpcMessage::Ping { id }).await?;
 		let message = self.receive().await?;
@@ -116,9 +78,6 @@ impl EstateConnection {
 			}
 		}
 	}
-	// ─────────────────────────────────────────────
-	// Estate Context
-	// ─────────────────────────────────────────────
 	pub async fn context(&mut self) -> anyhow::Result<EstateContext> {
 		self.send(IpcMessage::GetContext).await?;
 		let message = self.receive().await?;
@@ -133,102 +92,7 @@ impl EstateConnection {
 		}
 	}
 }
-impl EstateConnection {
-	pub async fn fs_list(&mut self, path: String) -> anyhow::Result<Vec<FileEntry>> {
-		self.send(IpcMessage::FsList { path }).await?;
-		loop {
-			let message = self.receive().await?;
-			match message {
-				IpcMessage::FsListResult { entries } => {
-					return Ok(entries);
-				}
-				IpcMessage::Event(event) => {
-					// Don't return this as the fs_list result.
-					// The dedicated event bridge should handle UI events.
-					continue;
-				}
-				IpcMessage::Error(error) => {
-					anyhow::bail!("Estate fs_list error {:?}: {}", error.code, error.message);
-				}
-				other => {
-					anyhow::bail!("unexpected fs_list response: {other:?}");
-				}
-			}
-		}
-	}
-	pub async fn fs_read(&mut self, path: String) -> anyhow::Result<String> {
-		self.send(IpcMessage::FsRead { path }).await?;
-		let message = self.receive().await?;
-		match message {
-			IpcMessage::FsReadResult { content } => Ok(content),
-			IpcMessage::Error(error) => {
-				anyhow::bail!("Estate fs_read error {:?}: {}", error.code, error.message);
-			}
-			other => {
-				anyhow::bail!("unexpected fs_read response: {other:?}");
-			}
-		}
-	}
-	pub async fn fs_create(&mut self, path: String, content: String) -> anyhow::Result<()> {
-		self.send(IpcMessage::FsCreate { path, content }).await?;
-		let message = self.receive().await?;
-		match message {
-			IpcMessage::FsCreateResult => Ok(()),
-			IpcMessage::Error(error) => {
-				anyhow::bail!("Estate fs_create error {:?}: {}", error.code, error.message);
-			}
-			other => {
-				anyhow::bail!("unexpected fs_create response: {other:?}");
-			}
-		}
-	}
-	pub async fn fs_update(&mut self, path: String, content: String) -> anyhow::Result<()> {
-		self.send(IpcMessage::FsUpdate { path, content }).await?;
-		let message = self.receive().await?;
-		match message {
-			IpcMessage::FsUpdateResult => Ok(()),
-			IpcMessage::Error(error) => {
-				anyhow::bail!("Estate fs_update error {:?}: {}", error.code, error.message);
-			}
-			other => {
-				anyhow::bail!("unexpected fs_update response: {other:?}");
-			}
-		}
-	}
-	pub async fn fs_delete(&mut self, path: String) -> anyhow::Result<()> {
-		self.send(IpcMessage::FsDelete { path }).await?;
-		let message = self.receive().await?;
-		match message {
-			IpcMessage::FsDeleteResult => Ok(()),
-			IpcMessage::Error(error) => {
-				anyhow::bail!("Estate fs_delete error {:?}: {}", error.code, error.message);
-			}
-			other => {
-				anyhow::bail!("unexpected fs_delete response: {other:?}");
-			}
-		}
-	}
-	pub async fn run_command(
-		&mut self,
-		command: EstateCommand,
-	) -> anyhow::Result<EstateCommandResult> {
-		println!("🔥 ESTATE CLIENT → RUN COMMAND: {command:?}");
-		self.send(IpcMessage::RunCommand { command }).await?;
-		let message = self.receive().await?;
 
-		println!("🔥 ESTATE CLIENT ← COMMAND RESULT: {message:?}");
-
-		match message {
-			IpcMessage::CommandResult { result } => Ok(result),
-
-			IpcMessage::Error(error) => {
-				anyhow::bail!("Estate command error {:?}: {}", error.code, error.message)
-			}
-
-			other => anyhow::bail!("unexpected command response: {other:?}"),
-		}
-	}
-}
 impl EstateConnection {
 	pub async fn curl(&mut self, url: impl Into<String>) -> anyhow::Result<EstateCommandResult> {
 		self
@@ -414,6 +278,136 @@ impl EstateConnection {
 				path: path.into(),
 			})
 			.await
+	}
+}
+
+impl EstateConnection {
+	pub async fn git_status(
+		&mut self,
+		path: impl Into<String>,
+	) -> anyhow::Result<EstateCommandResult> {
+		self
+			.run_command(EstateCommand::GitStatus { path: path.into() })
+			.await
+	}
+	pub async fn git_diff(&mut self, path: impl Into<String>) -> anyhow::Result<EstateCommandResult> {
+		self
+			.run_command(EstateCommand::GitDiff { path: path.into() })
+			.await
+	}
+	pub async fn git_log(&mut self, path: impl Into<String>) -> anyhow::Result<EstateCommandResult> {
+		self
+			.run_command(EstateCommand::GitLog { path: path.into() })
+			.await
+	}
+	pub async fn git_show(
+		&mut self,
+		revision: impl Into<String>,
+		path: Option<String>,
+	) -> anyhow::Result<EstateCommandResult> {
+		self
+			.run_command(EstateCommand::GitShow {
+				revision: revision.into(),
+				path,
+			})
+			.await
+	}
+}
+
+impl EstateConnection {
+	pub async fn fs_list(&mut self, path: String) -> anyhow::Result<Vec<FileEntry>> {
+		self.send(IpcMessage::FsList { path }).await?;
+		loop {
+			let message = self.receive().await?;
+			match message {
+				IpcMessage::FsListResult { entries } => {
+					return Ok(entries);
+				}
+				IpcMessage::Event(event) => {
+					// Don't return this as the fs_list result.
+					// The dedicated event bridge should handle UI events.
+					continue;
+				}
+				IpcMessage::Error(error) => {
+					anyhow::bail!("Estate fs_list error {:?}: {}", error.code, error.message);
+				}
+				other => {
+					anyhow::bail!("unexpected fs_list response: {other:?}");
+				}
+			}
+		}
+	}
+	pub async fn fs_read(&mut self, path: String) -> anyhow::Result<String> {
+		self.send(IpcMessage::FsRead { path }).await?;
+		let message = self.receive().await?;
+		match message {
+			IpcMessage::FsReadResult { content } => Ok(content),
+			IpcMessage::Error(error) => {
+				anyhow::bail!("Estate fs_read error {:?}: {}", error.code, error.message);
+			}
+			other => {
+				anyhow::bail!("unexpected fs_read response: {other:?}");
+			}
+		}
+	}
+	pub async fn fs_create(&mut self, path: String, content: String) -> anyhow::Result<()> {
+		self.send(IpcMessage::FsCreate { path, content }).await?;
+		let message = self.receive().await?;
+		match message {
+			IpcMessage::FsCreateResult => Ok(()),
+			IpcMessage::Error(error) => {
+				anyhow::bail!("Estate fs_create error {:?}: {}", error.code, error.message);
+			}
+			other => {
+				anyhow::bail!("unexpected fs_create response: {other:?}");
+			}
+		}
+	}
+	pub async fn fs_update(&mut self, path: String, content: String) -> anyhow::Result<()> {
+		self.send(IpcMessage::FsUpdate { path, content }).await?;
+		let message = self.receive().await?;
+		match message {
+			IpcMessage::FsUpdateResult => Ok(()),
+			IpcMessage::Error(error) => {
+				anyhow::bail!("Estate fs_update error {:?}: {}", error.code, error.message);
+			}
+			other => {
+				anyhow::bail!("unexpected fs_update response: {other:?}");
+			}
+		}
+	}
+	pub async fn fs_delete(&mut self, path: String) -> anyhow::Result<()> {
+		self.send(IpcMessage::FsDelete { path }).await?;
+		let message = self.receive().await?;
+		match message {
+			IpcMessage::FsDeleteResult => Ok(()),
+			IpcMessage::Error(error) => {
+				anyhow::bail!("Estate fs_delete error {:?}: {}", error.code, error.message);
+			}
+			other => {
+				anyhow::bail!("unexpected fs_delete response: {other:?}");
+			}
+		}
+	}
+	pub async fn run_command(
+		&mut self,
+		command: EstateCommand,
+	) -> anyhow::Result<EstateCommandResult> {
+		println!("🔥 ESTATE CLIENT → RUN COMMAND: {command:?}");
+		self.send(IpcMessage::RunCommand { command }).await?;
+		let message = self.receive().await?;
+
+		println!("🔥 ESTATE CLIENT ← COMMAND RESULT: {message:?}");
+
+		match message {
+			IpcMessage::CommandResult { result } => Ok(result),
+
+			IpcMessage::Error(error) => {
+				anyhow::bail!("Estate command error {:?}: {}", error.code, error.message)
+			}
+
+			other => anyhow::bail!("unexpected command response: {other:?}"),
+		}
 	}
 }
 pub struct EstateConnection {

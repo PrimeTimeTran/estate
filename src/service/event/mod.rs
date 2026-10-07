@@ -299,7 +299,6 @@ pub enum EventKind {
 	WorkspaceIndexed {
 		duration: u64,
 	},
-
 	KeyDown {
 		key_code: u16,
 	},
@@ -327,13 +326,13 @@ pub enum EventKind {
 		modifiers: ModifierSnapshot,
 	},
 	Sdlc(SdlcEvent),
-	Unknown,
-
+	Agent(AgentEvent),
 	ActiveAppChanged {
 		name: String,
 		bundle_id: String,
 		pid: u32,
 	},
+	Unknown,
 }
 
 /// ## [EventSource]

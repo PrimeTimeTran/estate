@@ -2,7 +2,9 @@ use jev_sdk::{NoulAnswer, ScoreAnswer};
 pub use ratatui::Frame;
 
 use super::{AiSession, *};
-const DEFAULT_NAUL_BAR: f64 = 0.40;
+
+
+
 impl AiSession {
 	fn create_readable(&self) -> String {
 		let current = Utc::now();
