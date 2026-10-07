@@ -1021,10 +1021,10 @@ func handleEstateConnection(
       count: 4096
     )
 
-    print("🔥 SWIFT WAITING FOR RUST")
-    fflush(stdout)
+    // print("🔥 SWIFT WAITING FOR RUST")
+    // fflush(stdout)
 
-    swiftLog("🔥 SWIFT WAITING FOR RUST fd=\(clientFD)")
+    // swiftLog("🔥 SWIFT WAITING FOR RUST fd=\(clientFD)")
 
     let count = read(
       clientFD,
@@ -1032,12 +1032,12 @@ func handleEstateConnection(
       buffer.count
     )
 
-    swiftLog(
-      "🔥 SWIFT READ RETURNED count=\(count) fd=\(clientFD)"
-    )
-
-    print("🔥 SWIFT READ RETURNED \(count)")
-    fflush(stdout)
+//     swiftLog(
+//       "🔥 SWIFT READ RETURNED count=\(count) fd=\(clientFD)"
+//     )
+// 
+//     print("🔥 SWIFT READ RETURNED \(count)")
+//     fflush(stdout)
 
     if count <= 0 {
       print(
@@ -1202,9 +1202,9 @@ func startEstateSocket() {
   swiftLog("🔥 SWIFT SOCKET READY path=\(socketPath) fd=\(serverFD)")
 
   while true {
-    print("🔥 SWIFT WAITING FOR RUST ACCEPT")
-    fflush(stdout)
-    swiftLog("🔥 SWIFT WAITING FOR RUST ACCEPT")
+    // print("🔥 SWIFT WAITING FOR RUST ACCEPT")
+    // fflush(stdout)
+    // swiftLog("🔥 SWIFT WAITING FOR RUST ACCEPT")
 
     let clientFD = accept(
       serverFD,
@@ -1212,7 +1212,7 @@ func startEstateSocket() {
       nil
     )
 
-    swiftLog("🔥 SWIFT ACCEPT RETURNED fd=\(clientFD)")
+    // swiftLog("🔥 SWIFT ACCEPT RETURNED fd=\(clientFD)")
 
     guard clientFD >= 0 else {
       swiftLog(
@@ -1223,8 +1223,8 @@ func startEstateSocket() {
 
     estateClientFD = clientFD
 
-    swiftLog("🔥 SWIFT ACCEPTED RUST fd=\(clientFD)")
-    swiftLog("🔥 SWIFT → handleEstateConnection fd=\(clientFD)")
+    // swiftLog("🔥 SWIFT ACCEPTED RUST fd=\(clientFD)")
+    // swiftLog("🔥 SWIFT → handleEstateConnection fd=\(clientFD)")
 
     handleEstateConnection(clientFD)
 

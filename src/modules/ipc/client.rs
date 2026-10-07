@@ -81,7 +81,6 @@ impl EstateConnection {
 	pub fn connection_id(&self) -> uuid::Uuid {
 		self.ack.connection_id
 	}
-
 	// ─────────────────────────────────────────────
 	// Transport
 	// ─────────────────────────────────────────────
@@ -101,7 +100,6 @@ impl EstateConnection {
 		let message = serde_json::from_str::<IpcMessage<EventKind>>(&line)?;
 		Ok(message)
 	}
-
 	// ─────────────────────────────────────────────
 	// Ping
 	// ─────────────────────────────────────────────
@@ -118,7 +116,6 @@ impl EstateConnection {
 			}
 		}
 	}
-
 	// ─────────────────────────────────────────────
 	// Estate Context
 	// ─────────────────────────────────────────────
@@ -137,10 +134,6 @@ impl EstateConnection {
 	}
 }
 impl EstateConnection {
-	// ─────────────────────────────────────────────
-
-	// Filesystem
-	// ─────────────────────────────────────────────
 	pub async fn fs_list(&mut self, path: String) -> anyhow::Result<Vec<FileEntry>> {
 		self.send(IpcMessage::FsList { path }).await?;
 		loop {
@@ -215,7 +208,6 @@ impl EstateConnection {
 			}
 		}
 	}
-
 	pub async fn run_command(
 		&mut self,
 		command: EstateCommand,
@@ -424,13 +416,11 @@ impl EstateConnection {
 			.await
 	}
 }
-
 pub struct EstateConnection {
 	reader: BufReader<tokio::net::unix::OwnedReadHalf>,
 	writer: tokio::net::unix::OwnedWriteHalf,
 	ack: HelloAck,
 }
-
 #[derive(Clone)]
 pub struct EstateClient {
 	socket: PathBuf,

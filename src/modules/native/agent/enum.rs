@@ -1,0 +1,80 @@
+use super::*;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "action")]
+pub enum AgentAction {
+	#[serde(rename = "finish")]
+	Finish { message: String },
+	#[serde(rename = "current")]
+	Current { message: String },
+	#[serde(rename = "run_command")]
+	RunCommand { command: String },
+	#[serde(rename = "context")]
+	Context { path: Option<String> },
+}
+
+#[derive(Debug, Clone)]
+pub enum AgentEvent {
+	NewTask { task: AgentTask },
+	Thinking { task: AgentTask },
+	Working { task: AgentTask, message: String },
+	Finished { result: TaskResult },
+	TaskEvent { task: AgentTask, event: TaskEvent },
+}
+
+#[derive(Debug)]
+pub enum AgentMode {
+	Chat,
+	Tool,
+}
+#[derive(PartialEq, Clone)]
+pub enum AgentStatus {
+	Done,
+	Waiting,
+	Thinking,
+	Error(String),
+}
+#[derive(Clone, Serialize, Deserialize, Debug)]
+pub enum AgentObservation {
+	Current { message: String },
+	RunCommand { result: ShellResult },
+}
+
+#[derive(Debug, Clone)]
+pub enum Artifact {
+	FileRead { path: String, content: String },
+	FileWrite { path: String },
+	Observation(String),
+	ToolOutput(String),
+}
+
+#[derive(Clone, Debug)]
+pub enum RuntimeEvent {
+	Agent(AgentEvent),
+	System(SystemEvent),
+}
+
+#[derive(Debug, Clone)]
+pub enum SystemEvent {
+	SpawnAgent { agent_id: String },
+	TaskAdd { task_id: String },
+	TaskSpawned { task: AgentTask },
+	TaskQueued { task_id: String },
+	TaskStarted { task_id: String },
+	TaskCompleted { result: TaskResult },
+	TaskFailed { task_id: String, error: String },
+	AgentSpawned { agent_id: String },
+	AgentFinished { agent_id: String },
+	TaskGroupFinished { group_id: String },
+	AllIdle,
+}
+
+#[derive(Debug, Clone)]
+pub enum TaskEvent {
+	Thinking,
+	Started,
+	Log(String),
+	Working(String),
+	Finished(String),
+	Error(String),
+}

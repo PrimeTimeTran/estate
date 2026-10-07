@@ -1,5 +1,4 @@
 pub const FILE_PREVIEW_COUNT: usize = 5;
-
 pub const FILE_PREVIEW_LEN: usize = 300;
 pub const HISTORY_PREVIEW_LEN: usize = 5;
 pub const PROMPT_PREVIEW_LEN: usize = 500;

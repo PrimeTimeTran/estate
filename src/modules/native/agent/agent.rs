@@ -1,147 +1,30 @@
 use super::*;
 
-#[derive(Debug)]
-pub enum AgentMode {
-	Chat,
-	Tool,
-}
-#[derive(PartialEq, Clone)]
-pub enum AgentStatus {
-	Done,
-	Waiting,
-	Thinking,
-	Error(String),
-}
-#[derive(Clone, Serialize, Deserialize, Debug)]
-pub enum AgentObservation {
-	Current { message: String },
-	RunCommand { result: ShellResult },
-}
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "action")]
-pub enum AgentAction {
-	#[serde(rename = "finish")]
-	Finish { message: String },
-	#[serde(rename = "current")]
-	Current { message: String },
-	#[serde(rename = "run_command")]
-	RunCommand { command: String },
-	#[serde(rename = "context")]
-	Context { path: Option<String> },
-}
+
 
 impl Agent {
-	pub fn new() -> Self {
+ 	pub fn new() -> Self {
 		Self {
 			id: uuid::Uuid::new_v4().to_string(),
 			tools: AgentTools::default(),
 			workspace: Arc::new(WorkspaceContext::default()),
 		}
 	}
-
-	pub fn with_workspace(workspace: WorkspaceContext) -> Self {
-		Self {
-			id: uuid::Uuid::new_v4().to_string(),
-			tools: AgentTools::default(),
-			workspace: Arc::new(workspace),
-		}
-	}
-
-	pub fn with_cwd(cwd: impl Into<PathBuf>) -> Self {
-		Self::with_workspace(WorkspaceContext::from_cwd(cwd))
-	}
-
-	pub fn with_ctx(ctx: AgentContext, _session: &AiSession) -> Result<Self> {
-		Ok(Self {
-			id: uuid::Uuid::new_v4().to_string(),
-			tools: AgentTools::default(),
-			workspace: Arc::new(ctx.workspace),
+	async fn pick_mode(&self, ctx: &AgentCtx) -> Result<AgentMode> {
+		let prompt = build_sys_prompt(DECIDE_PROMPT, &ctx.prompt.as_deref().unwrap_or(""));
+		let raw: LlmMode = prompt_ollama_json(&prompt).await?;
+		Ok(match raw.mode.as_str() {
+			"tool" => AgentMode::Tool,
+			_ => AgentMode::Chat,
 		})
 	}
-}
-
-impl Default for Agent {
-	fn default() -> Self {
-		Self::new()
-	}
-}
-impl AgentContext {
-	pub fn new(user_prompt: String) -> Self {
-		Self {
-			prompt: Some(user_prompt.clone()),
-			task: Some(AgentTask::new(user_prompt)),
-			workspace: WorkspaceContext::default(),
-			history: Vec::new(),
-			artifacts: Vec::new(),
-			logs: Vec::new(),
-			spawned_tasks: Vec::new(),
-		}
-	}
-	pub fn init() -> Self {
-		Self {
-			prompt: None,
-			task: None,
-			workspace: WorkspaceContext::default(),
-			history: Vec::new(),
-			artifacts: Vec::new(),
-			logs: Vec::new(),
-			spawned_tasks: Vec::new(),
-		}
-	}
-	pub fn with_workspace(user_prompt: String, workspace: WorkspaceContext) -> Self {
-		Self {
-			prompt: Some(user_prompt.clone()),
-			task: Some(AgentTask::new(user_prompt)),
-			workspace,
-			history: Vec::new(),
-			artifacts: Vec::new(),
-			logs: Vec::new(),
-			spawned_tasks: Vec::new(),
-		}
-	}
-	pub fn from_session(session: &AiSession) -> Result<Self> {
-		let workspace = WorkspaceContext::from_session(session)?;
-		Self::from_session_with_workspace(session, &workspace)
+	async fn pick_action(&self, ctx: &AgentCtx) -> Result<AgentAction> {
+		let prompt = build_prompt(ctx);
+		let raw = build_action(&prompt).await?;
+		let action = AgentAction::try_from(raw)?;
+		Ok(action)
 	}
 
-	pub fn from_session_with_workspace(
-		session: &AiSession,
-		workspace: &WorkspaceContext,
-	) -> Result<Self> {
-		Ok(Self {
-			prompt: Some(session.prompt.clone()),
-			task: Some(AgentTask::new(session.prompt.clone())),
-			workspace: workspace.clone(),
-			history: Vec::new(),
-			artifacts: Vec::new(),
-			logs: Vec::new(),
-			spawned_tasks: Vec::new(),
-		})
-	}
-	// pub fn from_session(session: &AiSession) -> Result<Self> {
-	// let ws = WorkspaceContext::from_session(session)?;
-	// Ok(Self {
-	// id: uuid::Uuid::new_v4().to_string(),
-	// tools: AgentTools::default(),
-	// workspace: Arc::new(ws),
-	// })
-	// }
-}
-
-fn preview(value: impl std::fmt::Debug, max_len: usize) -> String {
-	let value = format!("{value:?}");
-
-	if value.len() > max_len {
-		format!(
-			"{}... [truncated, true_len={}]",
-			&value[..max_len],
-			value.len()
-		)
-	} else {
-		value
-	}
-}
-impl Agent {
 	pub async fn run_agent_loop(
 		&self,
 		task: AgentTask,
@@ -149,7 +32,7 @@ impl Agent {
 	) -> Result<TaskResult> {
 		let mut steps = 0;
 		let max_steps = 10;
-		let mut ctx = AgentContext::with_workspace(task.prompt.clone(), (*self.workspace).clone());
+		let mut ctx = AgentCtx::with_workspace(task.prompt.clone(), (*self.workspace).clone());
 		section!("AGENT run_agent_loop CONTEXT");
 		let prompt = ctx.prompt.as_deref().unwrap_or("");
 		println!(
@@ -254,24 +137,101 @@ impl Agent {
 			}
 		}
 	}
-	async fn pick_mode(&self, ctx: &AgentContext) -> Result<AgentMode> {
-		let prompt = build_sys_prompt(DECIDE_PROMPT, &ctx.prompt.as_deref().unwrap_or(""));
-		let raw: LlmMode = prompt_ollama_json(&prompt).await?;
-		Ok(match raw.mode.as_str() {
-			"tool" => AgentMode::Tool,
-			_ => AgentMode::Chat,
+	
+	pub fn with_cwd(cwd: impl Into<PathBuf>) -> Self {
+		Self::with_workspace(WorkspaceContext::from_cwd(cwd))
+	}
+	pub fn with_ctx(ctx: AgentCtx, _session: &AiSession) -> Result<Self> {
+		Ok(Self {
+			id: uuid::Uuid::new_v4().to_string(),
+			tools: AgentTools::default(),
+			workspace: Arc::new(ctx.workspace),
 		})
 	}
-	async fn pick_action(&self, ctx: &AgentContext) -> Result<AgentAction> {
-		let prompt = build_prompt(ctx);
-		let raw = build_action(&prompt).await?;
-		let action = AgentAction::try_from(raw)?;
-		Ok(action)
+	pub fn with_workspace(workspace: WorkspaceContext) -> Self {
+		Self {
+			id: uuid::Uuid::new_v4().to_string(),
+			tools: AgentTools::default(),
+			workspace: Arc::new(workspace),
+		}
+	}
+	
+}
+impl Default for Agent {
+	fn default() -> Self {
+		Self::new()
+	}
+}
+impl AgentTask {
+  pub fn new(prompt: String) -> Self {
+		Self {
+			id: Uuid::new_v4(),
+			prompt,
+		}
+	}
+	pub fn from_session(session: &AiSession) -> Result<Self> {
+		Ok(Self {
+			id: Uuid::new_v4(),
+			prompt: session.prompt.clone(),
+		})
+	}
+}
+
+impl AgentCtx {
+	pub fn new(user_prompt: String) -> Self {
+		Self {
+			prompt: Some(user_prompt.clone()),
+			task: Some(AgentTask::new(user_prompt)),
+			workspace: WorkspaceContext::default(),
+			history: Vec::new(),
+			artifacts: Vec::new(),
+			logs: Vec::new(),
+			spawned_tasks: Vec::new(),
+		}
+	}
+	pub fn init() -> Self {
+		Self {
+			prompt: None,
+			task: None,
+			workspace: WorkspaceContext::default(),
+			history: Vec::new(),
+			artifacts: Vec::new(),
+			logs: Vec::new(),
+			spawned_tasks: Vec::new(),
+		}
+	}
+	pub fn with_workspace(user_prompt: String, workspace: WorkspaceContext) -> Self {
+		Self {
+			prompt: Some(user_prompt.clone()),
+			task: Some(AgentTask::new(user_prompt)),
+			workspace,
+			history: Vec::new(),
+			artifacts: Vec::new(),
+			logs: Vec::new(),
+			spawned_tasks: Vec::new(),
+		}
+	}
+	pub fn from_session(session: &AiSession) -> Result<Self> {
+		let workspace = WorkspaceContext::from_session(session)?;
+		Self::from_session_with_workspace(session, &workspace)
+	}
+	pub fn from_session_with_workspace(
+		session: &AiSession,
+		workspace: &WorkspaceContext,
+	) -> Result<Self> {
+		Ok(Self {
+			prompt: Some(session.prompt.clone()),
+			task: Some(AgentTask::new(session.prompt.clone())),
+			workspace: workspace.clone(),
+			history: Vec::new(),
+			artifacts: Vec::new(),
+			logs: Vec::new(),
+			spawned_tasks: Vec::new(),
+		})
 	}
 }
 impl TryFrom<LlmAction> for AgentAction {
 	type Error = Error;
-
 	fn try_from(v: LlmAction) -> Result<Self, Self::Error> {
 		match v.action.as_str() {
 			// 			"read_file" => Ok(Self::ReadFile {
@@ -289,11 +249,9 @@ impl TryFrom<LlmAction> for AgentAction {
 			"run_command" => Ok(Self::RunCommand {
 				command: v.command.ok_or_else(|| anyhow!("missing command"))?,
 			}),
-
 			"finish" => Ok(Self::Finish {
 				message: v.message.unwrap_or_default(),
 			}),
-
 			other => Err(anyhow!("unknown action: {}", other)),
 		}
 	}
@@ -310,9 +268,14 @@ pub struct AgentBus {
 	pub tx: UnboundedSender<AgentEvent>,
 	pub event_tx: UnboundedSender<RuntimeEvent>,
 }
-
+pub struct AgentContextInfo {
+	pub cwd: PathBuf,
+	pub workspace_dir: PathBuf,
+	pub project_dir: PathBuf,
+	pub settings_file: Option<PathBuf>,
+}
 #[derive(Debug)]
-pub struct AgentContext {
+pub struct AgentCtx {
 	pub prompt: Option<String>,
 	pub task: Option<AgentTask>,
 	pub workspace: WorkspaceContext,
@@ -321,6 +284,12 @@ pub struct AgentContext {
 	pub logs: Vec<String>,
 	pub spawned_tasks: Vec<AgentTask>,
 }
+#[derive(Debug, Clone)]
+pub struct AgentTask {
+	pub id: Uuid,
+	pub prompt: String,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct LlmAction {
 	pub action: String,
@@ -333,20 +302,14 @@ pub struct LlmAction {
 pub struct LlmMode {
 	pub mode: String,
 }
-
-pub struct AgentContextInfo {
-	pub cwd: PathBuf,
-	pub workspace_dir: PathBuf,
-	pub project_dir: PathBuf,
-	pub settings_file: Option<PathBuf>,
-}
-pub mod traits {
-	use super::*;
-	pub trait AgentContext {
-		fn task(&self) -> &AgentTask;
-		fn workspace(&self) -> &WorkspaceContext;
-		fn history(&self) -> &[AgentObservation];
-		fn record(&mut self, observation: AgentObservation);
-		fn observe(&self) -> AgentContextInfo;
-	}
-}
+// 
+// mod traits {
+//  	use super::*;
+// 	pub trait CtxAgent {
+// 		fn task(&self) -> &AgentTask;
+// 		fn workspace(&self) -> &WorkspaceContext;
+// 		fn history(&self) -> &[AgentObservation];
+// 		fn record(&mut self, observation: AgentObservation);
+// 		fn observe(&self) -> AgentContextInfo;
+// 	}
+// }

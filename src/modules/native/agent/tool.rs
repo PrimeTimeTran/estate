@@ -1,3 +1,5 @@
+use super::*;
+
 use crate::{
 	native::poc::McpClient,
 	prelude::{vfs as VfsPrev, *},
@@ -5,20 +7,19 @@ use crate::{
 use Error;
 use std::os::unix::fs::MetadataExt;
 
-use super::*;
-use crate::prelude::*;
-
-#[derive(Debug, Default, Clone)]
-pub struct FileInfo {
-	pub content: String,
-	pub extension: Option<String>,
-	pub inode: String,
-	pub is_directory: bool,
-	pub language: Option<String>,
-	pub modified_at: Option<SystemTime>,
-	pub name: String,
-	pub path: String,
-	pub size: u64,
+impl FileSystemTool {
+	pub fn search(&self, query: &str) -> Result<Vec<FileInfo>> {
+		self.vfs.search_files(query)
+	}
+	pub fn read(&self, path: &str) -> Result<String> {
+		self.vfs.read_file(path)
+	}
+	pub fn write(&self, path: &str, content: &str) -> Result<()> {
+		self.vfs.write_file(path, content)
+	}
+	pub fn create(&self, path: &str, content: &str) -> Result<()> {
+		self.vfs.create_file(path, content)
+	}
 }
 impl FileInfo {
 	pub fn from_path(path: &Path) -> Result<Self> {
@@ -53,78 +54,6 @@ impl FileInfo {
 			size: metadata.len(),
 		})
 	}
-}
-fn language_from_extension(extension: &str) -> Option<String> {
-	let language = match extension {
-		"rs" => "Rust",
-		"js" => "JavaScript",
-		"jsx" => "JavaScript",
-		"ts" => "TypeScript",
-		"tsx" => "TypeScript",
-		"py" => "Python",
-		"go" => "Go",
-		"java" => "Java",
-		"c" => "C",
-		"h" => "C",
-		"cpp" => "C++",
-		"cc" => "C++",
-		"cxx" => "C++",
-		"hpp" => "C++",
-		"cs" => "C#",
-		"swift" => "Swift",
-		"kt" => "Kotlin",
-		"kts" => "Kotlin",
-		"rb" => "Ruby",
-		"php" => "PHP",
-		"sh" => "Shell",
-		"bash" => "Shell",
-		"zsh" => "Shell",
-		"fish" => "Shell",
-		"html" => "HTML",
-		"css" => "CSS",
-		"scss" => "SCSS",
-		"json" => "JSON",
-		"toml" => "TOML",
-		"yaml" => "YAML",
-		"yml" => "YAML",
-		"xml" => "XML",
-		"md" => "Markdown",
-		"sql" => "SQL",
-		_ => return None,
-	};
-	Some(language.to_string())
-}
-#[derive(Debug, Default, Clone)]
-pub struct ShellTool;
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ShellCommand {
-	pub program: String,
-	pub args: Vec<String>,
-	pub cwd: Option<PathBuf>,
-	pub timeout: Option<Duration>,
-}
-impl ShellCommand {
-	pub fn shell(command: impl Into<String>) -> Self {
-		let command = command.into();
-		section!("COMMAND");
-		eprintln!("{command:?}");
-		Self {
-			program: "sh".into(),
-			args: vec!["-c".into(), command],
-			cwd: None,
-			timeout: None,
-		}
-	}
-}
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ShellResult {
-	pub program: String,
-	pub args: Vec<String>,
-	pub cwd: PathBuf,
-	pub exit_code: Option<i32>,
-	pub stdout: String,
-	pub stderr: String,
 }
 impl ShellTool {
 	pub async fn run(&self, command: ShellCommand) -> Result<ShellResult> {
@@ -198,14 +127,6 @@ impl ShellTool {
 		})
 	}
 }
-#[derive(Debug, Default, Clone)]
-pub struct AgentTools {
-	pub fs: FileSystemTool,
-	pub shell: ShellTool,
-	pub mcp: McpClient,
-}
-#[derive(Debug, Default, Clone)]
-pub struct Vfs;
 impl Vfs {
 	pub fn new() -> Self {
 		Self
@@ -222,7 +143,6 @@ impl Vfs {
 		}
 		std::fs::write(path, content)?;
 		println!("Created file: {} ({} bytes)", path.display(), content.len());
-
 		Ok(())
 	}
 
@@ -234,40 +154,71 @@ impl Vfs {
 
 	pub fn write_file(&self, path: &str, content: &str) -> Result<(), Error> {
 		dbg!("Write file: {}", path);
-
 		let path = Path::new(path);
-
 		if let Some(parent) = path.parent() {
 			std::fs::create_dir_all(parent)?;
 		}
-
 		std::fs::write(path, content)?;
-
 		println!("Wrote file: {} ({} bytes)", path.display(), content.len());
-
 		Ok(())
 	}
 }
 
+#[derive(Debug, Default, Clone)]
+pub struct AgentTools {
+	pub fs: FileSystemTool,
+	pub shell: ShellTool,
+	pub mcp: McpClient,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct FileInfo {
+	pub content: String,
+	pub extension: Option<String>,
+	pub inode: String,
+	pub is_directory: bool,
+	pub language: Option<String>,
+	pub modified_at: Option<SystemTime>,
+	pub name: String,
+	pub path: String,
+	pub size: u64,
+}
 #[derive(Default, Debug, Clone)]
 pub struct FileSystemTool {
 	pub vfs: Vfs,
 }
 
-impl FileSystemTool {
-	pub fn search(&self, query: &str) -> Result<Vec<FileInfo>> {
-		self.vfs.search_files(query)
-	}
-
-	pub fn read(&self, path: &str) -> Result<String> {
-		self.vfs.read_file(path)
-	}
-
-	pub fn write(&self, path: &str, content: &str) -> Result<()> {
-		self.vfs.write_file(path, content)
-	}
-
-	pub fn create(&self, path: &str, content: &str) -> Result<()> {
-		self.vfs.create_file(path, content)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ShellCommand {
+	pub program: String,
+	pub args: Vec<String>,
+	pub cwd: Option<PathBuf>,
+	pub timeout: Option<Duration>,
+}
+impl ShellCommand {
+	pub fn shell(command: impl Into<String>) -> Self {
+		let command = command.into();
+		section!("COMMAND");
+		eprintln!("{command:?}");
+		Self {
+			program: "sh".into(),
+			args: vec!["-c".into(), command],
+			cwd: None,
+			timeout: None,
+		}
 	}
 }
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ShellResult {
+	pub program: String,
+	pub args: Vec<String>,
+	pub cwd: PathBuf,
+	pub exit_code: Option<i32>,
+	pub stdout: String,
+	pub stderr: String,
+}
+#[derive(Debug, Default, Clone)]
+pub struct ShellTool;
+
+#[derive(Debug, Default, Clone)]
+pub struct Vfs;

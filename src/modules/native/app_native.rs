@@ -149,105 +149,6 @@ where
 	}
 }
 
-impl App<Context> {
-	pub fn api(&self) -> &ApiService {
-		self.host.api()
-	}
-	// pub fn run(&mut self) -> Result<()> {
-	// self.init_services()?;
-	// match self.mode {
-	// AppMode::Gui => self.run_gui(),
-	// AppMode::Tray => self.run_gui(),
-	// AppMode::Daemon => self.run_daemon_foreground(),
-	// }
-	// }
-	pub fn run(&mut self) -> Result<()> {
-		tracing::info!("app native app run");
-		self.init_services()?;
-		match self.mode {
-			AppMode::Daemon => {
-				tracing::info!("Starting daemon mode");
-				let hid = self.host.start()?;
-				self.workers.push(hid);
-				self.init_daemon();
-				self.host.worker.wait_for_ctrl_c();
-			}
-			_ => {
-				self.run_gui()?;
-			}
-		}
-
-		Ok(())
-	}
-	fn run_daemon_foreground(&mut self) -> Result<()> {
-		tracing::debug!("run_daemon");
-		let hid = self.host.start()?;
-		self.workers.push(hid);
-		self.init_daemon();
-		self
-			.worker()
-			.block_on(async { tokio::signal::ctrl_c().await });
-		Ok(())
-	}
-
-	fn run_daemon_2(&mut self) -> Result<()> {
-		tracing::debug!("starting daemon");
-		self.init_services()?;
-		let hid = self.host.start()?;
-		self.workers.push(hid);
-		self.init_daemon();
-		// Stay alive until supervisor terminates us
-		self.host.worker.wait_for_ctrl_c();
-		Ok(())
-	}
-
-	pub fn run_daemon(&mut self) -> Result<()> {
-		let hid = self.host.start()?;
-		self.workers.push(hid);
-		self.init_daemon();
-		// self.host.worker.wait_for_shutdown();
-		// macos_create_bg_daemon();
-		Ok(())
-	}
-
-	async fn daemon_loop(&mut self) -> Result<()> {
-		self.host.start()?;
-		self.init_daemon();
-		tokio::signal::ctrl_c().await?;
-		Ok(())
-	}
-	pub fn run_gui(&mut self) -> Result<()> {
-		tracing::info!("app native app run_gui");
-		let cancel = CancellationToken::new();
-		let event_loop = EventLoop::<AppEvent>::with_user_event()
-			.build()
-			.expect("failed to build GUI event loop");
-		let proxy = event_loop.create_proxy();
-		let handle = self.start_app_events(proxy.clone())?;
-		self.workers.push(handle);
-		let event_rx = self.host.event_bus.subscribe_broadcast("app");
-		let event_tx = self.host.event_bus.sender();
-		self.host.runtime.attach_event_proxy(proxy);
-		tracing::info!("app native ");
-		// #[cfg(not(feature = "daemon"))]
-		{
-			let mut renderer = Renderer::<Context, <Context as Ctx>::AppState>::new(
-				self.host.context(),
-				self.state.clone(),
-				Arc::new(self.settings.clone()),
-				cancel,
-				event_rx,
-				event_tx,
-			);
-			event_loop
-				.run_app(&mut renderer)
-				.map_err(|err| anyhow::anyhow!("GUI event loop failed: {err}"))?;
-		}
-
-		Ok(())
-	}
-}
-
 impl<C> App<C>
 where
 	C: Ctx,
@@ -382,6 +283,105 @@ where
 			// 	tracing::error!("Cursor daemon failed: {error}");
 			// }
 		}))
+	}
+}
+
+impl App<Context> {
+	pub fn api(&self) -> &ApiService {
+		self.host.api()
+	}
+	// pub fn run(&mut self) -> Result<()> {
+	// self.init_services()?;
+	// match self.mode {
+	// AppMode::Gui => self.run_gui(),
+	// AppMode::Tray => self.run_gui(),
+	// AppMode::Daemon => self.run_daemon_foreground(),
+	// }
+	// }
+	pub fn run(&mut self) -> Result<()> {
+		tracing::info!("app native app run");
+		self.init_services()?;
+		match self.mode {
+			AppMode::Daemon => {
+				tracing::info!("Starting daemon mode");
+				let hid = self.host.start()?;
+				self.workers.push(hid);
+				self.init_daemon();
+				self.host.worker.wait_for_ctrl_c();
+			}
+			_ => {
+				self.run_gui()?;
+			}
+		}
+
+		Ok(())
+	}
+	fn run_daemon_foreground(&mut self) -> Result<()> {
+		tracing::debug!("run_daemon");
+		let hid = self.host.start()?;
+		self.workers.push(hid);
+		self.init_daemon();
+		self
+			.worker()
+			.block_on(async { tokio::signal::ctrl_c().await });
+		Ok(())
+	}
+
+	fn run_daemon_2(&mut self) -> Result<()> {
+		tracing::debug!("starting daemon");
+		self.init_services()?;
+		let hid = self.host.start()?;
+		self.workers.push(hid);
+		self.init_daemon();
+		// Stay alive until supervisor terminates us
+		self.host.worker.wait_for_ctrl_c();
+		Ok(())
+	}
+
+	pub fn run_daemon(&mut self) -> Result<()> {
+		let hid = self.host.start()?;
+		self.workers.push(hid);
+		self.init_daemon();
+		// self.host.worker.wait_for_shutdown();
+		// macos_create_bg_daemon();
+		Ok(())
+	}
+
+	async fn daemon_loop(&mut self) -> Result<()> {
+		self.host.start()?;
+		self.init_daemon();
+		tokio::signal::ctrl_c().await?;
+		Ok(())
+	}
+	pub fn run_gui(&mut self) -> Result<()> {
+		tracing::info!("app native app run_gui");
+		let cancel = CancellationToken::new();
+		let event_loop = EventLoop::<AppEvent>::with_user_event()
+			.build()
+			.expect("failed to build GUI event loop");
+		let proxy = event_loop.create_proxy();
+		let handle = self.start_app_events(proxy.clone())?;
+		self.workers.push(handle);
+		let event_rx = self.host.event_bus.subscribe_broadcast("app");
+		let event_tx = self.host.event_bus.sender();
+		self.host.runtime.attach_event_proxy(proxy);
+		tracing::info!("app native ");
+		// #[cfg(not(feature = "daemon"))]
+		{
+			let mut renderer = Renderer::<Context, <Context as Ctx>::AppState>::new(
+				self.host.context(),
+				self.state.clone(),
+				Arc::new(self.settings.clone()),
+				cancel,
+				event_rx,
+				event_tx,
+			);
+			event_loop
+				.run_app(&mut renderer)
+				.map_err(|err| anyhow::anyhow!("GUI event loop failed: {err}"))?;
+		}
+
+		Ok(())
 	}
 }
 
@@ -563,11 +563,9 @@ where
 	{
 		let cancel = CancellationToken::new();
 		let task_cancel = cancel.clone();
-
 		let join = self.runtime.spawn_blocking(move || {
 			task(task_cancel);
 		});
-
 		WorkHandle::new(cancel, join)
 	}
 
@@ -577,11 +575,9 @@ where
 		Fut: Future<Output = ()> + Send + 'static,
 	{
 		let cancel = CancellationToken::new();
-
 		let join = self.runtime.spawn(async move {
 			task().await;
 		});
-
 		WorkHandle::new(cancel, join)
 	}
 }
@@ -754,23 +750,23 @@ fn macos_create_bg_daemon() {
 	// job state = exited
 	//
 	// pgrep -af daemon
+	// nohup /Users/future/kb/project/target/debug/daemon \\n\t>/tmp/estate-daemon.out \\n\t2>/tmp/estate-daemon.err &
+	// cat /tmp/estate-daemon.out\ncat /tmp/estate-daemon.err
+	// nohup /Users/future/kb/project/target/debug/daemon \\n\t>/tmp/estate-daemon.out \\n\t2>/tmp/estate-daemon.err &
+	// ps aux | grep -E '[e]state|[o]s-observer'
+	// pkill -f '^/tmp/estate-os-observer$'
+	// c
+	// ps aux | grep -E '[e]state|[o]s-observer'
+	// nohup /Users/future/kb/project/target/debug/daemon \\n\t>/tmp/estate-daemon.out \\n\t2>/tmp/estate-daemon.err &
+	// ps aux | grep -E '[e]state|[o]s-observer'
+	// nohup /Users/future/kb/project/target/debug/daemon \\n  >/tmp/estate-daemon.out \\n  2>/tmp/estate-daemon.err &\n\nDAEMON_PID=$!\necho "DAEMON PID=$DAEMON_PID"
+	// pgrep -af '/target/debug/daemon'\npgrep -af estate-os-observer
+	// ps -o pid,ppid,state,command -p "$DAEMON_PID"
+	// OBSERVER_PID=$(pgrep -f '^/tmp/estate-os-observer$' | head -1)\nps -o pid,ppid,state,command -p "$OBSERVER_PID"
+	// ps -o pid,ppid,state,command -p 32903
+	// ps -o pid,ppid,state,command -p 32903,32995
+	// ps -axo pid,ppid,state,lstart,command | grep '[e]state-os-observer'
+	// ps -o pid,ppid,state,lstart,command -p 32903,34320
+	// ps -o pid,ppid,state,lstart,command -p 6760,34320
+	// ps -axo pid,ppid,tty,state,command | grep -E '[d]aemon|[e]state-os-observer'
 }
-// nohup /Users/future/kb/project/target/debug/daemon \\n\t>/tmp/estate-daemon.out \\n\t2>/tmp/estate-daemon.err &
-// cat /tmp/estate-daemon.out\ncat /tmp/estate-daemon.err
-// nohup /Users/future/kb/project/target/debug/daemon \\n\t>/tmp/estate-daemon.out \\n\t2>/tmp/estate-daemon.err &
-// ps aux | grep -E '[e]state|[o]s-observer'
-// pkill -f '^/tmp/estate-os-observer$'
-// c
-// ps aux | grep -E '[e]state|[o]s-observer'
-// nohup /Users/future/kb/project/target/debug/daemon \\n\t>/tmp/estate-daemon.out \\n\t2>/tmp/estate-daemon.err &
-// ps aux | grep -E '[e]state|[o]s-observer'
-// nohup /Users/future/kb/project/target/debug/daemon \\n  >/tmp/estate-daemon.out \\n  2>/tmp/estate-daemon.err &\n\nDAEMON_PID=$!\necho "DAEMON PID=$DAEMON_PID"
-// pgrep -af '/target/debug/daemon'\npgrep -af estate-os-observer
-// ps -o pid,ppid,state,command -p "$DAEMON_PID"
-// OBSERVER_PID=$(pgrep -f '^/tmp/estate-os-observer$' | head -1)\nps -o pid,ppid,state,command -p "$OBSERVER_PID"
-// ps -o pid,ppid,state,command -p 32903
-// ps -o pid,ppid,state,command -p 32903,32995
-// ps -axo pid,ppid,state,lstart,command | grep '[e]state-os-observer'
-// ps -o pid,ppid,state,lstart,command -p 32903,34320
-// ps -o pid,ppid,state,lstart,command -p 6760,34320
-// ps -axo pid,ppid,tty,state,command | grep -E '[d]aemon|[e]state-os-observer'

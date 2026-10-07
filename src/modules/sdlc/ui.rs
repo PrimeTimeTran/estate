@@ -7,10 +7,9 @@ use ratatui::{
 };
 
 use crate::{
-	agent_event::RuntimeEvent,
 	model::{
 		AgentTask,
-		agent::{Agent, AgentContext},
+		agent::{Agent, AgentCtx},
 		resolver::*,
 		task::TaskResult,
 	},

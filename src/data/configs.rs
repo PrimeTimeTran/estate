@@ -8,10 +8,15 @@ macro_rules! grpc_endpoint {
 		)
 	};
 }
+// Estate daemon process identity / control socket.
 pub static PATH_PID: &str = "/tmp/estate-daemon.pid";
 pub static PATH_SOCKET: &str = "/tmp/estate-daemon.sock";
+
+// Estate application IPC socket.
 pub static ESTATE_SOCKET: &str = "/tmp/estate.sock";
-pub static HID_SOCKET: &str = "/tmp/estate-hid.sock"; 
+
+// Native macOS HID/OS-observer IPC socket.
+pub static HID_SOCKET: &str = "/tmp/estate-hid.sock";
 pub static ESTATE_HID_SMOKE_LOG: &str = "estate-hid-smoke.log";
 
 pub static SCHEMA_VERSION: u32 = 1;

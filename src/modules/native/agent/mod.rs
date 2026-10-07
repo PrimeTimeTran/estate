@@ -7,7 +7,6 @@
 // | UI representation               | `Task` / `Job` | Shows pending/running/etc.    |
 
 use notify::{Event, EventKind};
-
 use crate::{
 	model::task::TaskResult,
 	prelude::{anyhow::anyhow, *},
@@ -17,60 +16,25 @@ use crate::{
 mod r#const;
 use r#const::*;
 
-mod fmt;
-use fmt::*;
+mod r#enum;
+pub use r#enum::*;
 
 mod r#fn;
 pub use r#fn::*;
 
+mod fmt;
+use fmt::*;
+
 pub mod agent;
-#[path = "./agent-event.rs"]
-pub mod agent_event;
-pub use agent_event::{AgentEvent, RuntimeEvent};
-
-pub mod prompt;
-
-#[path = "./runtime.rs"]
 pub mod agent_runtime;
+pub mod prompt;
 pub mod system;
 pub mod tool;
-pub mod workspace;
 
-use crate::prelude::*;
 pub use agent::*;
 pub use agent_runtime::*;
 
 pub use prompt::*;
 pub use system::*;
 pub use tool::*;
-pub use workspace::*;
 
-#[derive(Debug, Clone)]
-pub enum Artifact {
-	FileRead { path: String, content: String },
-	FileWrite { path: String },
-	Observation(String),
-	ToolOutput(String),
-}
-
-#[derive(Debug, Clone)]
-pub struct AgentTask {
-	pub id: Uuid,
-	pub prompt: String,
-}
-impl AgentTask {
-	pub fn from_session(session: &AiSession) -> Result<Self> {
-		Ok(Self {
-			id: Uuid::new_v4(),
-			prompt: session.prompt.clone(),
-		})
-	}
-}
-impl AgentTask {
-	pub fn new(prompt: String) -> Self {
-		Self {
-			id: Uuid::new_v4(),
-			prompt,
-		}
-	}
-}

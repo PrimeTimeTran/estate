@@ -475,7 +475,7 @@ impl MacosHid {
 		// events.emit(event.into());
 	}
 	fn state_update(&mut self, event: &NativeEvent) {
-		tracing::info!("MacosHid state_update");
+		// tracing::info!("MacosHid state_update");
 		let m = &event.modifiers;
 		self.state.shift_left = m.shift_left;
 		self.state.shift_right = m.shift_right;
@@ -550,6 +550,10 @@ impl MacosHid {
 			.key_code
 			.map(|code| code.to_string())
 			.unwrap_or_default();
+
+		if app == "Zed" {
+			tracing::info!("Zed Focused");
+		}
 		println!(
 			"{:<10} | {:<17} | {:<17} | {:<7} | {:<16} | {:>5}",
 			app, left, right, special, event_display, key_code,
@@ -644,7 +648,7 @@ impl MacosHid {
 		tracing::info!("MacHid runrunrunrunrun");
 		let stream = self.connect().await?;
 
-		tracing::info!("🔥 RUST GOT UNIX STREAM");
+		// tracing::info!("🔥 RUST GOT UNIX STREAM");
 
 		let (reader, mut writer) = stream.into_split();
 
@@ -655,45 +659,45 @@ impl MacosHid {
 		let mut line = String::new();
 		loop {
 			tokio::select! {
-							_ = cancel.cancelled() => {
-									tracing::debug!("macOS HID cancelled");
-									return Ok(());
-							}
-							_ = ping_interval.tick() => {
-									ping_id += 1;
-									self.send_ping(&mut writer, ping_id).await?;
-							}
-							result = reader.read_line(&mut line) => {
-			tracing::info!("🔥 RUST READ COMPLETED");
+				_ = cancel.cancelled() => {
+						tracing::debug!("macOS HID cancelled");
+						return Ok(());
+				}
+				_ = ping_interval.tick() => {
+						ping_id += 1;
+						self.send_ping(&mut writer, ping_id).await?;
+				}
+				result = reader.read_line(&mut line) => {
+				 // tracing::info!("🔥 RUST READ COMPLETED");
 
-			let received_at = mach_now();
+				 let received_at = mach_now();
 
-			let bytes = match result {
-					Ok(bytes) => {
-							tracing::info!(bytes, "🔥 RUST READ RESULT");
-							bytes
-					}
+				 let bytes = match result {
+				Ok(bytes) => {
+						// tracing::info!(bytes, "🔥 RUST READ RESULT");
+						bytes
+				}
 
-					Err(error) => {
-							tracing::error!(
-									%error,
-									"🔥 RUST READ ERROR"
-							);
-							return Err(error.into());
-					}
+				Err(error) => {
+						tracing::error!(
+								%error,
+								"🔥 RUST READ ERROR"
+						);
+						return Err(error.into());
+				}
 			};
 
 			if bytes == 0 {
-					tracing::warn!(
-							"🔥 RUST READ EOF — Swift HID disconnected"
-					);
-					return Ok(());
+				tracing::warn!(
+						"🔥 RUST READ EOF — Swift HID disconnected"
+				);
+				return Ok(());
 			}
 
-			tracing::info!(
-					line = %line.trim_end(),
-					"🔥 RUST RECEIVED HID"
-			);
+			// tracing::info!(
+			// 		line = %line.trim_end(),
+			// 		"🔥 RUST RECEIVED HID"
+			// );
 
 			self.handle_line(
 					line.trim_end(),
@@ -1459,7 +1463,6 @@ impl MacosHid {
 				self.sequence.clear();
 				return true;
 			}
-
 			return true;
 		}
 
@@ -1492,7 +1495,6 @@ impl MacosHid {
 		if !self.pressed.contains(key) {
 			return false;
 		}
-
 		self.matches(trigger, event)
 	}
 	fn matches_ordered(&mut self, expected: &[GestureEvent], event: &NativeEvent) -> bool {

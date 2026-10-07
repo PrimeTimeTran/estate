@@ -1,15 +1,4 @@
 use super::*;
-use crate::prelude::*;
-
-#[derive(Clone, Debug, Default)]
-pub struct AgentRegistry;
-
-#[derive(Clone, Debug)]
-pub struct AgentRuntime {
-	pub event_tx: UnboundedSender<RuntimeEvent>,
-	pub registry: AgentRegistry,
-	pub workspace: WorkspaceContext,
-}
 
 impl AgentRuntime {
 	pub fn workspace(&self) -> &WorkspaceContext {
@@ -24,7 +13,7 @@ impl AgentRuntime {
 		agent.run_agent_loop(task, self.event_tx.clone()).await
 	}
 	pub async fn from_session(&self, task: AgentTask, session: &AiSession) -> Result<TaskResult> {
-		let ctx = AgentContext::from_session_with_workspace(session, &self.workspace)?;
+		let ctx = AgentCtx::from_session_with_workspace(session, &self.workspace)?;
 		let agent = Agent::with_ctx(ctx, session)?;
 		agent.run_agent_loop(task, self.event_tx.clone()).await
 	}
@@ -72,65 +61,6 @@ impl AgentRuntime {
 		}
 	}
 }
-
-#[derive(Clone, Debug, Default)]
-pub struct RuntimeMetrics {
-	// ── Interaction ──────────────────────────────────────────────
-	pub prompts_sent: u64,
-	pub responses_received: u64,
-
-	// ── Files ────────────────────────────────────────────────────
-	pub files_read: u64,
-	pub files_written: u64,
-	pub files_created: u64,
-	pub files_deleted: u64,
-
-	// ── Execution ────────────────────────────────────────────────
-	pub commands_run: u64,
-	pub tests_run: u64,
-	pub tests_passed: u64,
-	pub tests_failed: u64,
-	pub tool_calls: u64,
-
-	// ── Attempts / reliability ──────────────────────────────────
-	pub attempts: u64,
-	pub retries: u64,
-	pub failures: u64,
-	pub timeouts: u64,
-	pub cancellations: u64,
-
-	pub stuck_count: u64,
-	pub recovery_count: u64,
-
-	pub invalid_actions: u64,
-	pub rejected_actions: u64,
-
-	// ── Build / test failures ────────────────────────────────────
-	pub compile_failures: u64,
-	pub test_failures: u64,
-
-	// ── Tokens / context ─────────────────────────────────────────
-	pub tokens_input: u64,
-	pub tokens_output: u64,
-
-	pub context_tokens: u64,
-	pub disclosed_tokens: u64,
-	pub prompt_tokens: u64,
-	pub history_tokens: u64,
-	pub workspace_tokens: u64,
-
-	// ── Discovery ────────────────────────────────────────────────
-	pub discovery_runs: u64,
-	pub rules_evaluated: u64,
-	pub rules_matched: u64,
-
-	// ── Timing ───────────────────────────────────────────────────
-	pub elapsed_ms: u64,
-	pub command_durations_ms: Vec<u64>,
-	pub tool_durations_ms: Vec<u64>,
-	pub stage_durations_ms: Vec<u64>,
-}
-
 impl RuntimeMetrics {
 	pub fn new() -> Self {
 		Self::default()
@@ -256,3 +186,71 @@ impl RuntimeMetrics {
 		self.rules_matched as f64 / self.rules_evaluated as f64
 	}
 }
+
+#[derive(Clone, Debug, Default)]
+pub struct AgentRegistry;
+#[derive(Clone, Debug)]
+pub struct AgentRuntime {
+	pub event_tx: UnboundedSender<RuntimeEvent>,
+	pub registry: AgentRegistry,
+	pub workspace: WorkspaceContext,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct RuntimeMetrics {
+	// ── Interaction ──────────────────────────────────────────────
+	pub prompts_sent: u64,
+	pub responses_received: u64,
+
+	// ── Files ────────────────────────────────────────────────────
+	pub files_read: u64,
+	pub files_written: u64,
+	pub files_created: u64,
+	pub files_deleted: u64,
+
+	// ── Execution ────────────────────────────────────────────────
+	pub commands_run: u64,
+	pub tests_run: u64,
+	pub tests_passed: u64,
+	pub tests_failed: u64,
+	pub tool_calls: u64,
+
+	// ── Attempts / reliability ──────────────────────────────────
+	pub attempts: u64,
+	pub retries: u64,
+	pub failures: u64,
+	pub timeouts: u64,
+	pub cancellations: u64,
+
+	pub stuck_count: u64,
+	pub recovery_count: u64,
+
+	pub invalid_actions: u64,
+	pub rejected_actions: u64,
+
+	// ── Build / test failures ────────────────────────────────────
+	pub compile_failures: u64,
+	pub test_failures: u64,
+
+	// ── Tokens / context ─────────────────────────────────────────
+	pub tokens_input: u64,
+	pub tokens_output: u64,
+
+	pub context_tokens: u64,
+	pub disclosed_tokens: u64,
+	pub prompt_tokens: u64,
+	pub history_tokens: u64,
+	pub workspace_tokens: u64,
+
+	// ── Discovery ────────────────────────────────────────────────
+	pub discovery_runs: u64,
+	pub rules_evaluated: u64,
+	pub rules_matched: u64,
+
+	// ── Timing ───────────────────────────────────────────────────
+	pub elapsed_ms: u64,
+	pub command_durations_ms: Vec<u64>,
+	pub tool_durations_ms: Vec<u64>,
+	pub stage_durations_ms: Vec<u64>,
+}
+

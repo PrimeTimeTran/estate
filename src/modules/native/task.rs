@@ -1,4 +1,4 @@
-use crate::{model::agent::Artifact, prelude::*};
+use crate::prelude::*;
 
 use notify::{
 	Config, Event as NotifyEvent, EventKind as NotifyEventKind, RecommendedWatcher, RecursiveMode,
@@ -138,7 +138,7 @@ impl TaskManagerRuntime {
 	}
 }
 impl TaskResult {
-	pub fn completed_chat(task_id: Uuid, ctx: AgentContext, chat: String) -> Self {
+	pub fn completed_chat(task_id: Uuid, ctx: AgentCtx, chat: String) -> Self {
 		Self {
 			artifacts: ctx.artifacts,
 			chat: Some(chat),
@@ -149,7 +149,7 @@ impl TaskResult {
 			task_id,
 		}
 	}
-	pub fn completed_with_summary(task_id: Uuid, ctx: AgentContext, summary: String) -> Self {
+	pub fn completed_with_summary(task_id: Uuid, ctx: AgentCtx, summary: String) -> Self {
 		Self {
 			artifacts: ctx.artifacts,
 			chat: None,
@@ -162,7 +162,7 @@ impl TaskResult {
 	}
 	pub fn failed(
 		task_id: Uuid,
-		ctx: AgentContext,
+		ctx: AgentCtx,
 		reason: impl Into<String>,
 		summary: Option<String>,
 	) -> Self {
