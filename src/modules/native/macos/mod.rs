@@ -31,3 +31,40 @@ pub use window::*;
 
 pub mod server;
 pub use server::*;
+
+impl Context {
+	fn new(state: NativeState, api: ApiService) -> Self {
+		Self { state, api }
+	}
+}
+impl Ctx for Context {
+	fn api(&self) -> &Self::Api {
+		&self.api
+	}
+	fn api_mut(&mut self) -> &mut Self::Api {
+		&mut self.api
+	}
+	fn initial_state() -> Self::AppState {
+		structs::S {
+			context: PhantomData,
+			state: PhantomData,
+			view: ViewType::MarkdownScreen,
+		}
+	}
+	type Api = ApiService;
+	type AppState = structs::S<Context>;
+	type EventReceiver = structs::BroadcastReceiver<e::Event>;
+	type EventSender = structs::BroadcastSender<e::Event>;
+	type GuiState = NativeGuiState;
+}
+impl Default for Context {
+	fn default() -> Self {
+		Self::new(NativeState::default(), ApiService::default())
+	}
+}
+
+#[derive(Clone)]
+pub struct Context {
+	pub state: NativeState,
+	pub api: ApiService,
+}

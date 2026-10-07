@@ -273,15 +273,15 @@ where
 	pub fn start_cursor_watcher_from_app(
 		&mut self,
 	) -> anyhow::Result<WorkHandle<C, tokio::task::JoinHandle<()>>> {
-		// let sink = AppCursorSink {
-		// 	tx: self.cursor_event_tx.clone(),
-		// };
+		let sink = AppCursorSink {
+			tx: self.cursor_event_tx.clone(),
+		};
 		tracing::debug!("start_cursor_watcher_from_app");
 
 		Ok(self.worker().run_background_blocking(move |cancel| {
-			// if let Err(error) = CursorDaemon::new(sink, cancel).run() {
-			// 	tracing::error!("Cursor daemon failed: {error}");
-			// }
+			if let Err(error) = CursorDaemon::new(sink, cancel).run() {
+				tracing::error!("Cursor daemon failed: {error}");
+			}
 		}))
 	}
 }

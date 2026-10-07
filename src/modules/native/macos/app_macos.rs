@@ -1,3 +1,4 @@
+use super::*;
 use crate::prelude::*;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -42,6 +43,16 @@ pub enum NativeEventKind {
 	},
 }
 
+impl<C> App<C>
+where
+	C: Ctx,
+{
+	pub fn init_daemon(&mut self) -> Result<()> {
+		tracing::info!("🕋 init_daemon");
+		Ok(())
+	}
+}
+
 impl App<Context> {
 	pub fn api(&self) -> &ApiService {
 		self.host.api()
@@ -66,6 +77,7 @@ impl App<Context> {
 		let event_rx = self.host.event_bus.subscribe_broadcast("app");
 		let event_tx = self.host.event_bus.sender();
 		self.host.runtime.attach_event_proxy(proxy);
+
 		tracing::info!("app macos");
 		// #[cfg(not(feature = "daemon"))]
 		{
@@ -90,65 +102,7 @@ impl App<Context> {
 	// 	Ok(())
 	// }
 }
-impl Context {
-	fn new(state: NativeState, api: ApiService) -> Self {
-		Self { state, api }
-	}
-}
-impl Ctx for Context {
-	fn api(&self) -> &Self::Api {
-		&self.api
-	}
-	fn api_mut(&mut self) -> &mut Self::Api {
-		&mut self.api
-	}
-	fn initial_state() -> Self::AppState {
-		structs::S {
-			context: PhantomData,
-			state: PhantomData,
-			view: ViewType::MarkdownScreen,
-		}
-	}
-	type Api = ApiService;
-	type AppState = structs::S<Context>;
-	type EventReceiver = structs::BroadcastReceiver<e::Event>;
-	type EventSender = structs::BroadcastSender<e::Event>;
-	type GuiState = NativeGuiState;
-}
-impl Default for Context {
-	fn default() -> Self {
-		Self::new(NativeState::default(), ApiService::default())
-	}
-}
-impl Host<Context> {
-	pub fn init() -> anyhow::Result<Self> {
-		tracing::info!("app_macos Host init");
-		let parsed = cli::context::parse();
 
-		let mut config = LogConfig::load()?;
-		config.apply_cli(&parsed);
-		logger::init_logging(&config)?;
-
-		// Create the one runtime.
-		let tokio = tokio::runtime::Runtime::new()?;
-
-		// Context is still uniquely owned here.
-		let mut context = Context::default();
-
-		// Daemon may not need this
-		// This requires server access
-		#[cfg(not(feature = "daemon"))]
-		{
-			// Connect using the same runtime that Host will retain.
-			tokio.block_on(context.api_mut().connect())?;
-		}
-
-		// Only share Context after initialization.
-		let context = Arc::new(context);
-		Self::new(context, tokio)
-	}
-	fn logging() {}
-}
 impl From<NativeEventKind> for e::EventKind {
 	fn from(native: NativeEventKind) -> Self {
 		match native {
@@ -245,9 +199,4 @@ pub struct NativeEvent {
 
 	#[serde(default)]
 	pub frontmost_app: Option<FrontmostApp>,
-}
-#[derive(Clone)]
-pub struct Context {
-	pub state: NativeState,
-	pub api: ApiService,
 }
