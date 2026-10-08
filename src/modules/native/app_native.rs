@@ -85,7 +85,7 @@ impl Api for ApiClient {
 
 impl ApiClient {
 	pub async fn connect() -> anyhow::Result<Self> {
-		let endpoint = crate::GRPC_SOCKET_CLIENT;
+		let endpoint = GRPC_SOCKET_CLIENT;
 
 		tracing::debug!(endpoint, "Connecting to gRPC server");
 
@@ -118,6 +118,12 @@ impl<C> App<C>
 where
 	C: Ctx,
 {
+	fn init_settings() -> Result<Settings> {
+		tracing::debug!("init_settings");
+		let settings = resolver::settings(resolver::source_file(file!()), "settings.json")?;
+		println!("{}", serde_json::to_string_pretty(&settings)?);
+		Ok(settings)
+	}
 	pub fn new(host: Host<C>) -> Result<Self> {
 		tracing::debug!("App::new Native Context");
 		let state = C::initial_state();
@@ -139,13 +145,6 @@ where
 			tray_clock: None,
 			tray_cursor: None,
 		})
-	}
-
-	fn init_settings() -> Result<Settings> {
-		tracing::debug!("init_settings");
-		let settings = resolver::settings(resolver::source_file(file!()), "settings.json")?;
-		println!("{}", serde_json::to_string_pretty(&settings)?);
-		Ok(settings)
 	}
 }
 
@@ -265,7 +264,7 @@ where
 	/// Starts a blocking background worker that runs the native cursor daemon.
 	///
 	/// Cursor events are forwarded to the app's cursor-event channel through
-	/// [AppCursorSink]. The returned [WorkHandle] owns a cancellation token
+	/// [CursorSink]. The returned [WorkHandle] owns a cancellation token
 	/// and the Tokio join handle for the worker.
 	///
 	/// The cursor daemon is responsible for observing the cancellation token and
@@ -273,11 +272,10 @@ where
 	pub fn start_cursor_watcher_from_app(
 		&mut self,
 	) -> anyhow::Result<WorkHandle<C, tokio::task::JoinHandle<()>>> {
-		let sink = AppCursorSink {
+		let sink = CursorSink {
 			tx: self.cursor_event_tx.clone(),
 		};
 		tracing::debug!("start_cursor_watcher_from_app");
-
 		Ok(self.worker().run_background_blocking(move |cancel| {
 			if let Err(error) = CursorDaemon::new(sink, cancel).run() {
 				tracing::error!("Cursor daemon failed: {error}");
@@ -413,19 +411,18 @@ where
 	pub fn clock(&self) -> &HostClock {
 		&self.clock
 	}
-
 	pub fn context(&self) -> Arc<Context> {
 		self.context.clone()
 	}
-
 	pub fn handle(&self) -> tokio::runtime::Handle {
 		self.tokio.handle().clone()
 	}
-
 	pub fn shutdown(self) {
 		self.tokio.shutdown_background();
 	}
-
+	pub fn subscribe(&self) -> structs::BroadcastReceiver<e::Event> {
+		self.event_bus.subscribe_broadcast("host")
+	}
 	pub fn wait_for_shutdown(&self) {
 		self.worker.block_on(async {
 			tokio::signal::ctrl_c()
@@ -436,9 +433,6 @@ where
 	}
 	pub fn worker(&self) -> &HostWorker<Context> {
 		&self.worker
-	}
-	pub fn subscribe(&self) -> structs::BroadcastReceiver<e::Event> {
-		self.event_bus.subscribe_broadcast("host")
 	}
 }
 

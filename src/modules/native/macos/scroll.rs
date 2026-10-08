@@ -38,7 +38,7 @@ pub fn target_position(bounds: CGRect, target: ScreenPosition, y: f64) -> CGPoin
 	CGPoint { x, y }
 }
 
-impl CursorEventSink for AppCursorSink {
+impl CursorEventSink for CursorSink {
 	fn cursor_moved(&self, position: CursorPosition) {
 		let _ = self.tx.send(CursorEvent::CursorPosition {
 			x: position.x,
@@ -406,7 +406,7 @@ impl TrackpadState {
 	}
 }
 
-pub struct AppCursorSink {
+pub struct CursorSink {
 	pub tx: std::sync::mpsc::Sender<CursorEvent>,
 }
 #[derive(Debug)]
