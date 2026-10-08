@@ -22,125 +22,20 @@
 //! - sync
 //! - thread
 //!
-// use crate::proto::event_service_client::EventServiceClient;
-// use tonic::{Status, transport::Channel};
-// impl EventClient {
-// 	pub async fn subscribe(&mut self) -> Result<(), Status> {
-// 		let response = self.client.subscribe(types::SubscribeRequest {}).await?;
-// 		let mut stream = response.into_inner();
-// 		while let Some(event) = stream.message().await? {
-// 			self.handle(event).await?;
-// 		}
-// 		Ok(())
-// 	}
-// 	async fn handle(&self, event: types::Event) -> Result<(), Status> {
-// 		// protobuf → application event
-// 		// self.events.emit(...)
-// 		Ok(())
-// 	}
-// }
-
-// pub struct EventClient {
-// 	pub events: EventBus,
-// 	client: EventServiceClient<Channel>,
-// }
+use uuid::Timestamp;
 
 use crate::{
 	prelude::{SdlcEvent, *},
 	proto::types as proto_types,
 };
-use uuid::Timestamp;
 
-#[path = "[enum].rs"]
-pub mod enums;
 #[path = "[struct].rs"]
 pub mod event_structs;
 #[path = "[impl].rs"]
 pub mod impls;
 
-pub use enums::*;
 pub use event_structs::*;
 pub use impls::*;
-
-/// Client-side event service.
-///
-/// `T` is the transport used to receive events.
-///
-/// The transport is intentionally generic so this type can exist on both
-/// native and WASM without making the service itself depend on tonic.
-pub struct EventClient<T> {
-	pub events: EventBus,
-	pub transport: T,
-}
-
-impl<T> EventClient<T> {
-	pub fn new(events: EventBus, transport: T) -> Self {
-		Self { events, transport }
-	}
-}
-
-/// Transport used by [`EventClient`] to subscribe to remote events.
-///
-/// The transport owns the actual networking implementation.
-///
-/// Native might use tonic.
-///
-/// WASM might use gRPC-Web, WebSocket, or another browser-compatible
-/// transport.
-///
-/// The service layer only cares that the transport can produce protobuf
-/// events.
-pub trait EventTransport {
-	type Error;
-
-	fn subscribe(
-		&mut self,
-		events: EventBus,
-	) -> impl std::future::Future<Output = Result<(), Self::Error>>;
-}
-
-impl<T> EventClient<T>
-where
-	T: EventTransport,
-{
-	/// Subscribe to remote events and publish them into the local EventBus.
-	pub async fn subscribe(&mut self) -> Result<(), T::Error> {
-		self.transport.subscribe(self.events.clone()).await
-	}
-}
-
-/// Convert a wire/protobuf event into an application event.
-///
-/// This is intentionally kept separate from the transport.
-///
-/// Both native and WASM transports ultimately produce the same
-/// `proto_types::Event`, so the conversion only needs to exist once.
-pub fn event_from_proto(event: proto_types::Event) -> Result<Event> {
-	Ok(Event {
-		id: event.id,
-		kind: serde_json::from_str(&event.payload)?,
-		source: match event.source.as_str() {
-			"App" => EventSource::App,
-			"Cli" => EventSource::Cli,
-			"Daemon" => EventSource::Daemon,
-			"Editor" => EventSource::Editor,
-			"Filesystem" => EventSource::Filesystem,
-			source => {
-				anyhow::bail!("unknown event source: {source}");
-			}
-		},
-		timestamp: event.timestamp,
-	})
-}
-
-/// Publish a protobuf event into the local application EventBus.
-///
-/// This is the common final step for every transport.
-pub fn emit_proto_event(events: &EventBus, event: proto_types::Event) -> Result<()> {
-	let event = event_from_proto(event)?;
-	events.emit(event);
-	Ok(())
-}
 
 /// # Create Events
 ///
@@ -161,6 +56,7 @@ pub fn emit_proto_event(events: &EventBus, event: proto_types::Event) -> Result<
 pub mod create {
 	use super::IntrinsicEvent as Event;
 	use crate::prelude::*;
+
 	pub fn daemon(kind: EventKind) -> Event {
 		Event::daemon(kind)
 	}
@@ -349,11 +245,86 @@ pub enum EventSource {
 	Sdlc,
 }
 
-impl EventSink<AppEvent> for EventLoopProxy<AppEvent> {
-	fn send(&self, event: AppEvent) {
-		let _ = self.send_event(event);
+pub enum EventScope {
+	Local,
+	Process,
+	Node,
+	Cluster,
+}
+
+pub trait EventPublisher<E> {
+	fn publish(&self, event: E) -> Result<()>;
+}
+
+/// Transport used by [`EventClient`] to subscribe to remote events.
+///
+/// The transport owns the actual networking implementation.
+///
+/// Native might use tonic.
+///
+/// WASM might use gRPC-Web, WebSocket, or another browser-compatible
+/// transport.
+///
+/// The service layer only cares that the transport can produce protobuf
+/// events.
+pub trait EventTransport {
+	type Error;
+
+	fn subscribe(
+		&mut self,
+		events: EventBus,
+	) -> impl std::future::Future<Output = Result<(), Self::Error>>;
+}
+
+impl<T> EventClient<T> {
+	pub fn new(events: EventBus, transport: T) -> Self {
+		Self { events, transport }
 	}
 }
+
+impl<T> EventClient<T>
+where
+	T: EventTransport,
+{
+	/// Subscribe to remote events and publish them into the local EventBus.
+	pub async fn subscribe(&mut self) -> Result<(), T::Error> {
+		self.transport.subscribe(self.events.clone()).await
+	}
+}
+
+/// Publish a protobuf event into the local application EventBus.
+///
+/// This is the common final step for every transport.
+pub fn emit_proto_event(events: &EventBus, event: proto_types::Event) -> Result<()> {
+	let event = event_from_proto(event)?;
+	events.emit(event);
+	Ok(())
+}
+
+/// Convert a wire/protobuf event into an application event.
+///
+/// This is intentionally kept separate from the transport.
+///
+/// Both native and WASM transports ultimately produce the same
+/// `proto_types::Event`, so the conversion only needs to exist once.
+pub fn event_from_proto(event: proto_types::Event) -> Result<Event> {
+	Ok(Event {
+		id: event.id,
+		kind: serde_json::from_str(&event.payload)?,
+		source: match event.source.as_str() {
+			"App" => EventSource::App,
+			"Cli" => EventSource::Cli,
+			"Daemon" => EventSource::Daemon,
+			"Editor" => EventSource::Editor,
+			"Filesystem" => EventSource::Filesystem,
+			source => {
+				anyhow::bail!("unknown event source: {source}");
+			}
+		},
+		timestamp: event.timestamp,
+	})
+}
+
 impl Event {
 	pub fn app(kind: EventKind) -> Self {
 		Self::new(EventSource::App, kind)
@@ -383,6 +354,29 @@ impl Event {
 		Self::new(EventSource::Sdlc, kind)
 	}
 }
+impl EventBus {
+	// #[cfg(target_arch = "wasm32")]
+	pub fn emit(&self, event: e::Event) {
+		match self.tx.send(event.clone()) {
+			Ok(count) => {
+				// tracing::info!("📡 Event emitted: {:?} → {} receiver(s)", event.kind, count);
+			}
+			Err(_) => {
+				tracing::info!("⚠️ Event emitted with NO receivers: {:?}", event.kind);
+			}
+		}
+	}
+}
+impl std::hash::Hash for EventBus {
+	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+		self.tx.same_channel(&self.tx).hash(state);
+	}
+}
+impl EventSink<AppEvent> for EventLoopProxy<AppEvent> {
+	fn send(&self, event: AppEvent) {
+		let _ = self.send_event(event);
+	}
+}
 impl From<ProtoProblem> for ProblemLoaded {
 	fn from(problem: ProtoProblem) -> Self {
 		Self {
@@ -401,62 +395,6 @@ pub struct Event {
 	pub kind: EventKind,
 	pub source: EventSource,
 	pub timestamp: u64,
-}
-
-type IntrinsicEvent = Event;
-
-#[derive(Debug, Clone, Hash, Deserialize, Serialize)]
-pub struct ProblemLoaded {
-	pub id: String,
-	pub title: String,
-	pub slug: String,
-}
-
-/// ## [Klass] (Alias of EventKind)
-///
-/// Represents full event lifecycle for representing initial, pending,
-/// failed, repeated when necessary.
-///
-pub type Klass = EventKind;
-pub type Problem = ProtoProblem;
-
-/// ## Events Roadmap
-/// - 3 Even Paradigms/Types
-/// 	- In process events (notification module tells ui module an event occured with dispatch)
-/// 	- In network (K8s Cluster running inside of a VPN has multiple nodes that talk to each other)
-/// 	- Over the wire (Server wants users to know someone 'signed in')
-///
-/// The following structs will cover those cases and enable
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EventEnvelope<E> {
-	pub id: EventId,
-	pub timestamp: u64,
-	pub source: EventSource,
-	pub event: E,
-}
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NodeId;
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EventId {
-	pub node: NodeId,
-	pub sequence: u64,
-}
-
-pub enum EventScope {
-	Local,
-	Process,
-	Node,
-	Cluster,
-}
-
-pub trait EventPublisher<E> {
-	fn publish(&self, event: E) -> Result<()>;
-}
-
-impl std::hash::Hash for EventBus {
-	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-		self.tx.same_channel(&self.tx).hash(state);
-	}
 }
 
 /// ## [EventBus]
@@ -502,16 +440,52 @@ pub struct EventBus {
 	// id: usize,
 }
 
-impl EventBus {
-	// #[cfg(target_arch = "wasm32")]
-	pub fn emit(&self, event: e::Event) {
-		match self.tx.send(event.clone()) {
-			Ok(count) => {
-				// tracing::info!("📡 Event emitted: {:?} → {} receiver(s)", event.kind, count);
-			}
-			Err(_) => {
-				tracing::info!("⚠️ Event emitted with NO receivers: {:?}", event.kind);
-			}
-		}
-	}
+/// Client-side event service.
+///
+/// `T` is the transport used to receive events.
+///
+/// The transport is intentionally generic so this type can exist on both
+/// native and WASM without making the service itself depend on tonic.
+pub struct EventClient<T> {
+	pub events: EventBus,
+	pub transport: T,
 }
+
+/// ## Events Roadmap
+/// - 3 Even Paradigms/Types
+/// 	- In process events (notification module tells ui module an event occured with dispatch)
+/// 	- In network (K8s Cluster running inside of a VPN has multiple nodes that talk to each other)
+/// 	- Over the wire (Server wants users to know someone 'signed in')
+///
+/// The following structs will cover those cases and enable
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EventEnvelope<E> {
+	pub id: EventId,
+	pub timestamp: u64,
+	pub source: EventSource,
+	pub event: E,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EventId {
+	pub node: NodeId,
+	pub sequence: u64,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NodeId;
+#[derive(Debug, Clone, Hash, Deserialize, Serialize)]
+pub struct ProblemLoaded {
+	pub id: String,
+	pub title: String,
+	pub slug: String,
+}
+
+type IntrinsicEvent = Event;
+
+/// ## [Klass] (Alias of EventKind)
+///
+/// Represents full event lifecycle for representing initial, pending,
+/// failed, repeated when necessary.
+///
+pub type Klass = EventKind;
+pub type Problem = ProtoProblem;

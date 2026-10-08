@@ -71,8 +71,7 @@ pub use crate::{
 pub use crate::{
 	app::{context::*, *},
 	modules::{
-		ipc,
-		ipc::*,
+		ipc::{self, *},
 		native::{
 			runtime::*,
 			state::*,
@@ -80,8 +79,7 @@ pub use crate::{
 			*,
 		},
 		os::*,
-		platform,
-		platform::*,
+		platform::{self, *},
 		sdlc::{self, *},
 		server::{self, channel, event::*},
 	},

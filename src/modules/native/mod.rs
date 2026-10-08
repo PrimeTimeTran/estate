@@ -22,7 +22,6 @@ pub mod state;
 pub mod task;
 pub mod ui;
 pub mod util;
-pub mod window;
 
 #[path = "./[trait].rs"]
 pub mod native_traits;
@@ -61,6 +60,48 @@ pub use linux::*;
 
 #[cfg(target_os = "macos")]
 pub use macos::*;
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(tag = "kind")]
+pub enum NativeEventKind {
+	#[serde(rename = "key_down")]
+	KeyDown {
+		key_code: u16,
+	},
+	#[serde(rename = "key_up")]
+	KeyUp {
+		key_code: u16,
+	},
+	#[serde(rename = "mouse_down")]
+	MouseDown {
+		button: i64,
+		x: f64,
+		y: f64,
+	},
+	#[serde(rename = "mouse_up")]
+	MouseUp {
+		button: i64,
+		x: f64,
+		y: f64,
+	},
+	#[serde(rename = "scroll")]
+	Scroll {
+		vertical: i64,
+		horizontal: i64,
+	},
+	#[serde(rename = "flags_changed")]
+	FlagsChanged {
+		key_code: u16,
+	},
+	ModifierChanged,
+	#[serde(rename = "frontmost_app")]
+	FrontmostApp {
+		name: String,
+		#[serde(rename = "bundleID")]
+		bundle_id: String,
+		pid: i64,
+	},
+}
 
 impl NativeHost {
 	fn new() -> Self {

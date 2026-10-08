@@ -1,5 +1,7 @@
 use crate::prelude::*;
 
+pub static SCROLL_STATE: OnceLock<Mutex<ScrollRedirectState>> = OnceLock::new();
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScrollDirection {
 	None,
@@ -36,108 +38,6 @@ pub fn target_position(bounds: CGRect, target: ScreenPosition, y: f64) -> CGPoin
 	CGPoint { x, y }
 }
 
-pub static SCROLL_STATE: OnceLock<Mutex<ScrollRedirectState>> = OnceLock::new();
-impl Default for GestureState {
-	fn default() -> Self {
-		Self {
-			active_focus: FocusedPane::MainEditor,
-			side_panel_width: 300.0,
-			secondary_scroll_offset: 0.0,
-			last_delta: egui::Vec2::ZERO,
-			last_direction: ScrollDirection::None,
-		}
-	}
-}
-impl GestureController {
-	pub(crate) fn new() -> Self {
-		Self {
-			state: GestureState::default(),
-		}
-	}
-	pub(crate) fn inspect(&mut self, ui: &egui::Ui, input: &IOState) -> TrackpadState {
-		let current = ui.input(|input| {
-			let delta = input.smooth_scroll_delta;
-			(
-				delta,
-				input.modifiers.shift,
-				input.modifiers.ctrl,
-				input.modifiers.alt,
-				input.modifiers.command,
-				input.pointer.hover_pos(),
-			)
-		});
-		let (delta, shift, ctrl, alt, _command, _mouse_pos) = current;
-		if delta != egui::Vec2::ZERO {
-			self.state.last_delta = delta;
-			self.state.last_direction = Self::direction(delta);
-		}
-		TrackpadState {
-			alt_held: alt,
-			clicked: None,
-			command_held: input.command_held,
-			ctrl_held: ctrl,
-			delta: self.state.last_delta,
-			direction: self.state.last_direction,
-			focus: self.state.active_focus,
-			hovered: input.cursor_target,
-			mouse_pos: input.cursor_pos,
-			shift_held: shift,
-		}
-	}
-	pub(crate) fn direction(delta: egui::Vec2) -> ScrollDirection {
-		if delta.x == 0.0 && delta.y == 0.0 {
-			ScrollDirection::None
-		} else if delta.x.abs() > delta.y.abs() {
-			if delta.x > 0.0 {
-				ScrollDirection::Right
-			} else {
-				ScrollDirection::Left
-			}
-		} else if delta.y > 0.0 {
-			ScrollDirection::Down
-		} else {
-			ScrollDirection::Up
-		}
-	}
-	pub(crate) fn hover_target(
-		mouse_pos: Option<egui::Pos2>,
-		viewport: egui::Rect,
-	) -> Option<CursorTarget> {
-		let Some(pos) = mouse_pos else {
-			return None;
-		};
-		if !viewport.contains(pos) {
-			return None;
-		}
-		Some(CursorTarget::Main)
-	}
-	pub(crate) fn focus_for_target(target: CursorTarget) -> FocusedPane {
-		match target {
-			CursorTarget::Main => FocusedPane::MainEditor,
-			CursorTarget::DockLeft | CursorTarget::DockRight => FocusedPane::SidePanel,
-			CursorTarget::BottomPanel
-			| CursorTarget::ActivityBar
-			| CursorTarget::PrimaryBar
-			| CursorTarget::SecondaryBar
-			| CursorTarget::StatusBar
-			| CursorTarget::None => FocusedPane::Unknown,
-		}
-	}
-}
-impl TrackpadState {
-	pub(crate) fn primary_axis(&self) -> &'static str {
-		if self.delta.x.abs() > self.delta.y.abs() {
-			"Horizontal (X)"
-		} else if self.delta.y.abs() > self.delta.x.abs() {
-			"Vertical (Y)"
-		} else {
-			"None"
-		}
-	}
-	pub(crate) fn hovered_name(&self) -> &'static str {
-		self.hovered.name()
-	}
-}
 impl CursorEventSink for AppCursorSink {
 	fn cursor_moved(&self, position: CursorPosition) {
 		let _ = self.tx.send(CursorEvent::CursorPosition {
@@ -402,6 +302,107 @@ where
 		}
 
 		CallbackResult::Keep
+	}
+}
+impl Default for GestureState {
+	fn default() -> Self {
+		Self {
+			active_focus: FocusedPane::MainEditor,
+			side_panel_width: 300.0,
+			secondary_scroll_offset: 0.0,
+			last_delta: egui::Vec2::ZERO,
+			last_direction: ScrollDirection::None,
+		}
+	}
+}
+impl GestureController {
+	pub(crate) fn new() -> Self {
+		Self {
+			state: GestureState::default(),
+		}
+	}
+	pub(crate) fn inspect(&mut self, ui: &egui::Ui, input: &IOState) -> TrackpadState {
+		let current = ui.input(|input| {
+			let delta = input.smooth_scroll_delta;
+			(
+				delta,
+				input.modifiers.shift,
+				input.modifiers.ctrl,
+				input.modifiers.alt,
+				input.modifiers.command,
+				input.pointer.hover_pos(),
+			)
+		});
+		let (delta, shift, ctrl, alt, _command, _mouse_pos) = current;
+		if delta != egui::Vec2::ZERO {
+			self.state.last_delta = delta;
+			self.state.last_direction = Self::direction(delta);
+		}
+		TrackpadState {
+			alt_held: alt,
+			clicked: None,
+			command_held: input.command_held,
+			ctrl_held: ctrl,
+			delta: self.state.last_delta,
+			direction: self.state.last_direction,
+			focus: self.state.active_focus,
+			hovered: input.cursor_target,
+			mouse_pos: input.cursor_pos,
+			shift_held: shift,
+		}
+	}
+	pub(crate) fn direction(delta: egui::Vec2) -> ScrollDirection {
+		if delta.x == 0.0 && delta.y == 0.0 {
+			ScrollDirection::None
+		} else if delta.x.abs() > delta.y.abs() {
+			if delta.x > 0.0 {
+				ScrollDirection::Right
+			} else {
+				ScrollDirection::Left
+			}
+		} else if delta.y > 0.0 {
+			ScrollDirection::Down
+		} else {
+			ScrollDirection::Up
+		}
+	}
+	pub(crate) fn hover_target(
+		mouse_pos: Option<egui::Pos2>,
+		viewport: egui::Rect,
+	) -> Option<CursorTarget> {
+		let Some(pos) = mouse_pos else {
+			return None;
+		};
+		if !viewport.contains(pos) {
+			return None;
+		}
+		Some(CursorTarget::Main)
+	}
+	pub(crate) fn focus_for_target(target: CursorTarget) -> FocusedPane {
+		match target {
+			CursorTarget::Main => FocusedPane::MainEditor,
+			CursorTarget::DockLeft | CursorTarget::DockRight => FocusedPane::SidePanel,
+			CursorTarget::BottomPanel
+			| CursorTarget::ActivityBar
+			| CursorTarget::PrimaryBar
+			| CursorTarget::SecondaryBar
+			| CursorTarget::StatusBar
+			| CursorTarget::None => FocusedPane::Unknown,
+		}
+	}
+}
+impl TrackpadState {
+	pub(crate) fn primary_axis(&self) -> &'static str {
+		if self.delta.x.abs() > self.delta.y.abs() {
+			"Horizontal (X)"
+		} else if self.delta.y.abs() > self.delta.x.abs() {
+			"Vertical (Y)"
+		} else {
+			"None"
+		}
+	}
+	pub(crate) fn hovered_name(&self) -> &'static str {
+		self.hovered.name()
 	}
 }
 
