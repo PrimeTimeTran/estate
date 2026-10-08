@@ -29,9 +29,7 @@ fn key_state(active: bool, symbol: &str) -> &str {
 }
 fn display_name(value: &str, max: usize) -> String {
 	let mut chars = value.chars();
-
 	let truncated: String = chars.by_ref().take(max).collect();
-
 	if chars.next().is_some() {
 		format!("{truncated}…")
 	} else {
@@ -1081,32 +1079,15 @@ impl MacosHid {
 	}
 }
 impl MacosHid {
-	/// Convert an Estate action code string into a macOS keycode.
-	pub fn keycode_from_string(code: &str) -> Option<u16> {
-		code.parse::<u16>().ok()
-	}
-	pub fn key_from_code(code: u16) -> Option<Key> {
-		key_from_code(code)
-	}
-	fn mouse_code(button: MouseButton) -> i64 {
-		match button {
-			MouseButton::Primary => 0,
-			MouseButton::Secondary => 1,
-			MouseButton::Middle => 2,
-			MouseButton::Button4 => 3,
-			MouseButton::Button5 => 4,
+	fn event_key(event: &NativeEvent) -> Option<Key> {
+		match event.kind {
+			NativeEventKind::KeyDown { key_code } | NativeEventKind::KeyUp { key_code } => {
+				Self::key_from_code(key_code)
+			}
+			_ => None,
 		}
 	}
-	fn mouse_button_matches(event: &NativeEvent, button: MouseButton) -> bool {
-		let code = Self::mouse_code(button);
-		matches!(
-			event.kind,
-			NativeEventKind::MouseUp {
-				button: event_button,
-				..
-			} if event_button == code
-		)
-	}
+
 	fn gesture_mouse_button(button: i64) -> Option<MouseButton> {
 		match button {
 			0 => Some(MouseButton::Primary),
@@ -1117,22 +1098,6 @@ impl MacosHid {
 			_ => None,
 		}
 	}
-	fn update_pressed(&mut self, event: &NativeEvent) {
-		match &event.kind {
-			NativeEventKind::KeyDown { key_code } => {
-				if let Some(key) = Self::key_from_code(*key_code) {
-					self.pressed.insert(key);
-				}
-			}
-			NativeEventKind::KeyUp { key_code } => {
-				if let Some(key) = Self::key_from_code(*key_code) {
-					self.pressed.remove(&key);
-				}
-			}
-			_ => {}
-		}
-	}
-
 	fn gesture_event(event: &NativeEvent) -> Option<GestureEvent> {
 		match &event.kind {
 			NativeEventKind::KeyDown { key_code } => {
@@ -1176,12 +1141,93 @@ impl MacosHid {
 			_ => false,
 		}
 	}
-	fn event_key(event: &NativeEvent) -> Option<Key> {
-		match event.kind {
-			NativeEventKind::KeyDown { key_code } | NativeEventKind::KeyUp { key_code } => {
-				Self::key_from_code(key_code)
+
+	fn handle_modifier_event(&mut self, event: &SwiftNativeEvent) {
+		if event.kind != "flags_changed" {
+			return;
+		}
+		let Some(key_code) = event.key_code else {
+			tracing::warn!(
+				name = ?event.name,
+				"🍎 MODIFIER EVENT missing key code"
+			);
+			return;
+		};
+		let key = MacosHid::key_from_code(key_code);
+		tracing::debug!(
+			name = ?event.name,
+			key_code,
+			key = ?key.map(|k| k.display()),
+			direction = ?event.direction,
+			modifiers = ?event.modifiers,
+			"🍎 MODIFIER EVENT"
+		);
+	}
+
+	fn init_hid_smoke_log() -> std::io::Result<()> {
+		let path = std::env::current_dir()?.join(ESTATE_HID_SMOKE_LOG);
+		let mut file = std::fs::File::create(path)?;
+		writeln!(
+			file,
+			"TIME          LS LC LO LM | RS RC RO RM | FN CP | EVENT              FLAGS"
+		)?;
+		writeln!(
+			file,
+			"              -- --------- | --------- | -- -- | ------------------ ----------------"
+		)?;
+		writeln!(
+			file,
+			"Columns: LS LC LO LM = left modifiers, RS RC RO RM = right modifiers, FN CP = Fn/Caps"
+		)?;
+		writeln!(
+			file,
+			"Event flags are aggregate CoreGraphics state; left/right state is reconstructed from keycodes"
+		)?;
+		writeln!(file)?;
+		Ok(())
+	}
+
+	/// Convert an Estate action code string into a macOS keycode.
+	pub fn keycode_from_string(code: &str) -> Option<u16> {
+		code.parse::<u16>().ok()
+	}
+	pub fn key_from_code(code: u16) -> Option<Key> {
+		key_from_code(code)
+	}
+
+	fn mouse_code(button: MouseButton) -> i64 {
+		match button {
+			MouseButton::Primary => 0,
+			MouseButton::Secondary => 1,
+			MouseButton::Middle => 2,
+			MouseButton::Button4 => 3,
+			MouseButton::Button5 => 4,
+		}
+	}
+	fn mouse_button_matches(event: &NativeEvent, button: MouseButton) -> bool {
+		let code = Self::mouse_code(button);
+		matches!(
+			event.kind,
+			NativeEventKind::MouseUp {
+				button: event_button,
+				..
+			} if event_button == code
+		)
+	}
+
+	fn update_pressed(&mut self, event: &NativeEvent) {
+		match &event.kind {
+			NativeEventKind::KeyDown { key_code } => {
+				if let Some(key) = Self::key_from_code(*key_code) {
+					self.pressed.insert(key);
+				}
 			}
-			_ => None,
+			NativeEventKind::KeyUp { key_code } => {
+				if let Some(key) = Self::key_from_code(*key_code) {
+					self.pressed.remove(&key);
+				}
+			}
+			_ => {}
 		}
 	}
 
@@ -1207,49 +1253,6 @@ impl MacosHid {
 				.unwrap_or_default(),
 		)?;
 		Ok(())
-	}
-	fn init_hid_smoke_log() -> std::io::Result<()> {
-		let path = std::env::current_dir()?.join(ESTATE_HID_SMOKE_LOG);
-		let mut file = std::fs::File::create(path)?;
-		writeln!(
-			file,
-			"TIME          LS LC LO LM | RS RC RO RM | FN CP | EVENT              FLAGS"
-		)?;
-		writeln!(
-			file,
-			"              -- --------- | --------- | -- -- | ------------------ ----------------"
-		)?;
-		writeln!(
-			file,
-			"Columns: LS LC LO LM = left modifiers, RS RC RO RM = right modifiers, FN CP = Fn/Caps"
-		)?;
-		writeln!(
-			file,
-			"Event flags are aggregate CoreGraphics state; left/right state is reconstructed from keycodes"
-		)?;
-		writeln!(file)?;
-		Ok(())
-	}
-	fn handle_modifier_event(&mut self, event: &SwiftNativeEvent) {
-		if event.kind != "flags_changed" {
-			return;
-		}
-		let Some(key_code) = event.key_code else {
-			tracing::warn!(
-				name = ?event.name,
-				"🍎 MODIFIER EVENT missing key code"
-			);
-			return;
-		};
-		let key = MacosHid::key_from_code(key_code);
-		tracing::debug!(
-			name = ?event.name,
-			key_code,
-			key = ?key.map(|k| k.display()),
-			direction = ?event.direction,
-			modifiers = ?event.modifiers,
-			"🍎 MODIFIER EVENT"
-		);
 	}
 }
 impl MacosHid {
