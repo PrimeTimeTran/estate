@@ -514,6 +514,7 @@ pub struct NavigationHandler;
 pub struct ProblemHandler;
 pub struct LogHandler;
 pub struct StateHandler;
+
 /// ## TaskHandler
 ///
 /// Background job handler
