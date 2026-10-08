@@ -68,9 +68,6 @@ pub enum KeySequence {
 	Double(KeyEvent),
 	Hold(KeyCode),
 }
-pub struct KeyEvent;
-pub struct KeyCode;
-pub struct Tooltip;
 pub enum NotificationKind {
 	Info,
 	Success,
@@ -227,22 +224,8 @@ impl OverlayManager {
 	// 	self.overlays.retain(|overlay| overlay.id != id);
 	// }
 }
+
 impl View for BottomBar {
-	fn render(&self, frame: &mut Frame, area: Rect) {
-		// ...
-	}
-}
-impl View for ProgressOverlay {
-	fn render(&self, frame: &mut Frame, area: Rect) {
-		// ...
-	}
-}
-impl View for Sidebar {
-	fn render(&self, frame: &mut Frame, area: Rect) {
-		// ...
-	}
-}
-impl View for TopBar {
 	fn render(&self, frame: &mut Frame, area: Rect) {
 		// ...
 	}
@@ -272,7 +255,22 @@ impl View for Picker {
 		// ...
 	}
 }
+impl View for ProgressOverlay {
+	fn render(&self, frame: &mut Frame, area: Rect) {
+		// ...
+	}
+}
+impl View for Sidebar {
+	fn render(&self, frame: &mut Frame, area: Rect) {
+		// ...
+	}
+}
 impl View for Switcher {
+	fn render(&self, frame: &mut Frame, area: Rect) {
+		// ...
+	}
+}
+impl View for TopBar {
 	fn render(&self, frame: &mut Frame, area: Rect) {
 		// ...
 	}
@@ -366,6 +364,7 @@ impl WizardStep {
 		}
 	}
 }
+
 /// --- Structs: Entities
 ///
 pub struct App<C, S> {
@@ -677,6 +676,9 @@ pub struct Tab {
 	pub title: String,
 	pub view: ViewId,
 }
+pub struct KeyEvent;
+pub struct KeyCode;
+pub struct Point;
 pub struct TabBar {
 	pub chrome: Chrome,
 
@@ -686,6 +688,7 @@ pub struct TabBar {
 pub struct TabState {
 	pub active: usize,
 }
+pub struct Tooltip;
 pub struct TopRegion {
 	pub primary: Option<TabBar>,
 	pub secondary: Option<Breadcrumbs>,
@@ -695,7 +698,6 @@ pub struct TopBar {
 }
 pub struct Role;
 pub struct Subrole;
-pub struct Point;
 pub struct Size;
 pub struct UiElement {
 	role: Role,

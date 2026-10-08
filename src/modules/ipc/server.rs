@@ -2,6 +2,88 @@ use crate::prelude::*;
 use anyhow::Result;
 
 async fn handle_connection(stream: UnixStream, events: EventBus) -> anyhow::Result<()> {
+	// ─────────────────────────────────────────────────────────────────────────────
+	// Handshake
+	// ─────────────────────────────────────────────────────────────────────────────
+	async fn read_hello(
+		reader: &mut BufReader<tokio::net::unix::OwnedReadHalf>,
+		write_half: &mut tokio::net::unix::OwnedWriteHalf,
+	) -> anyhow::Result<Hello> {
+		let mut line = String::new();
+
+		reader.read_line(&mut line).await?;
+
+		let message: IpcMessage<EventKind> = serde_json::from_str(&line)?;
+
+		match message {
+			IpcMessage::Hello(hello) => {
+				validate_protocol(&hello, write_half).await?;
+				Ok(hello)
+			}
+
+			_ => {
+				send(
+					write_half,
+					IpcMessage::Error(IpcError {
+						code: IpcErrorCode::InvalidMessage,
+						message: "expected Hello".into(),
+					}),
+				)
+				.await?;
+
+				anyhow::bail!("first IPC message was not Hello");
+			}
+		}
+	}
+	async fn validate_protocol(
+		hello: &Hello,
+		write_half: &mut tokio::net::unix::OwnedWriteHalf,
+	) -> anyhow::Result<()> {
+		if hello.protocol.major == ProtocolVersion::CURRENT.major {
+			return Ok(());
+		}
+
+		send(
+			write_half,
+			IpcMessage::Error(IpcError {
+				code: IpcErrorCode::ProtocolMismatch,
+				message: format!(
+					"unsupported protocol {}.{}",
+					hello.protocol.major, hello.protocol.minor
+				),
+			}),
+		)
+		.await?;
+
+		anyhow::bail!("IPC protocol mismatch");
+	}
+	fn log_client_connected(connection_id: Uuid, hello: &Hello) {
+		tracing::debug!(
+			connection = %connection_id,
+			client = ?hello.client,
+			pid = hello.pid,
+			protocol_major = hello.protocol.major,
+			protocol_minor = hello.protocol.minor,
+			"Estate IPC client connected"
+		);
+	}
+	async fn send_hello_ack(
+		write_half: &mut tokio::net::unix::OwnedWriteHalf,
+		connection_id: Uuid,
+	) -> anyhow::Result<()> {
+		send(
+			write_half,
+			IpcMessage::HelloAck(HelloAck {
+				protocol: ProtocolVersion::CURRENT,
+				server: ClientKind::Daemon,
+				connection_id,
+			}),
+		)
+		.await?;
+
+		Ok(())
+	}
+
 	tracing::info!("🔥 IPC HANDLE CONNECTION");
 	let connection_id = Uuid::new_v4();
 
@@ -42,88 +124,6 @@ async fn handle_connection(stream: UnixStream, events: EventBus) -> anyhow::Resu
 		connection = %connection_id,
 		"Estate IPC client disconnected"
 	);
-
-	Ok(())
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Handshake
-// ─────────────────────────────────────────────────────────────────────────────
-async fn read_hello(
-	reader: &mut BufReader<tokio::net::unix::OwnedReadHalf>,
-	write_half: &mut tokio::net::unix::OwnedWriteHalf,
-) -> anyhow::Result<Hello> {
-	let mut line = String::new();
-
-	reader.read_line(&mut line).await?;
-
-	let message: IpcMessage<EventKind> = serde_json::from_str(&line)?;
-
-	match message {
-		IpcMessage::Hello(hello) => {
-			validate_protocol(&hello, write_half).await?;
-			Ok(hello)
-		}
-
-		_ => {
-			send(
-				write_half,
-				IpcMessage::Error(IpcError {
-					code: IpcErrorCode::InvalidMessage,
-					message: "expected Hello".into(),
-				}),
-			)
-			.await?;
-
-			anyhow::bail!("first IPC message was not Hello");
-		}
-	}
-}
-async fn validate_protocol(
-	hello: &Hello,
-	write_half: &mut tokio::net::unix::OwnedWriteHalf,
-) -> anyhow::Result<()> {
-	if hello.protocol.major == ProtocolVersion::CURRENT.major {
-		return Ok(());
-	}
-
-	send(
-		write_half,
-		IpcMessage::Error(IpcError {
-			code: IpcErrorCode::ProtocolMismatch,
-			message: format!(
-				"unsupported protocol {}.{}",
-				hello.protocol.major, hello.protocol.minor
-			),
-		}),
-	)
-	.await?;
-
-	anyhow::bail!("IPC protocol mismatch");
-}
-fn log_client_connected(connection_id: Uuid, hello: &Hello) {
-	tracing::debug!(
-		connection = %connection_id,
-		client = ?hello.client,
-		pid = hello.pid,
-		protocol_major = hello.protocol.major,
-		protocol_minor = hello.protocol.minor,
-		"Estate IPC client connected"
-	);
-}
-async fn send_hello_ack(
-	write_half: &mut tokio::net::unix::OwnedWriteHalf,
-	connection_id: Uuid,
-) -> anyhow::Result<()> {
-	send(
-		write_half,
-		IpcMessage::HelloAck(HelloAck {
-			protocol: ProtocolVersion::CURRENT,
-			server: ClientKind::Daemon,
-			connection_id,
-		}),
-	)
-	.await?;
 
 	Ok(())
 }

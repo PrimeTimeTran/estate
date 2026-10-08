@@ -1,7 +1,6 @@
 use demand::{Confirm, DemandOption, Dialog, DialogButton, Input, MultiSelect, Select, Spinner};
 
 use anyhow::Result;
-
 use estate::modules::wizard;
 
 pub fn main() -> Result<()> {
@@ -30,11 +29,9 @@ pub fn main() -> Result<()> {
 			if s.is_empty() {
 				return Err("Name cannot be empty");
 			}
-
 			if s.len() < 5 {
 				return Err("Name must be at least 5 characters");
 			}
-
 			Ok(())
 		})
 		.run()
@@ -45,7 +42,6 @@ pub fn main() -> Result<()> {
 	// ─────────────────────────────────────────────
 	// 2. SELECT
 	// ─────────────────────────────────────────────
-
 	let project_type = Select::new("What are you building?")
 		.description("[Select] Choose the primary type of project.")
 		.filterable(true)
@@ -56,13 +52,10 @@ pub fn main() -> Result<()> {
 		.option(DemandOption::new("Web").description("A WebAssembly application"))
 		.run()
 		.expect("select failed");
-
 	println!("Project type: {project_type}");
-
 	// ─────────────────────────────────────────────
 	// 3. MULTISELECT
 	// ─────────────────────────────────────────────
-
 	let features = MultiSelect::new("Which features do you want?")
 		.description("[Multi Select] You can select multiple features.")
 		.filterable(true)
@@ -76,7 +69,6 @@ pub fn main() -> Result<()> {
 		.max(6)
 		.run()
 		.expect("multiselect failed");
-
 	println!("Features: {features:?}");
 
 	// ─────────────────────────────────────────────
