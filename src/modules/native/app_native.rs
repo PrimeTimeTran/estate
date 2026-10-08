@@ -1,4 +1,3 @@
-use crate::model::resolver::crate_root;
 use crate::{
 	prelude::*,
 	proto::{
@@ -39,38 +38,30 @@ impl Api for ApiClient {
 	}
 	async fn load_problems(&self, query: ProblemQuery) -> anyhow::Result<Vec<StoredProblem>> {
 		let request: crate::proto::types::ListProblemsRequest = query.try_into()?;
-
 		tracing::debug!(?request, "Sending ListProblemsRequest");
-
 		let response = self
 			.problems
 			.clone()
 			.list_problems(request)
 			.await?
 			.into_inner();
-
 		tracing::debug!(
 			returned = response.problems.len(),
 			?response,
 			"Received ListProblemsResponse"
 		);
-
 		let problems = response
 			.problems
 			.into_iter()
 			.map(StoredProblem::try_from)
 			.collect::<Result<Vec<_>, _>>()?;
-
 		tracing::debug!(count = problems.len(), "Decoded problems");
-
 		Ok(problems)
 	}
-
 	async fn load_problem(&self, _id: i64) -> anyhow::Result<StoredProblem> {
 		todo!("load_problem");
 		// StoredProblem::try_from(response)
 	}
-
 	async fn sample_problem(&self, request: SampleProblemRequest) -> anyhow::Result<StoredProblem> {
 		let request: crate::proto::types::SampleProblemRequest = request.into();
 		let response = self
@@ -129,21 +120,19 @@ where
 		let state = C::initial_state();
 		let (cursor_event_tx, cursor_events) = std::sync::mpsc::channel();
 		let cancel = CancellationToken::new();
-
 		let settings = Self::init_settings()?;
-
 		Ok(Self {
 			cancel,
-			settings,
 			cursor_event_tx,
 			cursor_events,
 			host,
-			state,
-			workers: vec![],
-			mode: get_app_mode(),
 			menu_bar: None,
+			mode: get_app_mode(),
+			settings,
+			state,
 			tray_clock: None,
 			tray_cursor: None,
+			workers: vec![],
 		})
 	}
 }
@@ -158,17 +147,14 @@ where
 	) -> Result<WorkHandle<C, tokio::task::JoinHandle<()>>> {
 		let handle = self.host.worker().run_background(move |cancel| async move {
 			// tracing::debug!("🔥 APP EVENTS TASK STARTED");
-
 			let mut view_idx = 0;
 			let mut current_time = 3;
-
 			loop {
 				tokio::select! {
 					_ = cancel.cancelled() => {
 						tracing::debug!("🔥 APP EVENTS CANCELLED");
 						break;
 					}
-
 					_ = tokio::time::sleep(Duration::from_secs(1)) => {
 						if current_time == 0 {
 							current_time = 3;
@@ -230,7 +216,6 @@ where
 				if cancel.is_cancelled() {
 					break;
 				}
-
 				match rx.recv_timeout(std::time::Duration::from_millis(100)) {
 					Ok(Ok(event)) => {
 						if matches!(
@@ -249,7 +234,6 @@ where
 					Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
 						// Allows us to check cancellation.
 					}
-
 					Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
 						break;
 					}
@@ -399,8 +383,8 @@ impl Ctx for Context {
 	}
 	type Api = ApiService;
 	type AppState = structs::S<Context>;
-	type EventReceiver = structs::BroadcastReceiver<e::Event>;
-	type EventSender = structs::BroadcastSender<e::Event>;
+	type EventReceiver = s::BroadcastReceiver<e::Event>;
+	type EventSender = s::BroadcastSender<e::Event>;
 	type GuiState = NativeGuiState;
 }
 
@@ -615,6 +599,7 @@ pub struct CursorDaemon<S> {
 	pub sink: S,
 	pub cancel: CancellationToken,
 }
+
 #[derive(Debug, Clone, Copy)]
 pub struct CursorPosition {
 	pub x: f64,

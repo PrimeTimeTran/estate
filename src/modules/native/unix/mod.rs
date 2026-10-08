@@ -1,7 +1,4 @@
 use crate::prelude::*;
-use std::io;
-
-pub use core_foundation;
 
 pub mod server;
 pub use server::*;
@@ -25,9 +22,9 @@ impl Default for HDIUnix {
 }
 
 impl HDIInput for HDIUnix {
-	fn run(&mut self) -> io::Result<()> {
-		Err(io::Error::new(
-			io::ErrorKind::Unsupported,
+	fn run(&mut self) -> std::io::Result<()> {
+		Err(std::io::Error::new(
+			std::io::ErrorKind::Unsupported,
 			"Unix input monitoring backend is not implemented yet",
 		))
 	}

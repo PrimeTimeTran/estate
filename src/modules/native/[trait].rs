@@ -1,7 +1,5 @@
 use std::io;
 
-use crate::prelude::*;
-
 // Human Device Interaction Input
 // - Keyboard
 // - Mouse

@@ -8,8 +8,6 @@
 // Native common
 // ============================================================
 
-pub use cli::context::*;
-pub use cli::prelude::*;
 pub use egui::MenuBar;
 pub use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
 pub use rmcp::{

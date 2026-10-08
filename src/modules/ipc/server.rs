@@ -1,6 +1,5 @@
 use crate::prelude::*;
-use crate::prelude::{shared::Binding as OldKeyBinding, *};
-use anyhow::{Context as CtxAnyhow, Result};
+use anyhow::Result;
 
 async fn handle_connection(stream: UnixStream, events: EventBus) -> anyhow::Result<()> {
 	tracing::info!("🔥 IPC HANDLE CONNECTION");

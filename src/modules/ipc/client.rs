@@ -1,8 +1,4 @@
-use std::{path::PathBuf, process};
-use tokio::{
-	io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
-	net::UnixStream,
-};
+use super::*;
 
 use crate::prelude::*;
 
@@ -323,7 +319,7 @@ impl EstateConnection {
 				IpcMessage::FsListResult { entries } => {
 					return Ok(entries);
 				}
-				IpcMessage::Event(event) => {
+				IpcMessage::Event(_event) => {
 					// Don't return this as the fs_list result.
 					// The dedicated event bridge should handle UI events.
 					continue;

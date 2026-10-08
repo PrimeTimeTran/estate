@@ -1,12 +1,6 @@
-use crate::model::resolver::crate_root;
 use crate::{
 	prelude::*,
-	proto::{
-		problem_service_client::ProblemServiceClient,
-		submission_service_client::SubmissionServiceClient,
-	},
 };
-use std::cmp::PartialEq;
 use tray_icon::{Icon, TrayIconBuilder};
 
 const TRAY_ICON_WIDTH: u32 = 16;

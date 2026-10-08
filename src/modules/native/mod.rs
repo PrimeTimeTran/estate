@@ -1,6 +1,3 @@
-use std::cmp::PartialEq;
-use tray_icon::{Icon, TrayIconBuilder};
-
 use crate::prelude::*;
 
 pub mod agent;
