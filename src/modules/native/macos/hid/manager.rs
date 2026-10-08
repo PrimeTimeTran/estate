@@ -4,10 +4,6 @@ use crate::prelude::{
 	*,
 };
 
-use anyhow::{Context as CtxAnyhow, Result};
-use mach2::mach_time;
-use std::process::{Child, Command, Stdio};
-
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum HidMessage {
@@ -639,7 +635,7 @@ impl MacosHid {
 		Ok(())
 	}
 	pub async fn run(mut self, events: EventBus, cancel: CancellationToken) -> Result<()> {
-		tracing::info!("⌨️ MacOSHID Manager run");
+		tracing::info!("⌨️ MacOS HID Manager run");
 		let stream = self.connect().await?;
 
 		// tracing::info!("🔥 RUST GOT UNIX STREAM");
@@ -1190,7 +1186,7 @@ impl MacosHid {
 	}
 
 	fn write_hid_trace(event: &NativeEvent, action: Option<&Action>) -> std::io::Result<()> {
-		let path = std::env::current_dir()?.join("estate-hid-smoke.log");
+		let path = std::env::current_dir()?.join(ESTATE_HID_SMOKE_LOG);
 		let mut file = OpenOptions::new().create(true).append(true).open(path)?;
 		let event_name = match &event.kind {
 			NativeEventKind::KeyDown { .. } => "↓",
