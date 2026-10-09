@@ -7,8 +7,6 @@ pub const TODO: &'static str = r#"
 	- Add progressive disclosure
 "#;
 
-// pub static SDLC_LOG_DIR: LazyLock<PathBuf> =
-// LazyLock::new(|| PathBuf::from("/Users/future/kb/project/crates/estate/log"));
 pub const SDLC_LOG_DIR: &str = "/Users/future/kb/project/crates/estate/log";
 pub const SDLC_LOG_FILE_NAME: &str = "events.jsonl";
 
@@ -22,10 +20,17 @@ pub static SDLC_TEMPLATE_SPEC: &str =
 pub static SDLC_TEMPLATE_PLAN: &str =
 	"/Users/future/kb/project/crates/estate/src/modules/sdlc/input/plan.md";
 
+pub static SDLC_PROMPT_INTENT: &str =
+	"/Users/future/kb/project/crates/estate/src/modules/sdlc/input/prompt_intent.md";
+pub static SDLC_PROMPT_SPEC: &str =
+	"/Users/future/kb/project/crates/estate/src/modules/sdlc/input/prompt_spec.md";
+pub static SDLC_PROMPT_PLAN: &str =
+	"/Users/future/kb/project/crates/estate/src/modules/sdlc/input/prompt_plan.md";
+
 pub static SDLC_GOAL: &str =
 	"/Users/future/kb/project/crates/estate/src/modules/sdlc/input/user.goal.md";
 
-	pub static SYS_PROMPT_INTENT: &str =
+pub static SYS_PROMPT_INTENT: &str =
 	"/Users/future/kb/project/crates/estate/log/SYS_PROMPT_INTENT.md";
 pub static SYS_PROMPT_SPEC: &str = "/Users/future/kb/project/crates/estate/log/SYS_PROMPT_SPEC.md";
 pub static SYS_PROMPT_PLAN: &str = "/Users/future/kb/project/crates/estate/log/SYS_PROMPT_PLAN.md";

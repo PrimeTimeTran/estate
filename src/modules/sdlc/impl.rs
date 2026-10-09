@@ -912,7 +912,7 @@ impl Pipeline {
 		FS::save(SpecialFile::WriteCurrent.path()?, session)?;
 		Ok(())
 	}
-	fn write(path: PathBuf, contents: String) -> Result<()> {
+	fn write(path: PathBuf, contents: &str) -> Result<()> {
 		Ok(std::fs::write(path, contents)?)
 	}
 	fn emit(&self, event: SdlcEvent) {
@@ -2320,67 +2320,12 @@ impl PipeRunner<'_> {
 
 	async fn on_intent(&mut self, input: StageInput) -> Result<RunResult> {
 		let (stage, _session_dir) = self.stage_dir();
-		let write_dir = self.write_dir();
 		let goal = self.session().prompt.clone();
-
 		if stage != Stage::Intent {
 			return Err(anyhow!("cannot execute Intent stage while at {stage:?}"));
 		}
-
-		if goal.trim().is_empty() {
-			return Err(anyhow!("SDLC session goal is empty"));
-		}
-
-		// Read the canonical Intent template. The generated artifact must follow
-		// this structure while describing the user's actual goal.
-		let template = std::fs::read_to_string(SDLC_TEMPLATE_INTENT)
-			.with_context(|| format!("reading Intent template from {}", SDLC_TEMPLATE_INTENT))?;
-
-		if template.trim().is_empty() {
-			return Err(anyhow!(
-				"Intent template is empty: {}",
-				SDLC_TEMPLATE_INTENT
-			));
-		}
-
-		let prompt = format!(
-"You are an SDLC Intent document writer.
-Your task is to transform the user's goal into a new Intent artifact using the supplied template.
-
-RULES:
-1. The user's goal is the source of truth for the content.
-2. The template is the source of truth for the document structure.
-3. Produce the complete Intent document, filling in every section of the template.
-4. Preserve the template's five numbered sections and their headings.
-5. Replace placeholder instructions with concrete information derived from the user's goal.
-6. Do not claim that implementation, testing, verification, or acceptance criteria have been completed. This is an Intent document describing what should be built, not a report of completed work.
-7. Do not return a summary, status update, or statement that requirements have been satisfied.
-8. Do not invent facts. Mark genuinely unknown details as unspecified.
-9. Return only the completed Markdown document.
-
-Before responding, verify that your output contains all five sections:
-- Problem
-- Proposed Outcome
-- Affected Users and Systems
-- Constraints
-- Open Questions
-
-If any section is missing, complete it before returning the document.
-
-<INTENT_TEMPLATE>
-{template}
-</INTENT_TEMPLATE>
-
-<USER_GOAL>
-{goal}
-</USER_GOAL>
-
-Return only the completed Intent artifact in Markdown. Do not include
-preamble, commentary, or an explanation of your process."
-		);
-
+		let prompt = p::gen_intent(&goal)?;
 		std::fs::write(SYS_PROMPT_INTENT, &prompt).context("writing Intent prompt debug file")?;
-
 		let generated = self
 			.pipeline
 			.system
@@ -2388,49 +2333,23 @@ preamble, commentary, or an explanation of your process."
 			.generate(&prompt)
 			.await
 			.context("generating Intent artifact from template and user goal")?;
-		// tracing::debug!(
-		// 	generated_chars = generated.len(),
-		// 	generated_lines = generated.lines().count(),
-		// 	generated = %generated,
-		// 	"INTENT: received generated response"
-		// );
-
 		if generated.trim().is_empty() {
 			return Err(anyhow!("generated Intent artifact is empty"));
 		}
-		let output_path = write_dir.join("intent.md");
-
-		// tracing::debug!(
-		// 	path = %output_path.display(),
-		// 	"INTENT: writing generated artifact"
-		// );
-
-		Pipeline::write(output_path, generated)?;
+		self.write(&generated)?;
 		self.pipeline.persist_progress("Intent stage completed")?;
 		Ok(RunResult::Intent)
 	}
 	async fn on_spec(&mut self, input: StageInput) -> Result<RunResult> {
 		let (stage, _session_dir) = self.stage_dir();
-		let write_dir = self.write_dir();
-
 		if stage != Stage::Spec {
 			return Err(anyhow!("cannot execute Spec stage while at {stage:?}"));
 		}
-
 		let intent = self.pipeline.session_read("intent.md")?;
-		if intent.trim().is_empty() {
-			return Err(anyhow!("Intent artifact is empty"));
-		}
-
 		let is_revision = matches!(input, StageInput::Revision { .. });
-
 		let prompt = match input {
-			StageInput::Initial => {
-				println!("[SDLC] Spec input = Initial");
-				p::gen_spec(&intent)?
-			}
+			StageInput::Initial => p::gen_spec(&intent)?,
 			StageInput::Revision { evaluation } => {
-				println!("[SDLC] Spec input = Revision; evaluation = {evaluation:#?}");
 				let spec = self.pipeline.session_read("spec.md")?;
 				if spec.trim().is_empty() {
 					return Err(anyhow!("Cannot revise Spec because spec.md is empty"));
@@ -2438,13 +2357,10 @@ preamble, commentary, or an explanation of your process."
 				p::revise_spec(&intent, &spec, &evaluation)?
 			}
 		};
-
 		if prompt.trim().is_empty() {
 			return Err(anyhow!("generated Spec prompt is empty"));
 		}
-
 		std::fs::write(SYS_PROMPT_SPEC, &prompt).context("writing Spec prompt debug file")?;
-
 		let generated = self
 			.pipeline
 			.system
@@ -2452,20 +2368,15 @@ preamble, commentary, or an explanation of your process."
 			.generate(&prompt)
 			.await
 			.context("generating Spec artifact from Intent and prompt")?;
-
 		if generated.trim().is_empty() {
 			return Err(anyhow!("generated Spec artifact is empty"));
 		}
-
-		let output_path = write_dir.join("spec.md");
-		Pipeline::write(output_path, generated)?;
-
+		self.write(&generated)?;
 		self.pipeline.persist_progress(if is_revision {
 			"Spec revision completed"
 		} else {
 			"Spec stage completed"
 		})?;
-
 		Ok(RunResult::Spec)
 	}
 	async fn on_plan(&mut self, input: StageInput) -> Result<RunResult> {
@@ -2475,15 +2386,9 @@ preamble, commentary, or an explanation of your process."
 		}
 		let intent = self.pipeline.session_read("intent.md")?;
 		let spec = self.pipeline.session_read("spec.md")?;
-		if intent.trim().is_empty() {
-			return Err(anyhow!("Intent artifact is empty"));
-		}
-		if spec.trim().is_empty() {
-			return Err(anyhow!("Spec artifact is empty"));
-		}
 		let prompt = p::gen_plan(&intent, &spec)?;
 		if prompt.trim().is_empty() {
-			return Err(anyhow!("generated Plan prompt is empty"));
+			return Err(anyhow!("Generated Plan prompt is empty"));
 		}
 		std::fs::write(SYS_PROMPT_PLAN, &prompt).context("writing plan prompt debug file")?;
 		let generated = self
@@ -2496,7 +2401,8 @@ preamble, commentary, or an explanation of your process."
 		if generated.trim().is_empty() {
 			return Err(anyhow!("generated Plan artifact is empty"));
 		}
-		Pipeline::write(session_dir.join("plan.md"), generated)?;
+		// Pipeline::write(output_path, generated)?;
+		self.write(&generated)?;
 		self.pipeline.persist_progress("Plan stage completed")?;
 		Ok(RunResult::Plan)
 	}
@@ -2575,10 +2481,7 @@ preamble, commentary, or an explanation of your process."
 		// 		}
 		let workspace_after = WSSnapshot::capture(&workspace)?;
 		let changes = workspace_before.diff(&workspace_after);
-		Pipeline::write(
-			session_dir.join("build.md"),
-			changes.to_markdown("Build completed"),
-		)?;
+		self.write(&changes.to_markdown("Build completed"))?;
 		self.pipeline.persist_progress(&format!(
 			"Build completed: {} file(s) changed",
 			changes.file_count()
@@ -2657,6 +2560,14 @@ preamble, commentary, or an explanation of your process."
 			.pipeline
 			.wait_for_intervention(stage, attempt, reason, input_rx)
 			.await
+	}
+	fn write(&mut self, content: &str) -> Result<()> {
+		let (stage, session_dir) = self.stage_dir();
+		let filename = format!("{stage:?}").to_lowercase() + ".md";
+		let output_path = session_dir.join(filename);
+	
+		Pipeline::write(output_path, content)?;
+		Ok(())
 	}
 }
 
@@ -2892,7 +2803,7 @@ pub struct Context {
 	pub api: ApiService,
 }
 
-// 
+//
 // impl CtxSdlc {
 //   pub fn new() -> Self {
 //     Self {
