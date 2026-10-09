@@ -51,41 +51,48 @@ pub const STATUS_INTERVAL: Duration = Duration::from_secs(30);
 
 pub const PROMPT_BUILD_ORIENT: &str = r#"You are in the ORIENT phase of the SDLC Build stage.
 
-Your objective is to understand the implementation requirements and
-establish the current state of the workspace before making changes.
+Your task is to analyze the Intent, Specification, and Plan provided in this prompt, then inspect the workspace to determine the current implementation state.
 
-## Required actions
+## Input Contract
 
-1. Read and understand plan.md.
-2. Read intent.md and spec.md for the original goal and requirements.
-3. Inspect the repository structure and relevant existing files.
-4. Inspect Git status, including modified and untracked files.
-5. For every expected file in the Plan, determine whether it exists
-   and whether its required behavior is already implemented.
-6. Identify missing work, incomplete work, existing work, and blockers.
+The Intent, Specification, and Plan are provided below as complete text.
 
-## Rules
+- Do not read `intent.md`, `spec.md`, or `plan.md` from disk.
+- Treat the supplied Plan as the authoritative boundary for file discovery.
+- Extract the explicitly referenced paths from the supplied Plan.
+- Inspect only those paths in the workspace, subject to the scope rules below.
 
-- Do not modify, create, or delete implementation files in this phase.
-- A clean Git status does not mean the task is complete.
-- Existing files do not automatically satisfy their requirements.
-- Do not assume planned changes are necessary if the requirements
-  are already satisfied; gather evidence first.
-- Preserve unrelated changes.
-- Do not invent requirements beyond the Intent, Specification, and Plan.
+## Scope of Inspection
 
-## Required output
+1. Identify the required file paths from the supplied Plan.
+2. Determine whether each required path exists at its specified location.
+3. Inspect the contents of existing, in-scope files to assess whether the planned behavior is implemented.
+4. Inspect Git status for relevant changes, without performing unrestricted repository discovery.
+5. If a path is ambiguous or a necessary dependency is not listed in the Plan, report the issue instead of expanding the search arbitrarily.
+
+## Prohibited Actions
+
+- Do not reread the three supplied SDLC documents from disk.
+- Do not use unrestricted discovery commands such as `find . -type f`, `ls -R`, or equivalent recursive searches.
+- Do not inspect unrelated files or directories.
+- Do not modify, create, or delete files.
+- Do not begin implementation.
+
+## Required Output
 
 Return an orientation report containing:
 
 1. Task objective.
-2. Required file changes and their purposes.
-3. Current state of each required file.
-4. Outstanding implementation requirements.
-5. Verification requirements.
-6. Relevant risks, ambiguities, or blockers.
+2. Required paths and their purposes, extracted from the supplied Plan.
+3. Existence and implementation status of each required path, supported by observed evidence.
+4. Outstanding implementation work.
+5. Required verification steps.
+6. Risks, ambiguities, and blockers.
+7. The paths actually inspected.
 
-Do not begin implementation. Finish after the report is complete.
+Distinguish verified facts from assumptions. Do not claim to have inspected files that you did not inspect.
+
+Finish after producing the report.
 "#;
 
 

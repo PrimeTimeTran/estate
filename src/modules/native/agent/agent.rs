@@ -165,14 +165,14 @@ impl Agent {
 					// return early and discard the in-memory run.
 					let result = match self.tools.shell.run(shell_command).await {
 						Ok(result) => result,
-						Err(error) => {
-							let message = format!("Command execution failed: {error:#}");
 
+						Err(error) => {
+							let message = format!("Action selection failed: {error:#}");
 							eprintln!("{message}");
 
 							run.record_error(AgentError {
 								step: Some(step),
-								kind: "command_execution".into(),
+								kind: "action_selection".into(),
 								message: message.clone(),
 								raw_response: None,
 								recoverable: true,
@@ -181,8 +181,12 @@ impl Agent {
 
 							run.ctx.history.push(AgentObservation::Current {
 								message: format!(
-									"Command: {command}\n{message}\n\
-									Choose another command or adjust the approach."
+									"Shell execution failed for command:\n{command}\n\n\
+									Error: {error:#}\n\n\
+									The command did not produce a usable result. \
+									Choose a different supported `run_command`, correct the \
+									command based on the error, or inspect the environment. \
+									Do not blindly repeat the same command."
 								),
 							});
 

@@ -2461,9 +2461,13 @@ impl PipeRunner<'_> {
 		// Phase 1: Orient.
 		let orient_task = AgentTask::new(format!(
 			"{PROMPT_BUILD_ORIENT}\n\n\
-			 ## Intent\n\n{intent}\n\n\
-			 ## Specification\n\n{spec}\n\n\
-			 ## Plan\n\n{plan}"
+			 # Supplied SDLC Artifacts\n\n\
+			 The following sections contain the artifact contents already loaded \
+			 by the orchestrator. Analyze these contents directly; do not reread \
+			 the corresponding files from disk.\n\n\
+			 ## Intent (intent.md)\n\n{intent}\n\n\
+			 ## Specification (spec.md)\n\n{spec}\n\n\
+			 ## Plan (plan.md)\n\n{plan}"
 		));
 
 		let orient_result = self
