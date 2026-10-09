@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+		<title>Estate</title>
+
+		<style>
+			* {
+				box-sizing: border-box;
+			}
+
+			html,
+			body {
+				margin: 0;
+				width: 100%;
+				height: 100%;
+				overflow: hidden;
+				font-family:
+					Inter,
+					-apple-system,
+					BlinkMacSystemFont,
+					'Segoe UI',
+					sans-serif;
+			}
+
+			body {
+				background: #111;
+				color: #eee;
+			}
+
+			.rail {
+				width: 64px;
+				height: 100vh;
+
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+
+				padding: 12px 0;
+
+				background: #181818;
+				border-right: 1px solid #2a2a2a;
+			}
+
+			.logo {
+				width: 40px;
+				height: 40px;
+
+				display: grid;
+				place-items: center;
+
+				margin-bottom: 18px;
+
+				border-radius: 10px;
+
+				background: #242424;
+				color: #fff;
+
+				font-size: 18px;
+				font-weight: 700;
+			}
+
+			.nav {
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				gap: 6px;
+
+				flex: 1;
+			}
+
+			.rail-button {
+				position: relative;
+
+				width: 42px;
+				height: 42px;
+
+				display: grid;
+				place-items: center;
+
+				border: 0;
+				border-radius: 9px;
+
+				background: transparent;
+				color: #888;
+
+				cursor: pointer;
+
+				transition:
+					background 120ms ease,
+					color 120ms ease;
+			}
+
+			.rail-button:hover {
+				background: #252525;
+				color: #ddd;
+			}
+
+			.rail-button.active {
+				background: #303030;
+				color: #fff;
+			}
+
+			.rail-button.active::before {
+				content: '';
+
+				position: absolute;
+				left: -11px;
+
+				width: 3px;
+				height: 20px;
+
+				border-radius: 0 3px 3px 0;
+
+				background: #fff;
+			}
+
+			.icon {
+				width: 20px;
+				height: 20px;
+				stroke: currentColor;
+				stroke-width: 1.8;
+				fill: none;
+				stroke-linecap: round;
+				stroke-linejoin: round;
+			}
+
+			.bottom {
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				gap: 6px;
+			}
+
+			/* Tooltip */
+			.rail-button[data-tooltip]::after {
+				content: attr(data-tooltip);
+
+				position: absolute;
+				left: 52px;
+
+				padding: 6px 9px;
+
+				border-radius: 6px;
+
+				background: #252525;
+				color: #eee;
+
+				font-size: 12px;
+				white-space: nowrap;
+
+				opacity: 0;
+				pointer-events: none;
+
+				transform: translateX(-4px);
+
+				transition:
+					opacity 100ms ease,
+					transform 100ms ease;
+
+				z-index: 100;
+			}
+
+			.rail-button:hover[data-tooltip]::after {
+				opacity: 1;
+				transform: translateX(0);
+			}
+		</style>
+	</head>
+
+	<body>
+		<aside class="rail">
+			<!-- Estate -->
+			<div class="logo">E</div>
+
+			<!-- Main navigation -->
+			<nav class="nav">
+				<button
+					class="rail-button active"
+					data-tooltip="Workspace"
+					aria-label="Workspace"
+				>
+					<svg class="icon" viewBox="0 0 24 24">
+						<path d="M4 4h7v7H4z" />
+						<path d="M13 4h7v7h-7z" />
+						<path d="M4 13h7v7H4z" />
+						<path d="M13 13h7v7h-7z" />
+					</svg>
+				</button>
+
+				<button class="rail-button" data-tooltip="Files" aria-label="Files">
+					<svg class="icon" viewBox="0 0 24 24">
+						<path
+							d="M3 6a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"
+						/>
+					</svg>
+				</button>
+
+				<button class="rail-button" data-tooltip="Search" aria-label="Search">
+					<svg class="icon" viewBox="0 0 24 24">
+						<circle cx="11" cy="11" r="7" />
+						<path d="m20 20-4-4" />
+					</svg>
+				</button>
+
+				<button
+					class="rail-button"
+					data-tooltip="Commands"
+					aria-label="Commands"
+				>
+					<svg class="icon" viewBox="0 0 24 24">
+						<path d="m8 9 4 3-4 3" />
+						<path d="M13 15h4" />
+					</svg>
+				</button>
+
+				<button
+					class="rail-button"
+					data-tooltip="Activity"
+					aria-label="Activity"
+				>
+					<svg class="icon" viewBox="0 0 24 24">```</svg>
+				</button>
+			</nav>
+		</aside>
+	</body>
+</html>

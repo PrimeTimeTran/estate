@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+		<title>Estate Search</title>
+		<script src="https://cdn.tailwindcss.com"></script>
+
+		<link rel="stylesheet" href="/src/styles.css" />
+		<style>
+			html,
+			body {
+				margin: 0;
+				width: 100%;
+				height: 100%;
+				overflow: hidden;
+				background: transparent !important;
+			}
+
+			body {
+				background-color: transparent !important;
+			}
+		</style>
+
+		<script>
+			tailwind.config = {
+				theme: {
+					extend: {
+						colors: {
+							background: 'rgb(var(--color-background) / <alpha-value>)',
+							surface: 'rgb(var(--color-surface) / <alpha-value>)',
+							'surface-container':
+								'rgb(var(--color-surface-container) / <alpha-value>)',
+							primary: 'rgb(var(--color-primary) / <alpha-value>)',
+							'on-primary': 'rgb(var(--color-on-primary) / <alpha-value>)',
+							'on-background':
+								'rgb(var(--color-on-background) / <alpha-value>)',
+							'on-surface': 'rgb(var(--color-on-surface) / <alpha-value>)',
+							outline: 'rgb(var(--color-outline) / <alpha-value>)',
+						},
+						borderRadius: {
+							sm: 'var(--radius-sm)',
+							lg: 'var(--radius-lg)',
+							xl: 'var(--radius-xl)',
+						},
+					},
+				},
+			}
+		</script>
+	</head>
+	<body class="m-0 h-screen w-screen overflow-hidden bg-transparent">
+		<div class="h-full w-full p-1">
+			<div
+				class="flex h-full flex-col overflow-hidden rounded-xl border border-outline/20 bg-surface/90 shadow-2xl"
+			>
+				<!-- tabs -->
+				<div
+					class="flex h-9 shrink-0 items-end border-b border-outline/10 px-2"
+				>
+					<div
+						class="flex h-full items-center rounded-t-lg bg-surface-container px-4 text-sm text-on-surface"
+					>
+						Search
+					</div>
+					<div
+						class="flex h-full items-center rounded-t-lg bg-surface-container px-4 text-sm text-on-surface"
+					>
+						Files
+					</div>
+					<div
+						class="flex h-full items-center rounded-t-lg bg-surface-container px-4 text-sm text-on-surface"
+					>
+						Project
+					</div>
+
+					<div class="ml-auto flex items-center">
+						<button
+							class="flex h-7 w-7 items-center justify-center rounded-md text-on-surface/40 hover:bg-surface-container"
+						>
+							+
+						</button>
+					</div>
+				</div>
+
+				<!-- search -->
+				<div class="flex h-16 shrink-0 items-center gap-4 px-5">
+					<svg
+						class="h-5 w-5 shrink-0 text-on-surface/40"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+					>
+						<circle cx="11" cy="11" r="7" />
+						<path d="m20 20-4-4" />
+					</svg>
+
+					<input
+						autofocus
+						type="text"
+						placeholder="Search Estate..."
+						class="min-w-0 flex-1 bg-transparent text-lg text-on-surface outline-none placeholder:text-on-surface/35"
+					/>
+
+					<kbd
+						class="rounded-md border border-outline/15 bg-surface-container px-2 py-1 text-xs text-on-surface/40"
+					>
+						⌘ K
+					</kbd>
+				</div>
+
+				<!-- dropdown/results -->
+				<div class="flex-1 overflow-y-auto border-t border-outline/10 p-2">
+					<button
+						class="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-primary/10"
+					>
+						<span class="w-5 text-center text-primary">→</span>
+
+						<div class="flex-1">
+							<div class="text-sm text-on-surface">Open File</div>
+
+							<div class="text-xs text-on-surface/40">
+								Search and open a file
+							</div>
+						</div>
+
+						<kbd class="text-xs text-on-surface/30">↵</kbd>
+					</button>
+
+					<button
+						class="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-primary/10"
+					>
+						<span class="w-5 text-center text-on-surface/40">⌕</span>
+
+						<div class="flex-1">
+							<div class="text-sm text-on-surface">Search Everywhere</div>
+
+							<div class="text-xs text-on-surface/40">
+								Search files, symbols, commands and projects
+							</div>
+						</div>
+					</button>
+
+					<button
+						class="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-primary/10"
+					>
+						<span class="w-5 text-center text-on-surface/40">⌘</span>
+
+						<div class="flex-1">
+							<div class="text-sm text-on-surface">Command Palette</div>
+
+							<div class="text-xs text-on-surface/40">
+								Run an Estate command
+							</div>
+						</div>
+					</button>
+				</div>
+			</div>
+		</div>
+	</body>
+</html>

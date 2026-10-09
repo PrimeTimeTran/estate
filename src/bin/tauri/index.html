@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Estate</title>
+		<style>
+			html {
+				scrollbar-gutter: stable;
+			}
+		</style>
+		<script src="https://cdn.tailwindcss.com"></script>
+		<link rel="stylesheet" href="/src/styles.css" />
+		<link rel="stylesheet" href="/template/keyboard/style.css" />
+		<script>
+			tailwind.config = {
+				theme: {
+					extend: {
+						colors: {
+							background: 'rgb(var(--color-background) / <alpha-value>)',
+							surface: 'rgb(var(--color-surface) / <alpha-value>)',
+							'surface-container':
+								'rgb(var(--color-surface-container) / <alpha-value>)',
+							primary: 'rgb(var(--color-primary) / <alpha-value>)',
+							'on-primary': 'rgb(var(--color-on-primary) / <alpha-value>)',
+							'on-background':
+								'rgb(var(--color-on-background) / <alpha-value>)',
+							'on-surface': 'rgb(var(--color-on-surface) / <alpha-value>)',
+							outline: 'rgb(var(--color-outline) / <alpha-value>)',
+						},
+						borderRadius: {
+							sm: 'var(--radius-sm)',
+							lg: 'var(--radius-lg)',
+							xl: 'var(--radius-xl)',
+						},
+					},
+				},
+			}
+		</script>
+	</head>
+
+	<body class="min-h-screen bg-background text-on-background antialiased">
+		<main class="mx-auto max-w-6xl px-6 py-10">
+			<!-- ====================================================== -->
+			<!-- Header                                                 -->
+			<!-- ====================================================== -->
+
+			<header class="mb-8">
+				<div
+					class="mb-2 text-sm font-medium uppercase tracking-widest text-primary"
+				>
+					Estate
+				</div>
+				<h1 class="text-3xl font-semibold tracking-tight">Workspace Context</h1>
+				<p class="mt-2 text-sm text-on-surface/60">
+					Current environment observed by Estate.
+				</p>
+			</header>
+
+			<!-- ====================================================== -->
+			<!-- Status                                                 -->
+			<!-- ====================================================== -->
+
+			<div
+				id="status"
+				class="mb-6 rounded-lg border border-outline/15 bg-surface-container px-4 py-3 text-sm text-on-surface/60"
+			>
+				Connecting to Estate...
+			</div>
+
+			<div class="grid gap-8 lg:grid-cols-[13rem_minmax(0,1fr)]">
+				<aside>
+					<div
+						class="mb-3 px-3 text-xs font-medium uppercase tracking-wider text-on-surface/50"
+					>
+						Views
+					</div>
+					<nav aria-label="Workspace views" class="flex gap-2 lg:flex-col">
+						<button
+							type="button"
+							data-view="everything"
+							aria-pressed="true"
+							class="rounded-md px-3 py-2 text-left text-sm font-medium text-primary bg-primary/10"
+						>
+							Everything
+						</button>
+						<button
+							type="button"
+							data-view="keyboard"
+							aria-pressed="false"
+							class="rounded-md px-3 py-2 text-left text-sm font-medium text-on-surface/70 hover:bg-surface-container"
+						>
+							Keyboard
+						</button>
+					</nav>
+				</aside>
+
+				<div class="min-w-0">
+					<h2
+						id="view-title"
+						class="mb-3 text-sm font-medium uppercase tracking-wider text-on-surface/50"
+					>
+						Everything
+					</h2>
+
+					<!-- ====================================================== -->
+					<!-- Estate Context                                         -->
+					<!-- ====================================================== -->
+
+					<section
+						data-page-section="overview"
+						class="grid gap-4 sm:grid-cols-3"
+					>
+						<!-- Active App -->
+						<article
+							class="rounded-lg border border-outline/15 bg-surface-container p-5 shadow-sm"
+						>
+							<div
+								class="mb-3 text-xs font-medium uppercase tracking-wider text-on-surface/50"
+							>
+								Active App
+							</div>
+
+							<strong
+								id="active-app"
+								class="block truncate text-lg font-medium text-on-surface"
+							>
+								...
+							</strong>
+						</article>
+
+						<!-- Workspace -->
+						<article
+							class="rounded-lg border border-outline/15 bg-surface-container p-5 shadow-sm"
+						>
+							<div
+								class="mb-3 text-xs font-medium uppercase tracking-wider text-on-surface/50"
+							>
+								Workspace
+							</div>
+
+							<strong
+								id="workspace"
+								class="block truncate text-lg font-medium text-on-surface"
+							>
+								...
+							</strong>
+						</article>
+
+						<!-- Mode -->
+						<article
+							class="rounded-lg border border-outline/15 bg-surface-container p-5 shadow-sm"
+						>
+							<div
+								class="mb-3 text-xs font-medium uppercase tracking-wider text-on-surface/50"
+							>
+								Mode
+							</div>
+
+							<strong
+								id="mode"
+								class="inline-flex rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary"
+							>
+								...
+							</strong>
+						</article>
+					</section>
+
+					<!-- ====================================================== -->
+					<!-- Connection + Tauri Runtime                             -->
+					<!-- ====================================================== -->
+
+					<section
+						data-page-section="overview"
+						class="mt-6 grid gap-4 sm:grid-cols-2"
+					>
+						<!-- IPC Connection -->
+						<article
+							class="rounded-lg border border-outline/15 bg-surface-container p-5"
+						>
+							<div
+								class="mb-2 text-xs font-medium uppercase tracking-wider text-on-surface/50"
+							>
+								IPC Connection
+							</div>
+
+							<code
+								id="estate-connection"
+								class="block truncate font-mono text-xs text-on-surface/70"
+							>
+								...
+							</code>
+						</article>
+
+						<!-- Tauri PID -->
+						<article
+							class="rounded-lg border border-outline/15 bg-surface-container p-5"
+						>
+							<div
+								class="mb-2 text-xs font-medium uppercase tracking-wider text-on-surface/50"
+							>
+								Tauri PID
+							</div>
+
+							<strong id="tauri-pid" class="font-mono text-sm"> ... </strong>
+						</article>
+					</section>
+
+					<!-- ====================================================== -->
+					<!-- Tauri Runtime                                         -->
+					<!-- ====================================================== -->
+
+					<section data-page-section="overview" class="mt-6">
+						<h2
+							class="mb-3 text-sm font-medium uppercase tracking-wider text-on-surface/50"
+						>
+							Tauri Runtime
+						</h2>
+
+						<div class="grid gap-4 sm:grid-cols-2">
+							<!-- Platform -->
+							<article
+								class="rounded-lg border border-outline/15 bg-surface-container p-5"
+							>
+								<div class="mb-2 text-xs text-on-surface/50">Platform</div>
+
+								<strong id="tauri-platform" class="text-sm font-medium">
+									...
+								</strong>
+							</article>
+
+							<!-- Architecture -->
+							<article
+								class="rounded-lg border border-outline/15 bg-surface-container p-5"
+							>
+								<div class="mb-2 text-xs text-on-surface/50">Architecture</div>
+
+								<strong id="tauri-arch" class="text-sm font-medium">
+									...
+								</strong>
+							</article>
+
+							<!-- CWD -->
+							<article
+								class="rounded-lg border border-outline/15 bg-surface-container p-5 sm:col-span-2"
+							>
+								<div class="mb-2 text-xs text-on-surface/50">
+									Working Directory
+								</div>
+
+								<strong id="tauri-cwd" class="block truncate font-mono text-sm">
+									...
+								</strong>
+							</article>
+						</div>
+					</section>
+
+					<!-- ====================================================== -->
+					<!-- Filesystem IPC                                         -->
+					<!-- ====================================================== -->
+
+					<section data-page-section="filesystem">
+						<div class="grid gap-4 sm:grid-cols-2">
+							<!-- fs_list -->
+							<article
+								class="rounded-lg border border-outline/15 bg-surface-container p-5 sm:col-span-2"
+							>
+								<div class="mb-2 text-xs text-on-surface/50">fs_list</div>
+
+								<pre
+									id="fs-list"
+									class="max-h-64 overflow-auto rounded-md bg-background p-4 font-mono text-xs text-on-surface/70"
+								>
+									...</pre>
+							</article>
+
+							<!-- fs_read -->
+							<article
+								class="rounded-lg border border-outline/15 bg-surface-container p-5"
+							>
+								<div class="mb-2 text-xs text-on-surface/50">fs_read</div>
+
+								<pre
+									id="fs-read"
+									class="overflow-auto rounded-md bg-background p-4 font-mono text-xs text-on-surface/70"
+								>
+									...</pre>
+							</article>
+
+							<!-- fs_create -->
+							<article
+								class="rounded-lg border border-outline/15 bg-surface-container p-5"
+							>
+								<div class="mb-2 text-xs text-on-surface/50">fs_create</div>
+
+								<strong
+									id="fs-create"
+									class="text-sm font-medium text-on-surface"
+								>
+									...
+								</strong>
+							</article>
+							<!-- fs_update -->
+							<article
+								class="rounded-lg border border-outline/15 bg-surface-container p-5"
+							>
+								<div class="mb-2 text-xs text-on-surface/50">fs_update</div>
+
+								<strong
+									id="fs-update"
+									class="text-sm font-medium text-on-surface"
+								>
+									...
+								</strong>
+							</article>
+
+							<!-- fs_delete -->
+							<article
+								class="rounded-lg border border-outline/15 bg-surface-container p-5"
+							>
+								<div class="mb-2 text-xs text-on-surface/50">fs_delete</div>
+								<strong
+									id="fs-delete"
+									class="text-sm font-medium text-on-surface"
+								>
+									...
+								</strong>
+							</article>
+						</div>
+					</section>
+					<section
+						id="keyboard-panel"
+						class="keyboard-panel hidden"
+						data-page-section="keyboard"
+						hidden
+					>
+						<div class="keyboard">
+							<div class="board">
+								<div class="row function-row">
+									<div class="key" data-key="ESC">Esc</div>
+									<div class="key" data-key="F1">F1</div>
+									<div class="key" data-key="F2">F2</div>
+									<div class="key" data-key="F3">F3</div>
+									<div class="key" data-key="F4">F4</div>
+									<div class="key" data-key="F5">F5</div>
+									<div class="key" data-key="F6">F6</div>
+									<div class="key" data-key="F7">F7</div>
+									<div class="key" data-key="F8">F8</div>
+									<div class="key" data-key="F9">F9</div>
+									<div class="key" data-key="F10">F10</div>
+									<div class="key" data-key="F11">F11</div>
+									<div class="key" data-key="F12">F12</div>
+								</div>
+
+								<div class="row">
+									<div class="key" data-key="BACKTICK">` ~</div>
+									<div class="key" data-key="1">1 !</div>
+									<div class="key" data-key="2">2 @</div>
+									<div class="key" data-key="3">3 #</div>
+									<div class="key" data-key="4">4 $</div>
+									<div class="key" data-key="5">5 %</div>
+									<div class="key" data-key="6">6 ^</div>
+									<div class="key" data-key="7">7 &amp;</div>
+									<div class="key" data-key="8">8 *</div>
+									<div class="key" data-key="9">9 (</div>
+									<div class="key" data-key="0">0 )</div>
+									<div class="key" data-key="-">- _</div>
+									<div class="key" data-key="=">= +</div>
+									<div class="key backspace" data-key="DELETE">&larr;</div>
+								</div>
+
+								<div class="row">
+									<div class="key tab" data-key="TAB">&rarrb;</div>
+									<div class="key" data-key="Q">Q</div>
+									<div class="key" data-key="W">W</div>
+									<div class="key" data-key="E">E</div>
+									<div class="key" data-key="R">R</div>
+									<div class="key" data-key="T">T</div>
+									<div class="key" data-key="Y">Y</div>
+									<div class="key" data-key="U">U</div>
+									<div class="key" data-key="I">I</div>
+									<div class="key" data-key="O">O</div>
+									<div class="key" data-key="P">P</div>
+									<div class="key" data-key="[">[ {</div>
+									<div class="key" data-key="]">] }</div>
+									<div class="key backslash" data-key="\\">\ |</div>
+								</div>
+
+								<div class="row">
+									<div class="key caps" data-key="CAPS">&mapstoup;</div>
+									<div class="key" data-key="A">A</div>
+									<div class="key" data-key="S">S</div>
+									<div class="key" data-key="D">D</div>
+									<div class="key" data-key="F">F</div>
+									<div class="key" data-key="G">G</div>
+									<div class="key" data-key="H">H</div>
+									<div class="key" data-key="J">J</div>
+									<div class="key" data-key="K">K</div>
+									<div class="key" data-key="L">L</div>
+									<div class="key" data-key=";">; :</div>
+									<div class="key" data-key="'">' "</div>
+									<div class="key enter" data-key="ENTER">&ldsh;</div>
+								</div>
+
+								<div class="row">
+									<div class="key lshift" data-key="LSHIFT">&uarr;</div>
+									<div class="key" data-key="Z">Z</div>
+									<div class="key" data-key="X">X</div>
+									<div class="key" data-key="C">C</div>
+									<div class="key" data-key="V">V</div>
+									<div class="key" data-key="B">B</div>
+									<div class="key" data-key="N">N</div>
+									<div class="key" data-key="M">M</div>
+									<div class="key" data-key=",">, &lt;</div>
+									<div class="key" data-key=".">. &gt;</div>
+									<div class="key" data-key="/">/ ?</div>
+									<div class="key rshift" data-key="RSHIFT">&uarr;</div>
+									<div class="key nav-key" data-key="ARROWUP">&uarr;</div>
+								</div>
+
+								<div class="row">
+									<div class="key ctrl" data-key="LCTRL">Ctrl</div>
+									<div class="key cmd" data-key="LCMD">Cmd</div>
+									<div class="key alt" data-key="LOPT">Alt</div>
+									<div class="key space" data-key="SPACE">&mdash;</div>
+									<div class="key alt" data-key="ROPT">Alt</div>
+									<div class="key menu" data-key="RCMD">Menu</div>
+									<div class="key ctrl" data-key="RCTRL">Ctrl</div>
+									<div class="key fn" data-key="FN">Fn</div>
+									<div class="key nav-key" data-key="ARROWLEFT">&larr;</div>
+									<div class="key nav-key" data-key="ARROWDOWN">&darr;</div>
+									<div class="key nav-key" data-key="ARROWRIGHT">&rarr;</div>
+								</div>
+							</div>
+						</div>
+
+						<div class="theme">
+							<label for="keyboard-theme">Theme:</label>
+							<select id="keyboard-theme">
+								<option value="spring">Spring</option>
+								<option value="summer">Summer</option>
+								<option value="autumn">Autumn</option>
+								<option value="winter" selected>Winter</option>
+								<option value="custom">Custom</option>
+							</select>
+						</div>
+					</section>
+				</div>
+			</div>
+		</main>
+
+		<script>
+			const viewButtons = document.querySelectorAll('[data-view]')
+			const pageSections = document.querySelectorAll('[data-page-section]')
+			const viewTitle = document.querySelector('#view-title')
+
+			viewButtons.forEach((button) => {
+				button.addEventListener('click', () => {
+					const selectedView = button.dataset.view
+					viewTitle.textContent =
+						selectedView === 'everything' ? 'Everything' : 'Keyboard'
+
+					viewButtons.forEach((item) => {
+						const isSelected = item === button
+						item.setAttribute('aria-pressed', String(isSelected))
+						item.classList.toggle('bg-primary/10', isSelected)
+						item.classList.toggle('text-primary', isSelected)
+						item.classList.toggle('text-on-surface/70', !isSelected)
+					})
+
+					pageSections.forEach((section) => {
+						const shouldHide =
+							selectedView === 'everything'
+								? section.dataset.pageSection === 'keyboard'
+								: section.dataset.pageSection !== selectedView
+						section.hidden = shouldHide
+						section.classList.toggle('hidden', shouldHide)
+					})
+				})
+			})
+		</script>
+		<script type="module" src="/template/keyboard/main.ts"></script>
+		<script type="module" src="/src/main.ts"></script>
+	</body>
+</html>

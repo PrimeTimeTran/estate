@@ -1,0 +1,41 @@
+[workspace]
+
+[package]
+name = "estate_ui"
+version = "0.1.0"
+description = "A Tauri App"
+authors = ["Loi Tran"]
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/PrimeTimeTran/estate-ipc"
+readme = "README.md"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "servo_tauri_app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+anyhow = "1.0.104"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri = { version = "2", features = [] }
+tokio = "1.53.2"
+uuid = { version = "1.26.1", features = ["v4"] }
+estate = { package = "estate", path = "../../../.." }
+cocoa = "0.27.0"
+
+# Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true
