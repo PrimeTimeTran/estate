@@ -22,6 +22,15 @@ impl Agent {
 		let action = AgentAction::try_from(raw)?;
 		Ok(action)
 	}
+	pub async fn run_agent(&self, prompt: &str) -> Result<String> {
+		let task = AgentTask::new(prompt.to_string());
+		let (event_tx, _event_rx) = tokio::sync::mpsc::unbounded_channel();
+		let result = self.run_agent_loop(task, event_tx).await?;
+		Ok(result
+			.chat
+			.or(result.summary)
+			.unwrap_or_else(|| "Agent completed".to_string()))
+	}
 	pub async fn run_agent_loop(
 		&self,
 		task: AgentTask,

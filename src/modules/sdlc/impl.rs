@@ -393,7 +393,7 @@ impl Evaluator {
 						Question::from(Score::new(
 							"How well does this goal define a useful timeframe or completion boundary \
 							 for the software task?",
-							[ 
+							[
 								"Unusable: there is no meaningful completion boundary",
 								"Weak: completion timing or boundaries are substantially unclear",
 								"Usable: the scope provides an implicit or approximate completion boundary",
@@ -454,6 +454,7 @@ impl Evaluator {
 	async fn intent(&self, ctx: &CtxEvaluation) -> Result<QACheck> {
 		let time_started = Utc::now();
 		let intent = ctx.get(SrcArtifact::Intent)?;
+		tracing::info!("Evaluator intent {:?}", intent);
 		let response = self
 			.jev
 			.system_one(
@@ -883,8 +884,8 @@ impl Pipeline {
 	}
 	fn init_session_dir(kontex: &Kontex, title: &str) -> Result<PathBuf> {
 		let sessions_dir = kontex.path(FW::Session)?;
-		let date = Local::now().format("%Y-%m-%d");
-		let dir = sessions_dir.join(format!("{date}.{title}"));
+		// let date = Local::now().format("%Y-%m-%d");
+		let dir = sessions_dir;
 		FS::ensure_dir(&dir)?;
 		Ok(dir)
 	}
@@ -914,10 +915,11 @@ impl Pipeline {
 	fn write(path: PathBuf, contents: String) -> Result<()> {
 		Ok(std::fs::write(path, contents)?)
 	}
-
 	fn emit(&self, event: SdlcEvent) {
 		let _ = self.event_tx.send(event.clone());
-		let path = self.session.dir.join(LOG_EVENT_NAME);
+
+		let path = std::path::Path::new(SDLC_LOG_DIR).join(SDLC_LOG_FILE_NAME);
+
 		if let Ok(mut file) = std::fs::OpenOptions::new()
 			.create(true)
 			.append(true)
@@ -1760,19 +1762,15 @@ impl PipeRunner<'_> {
 				self.pipeline.retry(stage)?;
 				Ok(RunControl::Continue)
 			}
-
 			SdlcInput::Reviewed => {
 				let next = stage
 					.next()
 					.ok_or_else(|| anyhow!("Stage {stage:?} has no next stage"))?;
-
 				self.transition(next)?;
-
 				self.emit(SdlcEvent::StageTransitioned {
 					from: stage,
 					to: next,
 				});
-
 				Ok(RunControl::Continue)
 			}
 
@@ -1805,6 +1803,7 @@ impl PipeRunner<'_> {
 		}
 	}
 	async fn evaluate(&self, execution: &Execution) -> Result<QACheck> {
+		tracing::info!("evaluatepipelinerunner {:?}", execution);
 		let stage = execution.stage;
 		let checks = self.pipeline.run_checks(stage).await?;
 		let structural = self.evaluate_checks(checks)?;
@@ -1970,6 +1969,7 @@ impl PipeRunner<'_> {
 			phase: Phase::Evaluating,
 		});
 		self.emit(SdlcEvent::EvaluationStarted { stage });
+		tracing::info!("handle_evaluation {:?}", execution);
 		match self.pipeline.evaluate(&execution).await {
 			Ok(evaluation) => {
 				self.emit(SdlcEvent::Evaluated {
@@ -2311,59 +2311,155 @@ impl PipeRunner<'_> {
 	}
 
 	async fn on_intent(&mut self, input: StageInput) -> Result<RunResult> {
-		let (stage, session_dir) = self.stage_dir();
+		let (stage, _session_dir) = self.stage_dir();
 		let write_dir = self.write_dir();
 		let goal = self.session().prompt.clone();
+
 		if stage != Stage::Intent {
 			return Err(anyhow!("cannot execute Intent stage while at {stage:?}"));
 		}
+
 		if goal.trim().is_empty() {
 			return Err(anyhow!("SDLC session goal is empty"));
 		}
-		let prompt = p::gen_intent(&goal)?;
-		std::fs::write(SYS_PROMPT_INTENT, &prompt).context("writing Intent prompt debug file")?;
-		if prompt.trim().is_empty() {
-			return Err(anyhow!("generated Intent prompt is empty"));
+
+		// Read the canonical Intent template. The generated artifact must follow
+		// this structure while describing the user's actual goal.
+		let template = std::fs::read_to_string(SDLC_TEMPLATE_INTENT)
+			.with_context(|| format!("reading Intent template from {}", SDLC_TEMPLATE_INTENT))?;
+
+		if template.trim().is_empty() {
+			return Err(anyhow!(
+				"Intent template is empty: {}",
+				SDLC_TEMPLATE_INTENT
+			));
 		}
-		let generated = self.pipeline.run_task(&prompt).await?;
+
+		let prompt = format!(
+			"You are an SDLC Intent document writer.
+Your task is to transform the user's goal into a new Intent artifact using the supplied template.
+
+RULES:
+1. The user's goal is the source of truth for the content.
+2. The template is the source of truth for the document structure.
+3. Produce the complete Intent document, filling in every section of the template.
+4. Preserve the template's five numbered sections and their headings.
+5. Replace placeholder instructions with concrete information derived from the user's goal.
+6. Do not claim that implementation, testing, verification, or acceptance criteria have been completed. This is an Intent document describing what should be built, not a report of completed work.
+7. Do not return a summary, status update, or statement that requirements have been satisfied.
+8. Do not invent facts. Mark genuinely unknown details as unspecified.
+9. Return only the completed Markdown document.
+
+Before responding, verify that your output contains all five sections:
+- Problem
+- Proposed Outcome
+- Affected Users and Systems
+- Constraints
+- Open Questions
+
+If any section is missing, complete it before returning the document.
+
+<INTENT_TEMPLATE>
+{template}
+</INTENT_TEMPLATE>
+
+<USER_GOAL>
+{goal}
+</USER_GOAL>
+
+Return only the completed Intent artifact in Markdown. Do not include
+preamble, commentary, or an explanation of your process."
+		);
+
+		std::fs::write(SYS_PROMPT_INTENT, &prompt).context("writing Intent prompt debug file")?;
+
+		let generated = self
+			.pipeline
+			.system
+			.runtime
+			.generate(&prompt)
+			.await
+			.context("generating Intent artifact from template and user goal")?;
+		// tracing::debug!(
+		// 	generated_chars = generated.len(),
+		// 	generated_lines = generated.lines().count(),
+		// 	generated = %generated,
+		// 	"INTENT: received generated response"
+		// );
+
 		if generated.trim().is_empty() {
 			return Err(anyhow!("generated Intent artifact is empty"));
 		}
-		Pipeline::write(write_dir.join("intent.md"), generated)?;
+		let output_path = write_dir.join("intent.md");
+
+		// tracing::debug!(
+		// 	path = %output_path.display(),
+		// 	"INTENT: writing generated artifact"
+		// );
+
+		Pipeline::write(output_path, generated)?;
 		self.pipeline.persist_progress("Intent stage completed")?;
 		Ok(RunResult::Intent)
 	}
 	async fn on_spec(&mut self, input: StageInput) -> Result<RunResult> {
-		let (stage, session_dir) = self.stage_dir();
+		let (stage, _session_dir) = self.stage_dir();
+		let write_dir = self.write_dir();
+
 		if stage != Stage::Spec {
 			return Err(anyhow!("cannot execute Spec stage while at {stage:?}"));
 		}
+
 		let intent = self.pipeline.session_read("intent.md")?;
 		if intent.trim().is_empty() {
 			return Err(anyhow!("Intent artifact is empty"));
 		}
+
 		let is_revision = matches!(input, StageInput::Revision { .. });
+
 		let prompt = match input {
-			StageInput::Initial => p::gen_spec(&intent)?,
+			StageInput::Initial => {
+				println!("[SDLC] Spec input = Initial");
+				p::gen_spec(&intent)?
+			}
 			StageInput::Revision { evaluation } => {
+				println!("[SDLC] Spec input = Revision; evaluation = {evaluation:#?}");
+
 				let spec = self.pipeline.session_read("spec.md")?;
+				if spec.trim().is_empty() {
+					return Err(anyhow!("Cannot revise Spec because spec.md is empty"));
+				}
+
 				p::revise_spec(&intent, &spec, &evaluation)?
 			}
 		};
+
 		if prompt.trim().is_empty() {
 			return Err(anyhow!("generated Spec prompt is empty"));
 		}
-		std::fs::write(SYS_PROMPT_SPEC, &prompt).context("writing spec prompt debug file")?;
-		let generated = self.pipeline.run_task(&prompt).await?;
+
+		std::fs::write(SYS_PROMPT_SPEC, &prompt).context("writing Spec prompt debug file")?;
+
+		let generated = self
+			.pipeline
+			.system
+			.runtime
+			.generate(&prompt)
+			.await
+			.context("generating Spec artifact from Intent and prompt")?;
+
 		if generated.trim().is_empty() {
 			return Err(anyhow!("generated Spec artifact is empty"));
 		}
-		Pipeline::write(session_dir.join("spec.md"), generated)?;
+
+		let output_path = write_dir.join("spec.md");
+		Pipeline::write(output_path, generated)?;
+
 		self.pipeline.persist_progress(if is_revision {
 			"Spec revision completed"
 		} else {
 			"Spec stage completed"
 		})?;
+
 		Ok(RunResult::Spec)
 	}
 	async fn on_plan(&mut self, input: StageInput) -> Result<RunResult> {
@@ -2384,7 +2480,14 @@ impl PipeRunner<'_> {
 			return Err(anyhow!("generated Plan prompt is empty"));
 		}
 		std::fs::write(SYS_PROMPT_PLAN, &prompt).context("writing plan prompt debug file")?;
-		let generated = self.pipeline.run_task(&prompt).await?;
+		// let generated = self.pipeline.run_task(&prompt).await?;
+		let generated = self
+			.pipeline
+			.system
+			.runtime
+			.generate(&prompt)
+			.await
+			.context("generating Plan artifact from Intent and Spec")?;
 		if generated.trim().is_empty() {
 			return Err(anyhow!("generated Plan artifact is empty"));
 		}
@@ -2393,6 +2496,8 @@ impl PipeRunner<'_> {
 		Ok(RunResult::Plan)
 	}
 	async fn on_build(&mut self, input: StageInput) -> Result<RunResult> {
+  	// SDLC_FORCE_CONTINUE=1 SDLC_PLAIN=1 \
+  	// cargo run --bin sdlc --features sdlc
 		let (stage, session_dir) = self.stage_dir();
 		if stage != Stage::Build {
 			return Err(anyhow::anyhow!(
@@ -2406,6 +2511,8 @@ impl PipeRunner<'_> {
 		let plan: String = tokio::fs::read_to_string(session_dir.join("plan.md"))
 			.await
 			.context("reading plan.md")?;
+
+		tracing::info!("hello on_build {:?}", session_dir);
 		self.pipeline.system.add_file(session_dir.join("intent.md"));
 		self.pipeline.system.add_file(session_dir.join("spec.md"));
 		self.pipeline.system.add_file(session_dir.join("plan.md"));

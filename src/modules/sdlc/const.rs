@@ -7,24 +7,33 @@ pub const TODO: &'static str = r#"
 	- Add progressive disclosure
 "#;
 
-pub static SDLC_LOG_DIR: LazyLock<PathBuf> =
-	LazyLock::new(|| PathBuf::from("/Users/future/kb/project/crates/estate/log"));
+// pub static SDLC_LOG_DIR: LazyLock<PathBuf> =
+// LazyLock::new(|| PathBuf::from("/Users/future/kb/project/crates/estate/log"));
+pub const SDLC_LOG_DIR: &str = "/Users/future/kb/project/crates/estate/log";
+pub const SDLC_LOG_FILE_NAME: &str = "events.jsonl";
 
 pub static DEFAULT_NAUL_BAR: f64 = 0.40;
 pub static DEFAULT_MODEL: &str = "qwen3:8b";
+
+pub static SDLC_TEMPLATE_INTENT: &str =
+	"/Users/future/kb/project/crates/estate/src/bin/template/intent.md";
+pub static SDLC_TEMPLATE_SPEC: &str =
+	"/Users/future/kb/project/crates/estate/src/bin/template/spec.md";
+pub static SDLC_TEMPLATE_PLAN: &str =
+	"/Users/future/kb/project/crates/estate/src/bin/template/plan.md";
+
 pub static SDLC_GOAL: &str =
 	include_str!("/Users/future/kb/project/crates/estate/ai/template/user.goal.md");
 
 pub static SYS_PROMPT_INTENT: &str =
-	"/Users/future/kb/project/crates/estate/log/sys-prompt-intent.md";
-pub static SYS_PROMPT_SPEC: &str = "/Users/future/kb/project/crates/estate/log/sys-prompt-spec.md";
-pub static SYS_PROMPT_PLAN: &str = "/Users/future/kb/project/crates/estate/log/sys-prompt-plan.md";
+	"/Users/future/kb/project/crates/estate/log/SYS_PROMPT_INTENT.md";
+pub static SYS_PROMPT_SPEC: &str = "/Users/future/kb/project/crates/estate/log/SYS_PROMPT_SPEC.md";
+pub static SYS_PROMPT_PLAN: &str = "/Users/future/kb/project/crates/estate/log/SYS_PROMPT_PLAN.md";
 
 pub static OLLAMA_REQUEST: &str = "/Users/future/kb/project/crates/estate/log/ollama-request.json";
 pub static OLLAMA_RESPONSE: &str =
 	"/Users/future/kb/project/crates/estate/log/ollama-response.json";
 
-pub const LOG_EVENT_NAME: &str = "events.jsonl";
 pub const INTENT_PROMPT: &str =
 	include_str!("/Users/future/kb/project/crates/estate/ai/template/INITIAL_PROMPT.md");
 pub const DEMO_COMPLETE_DELAY: Duration = Duration::from_secs(1);

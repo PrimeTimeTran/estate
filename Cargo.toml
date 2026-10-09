@@ -53,10 +53,6 @@ name = "core"
 path = "src/bin/[core].rs"
 
 [[bin]]
-name = "focus"
-path = "src/bin/[focus].rs"
-
-[[bin]]
 name = "mpl"
 path = "src/bin/[mpl].rs"
 
