@@ -638,19 +638,20 @@ impl Agent {
 		));
 
 		let prompt = run.ctx.prompt.as_deref().unwrap_or("");
+		let prompt_chars = prompt.chars().count();
+		let estimated_tokens = prompt_chars.div_ceil(6);
 
 		section!("AGENT run_agent_loop CONTEXT");
+
 		log_run(
 			&mut run.clone(),
 			format!(
-				"RUN START: prompt_chars={}, prompt_lines={}, history={}, commands={}, errors={}, logs={}, tokens={}, files={}",
-				prompt.len(),
+				"RUN START: prompt_chars={prompt_chars}, estimated_tokens={estimated_tokens} (1 token / 6 chars), prompt_lines={}, history={}, commands={}, errors={}, logs={}, files={}",
 				prompt.lines().count(),
 				run.ctx.history.len(),
 				run.commands.len(),
 				run.errors.len(),
 				run.ctx.logs.len(),
-				self.tokens_seen,
 				self.files_seen,
 			),
 		);
@@ -664,9 +665,7 @@ impl Agent {
 		);
 
 		let context_log = format!(
-			"Initial context: prompt_chars={}, prompt_lines={}, workspace={}",
-			prompt.len(),
-			prompt.lines().count(),
+			"Initial context: prompt_chars={prompt_chars}, estimated_tokens={estimated_tokens}, workspace={}",
 			run.ctx.workspace,
 		);
 

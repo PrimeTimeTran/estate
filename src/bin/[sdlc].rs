@@ -60,28 +60,11 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 	if !use_tui {
 		println!(">>> starting runtime");
-
-		let status = StatusBar::new();
-
-		// Draw it once immediately.
-		status.draw()?;
-
-		// Tick independently of the pipeline.
-		let status_task = tokio::spawn(async move {
-			let mut ticker = tokio::time::interval(Duration::from_secs(1));
-
-			loop {
-				ticker.tick().await;
-
-				if status.draw().is_err() {
-					break;
-				}
-			}
-		});
-
+		let mut stdout = std::io::stdout();
+		let input = String::new();
+		render_plain_guard(&input, &mut stdout)?;
 		if resume_from_build {
 			println!(">>> resuming from Build");
-
 			runtime
 				.resume_from(Stage::Build, &mut input_rx)
 				.await
@@ -89,11 +72,10 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 		} else {
 			runtime.run(&mut input_rx).await.context("runtime.run")?;
 		}
-		status_task.abort();
 		println!(">>> runtime finished");
+		return Ok(());
 	}
 	let is_real_run = std::env::var_os("DRY_RUN").is_none();
-
 	let run = async {
 		if is_real_run {
 			runtime.run(&mut input_rx).await
@@ -218,4 +200,40 @@ impl Drop for Guard {
 			crossterm::terminal::LeaveAlternateScreen
 		);
 	}
+}
+fn render_plain_guard(input: &str, stdout: &mut std::io::Stdout) -> std::io::Result<()> {
+	use crossterm::{
+		QueueableCommand, cursor,
+		style::{Color, Print, ResetColor, SetForegroundColor},
+		terminal::{self, ClearType},
+	};
+
+	let (width, height) = terminal::size()?;
+	let row = height.saturating_sub(1);
+	let now = chrono::Local::now().format("%H:%M:%S").to_string();
+
+	stdout.queue(cursor::MoveTo(0, row))?;
+	stdout.queue(terminal::Clear(ClearType::CurrentLine))?;
+	stdout.queue(SetForegroundColor(Color::Green))?;
+	stdout.queue(Print("> "))?;
+	stdout.queue(ResetColor)?;
+
+	let clock_width = now.len() + 2;
+	let input_width = (width as usize).saturating_sub(clock_width + 2);
+	let visible_input: String = input.chars().take(input_width).collect();
+
+	stdout.queue(Print(visible_input))?;
+
+	if width as usize > clock_width {
+		stdout.queue(cursor::MoveTo(
+			width.saturating_sub(clock_width as u16),
+			row,
+		))?;
+		stdout.queue(SetForegroundColor(Color::Cyan))?;
+		stdout.queue(Print(format!(" {now}")))?;
+		stdout.queue(ResetColor)?;
+	}
+
+	stdout.queue(cursor::Show)?;
+	stdout.flush()
 }
