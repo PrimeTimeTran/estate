@@ -145,6 +145,137 @@ impl Agent {
 			};
 
 			match action {
+				AgentAction::RunProgram { program, args, cwd } => {
+					let display_command = std::iter::once(program.as_str())
+						.chain(args.iter().map(String::as_str))
+						.collect::<Vec<_>>()
+						.join(" ");
+
+					println!("PROGRAM: {display_command}");
+
+					let workspace_before = WSSnapshot::capture(&self.workspace.cwd)?;
+
+					let mut shell_command = ShellCommand::program(program.clone(), args.clone());
+
+					// The runtime workspace is authoritative; don't allow the model
+					// to execute in an arbitrary directory.
+					let _requested_cwd = cwd;
+					shell_command.cwd = Some(self.workspace.cwd.clone());
+
+					let result = match self.tools.shell.run(shell_command).await {
+						Ok(result) => result,
+						Err(error) => {
+							let workspace_after = WSSnapshot::capture(&self.workspace.cwd)?;
+
+							let changed_paths =
+								reconcile_agent_artifacts(&mut run.ctx, &workspace_before, &workspace_after)?;
+
+							let message = format!(
+								"Program execution failed for `{display_command}`: {error:#}\n\
+							Observed workspace changes:\n{}",
+								format_changed_files(&changed_paths),
+							);
+
+							eprintln!("{message}");
+
+							run.record_error(AgentError {
+								step: Some(step),
+								kind: "command_execution".into(),
+								message: message.clone(),
+								raw_response: None,
+								recoverable: true,
+								timestamp: chrono::Utc::now(),
+							});
+
+							run.ctx.history.push(AgentObservation::Current {
+								message: format!(
+									"{message}\n\
+								The program did not return a completed result. Inspect the error \
+								and observed changes before choosing the next action."
+								),
+							});
+
+							continue;
+						}
+					};
+
+					section!("PROGRAM RESULT");
+					println!("program: {program}");
+					println!("args: {args:?}");
+					println!("exit: {:?}", result.exit_code);
+
+					println!(
+						"stdout ({} chars, {} lines):\n{}",
+						result.stdout.len(),
+						result.stdout.lines().count(),
+						preview_lines(&result.stdout, SHELL_OUTPUT_PREVIEW_LINES)
+					);
+
+					println!(
+						"stderr ({} chars, {} lines):\n{}",
+						result.stderr.len(),
+						result.stderr.lines().count(),
+						preview_lines(&result.stderr, SHELL_OUTPUT_PREVIEW_LINES)
+					);
+
+					let workspace_after = WSSnapshot::capture(&self.workspace.cwd)?;
+
+					let changed_paths =
+						reconcile_agent_artifacts(&mut run.ctx, &workspace_before, &workspace_after)?;
+
+					println!(
+						"FILES CHANGED BY ACTION:\n{}",
+						format_changed_files(&changed_paths),
+					);
+
+					let success = result.exit_code == Some(0);
+
+					run.record_command(CommandRecord {
+						step,
+						command: display_command.clone(),
+						exit_code: result.exit_code,
+						stdout: result.stdout.clone(),
+						stderr: result.stderr.clone(),
+						success,
+						error: if success {
+							None
+						} else {
+							Some(format!("Program exited with status {:?}", result.exit_code))
+						},
+						timestamp: chrono::Utc::now(),
+					});
+
+					if !success {
+						run.record_error(AgentError {
+							step: Some(step),
+							kind: "command_exit".into(),
+							message: format!(
+								"Program `{display_command}` exited with status {:?}.\n\
+							Stderr:\n{}",
+								result.exit_code,
+								preview(&result.stderr, 1000),
+							),
+							raw_response: None,
+							recoverable: true,
+							timestamp: chrono::Utc::now(),
+						});
+					}
+
+					run.ctx.history.push(AgentObservation::Current {
+						message: format!(
+							"Runtime filesystem reconciliation after program `{display_command}`:\n\
+						{}\n\
+						These changes were observed by the runtime. Inspect and verify \
+						the relevant files before claiming completion.",
+							format_changed_files(&changed_paths),
+						),
+					});
+
+					run
+						.ctx
+						.history
+						.push(AgentObservation::RunCommand { result });
+				}
 				AgentAction::Current { message } => {
 					let now = chrono::Local::now().format("%Y-%m-%d").to_string();
 					let response = format!("Context update: The current date is {now}. {message}");
@@ -541,29 +672,60 @@ impl AgentCtx {
 		})
 	}
 }
+
 impl TryFrom<LlmAction> for AgentAction {
-	type Error = Error;
-	fn try_from(v: LlmAction) -> Result<Self, Self::Error> {
-		match v.action.as_str() {
-			// 			"read_file" => Ok(Self::ReadFile {
-			// 				path: v.path.ok_or_else(|| anyhow!("missing path"))?,
-			// 			}),
-			//
-			// 			"write_file" => Ok(Self::WriteFile {
-			// 				path: v.path.ok_or_else(|| anyhow!("missing path"))?,
-			// 				content: v.content.ok_or_else(|| anyhow!("missing content"))?,
-			// 			}),
-			//
-			// 			"current" => Ok(Self::Current {
-			// 				message: v.message.unwrap_or_default(),
-			// 			}),
-			"run_command" => Ok(Self::RunCommand {
-				command: v.command.ok_or_else(|| anyhow!("missing command"))?,
-			}),
-			"finish" => Ok(Self::Finish {
-				message: v.message.unwrap_or_default(),
-			}),
-			other => Err(anyhow!("unknown action: {}", other)),
+	type Error = anyhow::Error;
+
+	fn try_from(raw: LlmAction) -> Result<Self> {
+		match raw.action.trim() {
+			"run_command" => match (raw.command, raw.args) {
+				(Some(command), None) if !command.trim().is_empty() => Ok(Self::RunCommand { command }),
+
+				(None, Some(args)) if !args.is_empty() => {
+					let mut args = args.into_iter();
+					let program = args
+						.next()
+						.filter(|program| !program.trim().is_empty())
+						.ok_or_else(|| {
+							anyhow::anyhow!("run_command args must start with a non-empty program")
+						})?;
+
+					Ok(Self::RunProgram {
+						program,
+						args: args.collect(),
+						cwd: raw.cwd,
+					})
+				}
+
+				(Some(_), Some(_)) => {
+					anyhow::bail!("ambiguous run_command: provide command or args, not both")
+				}
+
+				(Some(_), None) => {
+					anyhow::bail!("run_command requires a non-empty command")
+				}
+
+				(None, Some(_)) => {
+					anyhow::bail!("run_command args must not be empty")
+				}
+
+				(None, None) => {
+					anyhow::bail!("run_command requires either command or args")
+				}
+			},
+
+			"finish" => {
+				let message = raw
+					.message
+					.filter(|message| !message.trim().is_empty())
+					.ok_or_else(|| anyhow::anyhow!("finish requires a non-empty message"))?;
+
+				Ok(Self::Finish { message })
+			}
+
+			action => {
+				anyhow::bail!("unsupported action: {action:?}")
+			}
 		}
 	}
 }
@@ -657,11 +819,16 @@ pub struct AgentTask {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LlmAction {
 	pub action: String,
+	#[serde(default)]
 	pub command: Option<String>,
+	#[serde(default)]
 	pub message: Option<String>,
+	#[serde(default)]
 	pub args: Option<Vec<String>>,
+	#[serde(default)]
 	pub cwd: Option<String>,
 }
+
 #[derive(Debug, Deserialize)]
 pub struct LlmMode {
 	pub mode: String,

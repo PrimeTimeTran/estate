@@ -207,6 +207,24 @@ impl ShellCommand {
 			timeout: None,
 		}
 	}
+	pub fn program(
+		program: impl Into<String>,
+		args: impl IntoIterator<Item = impl Into<String>>,
+	) -> Self {
+		let program = program.into();
+		let args = args.into_iter().map(Into::into).collect::<Vec<_>>();
+
+		section!("PROGRAM");
+		eprintln!("program: {program:?}");
+		eprintln!("args: {args:?}");
+
+		Self {
+			program,
+			args,
+			cwd: None,
+			timeout: None,
+		}
+	}
 }
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct ShellResult {

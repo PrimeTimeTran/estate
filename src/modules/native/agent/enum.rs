@@ -4,15 +4,33 @@ use super::*;
 #[serde(tag = "action")]
 pub enum AgentAction {
 	#[serde(rename = "finish")]
-	Finish { message: String },
-	#[serde(rename = "current")]
-	Current { message: String },
-	#[serde(rename = "run_command")]
-	RunCommand { command: String },
-	#[serde(rename = "context")]
-	Context { path: Option<String> },
-}
+	Finish {
+		message: String,
+	},
 
+	#[serde(rename = "current")]
+	Current {
+		message: String,
+	},
+
+	#[serde(rename = "run_command")]
+	RunCommand {
+		command: String,
+	},
+
+	#[serde(rename = "run_program")]
+	RunProgram {
+		program: String,
+		args: Vec<String>,
+		#[serde(default)]
+		cwd: Option<String>,
+	},
+
+	#[serde(rename = "context")]
+	Context {
+		path: Option<String>,
+	},
+}
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum AgentEvent {
 	NewTask { task: AgentTask },
