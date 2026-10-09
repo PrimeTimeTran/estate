@@ -58,21 +58,46 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	// }
 	let resume_from_build = std::env::var_os("SDLC_RESUME_BUILD").is_some();
 
+	use std::time::{Duration, Instant};
+	let session_started_at = chrono::Local::now().format("%H:%M:%S").to_string();
+	let session_started = Instant::now();
+
 	if !use_tui {
 		println!(">>> starting runtime");
+
 		let mut stdout = std::io::stdout();
 		let input = String::new();
-		render_plain_guard(&input, &mut stdout)?;
-		if resume_from_build {
+
+		render_plain_guard(&input, &mut stdout, &session_started_at, session_started)?;
+
+		// Refresh the bottom-right ticker once per second.
+		let ticker = tokio::spawn(async move {
+			let mut stdout = std::io::stdout();
+			let mut interval = tokio::time::interval(Duration::from_secs(1));
+
+			loop {
+				interval.tick().await;
+
+				if render_plain_guard("", &mut stdout, &session_started_at, session_started).is_err() {
+					break;
+				}
+			}
+		});
+
+		let result = if resume_from_build {
 			println!(">>> resuming from Build");
 			runtime
 				.resume_from(Stage::Build, &mut input_rx)
 				.await
-				.context("runtime.resume_from(Build)")?;
+				.context("runtime.resume_from(Build)")
 		} else {
-			runtime.run(&mut input_rx).await.context("runtime.run")?;
-		}
+			runtime.run(&mut input_rx).await.context("runtime.run")
+		};
+
+		ticker.abort();
+
 		println!(">>> runtime finished");
+		result?;
 		return Ok(());
 	}
 	let is_real_run = std::env::var_os("DRY_RUN").is_none();
@@ -201,7 +226,12 @@ impl Drop for Guard {
 		);
 	}
 }
-fn render_plain_guard(input: &str, stdout: &mut std::io::Stdout) -> std::io::Result<()> {
+fn render_plain_guard(
+	input: &str,
+	stdout: &mut std::io::Stdout,
+	session_started_at: &str,
+	session_started: Instant,
+) -> std::io::Result<()> {
 	use crossterm::{
 		QueueableCommand, cursor,
 		style::{Color, Print, ResetColor, SetForegroundColor},
@@ -210,27 +240,37 @@ fn render_plain_guard(input: &str, stdout: &mut std::io::Stdout) -> std::io::Res
 
 	let (width, height) = terminal::size()?;
 	let row = height.saturating_sub(1);
-	let now = chrono::Local::now().format("%H:%M:%S").to_string();
+
+	let elapsed = session_started.elapsed().as_secs();
+	let elapsed_time = format!(
+		"{:02}:{:02}:{:02}",
+		elapsed / 3600,
+		(elapsed % 3600) / 60,
+		elapsed % 60,
+	);
+
+	let ticker = format!("{session_started_at}  {elapsed_time}");
+	let ticker_width = ticker.len();
 
 	stdout.queue(cursor::MoveTo(0, row))?;
 	stdout.queue(terminal::Clear(ClearType::CurrentLine))?;
+
 	stdout.queue(SetForegroundColor(Color::Green))?;
 	stdout.queue(Print("> "))?;
 	stdout.queue(ResetColor)?;
 
-	let clock_width = now.len() + 2;
-	let input_width = (width as usize).saturating_sub(clock_width + 2);
-	let visible_input: String = input.chars().take(input_width).collect();
+	let input_width = (width as usize).saturating_sub(ticker_width + 3);
 
+	let visible_input: String = input.chars().take(input_width).collect();
 	stdout.queue(Print(visible_input))?;
 
-	if width as usize > clock_width {
+	if width as usize > ticker_width + 2 {
 		stdout.queue(cursor::MoveTo(
-			width.saturating_sub(clock_width as u16),
+			width.saturating_sub(ticker_width as u16),
 			row,
 		))?;
 		stdout.queue(SetForegroundColor(Color::Cyan))?;
-		stdout.queue(Print(format!(" {now}")))?;
+		stdout.queue(Print(ticker))?;
 		stdout.queue(ResetColor)?;
 	}
 
