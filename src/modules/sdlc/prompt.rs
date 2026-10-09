@@ -7,48 +7,58 @@ pub fn for_intent(user_request: &str) -> String {
 pub fn gen_intent(goal: &str) -> Result<String> {
 	Ok(format!(
 		r#"
-			You are defining the intent for an SDLC task.
-			The user's goal is authoritative.
+You are defining the intent for an SDLC task.
+The user's goal is authoritative.
 
-			## User Goal
-			{goal}
+## User Goal
+{goal}
 
-			## Instructions
-			Create `intent.md`.
-			Describe what the user is trying to accomplish and why.
+## Instructions
+Create `intent.md`.
+Describe what the user is trying to accomplish and why.
 
-			The intent should:
-			- preserve the user's actual goal without changing its meaning
-			- describe the desired outcome
-			- establish the problem or need being addressed
-			- identify the important constraints explicitly stated by the user
-			- avoid inventing requirements that the user did not state
-			- remain implementation-independent where possible
+The intent should:
+- preserve the user's actual goal without changing its meaning
+- describe the desired outcome
+- establish the problem or need being addressed
+- identify the important constraints explicitly stated by the user
+- avoid inventing requirements that the user did not state
+- remain implementation-independent where possible
 
-			Do not write the specification, implementation plan, or tests yet.
+Do not write the specification, implementation plan, or tests yet.
 
-			Use this format:
+Use this format:
 
-			# Intent <one sentence title summary for the goal>
+# Intent <one sentence title summary for the goal>
 
-			## Goal
+## Goal
 
-			<what the user wants to accomplish>
+<what the user wants to accomplish>
 
-			## Why
+## Why
 
-			<why this work is needed>
+<why this work is needed>
 
-			## Constraints
+## Constraints
 
-			- <constraint>
+- <constraint>
 
-			## Outcome
+## Outcome
 
-			<what successful completion should accomplish>
+<what successful completion should accomplish>
 
-			Return only the contents of `intent.md`.
-		"#,
+Return only the contents of `intent.md`.
+
+## Additional Intent Rules
+
+- Distinguish explicitly stated goals and constraints from reasonable interpretations.
+- Do not invent motivations, business context, acceptance criteria, deadlines, or technical requirements.
+- If the user has not provided a rationale, state that the rationale was not specified.
+- If a required detail is ambiguous, preserve the ambiguity rather than silently deciding it.
+- Use "None explicitly stated" when no constraints have been provided.
+- Preserve the user's intended scope, including any explicit exclusions.
+- Keep the Intent concise and independent of implementation choices.
+"#,
 	))
 }
 pub fn gen_spec(intent: &str) -> Result<String> {
@@ -57,8 +67,7 @@ pub fn gen_spec(intent: &str) -> Result<String> {
 	}
 
 	Ok(format!(
-		r#"
-You are the Specification stage of an SDLC pipeline.
+		r#"You are the Specification stage of an SDLC pipeline.
 
 Your job is to transform the approved Intent artifact below into a concrete,
 implementation-independent Specification.
@@ -172,8 +181,7 @@ pub fn gen_plan(intent: &str, spec: &str) -> Result<String> {
 		return Err(anyhow!("cannot generate Plan prompt from empty Spec"));
 	}
 	Ok(format!(
-		r#"
-You are the Plan stage of an SDLC pipeline.
+		r#"You are the Plan stage of an SDLC pipeline.
 
 Your job is to transform the approved Intent and Specification into a
 concrete, repository-aware Implementation Plan.
@@ -434,21 +442,21 @@ Produce the complete revised specification.
 
 The output will replace spec.md directly.
 "#,
-	score = evaluation.score,
-	confidence = evaluation.confidence,
-	passed = evaluation.passed,
-	evaluations = evaluation
-		.evaluations
-		.iter()
-		.map(|e| {
-			format!(
-				"- {}: passed={}, score={}, confidence={}\n  {}",
-				e.name, e.passed, e.score, e.confidence, e.explanation
-			)
-		})
-		.collect::<Vec<_>>()
-		.join("\n"),
-))
+		score = evaluation.score,
+		confidence = evaluation.confidence,
+		passed = evaluation.passed,
+		evaluations = evaluation
+			.evaluations
+			.iter()
+			.map(|e| {
+				format!(
+					"- {}: passed={}, score={}, confidence={}\n  {}",
+					e.name, e.passed, e.score, e.confidence, e.explanation
+				)
+			})
+			.collect::<Vec<_>>()
+			.join("\n"),
+	))
 }
 pub fn tests_gen(intent: &str, spec: &str, plan: &str) -> String {
 	format!(
