@@ -1,4 +1,4 @@
-# Specification: [Feature or Project Name]
+# Specification: [Short Title of Spec Strategy]
 
 ## 1. Overview & Inherited Intent
 

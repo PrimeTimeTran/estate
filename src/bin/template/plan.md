@@ -1,82 +1,165 @@
-# Plan: [Feature or Change Name]
+# Plan: [Short Title of Implementation Strategy]
 
-## Overview
+## 1. Overview
 
-Briefly describe what this plan accomplishes and how it directly addresses the user's goal and `spec.md`.
+- **Objective:** [What this plan will accomplish]
+- **Source Intent:** `intent/[slug].md`
+- **Source Specification:** `spec/[slug].md`
+- **Expected Outcome:** [What successful implementation looks like]
 
-## Files to Create or Modify
+## 2. Repository Context
 
-Identify the concrete files that need to be created, modified, or deleted to accomplish the user's requested task.
+- **Repository Root:** [Verified absolute repository path]
+- **Baseline Branch:** [Branch name, if known]
+- **Baseline Commit:** [Commit hash, if known]
+- **Relevant Existing Architecture:** [Components, modules, services, or entry points relevant to this task]
 
-For each file, specify:
+Use verified repository information wherever possible. Mark unknown values as `Unknown` rather than inventing them.
 
-- **File Path**: Repository-relative path.
-- **Action**: Create, Modify, or Delete.
-- **Purpose**: Why this file needs to change and how it contributes to the user's goal.
-- **Requirements Addressed**: The requirements from `spec.md` that necessitate this change, when available.
+## 3. Expected File Changes
 
-Rules:
+Identify **every file expected to be created, modified, or deleted** to complete the user's task.
 
-- Derive the required file changes from the user's original prompt, goal, approved Intent, and Specification.
-- Inspect the available repository context before identifying existing files to modify.
-- Prefer modifying existing files over creating redundant files when appropriate.
-- Do not invent file paths, modules, APIs, or tests.
-- Distinguish verified existing files from proposed new files.
-- If a file path or required change cannot be determined without further inspection, explicitly flag it.
-- Include test files, configuration files, documentation, and other supporting files when they need to change.
-- Do not include files merely because they are related to the task; every listed change must have a clear justification.
-- Ensure the proposed file changes collectively address the user's goal and all applicable in-scope requirements.
+This section is the authoritative file-change inventory for the implementation.
 
-## Context & References
+### 3.1 Files to Create
 
-- **User Goal**: [Original task or goal supplied by the user]
-- **Intent Reference**: `intent/[slug].md`
-- **Specification Reference**: `spec/[slug].md`
-- **Target Repository State**: [Branch name / commit hash baseline]
-- **Repository Root**: [Absolute or verified repository root]
+List each new file the implementation requires.
 
-## Proposed Changes
+| File Path              | Purpose                   | Requirements Addressed            |
+| ---------------------- | ------------------------- | --------------------------------- |
+| `path/to/new_file.ext` | [Why this file is needed] | [Requirement IDs or descriptions] |
 
-Describe the implementation details for the files identified in **Files to Create or Modify**.
+If no new files are required, state `None`.
 
-### [Component / Module Name]
+### 3.2 Files to Modify
 
-- **File Path**: `path/to/file.ext`
-- **Action**: Create, Modify, or Delete
-- **Description of Changes**:
-  - Describe structural changes.
-  - Describe logic or behavior changes.
-  - Describe relevant API, type, or interface changes.
-  - Explain how the change connects to other components.
-  - Identify dependencies and prerequisites.
+List each existing file that must change.
 
-Do not introduce additional file changes here without also adding them to the **Files to Create or Modify** section and justifying their purpose.
+| File Path                   | Current Responsibility   | Expected Change    | Requirements Addressed            |
+| --------------------------- | ------------------------ | ------------------ | --------------------------------- |
+| `path/to/existing_file.ext` | [What it currently does] | [What must change] | [Requirement IDs or descriptions] |
 
-## Verification & Testing Strategy
+If no existing files need modification, state `None`.
 
-### Unit Tests
+### 3.3 Files to Delete
 
-- [ ] Add or update tests in `path/to/test.ext`.
-- [ ] Verify each relevant requirement from `spec.md`.
-- [ ] Identify expected results and failure conditions.
+List files that must be removed as part of the approved task.
 
-### Integration / End-to-End Checks
+| File Path                   | Reason for Removal          | Dependencies or References to Update                      |
+| --------------------------- | --------------------------- | --------------------------------------------------------- |
+| `path/to/obsolete_file.ext` | [Why deletion is necessary] | [Affected references, imports, configuration, or callers] |
 
-- [ ] Identify integration tests, runtime checks, commands, or manual verification steps.
-- [ ] Specify the expected observable behavior for each check.
-- [ ] Verify that the implementation works within the affected application or runtime.
+If no files need deletion, state `None`.
 
-### Expected Constraints / Risks
+### File Inventory Rules
 
-- Identify potential regressions, compatibility issues, architectural risks, and policy boundaries.
-- Identify unresolved decisions or assumptions that could block implementation.
-- Connect each significant risk to the relevant requirement or proposed change.
+- Derive file changes from the user's original goal, approved Intent, Specification, and verified repository context.
+- Use repository-relative paths rooted at the verified repository root.
+- Distinguish existing files from proposed new files.
+- Inspect the repository before naming existing files to modify or delete.
+- Prefer extending existing components over creating redundant files when appropriate.
+- Include tests, configuration, documentation, and other supporting files when they actually need to change.
+- Do not list files merely because they are related to the task.
+- Do not invent paths, modules, APIs, or tests.
+- If a required path cannot be determined without further inspection, mark it `Requires repository inspection` and explain what must be checked.
+- Every listed file must have a clear purpose tied to the task or an applicable requirement.
 
-## Execution Work Order
+## 4. Proposed Implementation
 
-Provide an ordered sequence of steps for an agent or human to execute.
+Describe how the files in Section 3 will be changed to fulfill the Specification.
 
-Each step must identify:
+### 4.1 [Component or Change Name]
 
-1. **Action**: What needs to be done.
-2. **Files**: Which files from the proposed change list are involved
+- **Files Involved:** `path/to/file.ext`
+- **Action:** [Create, Modify, or Delete]
+- **Purpose:** [Why this change is needed]
+- **Implementation Details:**
+  - [Structural changes]
+  - [Behavior or logic changes]
+  - [Relevant type, API, or interface changes]
+  - [Integration with other components]
+- **Dependencies:** [Prerequisites or dependent changes]
+- **Requirements Addressed:** [Requirement IDs or descriptions]
+
+Repeat this subsection for each meaningful implementation change.
+
+Do not introduce a file change here unless it is also recorded in Section 3. If implementation analysis reveals another necessary file, update the file inventory and its justification.
+
+## 5. Verification and Testing Strategy
+
+### 5.1 Unit Tests
+
+- [ ] **Test Location:** `path/to/test_file.ext`
+  - **Behavior Under Test:** [What is being verified]
+  - **Expected Result:** [Observable success condition]
+  - **Requirements Addressed:** [Requirement IDs or descriptions]
+
+If no unit tests are applicable, explain why.
+
+### 5.2 Integration and End-to-End Tests
+
+- [ ] **Command or Procedure:** [Exact command or reproducible steps]
+  - **Expected Result:** [What should happen]
+  - **Requirements Addressed:** [Requirement IDs or descriptions]
+
+Include runtime checks, CLI execution, application behavior, or other integration checks when relevant.
+
+### 5.3 Regression Checks
+
+- [ ] [Existing behavior that must remain functional]
+- [ ] [Compatibility or integration boundary to verify]
+
+### 5.4 Risks and Constraints
+
+- **Risk:** [Potential regression or implementation concern]
+- **Impact:** [What could go wrong]
+- **Mitigation or Verification:** [How the risk will be addressed]
+
+Include unresolved decisions that could block implementation. Do not silently resolve decisions reserved for the user or product owner.
+
+## 6. Execution Work Order
+
+List the implementation steps in dependency order.
+
+### Step 1: [Action Name]
+
+- **Files:** `path/to/file.ext`
+- **Action:** [What to create, modify, or delete]
+- **Prerequisites:** [Required preceding work]
+- **Verification:** [How to confirm this step succeeded]
+
+### Step 2: [Action Name]
+
+- **Files:** `path/to/another_file.ext`
+- **Action:** [What to implement]
+- **Prerequisites:** [Required preceding work]
+- **Verification:** [How to confirm this step succeeded]
+
+Continue until all planned changes and required verification are complete.
+
+The work order must use the file inventory in Section 3 and reflect actual dependencies. Do not invent additional scope or simply repeat the inventory without describing the execution sequence.
+
+## 7. Completion Criteria
+
+The implementation is ready for completion when:
+
+- [ ] Every approved in-scope requirement has been addressed.
+- [ ] Every planned file change has been implemented or explicitly reported as blocked.
+- [ ] Tests and verification checks have been executed as planned, with results recorded.
+- [ ] Relevant regressions and integration boundaries have been checked.
+- [ ] No unapproved changes or unexplained file additions have been introduced.
+- [ ] Any remaining limitations or unresolved decisions are documented.
+
+## 8. Final File-Change Audit
+
+Before finalizing the plan, verify:
+
+- [ ] Every file to create, modify, or delete is listed in Section 3.
+- [ ] Every listed file has a corresponding implementation action in Section 4 or a deletion action.
+- [ ] Every implementation action references files in Section 3.
+- [ ] File paths are verified or explicitly marked as requiring inspection.
+- [ ] Test files are included when new or modified tests are needed.
+- [ ] All changes trace back to the user's goal or an applicable Specification requirement.
+
+Return only the completed Implementation Plan as Markdown.
