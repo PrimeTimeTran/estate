@@ -2493,8 +2493,7 @@ preamble, commentary, or an explanation of your process."
 		self.pipeline.persist_progress("Plan stage completed")?;
 		Ok(RunResult::Plan)
 	}
- 	// SDLC_FORCE_CONTINUE=1 SDLC_PLAIN=1 \
- 	// cargo run --bin sdlc --features sdlc
+ 	// SDLC_FORCE_CONTINUE=1 SDLC_PLAIN=1 cargo run --bin sdlc --features sdlc
 	async fn on_build(&mut self, input: StageInput) -> Result<RunResult> {
 		let (stage, session_dir) = self.stage_dir();
 		if stage != Stage::Build {
@@ -2509,8 +2508,6 @@ preamble, commentary, or an explanation of your process."
 		let plan: String = tokio::fs::read_to_string(session_dir.join("plan.md"))
 			.await
 			.context("reading plan.md")?;
-
-		tracing::info!("hello on_build {:?}", session_dir);
 		self.pipeline.system.add_file(session_dir.join("intent.md"));
 		self.pipeline.system.add_file(session_dir.join("spec.md"));
 		self.pipeline.system.add_file(session_dir.join("plan.md"));
@@ -2520,6 +2517,10 @@ preamble, commentary, or an explanation of your process."
 		));
 		let steps = build_steps();
 		let workspace_before = WSSnapshot::capture(workspace.clone())?;
+		section!(&format!(
+			"workspace_before:\n{:?}",
+			workspace_before
+		));
 		let ctx = &self.pipeline.system.ctx;
 		let prompt = agent::build_prompt_from_ctx(&ctx);
 		let task = AgentTask::new(prompt);

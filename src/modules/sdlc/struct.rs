@@ -217,6 +217,7 @@ pub struct Verification {
 pub struct WSChanges {
 	pub git_status: String,
 }
+#[derive(Debug, Clone)]
 pub struct WSSnapshot {
 	pub git_status: String,
 }
