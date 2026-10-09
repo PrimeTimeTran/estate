@@ -52,37 +52,28 @@ impl Agent {
 		);
 		println!("ctx.workspace:\n{}", ctx.workspace);
 		println!("ctx.history ({} entries):", ctx.history.len());
-
 		for (i, entry) in ctx.history.iter().take(5).enumerate() {
 			println!("  [{}] {}", i + 1, preview(&format!("{entry:?}"), 500));
 		}
-
 		if ctx.history.len() > 5 {
 			println!("  ... {} more entries", ctx.history.len() - 5);
 		}
-
 		let event = RuntimeEvent::Agent(AgentEvent::Thinking { task: task.clone() });
-
 		if let Err(error) = crate::agent::log::append_agent_event(&event) {
 			eprintln!("Failed to write agent event log: {error:#}");
 		}
 		let _ = event_tx.send(event);
-
 		let mode: AgentMode = self.pick_mode(&ctx).await?;
-
 		if matches!(mode, AgentMode::Chat) {
 			let response = prompt_chat(&ctx).await?;
 			let result = TaskResult::completed_chat(task.id, ctx, response);
-
 			let event = RuntimeEvent::Agent(AgentEvent::Finished {
 				result: result.clone(),
 			});
-
 			if let Err(error) = crate::agent::log::append_agent_event(&event) {
 				eprintln!("Failed to write agent event log: {error:#}");
 			}
 			let _ = event_tx.send(event);
-
 			return Ok(result);
 		}
 
@@ -132,7 +123,6 @@ impl Agent {
 				AgentAction::RunCommand { command } => {
 					let shell_command = ShellCommand::shell(command.clone());
 					let result = self.tools.shell.run(shell_command).await?;
-
 					section!("SHELL RESULT");
 					println!("exit: {:?}", result.exit_code);
 					println!(
@@ -147,21 +137,17 @@ impl Agent {
 						result.stderr.lines().count(),
 						preview_lines(&result.stderr, SHELL_OUTPUT_PREVIEW_LINES)
 					);
-
 					ctx.history.push(AgentObservation::RunCommand { result });
 				}
-
 				AgentAction::Context { .. } => {
 					let event = RuntimeEvent::Agent(AgentEvent::Working {
 						task: task.clone(),
 						message: "Inspecting agent context".into(),
 					});
-
 					if let Err(error) = crate::agent::log::append_agent_event(&event) {
 						eprintln!("Failed to write agent event log: {error:#}");
 					}
 					let _ = event_tx.send(event);
-
 					ctx.history.push(AgentObservation::Current {
 						message: "Agent context requested".into(),
 					});

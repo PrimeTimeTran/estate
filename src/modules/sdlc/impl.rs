@@ -2416,78 +2416,207 @@ impl PipeRunner<'_> {
 				stage
 			));
 		}
+
 		self.pipeline.persist_progress("Build started")?;
+
 		let workspace = self.pipeline.session.workspace_owned();
-		// self.pipeline.system.cwd(&workspace);
-		let plan: String = tokio::fs::read_to_string(session_dir.join("plan.md"))
+
+		// Load the SDLC artifacts.
+		let intent_path = session_dir.join("intent.md");
+		let spec_path = session_dir.join("spec.md");
+		let plan_path = session_dir.join("plan.md");
+
+		let intent = tokio::fs::read_to_string(&intent_path)
+			.await
+			.context("reading intent.md")?;
+		let spec = tokio::fs::read_to_string(&spec_path)
+			.await
+			.context("reading spec.md")?;
+		let plan = tokio::fs::read_to_string(&plan_path)
 			.await
 			.context("reading plan.md")?;
-		self.pipeline.system.add_file(session_dir.join("intent.md"));
-		self.pipeline.system.add_file(session_dir.join("spec.md"));
-		self.pipeline.system.add_file(session_dir.join("plan.md"));
+
+		if intent.trim().is_empty() {
+			return Err(anyhow::anyhow!("Intent artifact is empty"));
+		}
+		if spec.trim().is_empty() {
+			return Err(anyhow::anyhow!("Spec artifact is empty"));
+		}
+		if plan.trim().is_empty() {
+			return Err(anyhow::anyhow!("Plan artifact is empty"));
+		}
+
+		self.pipeline.system.add_file(intent_path);
+		self.pipeline.system.add_file(spec_path);
+		self.pipeline.system.add_file(plan_path);
+
 		section!(&format!(
-			"ctx.workspace:\n{}",
+			"Build workspace files: {}",
 			self.pipeline.system.runtime.workspace.files.len()
 		));
-		let steps = build_steps();
-		let workspace_before = WSSnapshot::capture(workspace.clone())?;
+
+		let workspace_before = WSSnapshot::capture(&workspace)?;
 		section!(&format!("workspace_before:\n{:?}", workspace_before));
-		let ctx = &self.pipeline.system.ctx;
-		let prompt = agent::build_prompt_from_ctx(&ctx);
-		let task = AgentTask::new(prompt);
-		let result = self.pipeline.system.runtime.run_agent(task).await?;
-		// 		for (index, instruction) in steps.iter().enumerate() {
-		// 			let step = index + 1;
-		// 			self.persist(&format!(
-		// 				"Build step {}/{}: {}",
-		// 				step,
-		// 				steps.len(),
-		// 				instruction
-		// 			))?;
-		// 			let current_workspace = WSSnapshot::capture(&workspace)?;
-		// 			let workspace_context = format!(
-		// 				"CWD: {}\n\n{}",
-		// 				workspace.display(),
-		// 				current_workspace.to_markdown()
-		// 			);
-		// 			let prompt = build_step_prompt(instruction, step, steps.len(), &plan, &workspace_context);
-		// 			let task = AgentTask::new(prompt);
-		// 			let result = self.pipeline.system.runtime.run_agent(task).await?;
-		// 			let step_path = session_dir.join(format!("build-step-{step:02}.md"));
-		// 			Pipeline::write(
-		// 				step_path,
-		// 				format!(
-		// 					"# Build Step {step}/{total}\n\n\
-		//           ## Task\n\n\
-		//           {instruction}\n\n\
-		//           ## Result\n\n\
-		//           {result:?}\n",
-		// 					total = steps.len(),
-		// 				),
-		// 			)?;
-		//
-		// 			// Give JEV / the next iteration a fresh view of the workspace.
-		// 			//
-		// 			// Don't carry the original workspace snapshot forward.
-		// 			// The agent just changed it.
-		// 			let after_step = WSSnapshot::capture(&workspace)?;
-		//
-		// 			self.pipeline.persist_progress(&format!(
-		// 				"Build step {}/{} completed: {} file(s) changed",
-		// 				step,
-		// 				steps.len(),
-		// 				after_step.diff(&workspace_before).file_count(),
-		// 			))?;
-		// 		}
+
+		// Phase 1: Orient.
+		let orient_task = AgentTask::new(format!(
+			"{PROMPT_BUILD_ORIENT}\n\n\
+			 ## Intent\n\n{intent}\n\n\
+			 ## Specification\n\n{spec}\n\n\
+			 ## Plan\n\n{plan}"
+		));
+
+		let orient_result = self
+			.pipeline
+			.system
+			.runtime
+			.run_agent(orient_task)
+			.await
+			.context("Build Orient phase failed")?;
+
+		let orient_report = format!("{orient_result:#?}");
+		tokio::fs::write(session_dir.join("build-orient.md"), &orient_report)
+			.await
+			.context("writing Build Orient report")?;
+
+		// Phase 2: Execute.
+		let execute_task = AgentTask::new(format!(
+			"{PROMPT_BUILD_EXECUTE}\n\n\
+			 ## Intent\n\n{intent}\n\n\
+			 ## Specification\n\n{spec}\n\n\
+			 ## Plan\n\n{plan}\n\n\
+			 ## Orientation Report\n\n{orient_report}"
+		));
+
+		let execute_result = self
+			.pipeline
+			.system
+			.runtime
+			.run_agent(execute_task)
+			.await
+			.context("Build Execute phase failed")?;
+
+		let execute_report = format!("{execute_result:#?}");
+		tokio::fs::write(session_dir.join("build-execute.md"), &execute_report)
+			.await
+			.context("writing Build Execute report")?;
+
+		// Phase 3: Verify.
+		let verify_task = AgentTask::new(format!(
+			"{PROMPT_BUILD_VERIFY}\n\n\
+			 ## Intent\n\n{intent}\n\n\
+			 ## Specification\n\n{spec}\n\n\
+			 ## Plan\n\n{plan}\n\n\
+			 ## Orientation Report\n\n{orient_report}\n\n\
+			 ## Implementation Report\n\n{execute_report}"
+		));
+
+		let verify_result = self
+			.pipeline
+			.system
+			.runtime
+			.run_agent(verify_task)
+			.await
+			.context("Build Verify phase failed")?;
+
+		let verify_report = format!("{verify_result:#?}");
+		tokio::fs::write(session_dir.join("build-verify.md"), &verify_report)
+			.await
+			.context("writing Build Verify report")?;
+
+		// Capture final workspace state.
 		let workspace_after = WSSnapshot::capture(&workspace)?;
 		let changes = workspace_before.diff(&workspace_after);
+
 		self.write(&changes.to_markdown("Build completed"))?;
+
 		self.pipeline.persist_progress(&format!(
-			"Build completed: {} file(s) changed",
+			"Build phases completed; {} file(s) changed",
 			changes.file_count()
 		))?;
+
 		Ok(RunResult::Build)
 	}
+	// async fn on_build(&mut self, input: StageInput) -> Result<RunResult> {
+	// 	let (stage, session_dir) = self.stage_dir();
+	// 	if stage != Stage::Build {
+	// 		return Err(anyhow::anyhow!(
+	// 			"cannot execute Build stage while at {:?}",
+	// 			stage
+	// 		));
+	// 	}
+	// 	self.pipeline.persist_progress("Build started")?;
+	// 	let workspace = self.pipeline.session.workspace_owned();
+	// 	// self.pipeline.system.cwd(&workspace);
+	// 	let plan: String = tokio::fs::read_to_string(session_dir.join("plan.md"))
+	// 		.await
+	// 		.context("reading plan.md")?;
+	// 	self.pipeline.system.add_file(session_dir.join("intent.md"));
+	// 	self.pipeline.system.add_file(session_dir.join("spec.md"));
+	// 	self.pipeline.system.add_file(session_dir.join("plan.md"));
+	// 	section!(&format!(
+	// 		"ctx.workspace:\n{}",
+	// 		self.pipeline.system.runtime.workspace.files.len()
+	// 	));
+	// 	let steps = build_steps();
+	// 	let workspace_before = WSSnapshot::capture(workspace.clone())?;
+	// 	section!(&format!("workspace_before:\n{:?}", workspace_before));
+	// 	let ctx = &self.pipeline.system.ctx;
+	// 	let prompt = agent::build_prompt_from_ctx(&ctx);
+	// 	let task = AgentTask::new(prompt);
+	// 	let result = self.pipeline.system.runtime.run_agent(task).await?;
+	// 	// 		for (index, instruction) in steps.iter().enumerate() {
+	// 	// 			let step = index + 1;
+	// 	// 			self.persist(&format!(
+	// 	// 				"Build step {}/{}: {}",
+	// 	// 				step,
+	// 	// 				steps.len(),
+	// 	// 				instruction
+	// 	// 			))?;
+	// 	// 			let current_workspace = WSSnapshot::capture(&workspace)?;
+	// 	// 			let workspace_context = format!(
+	// 	// 				"CWD: {}\n\n{}",
+	// 	// 				workspace.display(),
+	// 	// 				current_workspace.to_markdown()
+	// 	// 			);
+	// 	// 			let prompt = build_step_prompt(instruction, step, steps.len(), &plan, &workspace_context);
+	// 	// 			let task = AgentTask::new(prompt);
+	// 	// 			let result = self.pipeline.system.runtime.run_agent(task).await?;
+	// 	// 			let step_path = session_dir.join(format!("build-step-{step:02}.md"));
+	// 	// 			Pipeline::write(
+	// 	// 				step_path,
+	// 	// 				format!(
+	// 	// 					"# Build Step {step}/{total}\n\n\
+	// 	//           ## Task\n\n\
+	// 	//           {instruction}\n\n\
+	// 	//           ## Result\n\n\
+	// 	//           {result:?}\n",
+	// 	// 					total = steps.len(),
+	// 	// 				),
+	// 	// 			)?;
+	// 	//
+	// 	// 			// Give JEV / the next iteration a fresh view of the workspace.
+	// 	// 			//
+	// 	// 			// Don't carry the original workspace snapshot forward.
+	// 	// 			// The agent just changed it.
+	// 	// 			let after_step = WSSnapshot::capture(&workspace)?;
+	// 	//
+	// 	// 			self.pipeline.persist_progress(&format!(
+	// 	// 				"Build step {}/{} completed: {} file(s) changed",
+	// 	// 				step,
+	// 	// 				steps.len(),
+	// 	// 				after_step.diff(&workspace_before).file_count(),
+	// 	// 			))?;
+	// 	// 		}
+	// 	let workspace_after = WSSnapshot::capture(&workspace)?;
+	// 	let changes = workspace_before.diff(&workspace_after);
+	// 	self.write(&changes.to_markdown("Build completed"))?;
+	// 	self.pipeline.persist_progress(&format!(
+	// 		"Build completed: {} file(s) changed",
+	// 		changes.file_count()
+	// 	))?;
+	// 	Ok(RunResult::Build)
+	// }
 	async fn on_qa(&mut self, input: StageInput) -> Result<RunResult> {
 		let verification = self.run_qa_checks(self.pipeline.stage()).await?;
 		self.pipeline.persist_progress(&format!(
@@ -2565,7 +2694,7 @@ impl PipeRunner<'_> {
 		let (stage, session_dir) = self.stage_dir();
 		let filename = format!("{stage:?}").to_lowercase() + ".md";
 		let output_path = session_dir.join(filename);
-	
+
 		Pipeline::write(output_path, content)?;
 		Ok(())
 	}
