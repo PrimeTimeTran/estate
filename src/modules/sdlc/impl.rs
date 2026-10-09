@@ -2494,6 +2494,7 @@ preamble, commentary, or an explanation of your process."
 		Ok(RunResult::Plan)
 	}
  	// SDLC_FORCE_CONTINUE=1 SDLC_PLAIN=1 cargo run --bin sdlc --features sdlc
+ 	// SDLC_RESUME_BUILD=1 SDLC_PLAIN=1 cargo run --bin sdlc --features sdlc
 	async fn on_build(&mut self, input: StageInput) -> Result<RunResult> {
 		let (stage, session_dir) = self.stage_dir();
 		if stage != Stage::Build {
