@@ -23,13 +23,12 @@ impl AgentRuntime {
 		let agent = Agent::with_cwd(cwd);
 		agent.run_agent(prompt).await
 	}
-
 	pub async fn generate(&self, prompt: &str) -> Result<String> {
 		if prompt.trim().is_empty() {
 			return Err(anyhow!("generation prompt is empty"));
 		}
 		let request = serde_json::json!({
-			"model": "qwen3:8b",
+			"model": DEFAULT_MODEL,
 			"prompt": prompt,
 			"stream": false,
 		});
