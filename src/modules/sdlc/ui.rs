@@ -442,7 +442,7 @@ pub fn event_line(event: &SdlcEvent) -> Line<'static> {
 			),
 		]),
 
-		SdlcEvent::PhaseChanged { phase } => Line::from(vec![
+		SdlcEvent::PhaseChanged { stage, phase } => Line::from(vec![
 			Span::styled("  phase ", Style::default().fg(Color::DarkGray)),
 			Span::styled(format!("→ {phase:?}"), phase_style(*phase)),
 		]),

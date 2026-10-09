@@ -70,7 +70,7 @@ impl AiView {
 				self.runtime.attempt = attempt.number;
 				self.runtime.message = Some(message);
 			}
-			SdlcEvent::PhaseChanged { phase } => {
+			SdlcEvent::PhaseChanged { stage, phase } => {
 				self.runtime.phase = match phase {
 					Phase::Executing => Phase::Executing,
 					Phase::Evaluating => Phase::Evaluating,
@@ -1200,6 +1200,7 @@ impl Pipeline {
 			reason,
 		});
 		self.emit(SdlcEvent::PhaseChanged {
+			stage,
 			phase: Phase::AwaitingHuman,
 		});
 		let input = input_rx
@@ -1376,11 +1377,13 @@ impl PipelineRuntime {
 				message: format!("Dry Run · step {}/{}", index + 1, Step::ALL.len(),),
 			});
 			self.pipeline.emit(SdlcEvent::PhaseChanged {
+				stage,
 				phase: Phase::Executing,
 			});
 			sleep(DEMO_EXECUTION_TIME).await;
 			self.pipeline.emit(SdlcEvent::ExecutionComplete { stage });
 			self.pipeline.emit(SdlcEvent::PhaseChanged {
+				stage,
 				phase: Phase::Evaluating,
 			});
 			self.pipeline.emit(SdlcEvent::EvaluationStarted { stage });
@@ -1401,9 +1404,7 @@ impl PipelineRuntime {
 				to: next,
 			});
 		}
-		self.pipeline.emit(SdlcEvent::PhaseChanged {
-			phase: Phase::Completed,
-		});
+
 		self.pipeline.emit(SdlcEvent::Completed);
 		sleep(DEMO_COMPLETE_DELAY).await;
 		Ok(())
@@ -1673,6 +1674,7 @@ impl PipeRunner<'_> {
 			}
 			Decision::AwaitHuman => {
 				self.emit(SdlcEvent::PhaseChanged {
+					stage,
 					phase: Phase::AwaitingHuman,
 				});
 				let intervention = self
@@ -1731,6 +1733,7 @@ impl PipeRunner<'_> {
 			}
 			Decision::Complete => {
 				self.emit(SdlcEvent::PhaseChanged {
+					stage,
 					phase: Phase::Completed,
 				});
 				self
@@ -1749,6 +1752,7 @@ impl PipeRunner<'_> {
 		pending_input: &mut Option<SdlcInput>,
 	) -> Result<RunControl> {
 		self.emit(SdlcEvent::PhaseChanged {
+			stage,
 			phase: Phase::AwaitingHuman,
 		});
 		self.emit(SdlcEvent::Activity {
@@ -1817,6 +1821,7 @@ impl PipeRunner<'_> {
 		pending_input: &mut Option<SdlcInput>,
 	) -> Result<Outcome> {
 		self.emit(SdlcEvent::PhaseChanged {
+			stage,
 			phase: Phase::Executing,
 		});
 		let input = match pending_input.take() {
@@ -1958,6 +1963,7 @@ impl PipeRunner<'_> {
 			number: next_attempt.number,
 		});
 		self.emit(SdlcEvent::PhaseChanged {
+		  stage,
 			phase: Phase::Retrying,
 		});
 		self.pipeline.retry(stage)?;
@@ -1966,6 +1972,7 @@ impl PipeRunner<'_> {
 	async fn handle_evaluation(&mut self, execution: Execution, attempt: Attempt) -> Result<Outcome> {
 		let stage = execution.stage;
 		self.emit(SdlcEvent::PhaseChanged {
+		  stage,
 			phase: Phase::Evaluating,
 		});
 		self.emit(SdlcEvent::EvaluationStarted { stage });
@@ -2086,12 +2093,14 @@ impl PipeRunner<'_> {
 				number: attempt.number + 1,
 			});
 			self.emit(SdlcEvent::PhaseChanged {
+			  stage,
 				phase: Phase::Retrying,
 			});
 			self.pipeline.retry(stage)?;
 			return Ok(RunControl::Continue);
 		}
 		self.emit(SdlcEvent::PhaseChanged {
+		  stage,
 			phase: Phase::AwaitingHuman,
 		});
 		match self
@@ -2165,6 +2174,7 @@ impl PipeRunner<'_> {
 			});
 
 			self.emit(SdlcEvent::PhaseChanged {
+			  stage,
 				phase: Phase::Retrying,
 			});
 
@@ -2172,6 +2182,7 @@ impl PipeRunner<'_> {
 			return Ok(RunControl::Continue);
 		}
 		self.emit(SdlcEvent::PhaseChanged {
+		  stage,
 			phase: Phase::AwaitingHuman,
 		});
 		match self
@@ -2230,6 +2241,7 @@ impl PipeRunner<'_> {
 			});
 
 			self.emit(SdlcEvent::PhaseChanged {
+			  stage,
 				phase: Phase::Retrying,
 			});
 
@@ -2238,6 +2250,7 @@ impl PipeRunner<'_> {
 			return Ok(RunControl::Continue);
 		}
 		self.emit(SdlcEvent::PhaseChanged {
+		stage,
 			phase: Phase::AwaitingHuman,
 		});
 		match self
@@ -2492,8 +2505,8 @@ preamble, commentary, or an explanation of your process."
 		self.pipeline.persist_progress("Plan stage completed")?;
 		Ok(RunResult::Plan)
 	}
- 	// SDLC_FORCE_CONTINUE=1 SDLC_PLAIN=1 cargo run --bin sdlc --features sdlc
- 	// SDLC_RESUME_BUILD=1 SDLC_PLAIN=1 cargo run --bin sdlc --features sdlc
+	// SDLC_FORCE_CONTINUE=1 SDLC_PLAIN=1 cargo run --bin sdlc --features sdlc
+	// SDLC_RESUME_BUILD=1 SDLC_PLAIN=1 cargo run --bin sdlc --features sdlc
 	async fn on_build(&mut self, input: StageInput) -> Result<RunResult> {
 		let (stage, session_dir) = self.stage_dir();
 		if stage != Stage::Build {
@@ -2517,10 +2530,7 @@ preamble, commentary, or an explanation of your process."
 		));
 		let steps = build_steps();
 		let workspace_before = WSSnapshot::capture(workspace.clone())?;
-		section!(&format!(
-			"workspace_before:\n{:?}",
-			workspace_before
-		));
+		section!(&format!("workspace_before:\n{:?}", workspace_before));
 		let ctx = &self.pipeline.system.ctx;
 		let prompt = agent::build_prompt_from_ctx(&ctx);
 		let task = AgentTask::new(prompt);
