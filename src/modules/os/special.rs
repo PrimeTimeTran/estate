@@ -241,7 +241,7 @@ impl Kontex {
 		};
 		Ok(Self { platform, app })
 	}
-	pub fn sesion_read(&self, name: &str) -> Result<String> {
+	pub fn session_read(&self, name: &str) -> Result<String> {
 		let path = self.path(FW::Session)?.join(name);
 		FS::read(path)
 	}

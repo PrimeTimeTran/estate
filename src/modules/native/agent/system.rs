@@ -24,7 +24,7 @@ pub fn new_agent_system() -> (AgentBus, AgentRuntime, UnboundedReceiver<RuntimeE
 	};
 	let runtime = AgentRuntime {
 		event_tx,
-		workspace: WorkspaceContext::default(),
+		workspace: CtxWorkspace::default(),
 		registry: AgentRegistry::default(),
 	};
 	(bus, runtime, event_rx)
@@ -47,7 +47,7 @@ impl AgentSystem {
 		};
 		let runtime = AgentRuntime {
 			event_tx,
-			workspace: WorkspaceContext::default(),
+			workspace: CtxWorkspace::default(),
 			registry: AgentRegistry::default(),
 		};
 		Self {
@@ -62,7 +62,7 @@ impl AgentSystem {
 		self
 	}
 }
-impl WorkspaceContext {
+impl CtxWorkspace {
 	pub fn new(files: Vec<FileInfo>) -> Self {
 		Self {
 			files,
@@ -119,7 +119,7 @@ impl WorkspaceContext {
 		}
 	}
 }
-impl Default for WorkspaceContext {
+impl Default for CtxWorkspace {
 	fn default() -> Self {
 		Self {
 			files: Vec::new(),
@@ -127,7 +127,7 @@ impl Default for WorkspaceContext {
 		}
 	}
 }
-impl Display for WorkspaceContext {
+impl Display for CtxWorkspace {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		writeln!(f, "CWD: {}", self.cwd.display())?;
 		writeln!(f, "FILES: {}", self.files.len())?;
@@ -152,7 +152,7 @@ pub struct AgentSystem {
 	pub ctx: AgentCtx,
 }
 #[derive(Debug, Clone)]
-pub struct WorkspaceContext {
+pub struct CtxWorkspace {
 	pub files: Vec<FileInfo>,
 	pub cwd: PathBuf,
 }

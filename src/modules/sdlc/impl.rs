@@ -16,14 +16,15 @@ impl AiSession {
 		let prompt = include_str!("../../../ai/template/user.goal.md").to_string();
 		Ok(Self {
 			workspace: dir.clone(),
-			prompt,
+			cwd: std::env::current_dir().unwrap_or_default(),
+			dir,
 			id: uuid::Uuid::new_v4(),
-			title: title.into(),
+			prompt,
 			stage: Stage::Intent,
 			stages: Vec::new(),
-			dir,
 			time_created: now,
 			time_updated: now,
+			title: title.into(),
 		})
 	}
 	pub fn workspace(&self) -> &Path {
@@ -33,7 +34,6 @@ impl AiSession {
 		self.workspace.clone()
 	}
 }
-
 impl crate::traits::DateableSession for AiSession {
 	fn start(&self) -> Option<DateTime<Utc>> {
 		Some(self.time_created)
@@ -1604,6 +1604,7 @@ impl PipeRunner<'_> {
 	fn transition(&mut self, next: Stage) -> Result<()> {
 		self.pipeline.transition(next)
 	}
+
 	/// "Given this decision, what actions/state changes must happen?"
 	///
 	/// Applies the decision to the pipeline/session and returns control
@@ -2404,8 +2405,8 @@ impl PipeRunner<'_> {
 		}
 		self.pipeline.persist_progress("Build started")?;
 		let workspace = self.pipeline.session.workspace_owned();
-		self.pipeline.system.cwd(&workspace);
-		let plan = tokio::fs::read_to_string(session_dir.join("plan.md"))
+		// self.pipeline.system.cwd(&workspace);
+		let plan: String = tokio::fs::read_to_string(session_dir.join("plan.md"))
 			.await
 			.context("reading plan.md")?;
 		self.pipeline.system.add_file(session_dir.join("intent.md"));
@@ -2484,7 +2485,7 @@ impl PipeRunner<'_> {
 		))?;
 		Ok(RunResult::Verification(verification))
 	}
-	
+
 	async fn route_execution(
 		&mut self,
 		stage: Stage,
@@ -2527,7 +2528,7 @@ impl PipeRunner<'_> {
 			evaluations,
 		})
 	}
-	
+
 	async fn stage_deploy(&mut self) -> Result<()> {
 		todo!("sdlc deploy")
 	}
@@ -2537,7 +2538,7 @@ impl PipeRunner<'_> {
 	async fn stage_complete(&mut self) -> Result<RunControl> {
 		todo!("WOW DONE!")
 	}
-	
+
 	async fn wait_for_intervention(
 		&mut self,
 		stage: Stage,

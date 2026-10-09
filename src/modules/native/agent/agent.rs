@@ -1,13 +1,11 @@
 use super::*;
 
-
-
 impl Agent {
- 	pub fn new() -> Self {
+	pub fn new() -> Self {
 		Self {
 			id: uuid::Uuid::new_v4().to_string(),
 			tools: AgentTools::default(),
-			workspace: Arc::new(WorkspaceContext::default()),
+			workspace: Arc::new(CtxWorkspace::default()),
 		}
 	}
 	async fn pick_mode(&self, ctx: &AgentCtx) -> Result<AgentMode> {
@@ -24,7 +22,6 @@ impl Agent {
 		let action = AgentAction::try_from(raw)?;
 		Ok(action)
 	}
-
 	pub async fn run_agent_loop(
 		&self,
 		task: AgentTask,
@@ -33,7 +30,9 @@ impl Agent {
 		let mut steps = 0;
 		let max_steps = 10;
 		let mut ctx = AgentCtx::with_workspace(task.prompt.clone(), (*self.workspace).clone());
+
 		section!("AGENT run_agent_loop CONTEXT");
+
 		let prompt = ctx.prompt.as_deref().unwrap_or("");
 		println!(
 			"ctx.prompt ({} chars, {} lines):\n{}",
@@ -43,26 +42,43 @@ impl Agent {
 		);
 		println!("ctx.workspace:\n{}", ctx.workspace);
 		println!("ctx.history ({} entries):", ctx.history.len());
+
 		for (i, entry) in ctx.history.iter().take(5).enumerate() {
 			println!("  [{}] {}", i + 1, preview(&format!("{entry:?}"), 500));
 		}
+
 		if ctx.history.len() > 5 {
 			println!("  ... {} more entries", ctx.history.len() - 5);
 		}
-		let _ = event_tx.send(RuntimeEvent::Agent(AgentEvent::Thinking {
-			task: task.clone(),
-		}));
+
+		let event = RuntimeEvent::Agent(AgentEvent::Thinking { task: task.clone() });
+
+		if let Err(error) = crate::agent::log::append_agent_event(&event) {
+			eprintln!("Failed to write agent event log: {error:#}");
+		}
+		let _ = event_tx.send(event);
+
 		let mode: AgentMode = self.pick_mode(&ctx).await?;
+
 		if matches!(mode, AgentMode::Chat) {
 			let response = prompt_chat(&ctx).await?;
 			let result = TaskResult::completed_chat(task.id, ctx, response);
-			let _ = event_tx.send(RuntimeEvent::Agent(AgentEvent::Finished {
+
+			let event = RuntimeEvent::Agent(AgentEvent::Finished {
 				result: result.clone(),
-			}));
+			});
+
+			if let Err(error) = crate::agent::log::append_agent_event(&event) {
+				eprintln!("Failed to write agent event log: {error:#}");
+			}
+			let _ = event_tx.send(event);
+
 			return Ok(result);
 		}
+
 		loop {
 			steps += 1;
+
 			if steps > max_steps {
 				return Ok(TaskResult::failed(
 					task.id,
@@ -71,31 +87,50 @@ impl Agent {
 					Some("Agent exceeded maximum reasoning steps".into()),
 				));
 			}
+
 			let action = self.pick_action(&ctx).await?;
+
 			match action {
 				AgentAction::Current { message } => {
 					let now = chrono::Local::now().format("%Y-%m-%d").to_string();
 					let response = format!("Context update: The current date is {}. {}", now, message);
-					let _ = event_tx.send(RuntimeEvent::Agent(AgentEvent::Working {
+
+					let event = RuntimeEvent::Agent(AgentEvent::Working {
 						task: task.clone(),
 						message: response.clone(),
-					}));
+					});
+
+					if let Err(error) = crate::agent::log::append_agent_event(&event) {
+						eprintln!("Failed to write agent event log: {error:#}");
+					}
+					let _ = event_tx.send(event);
+
 					ctx
 						.history
 						.push(AgentObservation::Current { message: response });
 				}
+
 				AgentAction::Finish { message } => {
 					if ctx.history.is_empty() {
 						return Err(anyhow!(
 							"Agent attempted to finish without performing any work"
 						));
 					}
+
 					let result = TaskResult::completed_with_summary(task.id, ctx, message);
-					let _ = event_tx.send(RuntimeEvent::Agent(AgentEvent::Finished {
+
+					let event = RuntimeEvent::Agent(AgentEvent::Finished {
 						result: result.clone(),
-					}));
+					});
+
+					if let Err(error) = crate::agent::log::append_agent_event(&event) {
+						eprintln!("Failed to write agent event log: {error:#}");
+					}
+					let _ = event_tx.send(event);
+
 					return Ok(result);
 				}
+
 				AgentAction::RunCommand { command } => {
 					let shell_command = ShellCommand::shell(command.clone());
 					let result = self.tools.shell.run(shell_command).await?;
@@ -114,22 +149,21 @@ impl Agent {
 						result.stderr.lines().count(),
 						preview_lines(&result.stderr, SHELL_OUTPUT_PREVIEW_LINES)
 					);
+
 					ctx.history.push(AgentObservation::RunCommand { result });
 				}
+
 				AgentAction::Context { .. } => {
-					let _ = event_tx.send(RuntimeEvent::Agent(AgentEvent::Working {
+					let event = RuntimeEvent::Agent(AgentEvent::Working {
 						task: task.clone(),
 						message: "Inspecting agent context".into(),
-					}));
-					ctx.history.push(AgentObservation::Current {
-						message: "Agent context requested".into(),
 					});
-				}
-				AgentAction::Context { .. } => {
-					let _ = event_tx.send(RuntimeEvent::Agent(AgentEvent::Working {
-						task: task.clone(),
-						message: "Inspecting agent context".into(),
-					}));
+
+					if let Err(error) = crate::agent::log::append_agent_event(&event) {
+						eprintln!("Failed to write agent event log: {error:#}");
+					}
+					let _ = event_tx.send(event);
+
 					ctx.history.push(AgentObservation::Current {
 						message: "Agent context requested".into(),
 					});
@@ -137,9 +171,9 @@ impl Agent {
 			}
 		}
 	}
-	
+
 	pub fn with_cwd(cwd: impl Into<PathBuf>) -> Self {
-		Self::with_workspace(WorkspaceContext::from_cwd(cwd))
+		Self::with_workspace(CtxWorkspace::from_cwd(cwd))
 	}
 	pub fn with_ctx(ctx: AgentCtx, _session: &AiSession) -> Result<Self> {
 		Ok(Self {
@@ -148,14 +182,13 @@ impl Agent {
 			workspace: Arc::new(ctx.workspace),
 		})
 	}
-	pub fn with_workspace(workspace: WorkspaceContext) -> Self {
+	pub fn with_workspace(workspace: CtxWorkspace) -> Self {
 		Self {
 			id: uuid::Uuid::new_v4().to_string(),
 			tools: AgentTools::default(),
 			workspace: Arc::new(workspace),
 		}
 	}
-	
 }
 impl Default for Agent {
 	fn default() -> Self {
@@ -163,7 +196,7 @@ impl Default for Agent {
 	}
 }
 impl AgentTask {
-  pub fn new(prompt: String) -> Self {
+	pub fn new(prompt: String) -> Self {
 		Self {
 			id: Uuid::new_v4(),
 			prompt,
@@ -182,7 +215,7 @@ impl AgentCtx {
 		Self {
 			prompt: Some(user_prompt.clone()),
 			task: Some(AgentTask::new(user_prompt)),
-			workspace: WorkspaceContext::default(),
+			workspace: CtxWorkspace::default(),
 			history: Vec::new(),
 			artifacts: Vec::new(),
 			logs: Vec::new(),
@@ -193,14 +226,14 @@ impl AgentCtx {
 		Self {
 			prompt: None,
 			task: None,
-			workspace: WorkspaceContext::default(),
+			workspace: CtxWorkspace::default(),
 			history: Vec::new(),
 			artifacts: Vec::new(),
 			logs: Vec::new(),
 			spawned_tasks: Vec::new(),
 		}
 	}
-	pub fn with_workspace(user_prompt: String, workspace: WorkspaceContext) -> Self {
+	pub fn with_workspace(user_prompt: String, workspace: CtxWorkspace) -> Self {
 		Self {
 			prompt: Some(user_prompt.clone()),
 			task: Some(AgentTask::new(user_prompt)),
@@ -212,12 +245,12 @@ impl AgentCtx {
 		}
 	}
 	pub fn from_session(session: &AiSession) -> Result<Self> {
-		let workspace = WorkspaceContext::from_session(session)?;
+		let workspace = CtxWorkspace::from_session(session)?;
 		Self::from_session_with_workspace(session, &workspace)
 	}
 	pub fn from_session_with_workspace(
 		session: &AiSession,
-		workspace: &WorkspaceContext,
+		workspace: &CtxWorkspace,
 	) -> Result<Self> {
 		Ok(Self {
 			prompt: Some(session.prompt.clone()),
@@ -261,7 +294,7 @@ impl TryFrom<LlmAction> for AgentAction {
 pub struct Agent {
 	pub id: String,
 	pub tools: AgentTools,
-	pub workspace: Arc<WorkspaceContext>,
+	pub workspace: Arc<CtxWorkspace>,
 }
 #[derive(Clone, Debug)]
 pub struct AgentBus {
@@ -278,7 +311,7 @@ pub struct AgentContextInfo {
 pub struct AgentCtx {
 	pub prompt: Option<String>,
 	pub task: Option<AgentTask>,
-	pub workspace: WorkspaceContext,
+	pub workspace: CtxWorkspace,
 	pub history: Vec<AgentObservation>,
 	pub artifacts: Vec<Artifact>,
 	pub logs: Vec<String>,
@@ -302,12 +335,12 @@ pub struct LlmAction {
 pub struct LlmMode {
 	pub mode: String,
 }
-// 
+//
 // mod traits {
 //  	use super::*;
 // 	pub trait CtxAgent {
 // 		fn task(&self) -> &AgentTask;
-// 		fn workspace(&self) -> &WorkspaceContext;
+// 		fn workspace(&self) -> &CtxWorkspace;
 // 		fn history(&self) -> &[AgentObservation];
 // 		fn record(&mut self, observation: AgentObservation);
 // 		fn observe(&self) -> AgentContextInfo;

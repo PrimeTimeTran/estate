@@ -1,7 +1,7 @@
 use super::*;
 
 impl AgentRuntime {
-	pub fn workspace(&self) -> &WorkspaceContext {
+	pub fn workspace(&self) -> &CtxWorkspace {
 		&self.workspace
 	}
 	pub async fn run_agent_with_sdlc(
@@ -51,7 +51,7 @@ impl AgentRuntime {
 	pub fn new(
 		event_tx: UnboundedSender<RuntimeEvent>,
 		registry: AgentRegistry,
-		workspace: WorkspaceContext,
+		workspace: CtxWorkspace,
 	) -> Self {
 		Self {
 			event_tx,
@@ -193,7 +193,7 @@ pub struct AgentRegistry;
 pub struct AgentRuntime {
 	pub event_tx: UnboundedSender<RuntimeEvent>,
 	pub registry: AgentRegistry,
-	pub workspace: WorkspaceContext,
+	pub workspace: CtxWorkspace,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -253,4 +253,3 @@ pub struct RuntimeMetrics {
 	pub tool_durations_ms: Vec<u64>,
 	pub stage_durations_ms: Vec<u64>,
 }
-

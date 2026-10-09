@@ -273,7 +273,7 @@ pub fn build_step_prompt(
     "#,
 	)
 }
-fn verify_created_files(plan: &BuildPlan, workspace: &WorkspaceContext) -> Result<()> {
+fn verify_created_files(plan: &BuildPlan, workspace: &CtxWorkspace) -> Result<()> {
 	for file in &plan.files {
 		let path = workspace.cwd.join(&file.path);
 

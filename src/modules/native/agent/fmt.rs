@@ -1,6 +1,6 @@
 use super::*;
 
-pub fn format_workspace(workspace: &WorkspaceContext) -> String {
+pub fn format_workspace(workspace: &CtxWorkspace) -> String {
 	let mut output = String::new();
 	output.push_str(&format!("CWD: {}\n", workspace.cwd.display()));
 	if workspace.files.is_empty() {

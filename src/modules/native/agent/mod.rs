@@ -6,12 +6,12 @@
 // | Individual background execution | `Job`          | Has lifecycle/state           |
 // | UI representation               | `Task` / `Job` | Shows pending/running/etc.    |
 
-use notify::{Event, EventKind};
 use crate::{
 	model::task::TaskResult,
 	prelude::{anyhow::anyhow, *},
 	sdlc::AiSession,
 };
+use notify::{Event, EventKind};
 
 mod r#const;
 use r#const::*;
@@ -38,3 +38,5 @@ pub use prompt::*;
 pub use system::*;
 pub use tool::*;
 
+pub mod log;
+pub use log::*;

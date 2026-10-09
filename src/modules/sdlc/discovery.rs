@@ -169,7 +169,7 @@ fn checkall() {
 			disclosure: Disclosure::Context("SDLC plan"),
 		},
 	];
-	// let workspace = WorkspaceContext::default();
+	// let workspace = CtxWorkspace::default();
 	let workspace = Path::new(".");
 	let evidence = discover(workspace, &rules);
 	for item in &evidence {

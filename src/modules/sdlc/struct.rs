@@ -12,6 +12,7 @@ pub struct AiSession {
 	pub time_created: DateTime<Utc>,
 	pub time_updated: DateTime<Utc>,
 	pub workspace: PathBuf,
+	pub cwd: PathBuf,
 }
 pub struct AiView {
 	pub runtime: PipelineRuntimeView,
