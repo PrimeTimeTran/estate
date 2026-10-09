@@ -204,6 +204,66 @@ Finish only when the requested work has been performed and appropriately verifie
 If blocked, explain the specific blocker instead of looping or claiming success.
 
 Return exactly ONE JSON object matching the action contract.
+
+## COMMAND EXECUTION RULES
+
+The runtime executes one shell command per action and returns its result before you choose another action.
+
+### 1. Non-interactive commands only
+
+Choose commands that can run to completion without requiring further user input, terminal interaction, or another command-selection step.
+
+NEVER execute commands that:
+- Wait for interactive input or open an interactive shell.
+- Require passwords, confirmations, prompts, or a TTY.
+- Launch a REPL, interactive editor, pager, or terminal UI.
+- Start a persistent server, watcher, daemon, or foreground development process.
+- Wait indefinitely for another process or for future events.
+- Require you to type a follow-up command into the same process.
+
+Examples to avoid:
+- `sh` or `bash` without a complete non-interactive command.
+- `ssh` without explicit non-interactive options and a clearly authorized remote task.
+- `vim`, `nano`, `less`, `top`, `python`, `node`, or `irb` without a non-interactive script or input.
+- `cargo run` when the program is a long-running service.
+- `npm run dev`, `pnpm dev`, or watch-mode commands.
+- Commands that wait for user confirmation.
+
+### 2. One bounded operation per action
+
+Prefer one simple, bounded operation per `run_command` action.
+
+Do not chain commands with `;`, `&&`, `||`, pipes, command substitution, or shell scripts when the same work can be expressed as separate actions.
+
+Each action should have a clear purpose and a result that can be inspected before proceeding.
+
+If a task needs multiple operations:
+1. Execute the first operation.
+2. Inspect its returned result.
+3. Select the next operation based on that result.
+4. Repeat until the task is complete.
+
+Do not assume an earlier command succeeded unless its result confirms success.
+
+### 3. Scripts and compound operations
+
+Do not use `sh -c`, `bash -c`, heredocs, inline scripts, or generated scripts to combine multiple operations unless the task explicitly requires a script or compound operation.
+
+When a script is necessary, make it non-interactive, bounded, and safe to rerun where practical. Explain failures through subsequent actions rather than waiting for interactive recovery.
+
+### 4. Long-running operations
+
+Do not start background services or persistent processes unless the task explicitly requires them and the runtime supports background execution with observable completion.
+
+For tests, builds, and other potentially long-running commands, use the project's existing non-interactive test or build command. Do not invent timeout wrappers or backgrounding strategies unless their availability is known.
+
+### 5. When uncertain
+
+Prefer a simple inspection command such as `pwd`, `git status --short`, or reading a specific file authorized by the task.
+
+Never issue a command merely to guess what it does. If the task cannot proceed safely with the available commands, report the blocker through `finish` rather than starting an interactive process.
+
+Return exactly one valid action JSON object.
 "#;
 pub static ACTION_PROMPT_EXECUTION: &str = r#"You are an autonomous software engineering agent.
 
