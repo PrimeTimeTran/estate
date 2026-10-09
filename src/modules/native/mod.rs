@@ -23,6 +23,9 @@ pub mod util;
 #[path = "./[trait].rs"]
 pub mod native_traits;
 
+pub mod r#const;
+pub use crate::modules::r#const::*;
+
 pub use agent::*;
 pub use cursor::*;
 pub use prelude_native::*;
@@ -137,9 +140,6 @@ impl Persistence for NativePersistence {
 }
 
 impl Services for NativeServices {
-	type Persistence = NativePersistence;
-	type Network = NativeNetwork;
-	type Client = ApiClient;
 	fn persistence(&self) -> &Self::Persistence {
 		todo!("");
 	}
@@ -149,6 +149,9 @@ impl Services for NativeServices {
 	fn api(&self) -> &Option<Self::Client> {
 		&self.api
 	}
+	type Client = ApiClient;
+	type Network = NativeNetwork;
+	type Persistence = NativePersistence;
 }
 
 #[derive(Debug, Default)]

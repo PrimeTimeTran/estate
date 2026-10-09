@@ -362,7 +362,6 @@ impl App<Context> {
 				.run_app(&mut renderer)
 				.map_err(|err| anyhow::anyhow!("GUI event loop failed: {err}"))?;
 		}
-
 		Ok(())
 	}
 }
@@ -483,7 +482,7 @@ where
 {
 	pub fn start_grpc_server(&self) -> WorkHandle<C, tokio::task::JoinHandle<()>> {
 		self.run_background(|cancel| async move {
-			if let Err(error) = crate::modules::grpc_server::run_server(cancel).await {
+			if let Err(error) = crate::modules::grpc::run_server(cancel).await {
 				tracing::error!(
 					%error,
 					"❌ Estate gRPC server stopped"
@@ -492,7 +491,7 @@ where
 		})
 	}
 }
-impl<C> traits::Worker<C> for HostWorker<C>
+impl<C> r#trait::Worker<C> for HostWorker<C>
 where
 	C: Ctx,
 {

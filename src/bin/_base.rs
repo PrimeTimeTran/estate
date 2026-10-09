@@ -36,6 +36,11 @@ mod enums {
 mod impls {
 	use super::{e, s, t, *};
 
+	impl<'a> s::Bar<'a> {
+		pub fn new(name: &'a str) -> Self {
+			Self { name }
+		}
+	}
 	impl s::Foo {
 		pub fn new(name: &str) -> Self {
 			Self {
@@ -43,6 +48,7 @@ mod impls {
 			}
 		}
 	}
+
 	impl t::BaseTrait for s::Foo {
 		fn a_borrowed_read(&self) -> &str {
 			&self.name
@@ -61,12 +67,6 @@ mod impls {
 			println!("- Foos's spam {}", self.name);
 		}
 	}
-
-	impl<'a> s::Bar<'a> {
-		pub fn new(name: &'a str) -> Self {
-			Self { name }
-		}
-	}
 	impl<'a> t::Jam<'a> for s::Bar<'a> {
 		fn a_borrowed_read(&self) -> &str {
 			self.name
@@ -75,21 +75,18 @@ mod impls {
 			self.name = new_name;
 			self
 		}
-
 		fn spam(self) {
 			println!("... Jam's spam {}", self.name)
 		}
 	}
-
-	impl t::Read for s::Foo {
-		fn read(&self) -> &str {
-			&self.name
-		}
-	}
-
 	impl t::Mutate for s::Foo {
 		fn mutate(&mut self, s: &str) {
 			self.name = s.into();
+		}
+	}
+	impl t::Read for s::Foo {
+		fn read(&self) -> &str {
+			&self.name
 		}
 	}
 }
@@ -101,11 +98,6 @@ mod impls {
 /// [structs]: https://doc.rust-lang.org/reference/items/structs.html
 mod structs {
 	use super::{e, i, t, *};
-
-	#[derive(Clone, Debug, Default, Eq, PartialEq)]
-	pub struct Foo {
-		pub name: String,
-	}
 
 	#[derive(Clone, Debug, Default, Eq, PartialEq)]
 	pub struct Bar<'a> {
@@ -132,6 +124,11 @@ mod structs {
 		///   ↓
 		/// &'static [&'static str]
 		items: &'static [&'static str],
+	}
+
+	#[derive(Clone, Debug, Default, Eq, PartialEq)]
+	pub struct Foo {
+		pub name: String,
 	}
 }
 

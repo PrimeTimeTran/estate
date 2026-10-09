@@ -36,11 +36,13 @@ pub mod server;
 pub mod web;
 
 #[cfg(not(target_arch = "wasm32"))]
-pub mod grpc_server;
+pub mod grpc;
+
 #[cfg(not(target_arch = "wasm32"))]
-pub use grpc_server::*;
+pub use grpc::*;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub mod ipc;
+
 #[cfg(not(target_arch = "wasm32"))]
 pub use ipc::*;

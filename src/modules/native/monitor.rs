@@ -14,9 +14,7 @@ pub struct WebMonitor;
 #[cfg(target_arch = "wasm32")]
 impl Monitor for WebMonitor {
 	fn watch(&mut self) {}
-
 	fn rx(&mut self) {}
-
 	fn poll(&mut self) -> bool {
 		false
 	}
@@ -72,11 +70,9 @@ impl StateMonitor {
 	/// Multiple filesystem events are collapsed into one logical change.
 	pub fn poll(&mut self) -> bool {
 		let mut changed = false;
-
 		while self.rx.try_recv().is_ok() {
 			changed = true;
 		}
-
 		changed
 	}
 }
@@ -108,7 +104,6 @@ impl NativeMonitor {
 			},
 			Config::default(),
 		)?;
-
 		Ok(Self { _watcher, rx })
 	}
 }

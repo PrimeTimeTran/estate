@@ -1,10 +1,5 @@
-use crate::{
-	prelude::*,
-};
+use crate::prelude::*;
 use tray_icon::{Icon, TrayIconBuilder};
-
-const TRAY_ICON_WIDTH: u32 = 16;
-const TRAY_ICON_HEIGHT: u32 = 16;
 
 // #[cfg(not(feature = "daemon"))]
 impl<NativeCtx, S> ApplicationHandler<AppEvent> for Renderer<NativeCtx, S>
@@ -33,7 +28,6 @@ where
 			AppEvent::Navigate(view) => {
 				self.navigate_to(view);
 			}
-
 			AppEvent::RuntimeEvent => {
 				tracing::debug!("user_event RuntimeEvent");
 				let _ctx = self.app_context();
@@ -341,7 +335,7 @@ where
 	pub event_rx: C::EventReceiver,
 	pub event_tx: C::EventSender,
 	pub settings: Arc<Settings>,
-
+	
 	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 	pub windows: Vec<AppWindow<C, S>>,
 	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]

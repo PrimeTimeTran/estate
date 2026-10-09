@@ -59,8 +59,8 @@ fn threads_have_non_deterministic_lifetimes() {
 	/// [Error]: "Closure may outlive the current function"
 	/// Solve this by moving all the closure's dependencies ownership using `move`
 	let s = "hello";
-	// let t4 = thread::spawn(|| {
-	let t4 = thread::spawn(move || {
+	let t4 = thread::spawn(|| {
+	// let t4 = thread::spawn(move || {
 		println!(
 			"{:?} Spawned thread '4' running... {}",
 			thread::current().id(),

@@ -57,7 +57,7 @@ pub use crate::{
 	impls::{self, self as i},
 	structs::{self, self as s, *},
 	// Verbose use/export to resolve name collisions with external crates.
-	traits::{self, self as t, Context, EventReceiver, *},
+	r#trait::{self, self as t, Context, EventReceiver, *},
 };
 
 /// A non wasm32 target is non browser code, server, native, desktop
@@ -70,6 +70,7 @@ pub use crate::{
 #[cfg(not(target_arch = "wasm32"))]
 pub use crate::{
 	app::{context::*, *},
+	r#const::*,
 	modules::{
 		ipc::{self, *},
 		native::{

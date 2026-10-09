@@ -22,6 +22,18 @@ pub enum TaskRequest {
 	Delete(TaskId),
 }
 
+/// ## [TaskStatus]
+///
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TaskStatus {
+	Pending,
+	Running,
+	Completed,
+	Failed(String),
+	Stopped,
+	Interrupted,
+}
+
 impl TaskKind {
 	pub fn name(&self) -> &'static str {
 		self.into()

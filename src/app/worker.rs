@@ -1,14 +1,5 @@
 use crate::prelude::*;
 
-#[cfg(not(target_arch = "wasm32"))]
-pub type ClockWork<NativeContext> = WorkHandle<NativeContext, tokio::task::JoinHandle<()>>;
-
-#[cfg(target_arch = "wasm32")]
-pub type ClockWork<WebContext> = WorkHandle<WebContext, ()>;
-
-#[cfg(target_arch = "wasm32")]
-pub type PlatformJoin = ();
-
 pub enum WorkerStatus {
 	Starting,
 	Running,
@@ -16,6 +7,7 @@ pub enum WorkerStatus {
 	Stopped,
 	Failed(String),
 }
+
 #[cfg(target_arch = "wasm32")]
 impl<C> WorkHandle<C, std::thread::JoinHandle<()>>
 where
@@ -108,6 +100,7 @@ pub struct WorkerInfo {
 	pub status: WorkerStatus,
 	pub started_at: Option<Instant>,
 }
+
 /// "This is a unit of work that I know how to stop."
 ///
 pub struct WorkHandle<C, J>
@@ -127,3 +120,12 @@ where
 {
 	workers: HashMap<WorkerId, Worker<C, S>>,
 }
+
+#[cfg(not(target_arch = "wasm32"))]
+pub type ClockWork<NativeContext> = WorkHandle<NativeContext, tokio::task::JoinHandle<()>>;
+
+#[cfg(target_arch = "wasm32")]
+pub type ClockWork<WebContext> = WorkHandle<WebContext, ()>;
+
+#[cfg(target_arch = "wasm32")]
+pub type PlatformJoin = ();

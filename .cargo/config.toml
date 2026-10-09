@@ -12,8 +12,6 @@
 # trunk-run = "trunk serve src/web/public/index.html --features web"
 
 
-
-
 # Run full suite
 # cargo +stable-x86_64-pc-windows-gnu run --bin server --features=native
 # cargo run --bin native --features=native

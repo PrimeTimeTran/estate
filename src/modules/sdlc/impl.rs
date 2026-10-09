@@ -36,7 +36,7 @@ impl AiSession {
 	}
 }
 
-impl crate::traits::DateableSession for AiSession {
+impl crate::r#trait::DateableSession for AiSession {
 	fn start(&self) -> Option<DateTime<Utc>> {
 		Some(self.time_created)
 	}

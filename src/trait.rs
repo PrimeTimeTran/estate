@@ -22,6 +22,16 @@ use crate::prelude::*;
 ///
 /// [traits]: https://doc.rust-lang.org/rust-by-example/trait.html
 pub trait Context: Sized {
+	fn run(&mut self, args: Self::Args) -> Result<()>;
+	/// ## [Context::runtime]
+	///
+	/// Returns a reference to the concrete [`Runtime`] associated with this context.
+	///
+	/// The returned type is [`Self::Runtime`], i.e. the associated type selected
+	/// by the concrete [`Context`] implementation.
+	fn runtime(&self) -> &Self::Runtime;
+	fn new() -> Result<Self>;
+	type Args;
 	/// The host on which the application is running.
 	///
 	/// An associated type whose concrete implementation is selected by
@@ -38,16 +48,6 @@ pub trait Context: Sized {
 	/// implementor and can vary based on the platform, host, configuration,
 	/// and other runtime factors.
 	type Runtime: Runtime;
-	/// ## [Context::runtime]
-	///
-	/// Returns a reference to the concrete [`Runtime`] associated with this context.
-	///
-	/// The returned type is [`Self::Runtime`], i.e. the associated type selected
-	/// by the concrete [`Context`] implementation.
-	fn runtime(&self) -> &Self::Runtime;
-	type Args;
-	fn new() -> Result<Self>;
-	fn run(&mut self, args: Self::Args) -> Result<()>;
 }
 
 /// ## [Ctx]

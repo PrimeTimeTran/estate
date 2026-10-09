@@ -244,7 +244,7 @@ impl<R: Runtime> Daemon<R> {
 	}
 
 	fn write_pid(pid: u32) -> Result<()> {
-		std::fs::write(crate::data::PATH_PID, pid.to_string())?;
+		std::fs::write(PATH_PID, pid.to_string())?;
 		Ok(())
 	}
 }

@@ -41,8 +41,7 @@ pub struct StatusDaemon;
 impl CliCommand for StatusDaemon {
 	async fn run(&self, _ctx: &CliContext) {
 		let state = EstateState::load_from_disk().unwrap();
-		let pid =
-			std::fs::read_to_string(crate::data::PATH_PID).unwrap_or_else(|_| "unknown".to_string());
+		let pid = std::fs::read_to_string(PATH_PID).unwrap_or_else(|_| "unknown".to_string());
 		println!("📊 Estate Daemon Status");
 		println!("──────────────────────");
 		println!("✅ Status:          OK");

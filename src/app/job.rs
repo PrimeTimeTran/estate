@@ -12,18 +12,6 @@ pub enum JobStatus {
 	Interrupted,
 }
 
-/// ## [TaskStatus]
-///
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub enum TaskStatus {
-	Pending,
-	Running,
-	Completed,
-	Failed(String),
-	Stopped,
-	Interrupted,
-}
-
 impl JobStatus {
 	pub fn label(self) -> &'static str {
 		match self {

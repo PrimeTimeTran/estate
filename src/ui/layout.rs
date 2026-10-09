@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-use crate::data::LAYOUT as config;
+use LAYOUT as config;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum FocusedPane {
@@ -374,7 +374,7 @@ where
 	fn draw_view(
 		ui: &mut egui::Ui,
 		rect: egui::Rect,
-		view: &mut dyn traits::View<C, S>,
+		view: &mut dyn r#trait::View<C, S>,
 		ctx: &mut AppContext<'_, C, S>,
 	) {
 		// while let Some(event) = ctx.next_event() {

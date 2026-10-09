@@ -27,7 +27,7 @@ impl<R: Runtime> EventDispatcher<R> {
 	///
 	pub fn register<H>(&mut self, handler: H)
 	where
-		H: traits::EventHandler<R> + 'static,
+		H: r#trait::EventHandler<R> + 'static,
 	{
 		self.handlers.push(Box::new(handler));
 	}
@@ -75,5 +75,5 @@ impl<R: Runtime> EventDispatcher<R> {
 /// - [run][EventDispatcher::run]
 ///
 pub struct EventDispatcher<R: Runtime> {
-	handlers: Vec<Box<dyn traits::EventHandler<R>>>,
+	handlers: Vec<Box<dyn r#trait::EventHandler<R>>>,
 }

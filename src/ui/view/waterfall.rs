@@ -32,7 +32,7 @@ where
 pub struct WaterfallChart {
 	_jobs: Vec<&'static Job>,
 }
-impl<C, S> traits::View<C, S> for WaterfallChart
+impl<C, S> r#trait::View<C, S> for WaterfallChart
 where
 	C: Ctx,
 {

@@ -35,6 +35,22 @@ async fn handle_connection(stream: UnixStream, events: EventBus) -> anyhow::Resu
 			}
 		}
 	}
+	async fn send_hello_ack(
+		write_half: &mut tokio::net::unix::OwnedWriteHalf,
+		connection_id: Uuid,
+	) -> anyhow::Result<()> {
+		send(
+			write_half,
+			IpcMessage::HelloAck(HelloAck {
+				protocol: ProtocolVersion::CURRENT,
+				server: ClientKind::Daemon,
+				connection_id,
+			}),
+		)
+		.await?;
+
+		Ok(())
+	}
 	async fn validate_protocol(
 		hello: &Hello,
 		write_half: &mut tokio::net::unix::OwnedWriteHalf,
@@ -67,36 +83,20 @@ async fn handle_connection(stream: UnixStream, events: EventBus) -> anyhow::Resu
 			"Estate IPC client connected"
 		);
 	}
-	async fn send_hello_ack(
-		write_half: &mut tokio::net::unix::OwnedWriteHalf,
-		connection_id: Uuid,
-	) -> anyhow::Result<()> {
-		send(
-			write_half,
-			IpcMessage::HelloAck(HelloAck {
-				protocol: ProtocolVersion::CURRENT,
-				server: ClientKind::Daemon,
-				connection_id,
-			}),
-		)
-		.await?;
 
-		Ok(())
-	}
-
-	tracing::info!("🔥 IPC HANDLE CONNECTION");
+	tracing::info!("🚠 IPC HANDLE CONNECTION");
 	let connection_id = Uuid::new_v4();
 
 	let (read_half, mut write_half) = stream.into_split();
 	let mut reader = BufReader::new(read_half);
 
-	tracing::info!("🔥 IPC WAITING FOR CLIENT MESSAGE");
+	tracing::info!("🚠 IPC WAITING FOR CLIENT MESSAGE");
 	let hello = read_hello(&mut reader, &mut write_half).await?;
 
 	tracing::info!(
 		connection = %connection_id,
 		hello = ?hello,
-		"🔥 IPC HELLO RECEIVED"
+		"🚠 IPC HELLO RECEIVED"
 	);
 
 	log_client_connected(connection_id, &hello);
@@ -105,7 +105,7 @@ async fn handle_connection(stream: UnixStream, events: EventBus) -> anyhow::Resu
 
 	tracing::info!(
 		connection = %connection_id,
-		"🔥 IPC HELLO ACK SENT"
+		"🚠 IPC HELLO ACK SENT"
 	);
 
 	let mut event_rx = events.tx.subscribe();
@@ -138,14 +138,14 @@ async fn run_connection_loop(
 	event_rx: &mut tokio::sync::broadcast::Receiver<Event>,
 	line: &mut String,
 ) -> anyhow::Result<()> {
-	tracing::info!("🔥 run_connection_loop HID RAW ← Swift: {}", line);
+	tracing::info!("🚠 run_connection_loop HID RAW ← Swift: {}", line);
 	loop {
 		tokio::select! {
 			/*
 			 * Tauri → Estate
 			 */
 			result = reader.read_line(line) => {
-			tracing::info!("🔥 run_connection_loop HID RAW ← Swift: {}", line);
+			tracing::info!("🚠 run_connection_loop HID RAW ← Swift: {}", line);
 				if !handle_client_input(
 					connection_id,
 					result?,
@@ -196,14 +196,14 @@ async fn handle_client_input(
 	tracing::debug!(
 		connection = %connection_id,
 		line = %line.trim_end(),
-		"🔥 Estate IPC ← client"
+		"🚠 Estate IPC ← client"
 	);
 
 	let message = decode_client_message(connection_id, line)?;
 
 	tracing::debug!(
 		connection = %connection_id,
-		"🔥 Estate IPC received client message"
+		"🚠 Estate IPC received client message"
 	);
 
 	handle_client_message(connection_id, message, write_half).await
@@ -217,7 +217,7 @@ fn decode_client_message(connection_id: Uuid, line: &str) -> anyhow::Result<IpcM
 				connection = %connection_id,
 				%error,
 				line = %line.trim_end(),
-				"🔥 Estate IPC failed to decode client message"
+				"🚠 Estate IPC failed to decode client message"
 			);
 
 			Err(error.into())
@@ -267,7 +267,7 @@ async fn handle_get_context(
 ) -> anyhow::Result<()> {
 	tracing::info!(
 		connection = %connection_id,
-		"🔥 Estate IPC → sending ContextResult"
+		"🚠 Estate IPC → sending ContextResult"
 	);
 
 	let context = EstateContext {
@@ -279,7 +279,7 @@ async fn handle_get_context(
 	};
 
 	println!(
-		"🔥 ESTATE CLIENT → GET CONTEXT JSON: {}",
+		"🚠 ESTATE CLIENT → GET CONTEXT JSON: {}",
 		serde_json::to_string(&IpcMessage::<EventKind>::GetContext)?
 	);
 
@@ -301,17 +301,14 @@ async fn handle_event_bus_message(
 			send_event(connection_id, event, write_half).await?;
 			Ok(true)
 		}
-
 		Err(tokio::sync::broadcast::error::RecvError::Lagged(count)) => {
 			tracing::warn!(
 				connection = %connection_id,
 				count,
 				"Estate IPC event subscriber lagged"
 			);
-
 			Ok(true)
 		}
-
 		Err(tokio::sync::broadcast::error::RecvError::Closed) => {
 			tracing::debug!(
 				connection = %connection_id,
@@ -333,7 +330,7 @@ async fn send_event(
 		?event,
 		"📡 Estate IPC → event"
 	);
-	println!("🔥 IPC SERVER → EVENT BUS EVENT: {:?}", event.kind);
+	println!("🚠 IPC SERVER → EVENT BUS EVENT: {:?}", event.kind);
 	let envelope = EventEnvelope {
 		id: EventId {
 			node: NodeId,
@@ -387,7 +384,7 @@ impl IpcServer {
 		);
 		loop {
 			let (stream, _) = listener.accept().await?;
-			tracing::info!("🔥 IPC ACCEPTED connection");
+			tracing::info!("🚠 IPC ACCEPTED connection");
 			let events = self.events.clone();
 			tokio::spawn(async move {
 				if let Err(error) = handle_connection(stream, events).await {
