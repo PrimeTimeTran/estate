@@ -68,9 +68,9 @@ path = "src/bin/[mpl].rs"
 # documentation of APIs, cli commands, etc.
 [[bin]]
 # cargo run --bin native --no-default-features --features "native,daemon,macos"
-name = "daemon"
-path = "src/bin/[hid-daemon].rs"
-required-features = ["native", "daemon"]
+name = "hid"
+path = "src/bin/[hid].rs"
+required-features = ["native", "hid"]
 
 [[bin]]
 name = "native"

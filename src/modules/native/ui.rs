@@ -2,19 +2,106 @@ use tray_icon::{Icon, TrayIconBuilder};
 
 use crate::prelude::*;
 
-// The first concrete implementation of Veable is here.
-//
-// EguiVeable defines it's own state which is specific to its own implementation
-// and the correponding methods which operate on those properties.
-//
-// The draw method is the gateway for this struct to inject behavior thats independent of the
-// generic base and unique to itself as package or an instance of Veable.
-#[derive(Clone, Debug, Default)]
-pub struct EguiVeable {
-	state: EstateState,
-	top_tab: DevTopTab,
-	side_tab: DevSideTab,
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum DevTopTab {
+	#[default]
+	Status,
+	Tasks,
+	Logs,
+	Config,
 }
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub enum DevSideTab {
+	#[default]
+	Overview,
+	Registry,
+	Daemon,
+	Engine,
+	Workspace,
+	Runtime,
+}
+
+pub fn bootstrap() -> Result<(TrayMenu, TrayIcon)> {
+	let menu = Menu::new();
+	let clock_item = MenuItem::new("Clock: 30s", true, None);
+	let scroll_item = MenuItem::new("Scroll: Idle", true, None);
+	let status = MenuItem::new("● Estate Daemon Running", false, None);
+	let dev = MenuItem::new("Dashboard", true, None);
+	let oracle = MenuItem::new("Oracle", true, None);
+	let task_manager = MenuItem::new("Task Manager", true, None);
+	let problem_screen = MenuItem::new("Problems", true, None);
+	let new_task = MenuItem::new("New Task", true, None);
+	let list_tasks = MenuItem::new("List Tasks", true, None);
+	let clear_tasks = MenuItem::new("Clear Tasks", true, None);
+	let tasks = Submenu::new("Tasks", true);
+	tasks.append(&new_task)?;
+	tasks.append(&list_tasks)?;
+	tasks.append(&clear_tasks)?;
+	let quit = MenuItem::new("Quit", true, None);
+	menu.append(&clock_item)?;
+	menu.append(&scroll_item)?;
+	menu.append(&status)?;
+	menu.append(&dev)?;
+	menu.append(&oracle)?;
+	menu.append(&task_manager)?;
+	menu.append(&tasks)?;
+	menu.append(&quit)?;
+	let tray = TrayIconBuilder::new()
+		.with_icon(tray_icon())
+		.with_menu(Box::new(menu))
+		.with_tooltip("Estate Daemon — Running")
+		.build()
+		.map_err(|e| anyhow::anyhow!("failed to create tray icon: {e}"))?;
+	Ok((
+		TrayMenu {
+			clear_tasks,
+			dev,
+			list_tasks,
+			problem_screen,
+			new_task,
+			quit,
+			status,
+			tasks,
+			oracle,
+			task_manager,
+		},
+		tray,
+	))
+}
+pub fn move_cursor_to(pos: ScreenPosition) {}
+// pub fn move_cursor_to(pos: ScreenPosition) {
+// 	let bounds = CGDisplay::main().bounds();
+// 	let x = match pos {
+// 		ScreenPosition::Left => bounds.origin.x + bounds.size.width * 0.125,
+// 		ScreenPosition::Center => bounds.origin.x + bounds.size.width * 0.5,
+// 		ScreenPosition::Right => bounds.origin.x + bounds.size.width * 0.875,
+// 	};
+// 	let y = bounds.origin.y + bounds.size.height * 0.5;
+// 	let point = geometry::CGPoint { x, y };
+// 	if let Ok(source) = CGEventSource::new(CGEventSourceStateID::CombinedSessionState) {
+// 		if let Ok(event) =
+// 			CGEvent::new_mouse_event(source, CGEventType::MouseMoved, point, CGMouseButton::Left)
+// 		{
+// 			event.post(CGEventTapLocation::HID);
+// 		}
+// 	}
+// }
+pub fn scroll_tray_icon() -> tray_icon::Icon {
+	let image = image::load_from_memory(crate::ui::TRAY_SCROLL_ICON)
+		.expect("failed to load scroll tray icon")
+		.into_rgba8();
+	let (width, height) = image.dimensions();
+	tray_icon::Icon::from_rgba(image.into_raw(), width, height)
+		.expect("failed to create scroll tray icon")
+}
+pub fn tray_icon() -> Icon {
+	let image = image::load_from_memory(crate::ui::TRAY_ICON)
+		.expect("failed to load generated tray icon")
+		.into_rgba8();
+	let (width, height) = image.dimensions();
+	Icon::from_rgba(image.into_raw(), width, height).expect("failed to create tray icon")
+}
+
 impl<C, S> Screen<C, S> for EguiVeable
 where
 	C: Ctx,
@@ -172,76 +259,6 @@ impl EguiVeable {
 	}
 }
 
-pub fn bootstrap() -> Result<(TrayMenu, TrayIcon)> {
-	let menu = Menu::new();
-	let clock_item = MenuItem::new("Clock: 30s", true, None);
-	let scroll_item = MenuItem::new("Scroll: Idle", true, None);
-	let status = MenuItem::new("● Estate Daemon Running", false, None);
-	let dev = MenuItem::new("Dashboard", true, None);
-	let oracle = MenuItem::new("Oracle", true, None);
-	let task_manager = MenuItem::new("Task Manager", true, None);
-	let problem_screen = MenuItem::new("Problems", true, None);
-	let new_task = MenuItem::new("New Task", true, None);
-	let list_tasks = MenuItem::new("List Tasks", true, None);
-	let clear_tasks = MenuItem::new("Clear Tasks", true, None);
-	let tasks = Submenu::new("Tasks", true);
-	tasks.append(&new_task)?;
-	tasks.append(&list_tasks)?;
-	tasks.append(&clear_tasks)?;
-	let quit = MenuItem::new("Quit", true, None);
-	menu.append(&clock_item)?;
-	menu.append(&scroll_item)?;
-	menu.append(&status)?;
-	menu.append(&dev)?;
-	menu.append(&oracle)?;
-	menu.append(&task_manager)?;
-	menu.append(&tasks)?;
-	menu.append(&quit)?;
-	let tray = TrayIconBuilder::new()
-		.with_icon(tray_icon())
-		.with_menu(Box::new(menu))
-		.with_tooltip("Estate Daemon — Running")
-		.build()
-		.map_err(|e| anyhow::anyhow!("failed to create tray icon: {e}"))?;
-	Ok((
-		TrayMenu {
-			clear_tasks,
-			dev,
-			list_tasks,
-			problem_screen,
-			new_task,
-			quit,
-			status,
-			tasks,
-			oracle,
-			task_manager,
-		},
-		tray,
-	))
-}
-pub fn tray_icon() -> Icon {
-	let image = image::load_from_memory(crate::ui::TRAY_ICON)
-		.expect("failed to load generated tray icon")
-		.into_rgba8();
-	let (width, height) = image.dimensions();
-	Icon::from_rgba(image.into_raw(), width, height).expect("failed to create tray icon")
-}
-pub fn scroll_tray_icon() -> tray_icon::Icon {
-	let image = image::load_from_memory(crate::ui::TRAY_SCROLL_ICON)
-		.expect("failed to load scroll tray icon")
-		.into_rgba8();
-	let (width, height) = image.dimensions();
-	tray_icon::Icon::from_rgba(image.into_raw(), width, height)
-		.expect("failed to create scroll tray icon")
-}
-
-#[derive(Debug, Copy, Clone)]
-pub struct Size {
-	pub value: f32,
-	pub min: f32,
-	pub max: f32,
-	pub resizable: bool,
-}
 impl Size {
 	pub fn new(value: f32, min: f32, max: f32) -> Self {
 		Self {
@@ -259,43 +276,6 @@ impl Size {
 	}
 }
 
-pub fn move_cursor_to(pos: ScreenPosition) {}
-// pub fn move_cursor_to(pos: ScreenPosition) {
-// 	let bounds = CGDisplay::main().bounds();
-// 	let x = match pos {
-// 		ScreenPosition::Left => bounds.origin.x + bounds.size.width * 0.125,
-// 		ScreenPosition::Center => bounds.origin.x + bounds.size.width * 0.5,
-// 		ScreenPosition::Right => bounds.origin.x + bounds.size.width * 0.875,
-// 	};
-// 	let y = bounds.origin.y + bounds.size.height * 0.5;
-// 	let point = geometry::CGPoint { x, y };
-// 	if let Ok(source) = CGEventSource::new(CGEventSourceStateID::CombinedSessionState) {
-// 		if let Ok(event) =
-// 			CGEvent::new_mouse_event(source, CGEventType::MouseMoved, point, CGMouseButton::Left)
-// 		{
-// 			event.post(CGEventTapLocation::HID);
-// 		}
-// 	}
-// }
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum DevTopTab {
-	#[default]
-	Status,
-	Tasks,
-	Logs,
-	Config,
-}
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub enum DevSideTab {
-	#[default]
-	Overview,
-	Registry,
-	Daemon,
-	Engine,
-	Workspace,
-	Runtime,
-}
 impl DevSideTab {
 	const ALL: &[Self] = &[
 		Self::Overview,
@@ -317,9 +297,6 @@ impl DevSideTab {
 	}
 }
 
-pub struct Sidebar {
-	buttons: Vec<&'static str>,
-}
 impl Sidebar {
 	pub fn new() -> Self {
 		Self {
@@ -342,4 +319,29 @@ where
 		_ctx: &mut AppContext<'_, C, S>,
 	) {
 	}
+}
+
+// The first concrete implementation of Veable is here.
+//
+// EguiVeable defines it's own state which is specific to its own implementation
+// and the correponding methods which operate on those properties.
+//
+// The draw method is the gateway for this struct to inject behavior thats independent of the
+// generic base and unique to itself as package or an instance of Veable.
+#[derive(Clone, Debug, Default)]
+pub struct EguiVeable {
+	state: EstateState,
+	top_tab: DevTopTab,
+	side_tab: DevSideTab,
+}
+pub struct Sidebar {
+	buttons: Vec<&'static str>,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct Size {
+	pub value: f32,
+	pub min: f32,
+	pub max: f32,
+	pub resizable: bool,
 }

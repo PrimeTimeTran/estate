@@ -2,7 +2,6 @@ use crate::prelude::*;
 
 pub mod agent;
 pub mod backend;
-pub mod cursor;
 pub mod daemon;
 pub mod discovery;
 
@@ -32,37 +31,30 @@ pub mod r#const;
 pub use crate::modules::r#const::*;
 
 pub use agent::*;
-pub use cursor::*;
 pub use prelude_native::*;
 pub use renderer::*;
 pub use util::*;
+
+#[cfg(target_os = "linux")]
+pub mod linux;
+#[cfg(target_os = "linux")]
+pub use linux::*;
+
+#[cfg(target_os = "macos")]
+pub mod macos;
+#[cfg(target_os = "macos")]
+pub use macos::*;
+
+#[cfg(unix)]
+pub mod unix;
+#[cfg(unix)]
+pub use unix::*;
 
 // This compiles the module only if the "windows" feature is enabled AND the OS is Windows
 #[cfg(target_os = "windows")]
 pub mod windows;
 #[cfg(target_os = "windows")]
 pub use windows::*;
-
-#[cfg(unix)]
-pub mod unix;
-
-#[cfg(unix)]
-pub use unix::*;
-
-#[cfg(target_os = "linux")]
-pub mod linux;
-
-#[cfg(target_os = "linux")]
-pub mod linux;
-
-#[cfg(target_os = "macos")]
-pub mod macos;
-
-#[cfg(target_os = "linux")]
-pub use linux::*;
-
-#[cfg(target_os = "macos")]
-pub use macos::*;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "kind")]

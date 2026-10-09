@@ -355,7 +355,8 @@ async fn send(
 }
 
 impl IpcServer {
-	pub fn new(socket: impl Into<PathBuf>, events: EventBus) -> Self {
+	pub fn new(events: EventBus) -> Self {
+		let socket = PathBuf::from(ESTATE_IPC_SOCKET);
 		Self {
 			socket: socket.into(),
 			events,

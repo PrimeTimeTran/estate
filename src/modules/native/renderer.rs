@@ -335,7 +335,7 @@ where
 	pub event_rx: C::EventReceiver,
 	pub event_tx: C::EventSender,
 	pub settings: Arc<Settings>,
-	
+
 	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 	pub windows: Vec<AppWindow<C, S>>,
 	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]

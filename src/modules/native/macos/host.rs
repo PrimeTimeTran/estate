@@ -1,35 +1,6 @@
 use super::*;
 use crate::{IpcServer, prelude::*};
 
-impl Host<Context> {
-	pub fn init() -> anyhow::Result<Self> {
-		tracing::info!("app_macos Host init");
-		let parsed = cli::context::parse();
-
-		let mut config = LogConfig::load()?;
-		config.apply_cli(&parsed);
-		logger::init_logging(&config)?;
-
-		// Create the one runtime.
-		let tokio = tokio::runtime::Runtime::new()?;
-
-		// Context is still uniquely owned here.
-		let mut context = Context::default();
-
-		// Daemon may not need this
-		// This requires server access
-		#[cfg(not(feature = "daemon"))]
-		{
-			// Connect using the same runtime that Host will retain.
-			tokio.block_on(context.api_mut().connect())?;
-		}
-
-		// Only share Context after initialization.
-		let context = Arc::new(context);
-		Self::new(context, tokio)
-	}
-	fn logging() {}
-}
 impl<C: Ctx> Host<C> {
 	pub fn start(&mut self) -> Result<WorkHandle<C, tokio::task::JoinHandle<()>>> {
 		self.start_ipc()?;
@@ -37,7 +8,7 @@ impl<C: Ctx> Host<C> {
 		Ok(self.start_hid_bridge()?)
 	}
 	pub fn start_ipc(&self) -> Result<()> {
-		let ipc = IpcServer::new(PathBuf::from(ESTATE_IPC_SOCKET), self.event_bus.clone());
+		let ipc = IpcServer::new(self.event_bus.clone());
 		self.worker.run_background(|_cancel| async move {
 			if let Err(error) = ipc.start().await {
 				tracing::error!(%error, "Estate IPC server stopped");
@@ -87,4 +58,34 @@ impl<C: Ctx> Host<C> {
 			tokio,
 		})
 	}
+}
+
+impl Host<Context> {
+	pub fn init() -> anyhow::Result<Self> {
+		tracing::info!("app_macos Host init");
+		let parsed = cli::context::parse();
+
+		let mut config = LogConfig::load()?;
+		config.apply_cli(&parsed);
+		logger::init_logging(&config)?;
+
+		// Create the one runtime.
+		let tokio = tokio::runtime::Runtime::new()?;
+
+		// Context is still uniquely owned here.
+		let mut context = Context::default();
+
+		// Daemon may not need this
+		// This requires server access
+		#[cfg(not(feature = "daemon"))]
+		{
+			// Connect using the same runtime that Host will retain.
+			tokio.block_on(context.api_mut().connect())?;
+		}
+
+		// Only share Context after initialization.
+		let context = Arc::new(context);
+		Self::new(context, tokio)
+	}
+	fn logging() {}
 }

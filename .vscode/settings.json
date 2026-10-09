@@ -116,6 +116,8 @@
     "sockaddr",
     "socklen",
     "strerror",
+    "stty",
+    "subsec",
     "systemextensionsctl",
     "Targert",
     "teleporting",
