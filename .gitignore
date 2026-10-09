@@ -12,3 +12,5 @@ tmp/
 *.part
 *.ytdl
 _WIN.TXT
+
+./src/bin/tauri
