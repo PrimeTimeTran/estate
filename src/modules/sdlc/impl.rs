@@ -451,7 +451,6 @@ impl Evaluator {
 			evaluations,
 		))
 	}
-
 	async fn intent(&self, ctx: &CtxEvaluation) -> Result<QACheck> {
 		let time_started = Utc::now();
 		let intent = ctx.get(SrcArtifact::Intent)?;
@@ -833,19 +832,15 @@ impl Metric {
 			explanation: String::new(),
 		}
 	}
-
 	fn quality(value: &ScoreAnswer) -> Self {
 		Self::threshold("quality", value.score, value.confidence, DEFAULT_NAUL_BAR)
 	}
-
 	fn meets_bar(value: &NoulAnswer) -> Self {
 		Self::threshold("meets_bar", value.noul, 1.0, DEFAULT_NAUL_BAR)
 	}
-
 	fn follows_instructions(value: &NoulAnswer) -> Self {
 		Self::threshold("follows_instructions", value.noul, 1.0, DEFAULT_NAUL_BAR)
 	}
-
 	fn language_fit(value: &NoulAnswer) -> Self {
 		Self::threshold("language_fit", value.noul, 1.0, DEFAULT_NAUL_BAR)
 	}
@@ -886,54 +881,6 @@ impl Pipeline {
 			_ => Vec::new(),
 		}
 	}
-	fn emit(&self, event: SdlcEvent) {
-		let _ = self.event_tx.send(event.clone());
-		let path = self.session.dir.join(LOG_EVENT_NAME);
-		if let Ok(mut file) = std::fs::OpenOptions::new()
-			.create(true)
-			.append(true)
-			.open(path)
-		{
-			let _ = serde_json::to_writer(&mut file, &event);
-			let _ = writeln!(file);
-		}
-	}
-	async fn evaluate(&self, execution: &Execution) -> Result<QACheck> {
-		self.qa.evaluate(execution).await
-	}
-	fn evaluate_checks(&self, checks: &[CheckResult]) -> Vec<Metric> {
-		checks
-			.iter()
-			.map(|check| Metric {
-				name: check.name.clone(),
-				passed: check.passed,
-				score: if check.passed { 1.0 } else { 0.0 },
-				confidence: 1.0,
-				explanation: match &check.output {
-					Some(output) if !output.is_empty() => output.clone(),
-					_ => {
-						if check.passed {
-							"Check passed.".into()
-						} else {
-							"Check failed.".into()
-						}
-					}
-				},
-			})
-			.collect()
-	}
-	pub async fn init(&mut self, intent: impl Into<String>) -> Result<()> {
-		let kontex = Kontex::new(special::Appp::Estate)?;
-		let intent = intent.into();
-		let title = Self::summarize_title(&intent).await?;
-		let dir = Self::init_session_dir(&kontex, &title)?;
-		Self::init_templates(&kontex, &dir)?;
-		let session = AiSession::new(title, dir)?;
-		self.session = session;
-		self.stage_attempt = 1;
-		self.persist_session()?;
-		Ok(())
-	}
 	fn init_session_dir(kontex: &Kontex, title: &str) -> Result<PathBuf> {
 		let sessions_dir = kontex.path(FW::Session)?;
 		let date = Local::now().format("%Y-%m-%d");
@@ -960,41 +907,50 @@ impl Pipeline {
 		}
 		Ok(())
 	}
+	fn session_save(session: &AiSession) -> Result<()> {
+		FS::save(SpecialFile::WriteCurrent.path()?, session)?;
+		Ok(())
+	}
+	fn write(path: PathBuf, contents: String) -> Result<()> {
+		Ok(std::fs::write(path, contents)?)
+	}
+
+	fn emit(&self, event: SdlcEvent) {
+		let _ = self.event_tx.send(event.clone());
+		let path = self.session.dir.join(LOG_EVENT_NAME);
+		if let Ok(mut file) = std::fs::OpenOptions::new()
+			.create(true)
+			.append(true)
+			.open(path)
+		{
+			let _ = serde_json::to_writer(&mut file, &event);
+			let _ = writeln!(file);
+		}
+	}
+	fn evaluate_checks(&self, checks: &[CheckResult]) -> Vec<Metric> {
+		checks
+			.iter()
+			.map(|check| Metric {
+				name: check.name.clone(),
+				passed: check.passed,
+				score: if check.passed { 1.0 } else { 0.0 },
+				confidence: 1.0,
+				explanation: match &check.output {
+					Some(output) if !output.is_empty() => output.clone(),
+					_ => {
+						if check.passed {
+							"Check passed.".into()
+						} else {
+							"Check failed.".into()
+						}
+					}
+				},
+			})
+			.collect()
+	}
 	fn is_passing(&self, checks: &[CheckResult], evaluations: &[Metric]) -> bool {
 		checks.iter().all(|check| check.passed)
 			&& evaluations.iter().all(|evaluation| evaluation.passed)
-	}
-	pub async fn new(intent: impl Into<String>) -> anyhow::Result<Self> {
-		dotenvy::dotenv().ok();
-		let kontex = Kontex::new(special::Appp::Estate)?;
-		let session = match kontex.session_load::<AiSession>()? {
-			Some(session) => session,
-			None => {
-				let intent = intent.into();
-				let title = Self::summarize_title(&intent).await?;
-				let dir = Self::init_session_dir(&kontex, &title)?;
-				Self::init_templates(&kontex, &dir)?;
-				let session = AiSession::new(title, dir)?;
-				kontex.session_save(&session)?;
-				session
-			}
-		};
-		let qa = Evaluator {
-			session: session.clone(),
-			jev: TypeSafeClient::from_env()?,
-		};
-		let system = AgentSystem::new();
-		let generator = Box::new(LocalGenerator::new(system.runtime.clone(), DEFAULT_MODEL));
-		let (event_tx, _event_rx) = tokio::sync::broadcast::channel::<SdlcEvent>(256);
-		Ok(Self {
-			qa,
-			system,
-			kontex,
-			generator,
-			session,
-			event_tx,
-			stage_attempt: 0,
-		})
 	}
 	fn next_attempt(&mut self, stage: Stage) -> Result<Attempt> {
 		let session = self.session()?;
@@ -1008,6 +964,7 @@ impl Pipeline {
 			.map_or(1, |number| number + 1);
 		Ok(Attempt { stage, number, max })
 	}
+
 	fn persist(&self) -> Result<()> {
 		self.kontex.session_save(&self.session)
 	}
@@ -1093,6 +1050,84 @@ impl Pipeline {
 		let session = self.session()?;
 		Self::session_save(session)
 	}
+
+	fn push_stage_record(&mut self, record: StageRunRecord) -> Result<()> {
+		let session = self.session()?;
+		session.stages.push(record);
+		session.time_updated = Utc::now();
+		self.persist()
+	}
+	fn session(&mut self) -> Result<&mut AiSession> {
+		Ok(&mut self.session)
+	}
+	fn session_read(&mut self, name: &str) -> Result<String> {
+		read_from_session(name, self.session()?)
+	}
+	fn session_record(&mut self) -> Result<()> {
+		let session = self.session()?;
+		let index_path = SpecialFile::SessionsIndex.path()?;
+		let mut sessions: Vec<AiSession> = FS::load(&index_path)?.unwrap_or_default();
+		sessions.retain(|existing| existing.id != session.id);
+		sessions.push(session.clone());
+		FS::save(index_path, &sessions)?;
+		Ok(())
+	}
+	fn retry(&mut self, _stage: Stage) -> Result<()> {
+		Ok(())
+	}
+	fn stage_attempt(&self) -> u32 {
+		self.stage_attempt
+	}
+	fn transition(&mut self, next: Stage) -> Result<()> {
+		let session = self.session()?;
+		let valid = matches!(
+			(&session.stage, &next),
+			(Stage::Intent, Stage::Spec)
+				| (Stage::Spec, Stage::Plan)
+				| (Stage::Plan, Stage::Build)
+				| (Stage::Build, Stage::QA)
+				| (Stage::QA, Stage::Build)
+				| (Stage::QA, Stage::Complete)
+		);
+
+		if !valid {
+			return Err(anyhow::anyhow!(
+				"invalid SDLC transition: {:?} -> {:?}",
+				session.stage,
+				next
+			));
+		}
+
+		session.stage = next;
+		session.time_updated = Utc::now();
+
+		self.persist()?;
+		self.session_record()?;
+
+		Ok(())
+	}
+
+	pub fn stage(&self) -> Stage {
+		self.session.stage
+	}
+	pub fn stage_attempt_increment(&mut self) -> u32 {
+		self.stage_attempt += 1;
+		self.stage_attempt
+	}
+	pub fn stage_attempt_reset(&mut self) {
+		self.stage_attempt = 1;
+	}
+	pub fn set_stage(&mut self, stage: Stage) -> Result<()> {
+		self.session()?.stage = stage;
+		Ok(())
+	}
+	pub fn subscribe(&self) -> broadcast::Receiver<SdlcEvent> {
+		self.event_tx.subscribe()
+	}
+
+	async fn evaluate(&self, execution: &Execution) -> Result<QACheck> {
+		self.qa.evaluate(execution).await
+	}
 	async fn resume(&mut self) -> Result<()> {
 		self.persist_progress("SDLC session resumed")?;
 		self.persist()?;
@@ -1104,12 +1139,6 @@ impl Pipeline {
 		self.persist_progress(&format!("SDLC session resumed from {stage}"))?;
 		self.persist()?;
 		Ok(())
-	}
-	fn push_stage_record(&mut self, record: StageRunRecord) -> Result<()> {
-		let session = self.session()?;
-		session.stages.push(record);
-		session.time_updated = Utc::now();
-		self.persist()
 	}
 	async fn run_task(&mut self, prompt: &str) -> Result<String> {
 		self
@@ -1153,83 +1182,9 @@ impl Pipeline {
 		}
 		Ok(results)
 	}
-	fn retry(&mut self, _stage: Stage) -> Result<()> {
-		Ok(())
-	}
-	pub fn set_stage(&mut self, stage: Stage) -> Result<()> {
-		self.session()?.stage = stage;
-		Ok(())
-	}
-	fn session(&mut self) -> Result<&mut AiSession> {
-		Ok(&mut self.session)
-	}
-	fn session_read(&mut self, name: &str) -> Result<String> {
-		read_from_session(name, self.session()?)
-	}
-	fn session_record(&mut self) -> Result<()> {
-		let session = self.session()?;
-		let index_path = SpecialFile::SessionsIndex.path()?;
-		let mut sessions: Vec<AiSession> = FS::load(&index_path)?.unwrap_or_default();
-		sessions.retain(|existing| existing.id != session.id);
-		sessions.push(session.clone());
-		FS::save(index_path, &sessions)?;
-		Ok(())
-	}
-	fn session_save(session: &AiSession) -> Result<()> {
-		FS::save(SpecialFile::WriteCurrent.path()?, session)?;
-		Ok(())
-	}
-
-	pub fn stage(&self) -> Stage {
-		self.session.stage
-	}
-	fn stage_attempt(&self) -> u32 {
-		self.stage_attempt
-	}
-	pub fn stage_attempt_increment(&mut self) -> u32 {
-		self.stage_attempt += 1;
-		self.stage_attempt
-	}
-	pub fn stage_attempt_reset(&mut self) {
-		self.stage_attempt = 1;
-	}
-
-	pub fn subscribe(&self) -> broadcast::Receiver<SdlcEvent> {
-		self.event_tx.subscribe()
-	}
 	async fn summarize_title(intent: &str) -> Result<String> {
 		Ok(String::from("create-sdlc-pipeline"))
 	}
-
-	fn transition(&mut self, next: Stage) -> Result<()> {
-		let session = self.session()?;
-		let valid = matches!(
-			(&session.stage, &next),
-			(Stage::Intent, Stage::Spec)
-				| (Stage::Spec, Stage::Plan)
-				| (Stage::Plan, Stage::Build)
-				| (Stage::Build, Stage::QA)
-				| (Stage::QA, Stage::Build)
-				| (Stage::QA, Stage::Complete)
-		);
-
-		if !valid {
-			return Err(anyhow::anyhow!(
-				"invalid SDLC transition: {:?} -> {:?}",
-				session.stage,
-				next
-			));
-		}
-
-		session.stage = next;
-		session.time_updated = Utc::now();
-
-		self.persist()?;
-		self.session_record()?;
-
-		Ok(())
-	}
-
 	async fn wait_for_intervention(
 		&mut self,
 		stage: Stage,
@@ -1298,11 +1253,58 @@ impl Pipeline {
 			}
 		}
 	}
-	fn write(path: PathBuf, contents: String) -> Result<()> {
-		Ok(std::fs::write(path, contents)?)
+
+	pub async fn init(&mut self, intent: impl Into<String>) -> Result<()> {
+		let kontex = Kontex::new(special::Appp::Estate)?;
+		let intent = intent.into();
+		let title = Self::summarize_title(&intent).await?;
+		let dir = Self::init_session_dir(&kontex, &title)?;
+		Self::init_templates(&kontex, &dir)?;
+		let session = AiSession::new(title, dir)?;
+		self.session = session;
+		self.stage_attempt = 1;
+		self.persist_session()?;
+		Ok(())
+	}
+	pub async fn new(intent: impl Into<String>) -> anyhow::Result<Self> {
+		dotenvy::dotenv().ok();
+		let kontex = Kontex::new(special::Appp::Estate)?;
+		let session = match kontex.session_load::<AiSession>()? {
+			Some(session) => session,
+			None => {
+				let intent = intent.into();
+				let title = Self::summarize_title(&intent).await?;
+				let dir = Self::init_session_dir(&kontex, &title)?;
+				Self::init_templates(&kontex, &dir)?;
+				let session = AiSession::new(title, dir)?;
+				kontex.session_save(&session)?;
+				session
+			}
+		};
+		let qa = Evaluator {
+			session: session.clone(),
+			jev: TypeSafeClient::from_env()?,
+		};
+		let system = AgentSystem::new();
+		let generator = Box::new(LocalGenerator::new(system.runtime.clone(), DEFAULT_MODEL));
+		let (event_tx, _event_rx) = tokio::sync::broadcast::channel::<SdlcEvent>(256);
+		Ok(Self {
+			qa,
+			system,
+			kontex,
+			generator,
+			session,
+			event_tx,
+			stage_attempt: 0,
+		})
 	}
 }
+
 impl PipelineRuntime {
+	fn retry(&mut self, _stage: Stage) -> Result<()> {
+		Ok(())
+	}
+
 	pub fn new(pipeline: Pipeline) -> Self {
 		let stage = pipeline.stage().clone();
 		Self {
@@ -1324,9 +1326,26 @@ impl PipelineRuntime {
 			events: vec![],
 		}
 	}
-	fn retry(&mut self, _stage: Stage) -> Result<()> {
-		Ok(())
+	pub fn view(&self) -> PipelineRuntimeView {
+		PipelineRuntimeView {
+			activity: self.activity.clone(),
+			attempt: self.attempt,
+			stage: self.stage,
+			time_started: self.time_started,
+			stage_time_started: self.stage_time_started,
+			phase: self.phase,
+			score: self.score,
+			confidence: self.confidence,
+			passed: self.passed,
+			message: self.message.clone(),
+			error: self.error.clone(),
+			total_tokens: self.total_tokens,
+			total_agent_calls: self.total_agent_calls,
+			history: self.history.clone(),
+			events: self.events.clone(),
+		}
 	}
+
 	pub async fn run(&mut self, input_rx: &mut UnboundedReceiver<SdlcInput>) -> Result<()> {
 		let mut runner = PipeRunner {
 			pipeline: &mut self.pipeline,
@@ -1413,25 +1432,6 @@ impl PipelineRuntime {
 
 		runner.run(input_rx).await.context("PipeRunner::run")
 	}
-	pub fn view(&self) -> PipelineRuntimeView {
-		PipelineRuntimeView {
-			activity: self.activity.clone(),
-			attempt: self.attempt,
-			stage: self.stage,
-			time_started: self.time_started,
-			stage_time_started: self.stage_time_started,
-			phase: self.phase,
-			score: self.score,
-			confidence: self.confidence,
-			passed: self.passed,
-			message: self.message.clone(),
-			error: self.error.clone(),
-			total_tokens: self.total_tokens,
-			total_agent_calls: self.total_agent_calls,
-			history: self.history.clone(),
-			events: self.events.clone(),
-		}
-	}
 }
 impl QACheck {
 	fn new(
@@ -1476,6 +1476,7 @@ impl SdlcInput {
 		}
 	}
 }
+
 #[async_trait::async_trait]
 impl sdlc_trait::Runner for PipeRunner<'_> {
 	type Context = UnboundedReceiver<SdlcInput>;
@@ -1555,6 +1556,54 @@ impl sdlc_trait::Runner for PipeRunner<'_> {
 	}
 }
 impl PipeRunner<'_> {
+	fn next_attempt(&mut self, stage: Stage) -> Result<Attempt> {
+		self.pipeline.next_attempt(stage)
+	}
+	fn emit(&self, event: SdlcEvent) {
+		self.pipeline.emit(event);
+	}
+	fn evaluate_checks(&self, checks: Vec<CheckResult>) -> Result<Vec<CheckResult>> {
+		todo!("evaluate_checks")
+	}
+	fn load_state(&mut self) -> Result<Stage> {
+		let path = SpecialFile::WriteCurrent.path()?;
+		tracing::info!(">>> load_state path = {:?}", path);
+		tracing::info!(">>> exists = {}", path.exists());
+		let json = std::fs::read_to_string(&path).with_context(|| format!("reading {:?}", path))?;
+		tracing::info!(">>> loaded state = {}", json);
+		#[derive(serde::Deserialize)]
+		struct PersistedStage {
+			stage: Stage,
+		}
+		let state: PersistedStage = serde_json::from_str(&json)?;
+		let stage = match state.stage {
+			e::Stage::QA => Stage::Build,
+			stage => stage,
+		};
+		self.pipeline.session.stage = stage;
+		Ok(stage)
+	}
+	fn persist(&mut self, msg: &str) -> Result<()> {
+		self.pipeline.persist_progress(msg)?;
+		Ok(())
+	}
+	fn retry(&mut self, stage: Stage) -> Result<()> {
+		self.pipeline.retry(stage)
+	}
+	fn session(&mut self) -> &AiSession {
+		&self.pipeline.session
+	}
+	fn stage_dir(&mut self) -> (Stage, PathBuf) {
+		let session = &self.session();
+		(session.stage, session.dir.clone())
+	}
+	fn write_dir(&mut self) -> PathBuf {
+		let session = &self.session();
+		session.dir.clone()
+	}
+	fn transition(&mut self, next: Stage) -> Result<()> {
+		self.pipeline.transition(next)
+	}
 	/// "Given this decision, what actions/state changes must happen?"
 	///
 	/// Applies the decision to the pipeline/session and returns control
@@ -1754,9 +1803,43 @@ impl PipeRunner<'_> {
 			}
 		}
 	}
-	fn next_attempt(&mut self, stage: Stage) -> Result<Attempt> {
-		self.pipeline.next_attempt(stage)
+	async fn evaluate(&self, execution: &Execution) -> Result<QACheck> {
+		let stage = execution.stage;
+		let checks = self.pipeline.run_checks(stage).await?;
+		let structural = self.evaluate_checks(checks)?;
+		let semantic = self.pipeline.qa.evaluate(&execution).await?;
+		Ok(semantic.with_evaluations(structural))
 	}
+	async fn execute(
+		&mut self,
+		stage: Stage,
+		attempt: Attempt,
+		pending_input: &mut Option<SdlcInput>,
+	) -> Result<Outcome> {
+		self.emit(SdlcEvent::PhaseChanged {
+			phase: Phase::Executing,
+		});
+		let input = match pending_input.take() {
+			Some(SdlcInput::Revision { evaluation }) => StageInput::Revision { evaluation },
+			Some(input) => {
+				*pending_input = Some(input);
+				StageInput::Initial
+			}
+			None => StageInput::Initial,
+		};
+		let execution = match self.route_execution(stage, attempt, input).await {
+			Ok(execution) => execution,
+			Err(error) => {
+				return Ok(Outcome::ExecutionFailed {
+					stage,
+					attempt,
+					error,
+				});
+			}
+		};
+		self.handle_evaluation(execution, attempt).await
+	}
+
 	async fn handle_outcome(&self, outcome: &Outcome) -> Result<Decision> {
 		tracing::info!(">>> DECIDE");
 		// tracing::info!(">>> outcome = {outcome:#?}");
@@ -1863,48 +1946,6 @@ impl PipeRunner<'_> {
 		};
 		tracing::info!(">>> FINAL DECISION = {:?}", decision);
 		Ok(decision)
-	}
-	fn emit(&self, event: SdlcEvent) {
-		self.pipeline.emit(event);
-	}
-	fn evaluate_checks(&self, checks: Vec<CheckResult>) -> Result<Vec<CheckResult>> {
-		todo!("evaluate_checks")
-	}
-	async fn evaluate(&self, execution: &Execution) -> Result<QACheck> {
-		let stage = execution.stage;
-		let checks = self.pipeline.run_checks(stage).await?;
-		let structural = self.evaluate_checks(checks)?;
-		let semantic = self.pipeline.qa.evaluate(&execution).await?;
-		Ok(semantic.with_evaluations(structural))
-	}
-	async fn execute(
-		&mut self,
-		stage: Stage,
-		attempt: Attempt,
-		pending_input: &mut Option<SdlcInput>,
-	) -> Result<Outcome> {
-		self.emit(SdlcEvent::PhaseChanged {
-			phase: Phase::Executing,
-		});
-		let input = match pending_input.take() {
-			Some(SdlcInput::Revision { evaluation }) => StageInput::Revision { evaluation },
-			Some(input) => {
-				*pending_input = Some(input);
-				StageInput::Initial
-			}
-			None => StageInput::Initial,
-		};
-		let execution = match self.route_execution(stage, attempt, input).await {
-			Ok(execution) => execution,
-			Err(error) => {
-				return Ok(Outcome::ExecutionFailed {
-					stage,
-					attempt,
-					error,
-				});
-			}
-		};
-		self.handle_evaluation(execution, attempt).await
 	}
 	async fn handle_retry(&mut self, stage: Stage, attempt: Attempt) -> Result<()> {
 		let next_attempt = Attempt {
@@ -2267,24 +2308,7 @@ impl PipeRunner<'_> {
 			}
 		}
 	}
-	fn load_state(&mut self) -> Result<Stage> {
-		let path = SpecialFile::WriteCurrent.path()?;
-		tracing::info!(">>> load_state path = {:?}", path);
-		tracing::info!(">>> exists = {}", path.exists());
-		let json = std::fs::read_to_string(&path).with_context(|| format!("reading {:?}", path))?;
-		tracing::info!(">>> loaded state = {}", json);
-		#[derive(serde::Deserialize)]
-		struct PersistedStage {
-			stage: Stage,
-		}
-		let state: PersistedStage = serde_json::from_str(&json)?;
-		let stage = match state.stage {
-			e::Stage::QA => Stage::Build,
-			stage => stage,
-		};
-		self.pipeline.session.stage = stage;
-		Ok(stage)
-	}
+
 	async fn on_intent(&mut self, input: StageInput) -> Result<RunResult> {
 		let (stage, session_dir) = self.stage_dir();
 		let write_dir = self.write_dir();
@@ -2460,13 +2484,7 @@ impl PipeRunner<'_> {
 		))?;
 		Ok(RunResult::Verification(verification))
 	}
-	fn persist(&mut self, msg: &str) -> Result<()> {
-		self.pipeline.persist_progress(msg)?;
-		Ok(())
-	}
-	fn retry(&mut self, stage: Stage) -> Result<()> {
-		self.pipeline.retry(stage)
-	}
+	
 	async fn route_execution(
 		&mut self,
 		stage: Stage,
@@ -2509,17 +2527,7 @@ impl PipeRunner<'_> {
 			evaluations,
 		})
 	}
-	fn session(&mut self) -> &AiSession {
-		&self.pipeline.session
-	}
-	fn stage_dir(&mut self) -> (Stage, PathBuf) {
-		let session = &self.session();
-		(session.stage, session.dir.clone())
-	}
-	fn write_dir(&mut self) -> PathBuf {
-		let session = &self.session();
-		session.dir.clone()
-	}
+	
 	async fn stage_deploy(&mut self) -> Result<()> {
 		todo!("sdlc deploy")
 	}
@@ -2529,9 +2537,7 @@ impl PipeRunner<'_> {
 	async fn stage_complete(&mut self) -> Result<RunControl> {
 		todo!("WOW DONE!")
 	}
-	fn transition(&mut self, next: Stage) -> Result<()> {
-		self.pipeline.transition(next)
-	}
+	
 	async fn wait_for_intervention(
 		&mut self,
 		stage: Stage,

@@ -270,7 +270,7 @@ Return exactly ONE action as JSON.
 pub static ACTION_PROMPT_EXECUTION: &str = r#"
 You have a plan explained in the following file.
 
-/Users/future/kb/project/crates/estate/log/2026-10-06.create-sdlc-pipeline/plan.md
+/Users/future/kb/project/crates/estate/log/2026-10-08.create-sdlc-pipeline/plan.md
 
 Your job is to make actual progress toward completing that plan.
 On each turn, choose exactly ONE next concrete action.

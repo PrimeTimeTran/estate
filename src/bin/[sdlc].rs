@@ -20,6 +20,7 @@ use estate::prelude::*;
 // rm -rf log && \
 // SDLC_RESUME_BUILD=1 SDLC_FORCE_CONTINUE=1 SDLC_PLAIN=1 \
 // cargo run --bin sdlc --features sdlc
+// SDLC_PLAIN=1 cargo run --bin sdlc --features sdlc
 #[tokio::main]
 pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let cli = cli::context::parse();
