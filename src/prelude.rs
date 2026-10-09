@@ -40,7 +40,6 @@ pub use crate::{
 	data::{configs::*, default::*},
 	e,
 	helper::*,
-	macros::{self, *},
 	// Verbose use/export to resolve name collisions with GRPC models.
 	model::common::{Difficulty, Language},
 	model::*,
@@ -56,6 +55,7 @@ pub use crate::{
 pub use crate::{
 	consts::{self, self as c, *},
 	impls::{self, self as i, *},
+	macros::{self, self as m, *},
 	structs::{self, self as s, *},
 	// Verbose use/export to resolve name collisions with external crates.
 	traits::{self, self as t, Context, EventReceiver, *},
@@ -71,7 +71,6 @@ pub use crate::{
 #[cfg(not(target_arch = "wasm32"))]
 pub use crate::{
 	app::{context::*, *},
-	// r#const::*,
 	modules::{
 		ipc::{self, *},
 		native::{
