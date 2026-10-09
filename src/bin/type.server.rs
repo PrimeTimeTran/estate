@@ -45,6 +45,21 @@ pub struct ServerBuilder {
 	events: Option<EventBus>,
 }
 
+impl Server {
+	pub async fn run(self) -> Result<(), Box<dyn std::error::Error>> {
+		let addr = estate::data::GRPC_SOCKET.parse()?;
+		println!("API listening on {addr}");
+		tonic::transport::Server::builder()
+			.add_service(ProblemServiceServer::new(self.problem_service))
+			.add_service(SubmissionServiceServer::new(self.submission_service))
+			.add_service(EventServiceServer::new(self.event_service))
+			.serve(addr)
+			.await?;
+
+		Ok(())
+	}
+}
+
 impl ServerBuilder {
 	pub fn new() -> Self {
 		Self {
@@ -84,20 +99,5 @@ impl ServerBuilder {
 			event_service,
 			events,
 		})
-	}
-}
-
-impl Server {
-	pub async fn run(self) -> Result<(), Box<dyn std::error::Error>> {
-		let addr = estate::data::GRPC_SOCKET.parse()?;
-		println!("API listening on {addr}");
-		tonic::transport::Server::builder()
-			.add_service(ProblemServiceServer::new(self.problem_service))
-			.add_service(SubmissionServiceServer::new(self.submission_service))
-			.add_service(EventServiceServer::new(self.event_service))
-			.serve(addr)
-			.await?;
-
-		Ok(())
 	}
 }
