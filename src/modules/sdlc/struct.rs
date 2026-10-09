@@ -183,7 +183,6 @@ pub struct Pipeline {
 pub struct PipeRunner<'a> {
 	pub pipeline: &'a mut Pipeline,
 }
-
 #[derive(Debug)]
 pub struct StageError;
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -2478,7 +2478,6 @@ preamble, commentary, or an explanation of your process."
 			return Err(anyhow!("generated Plan prompt is empty"));
 		}
 		std::fs::write(SYS_PROMPT_PLAN, &prompt).context("writing plan prompt debug file")?;
-		// let generated = self.pipeline.run_task(&prompt).await?;
 		let generated = self
 			.pipeline
 			.system

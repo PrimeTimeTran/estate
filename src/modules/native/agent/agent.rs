@@ -180,7 +180,6 @@ impl Agent {
 			}
 		}
 	}
-
 	pub fn with_cwd(cwd: impl Into<PathBuf>) -> Self {
 		Self::with_workspace(CtxWorkspace::from_cwd(cwd))
 	}
