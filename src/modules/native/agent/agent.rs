@@ -41,10 +41,11 @@ impl Agent {
 		event_tx: UnboundedSender<RuntimeEvent>,
 	) -> Result<TaskResult> {
 		let max_steps = 10;
+		let max_action_selection_errors = 3;
 
-		// One run, one context, one growing command/error history.
 		let ctx = AgentCtx::with_workspace(task.prompt.clone(), (*self.workspace).clone());
 		let mut run = AgentRun::new(ctx);
+		let mut consecutive_selection_errors = 0;
 
 		section!("AGENT run_agent_loop CONTEXT");
 
@@ -74,18 +75,22 @@ impl Agent {
 
 		for step in 1..=max_steps {
 			println!(
-				"AGENT STEP {step}/{max_steps}; history={}; commands={}; errors={}",
+				"AGENT STEP {step}/{max_steps}; history={}; commands={}; errors={}; selection_errors={}",
 				run.ctx.history.len(),
 				run.commands.len(),
 				run.errors.len(),
+				consecutive_selection_errors,
 			);
 
-			// Do not let a parse/selection error discard the entire run.
 			let action = match self.pick_action(&run.ctx).await {
-				Ok(action) => action,
+				Ok(action) => {
+					consecutive_selection_errors = 0;
+					action
+				}
 				Err(error) => {
-					let message = format!("Action selection failed: {error:#}");
+					consecutive_selection_errors += 1;
 
+					let message = format!("Action selection failed: {error:#}");
 					eprintln!("{message}");
 
 					run.record_error(AgentError {
@@ -93,14 +98,42 @@ impl Agent {
 						kind: "action_selection".into(),
 						message: message.clone(),
 						raw_response: None,
-						recoverable: true,
+						recoverable: consecutive_selection_errors < max_action_selection_errors,
 						timestamp: chrono::Utc::now(),
 					});
 
+					if consecutive_selection_errors >= max_action_selection_errors {
+						let failure = format!(
+							"{message}\n\
+							Reached {max_action_selection_errors} consecutive action-selection failures. \
+							Check the raw model response and LlmAction schema."
+						);
+
+						return Ok(TaskResult::failed(
+							task.id,
+							run.ctx,
+							"Action selection failed repeatedly",
+							Some(failure),
+						));
+					}
+
 					run.ctx.history.push(AgentObservation::Current {
 						message: format!(
-							"{message}. The previous action was not executed. \
-							Choose an action supported by the required JSON schema."
+							"INVALID ACTION RESPONSE\n\
+							Reason: {message}\n\n\
+							The model response was rejected before a valid action was selected. \
+							No command from this response was executed.\n\n\
+							Return exactly ONE valid JSON object using one of these schemas:\n\
+							{{\"action\":\"run_command\",\"command\":\"actual shell command\"}}\n\
+							{{\"action\":\"finish\",\"message\":\"summary of work and verification\"}}\n\n\
+							The only valid action values are `run_command` and `finish`.\n\
+							Do not use `run`, `RunCommand`, `git`, or another command name as \
+							the action. Put the complete shell command in the `command` field.\n\n\
+							Review the original task and recent HISTORY. Do not repeat a previous \
+							successful command unless further verification requires it. Do not \
+							repeat a failed command unchanged unless its failure is understood \
+							and retrying is justified.\n\
+							Return the corrected action now."
 						),
 					});
 
@@ -111,7 +144,6 @@ impl Agent {
 			match action {
 				AgentAction::Current { message } => {
 					let now = chrono::Local::now().format("%Y-%m-%d").to_string();
-
 					let response = format!("Context update: The current date is {now}. {message}");
 
 					let event = RuntimeEvent::Agent(AgentEvent::Working {
@@ -134,11 +166,11 @@ impl Agent {
 					let message = match path {
 						Some(path) => format!(
 							"Context requested for path: {path}. \
-							Inspect it using a supported command."
+							Inspect it using a supported command, respecting the task's scope."
 						),
 						None => format!(
 							"Context requested. Current history entries: {}. \
-							Use supported commands to inspect the workspace.",
+							Use supported commands to inspect only what the task authorizes.",
 							run.ctx.history.len()
 						),
 					};
@@ -161,18 +193,16 @@ impl Agent {
 
 					let mut shell_command = ShellCommand::shell(command.clone());
 					shell_command.cwd = Some(self.workspace.cwd.clone());
-					// Capture tool errors instead of using `?`, which would
-					// return early and discard the in-memory run.
+
 					let result = match self.tools.shell.run(shell_command).await {
 						Ok(result) => result,
-
 						Err(error) => {
-							let message = format!("Action selection failed: {error:#}");
+							let message = format!("Shell execution failed for command `{command}`: {error:#}");
 							eprintln!("{message}");
 
 							run.record_error(AgentError {
 								step: Some(step),
-								kind: "action_selection".into(),
+								kind: "command_execution".into(),
 								message: message.clone(),
 								raw_response: None,
 								recoverable: true,
@@ -181,12 +211,14 @@ impl Agent {
 
 							run.ctx.history.push(AgentObservation::Current {
 								message: format!(
-									"Shell execution failed for command:\n{command}\n\n\
-									Error: {error:#}\n\n\
-									The command did not produce a usable result. \
-									Choose a different supported `run_command`, correct the \
-									command based on the error, or inspect the environment. \
-									Do not blindly repeat the same command."
+									"{message}\n\n\
+									The shell tool did not return a completed ShellResult. \
+									Do not assume the command had no side effects.\n\
+									Review the error before deciding what to do next. Do not \
+									repeat the same command unchanged unless retrying is justified.\n\
+									Return exactly one valid JSON action:\n\
+									{{\"action\":\"run_command\",\"command\":\"corrected shell command\"}}\n\
+									{{\"action\":\"finish\",\"message\":\"blocker and work completed\"}}"
 								),
 							});
 
@@ -202,19 +234,18 @@ impl Agent {
 						"stdout ({} chars, {} lines):\n{}",
 						result.stdout.len(),
 						result.stdout.lines().count(),
-						preview_lines(&result.stdout, SHELL_OUTPUT_PREVIEW_LINES,)
+						preview_lines(&result.stdout, SHELL_OUTPUT_PREVIEW_LINES)
 					);
 
 					println!(
 						"stderr ({} chars, {} lines):\n{}",
 						result.stderr.len(),
 						result.stderr.lines().count(),
-						preview_lines(&result.stderr, SHELL_OUTPUT_PREVIEW_LINES,)
+						preview_lines(&result.stderr, SHELL_OUTPUT_PREVIEW_LINES)
 					);
 
 					let success = result.exit_code == Some(0);
 
-					// Record every completed command, including nonzero exits.
 					run.record_command(CommandRecord {
 						step,
 						command: command.clone(),
@@ -235,8 +266,8 @@ impl Agent {
 							step: Some(step),
 							kind: "command_exit".into(),
 							message: format!(
-								"Command `{command}` exited with status {:?}. \
-								Stderr: {}",
+								"Command `{command}` exited with status {:?}.\n\
+								Stderr:\n{}",
 								result.exit_code,
 								preview(&result.stderr, 1000),
 							),
@@ -246,7 +277,6 @@ impl Agent {
 						});
 					}
 
-					// Keep the full tool result in the model-visible history.
 					run
 						.ctx
 						.history
@@ -259,8 +289,8 @@ impl Agent {
 					if !did_work {
 						run.ctx.history.push(AgentObservation::Current {
 							message: format!(
-								"Finish rejected: no successful command has been \
-								recorded. Continue working and verify the task. \
+								"Finish rejected: no successful command has been recorded. \
+								Continue working and verify the task. \
 								Proposed finish message: {message}"
 							),
 						});
@@ -283,10 +313,8 @@ impl Agent {
 			}
 		}
 
-		// Preserve the accumulated context and serialized records on exhaustion.
 		let message = format!(
-			"Agent exceeded {max_steps} reasoning steps; \
-			commands={}, errors={}.",
+			"Agent exceeded {max_steps} reasoning steps; commands={}, errors={}.",
 			run.commands.len(),
 			run.errors.len(),
 		);
@@ -303,11 +331,10 @@ impl Agent {
 		Ok(TaskResult::failed(
 			task.id,
 			run.ctx,
-			"Infinite loop",
+			"Step limit exceeded",
 			Some(message),
 		))
 	}
-
 	pub fn with_cwd(cwd: impl Into<PathBuf>) -> Self {
 		Self::with_workspace(CtxWorkspace::from_cwd(cwd))
 	}
