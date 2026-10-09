@@ -30,11 +30,10 @@ pub async fn build_action(prompt: &str) -> Result<LlmAction> {
 pub fn build_prompt(ctx: &AgentCtx) -> String {
 	let workspace = format_workspace(&ctx.workspace);
 	let history = format_history(&ctx.history);
-	let prompt = build_sys_action(
-		ACTION_PROMPT_EXECUTION,
-		&[&ctx.prompt.as_deref().unwrap_or(""), &workspace, &history],
-	);
-
+	let prompt = ACTION_PROMPT_EXECUTION
+		.replace("{task}", ctx.prompt.as_deref().unwrap_or(""))
+		.replace("{workspace}", &workspace)
+		.replace("{history}", &history);
 	section!("build_prompt");
 	println!(
 		"prompt ({} lines, {} chars):\n{}",
@@ -42,7 +41,6 @@ pub fn build_prompt(ctx: &AgentCtx) -> String {
 		prompt.len(),
 		preview_lines(&prompt, PROMPT_PREVIEW_LINES)
 	);
-	
 	prompt
 }
 pub fn build_prompt_from_ctx(ctx: &AgentCtx) -> String {
@@ -52,7 +50,6 @@ pub fn build_prompt_from_ctx(ctx: &AgentCtx) -> String {
 		ACTION_PROMPT_EXECUTION,
 		&[&ctx.prompt.as_deref().unwrap_or(""), &workspace, &history],
 	);
-
 	section!("build_prompt_from_ctx");
 	println!("ctx.history ({} entries):", ctx.history.len());
 	println!(
@@ -61,15 +58,19 @@ pub fn build_prompt_from_ctx(ctx: &AgentCtx) -> String {
 		prompt.len(),
 		preview_lines(&prompt, PROMPT_PREVIEW_LINES)
 	);
-
 	prompt
 }
 pub fn build_sys_action(template: &str, args: &[&str]) -> String {
+	let placeholders = ["{task}", "{workspace}", "{history}"];
+
+	debug_assert_eq!(
+		placeholders.len(),
+		args.len(),
+		"build_sys_action: placeholder count doesn't match argument count",
+	);
 	let mut prompt = template.to_string();
-	for arg in args {
-		if let Some((before, after)) = prompt.split_once("{}") {
-			prompt = format!("{before}{arg}{after}");
-		}
+	for (placeholder, arg) in placeholders.iter().zip(args) {
+		prompt = prompt.replace(placeholder, arg);
 	}
 	prompt
 }
@@ -203,4 +204,3 @@ pub fn structured_prompt_chat(ctx: &AgentCtx) -> String {
 		format_history(&ctx.history)
 	)
 }
-

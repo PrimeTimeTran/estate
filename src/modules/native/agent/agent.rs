@@ -11,6 +11,7 @@ impl Agent {
 	async fn pick_mode(&self, ctx: &AgentCtx) -> Result<AgentMode> {
 		let prompt = build_sys_prompt(DECIDE_PROMPT, &ctx.prompt.as_deref().unwrap_or(""));
 		let raw: LlmMode = prompt_ollama_json(&prompt).await?;
+
 		Ok(match raw.mode.as_str() {
 			"tool" => AgentMode::Tool,
 			_ => AgentMode::Chat,
@@ -87,7 +88,6 @@ impl Agent {
 
 		loop {
 			steps += 1;
-
 			if steps > max_steps {
 				return Ok(TaskResult::failed(
 					task.id,
@@ -96,50 +96,39 @@ impl Agent {
 					Some("Agent exceeded maximum reasoning steps".into()),
 				));
 			}
-
 			let action = self.pick_action(&ctx).await?;
-
 			match action {
 				AgentAction::Current { message } => {
 					let now = chrono::Local::now().format("%Y-%m-%d").to_string();
 					let response = format!("Context update: The current date is {}. {}", now, message);
-
 					let event = RuntimeEvent::Agent(AgentEvent::Working {
 						task: task.clone(),
 						message: response.clone(),
 					});
-
 					if let Err(error) = crate::agent::log::append_agent_event(&event) {
 						eprintln!("Failed to write agent event log: {error:#}");
 					}
 					let _ = event_tx.send(event);
-
 					ctx
 						.history
 						.push(AgentObservation::Current { message: response });
 				}
-
 				AgentAction::Finish { message } => {
 					if ctx.history.is_empty() {
 						return Err(anyhow!(
 							"Agent attempted to finish without performing any work"
 						));
 					}
-
 					let result = TaskResult::completed_with_summary(task.id, ctx, message);
-
 					let event = RuntimeEvent::Agent(AgentEvent::Finished {
 						result: result.clone(),
 					});
-
 					if let Err(error) = crate::agent::log::append_agent_event(&event) {
 						eprintln!("Failed to write agent event log: {error:#}");
 					}
 					let _ = event_tx.send(event);
-
 					return Ok(result);
 				}
-
 				AgentAction::RunCommand { command } => {
 					let shell_command = ShellCommand::shell(command.clone());
 					let result = self.tools.shell.run(shell_command).await?;
