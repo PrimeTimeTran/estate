@@ -382,8 +382,8 @@ impl Ctx for Context {
 	}
 	type Api = ApiService;
 	type AppState = structs::S<Context>;
-	type EventReceiver = s::BroadcastReceiver<e::Event>;
-	type EventSender = s::BroadcastSender<e::Event>;
+	type EventReceiver = BroadcastReceiver<e::Event>;
+	type EventSender = BroadcastSender<e::Event>;
 	type GuiState = NativeGuiState;
 }
 
@@ -403,7 +403,7 @@ where
 	pub fn shutdown(self) {
 		self.tokio.shutdown_background();
 	}
-	pub fn subscribe(&self) -> structs::BroadcastReceiver<e::Event> {
+	pub fn subscribe(&self) -> BroadcastReceiver<e::Event> {
 		self.event_bus.subscribe_broadcast("host")
 	}
 	pub fn wait_for_shutdown(&self) {

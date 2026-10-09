@@ -14,3 +14,5 @@ pub static ESTATE_HID_SMOKE_LOG: &str = "estate-hid-smoke.log";
 pub static SCHEMA_VERSION: u32 = 1;
 pub static NEXT_PROBLEM_ID: AtomicI64 = AtomicI64::new(1);
 pub static START_APP_CLOCK: bool = true;
+
+pub static NEXT_RECEIVER_ID: AtomicU64 = AtomicU64::new(0);

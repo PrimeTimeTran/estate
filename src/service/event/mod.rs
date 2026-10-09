@@ -29,8 +29,12 @@ use crate::{
 	proto::types as proto_types,
 };
 
+pub mod broadcast;
+pub use broadcast::*;
+
 #[path = "[struct].rs"]
 pub mod event_structs;
+
 #[path = "[impl].rs"]
 pub mod impls;
 
@@ -436,7 +440,7 @@ pub struct Event {
 /// The issue is it's not big enough. Doesn't scroll?
 #[derive(Debug, Clone)]
 pub struct EventBus {
-	pub tx: broadcast::Sender<e::Event>,
+	pub tx: tokio::sync::broadcast::Sender<e::Event>,
 	// id: usize,
 }
 

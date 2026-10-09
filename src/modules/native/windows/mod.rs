@@ -40,8 +40,8 @@ impl Ctx for Context {
 
 	type Api = ApiService;
 	type AppState = structs::S<Context>;
-	type EventReceiver = structs::BroadcastReceiver<e::Event>;
-	type EventSender = structs::BroadcastSender<e::Event>;
+	type EventReceiver = BroadcastReceiver<e::Event>;
+	type EventSender = BroadcastSender<e::Event>;
 	type GuiState = NativeGuiState;
 }
 impl Context {
