@@ -2470,19 +2470,33 @@ impl PipeRunner<'_> {
 			 ## Plan (plan.md)\n\n{plan}"
 		));
 
-		let orient_result = self
-			.pipeline
-			.system
-			.runtime
-			.run_agent(orient_task)
-			.await
-			.context("Build Orient phase failed")?;
+		use std::time::Instant;
+
+		// Phase 1: Orient.
+		let phase_started = Instant::now();
+		section!("BUILD PHASE START: Orient");
+
+		let orient_result = match self.pipeline.system.runtime.run_agent(orient_task).await {
+			Ok(result) => {
+				section!(&format!(
+					"BUILD PHASE COMPLETE: Orient elapsed={:?}",
+					phase_started.elapsed()
+				));
+				result
+			}
+			Err(error) => {
+				section!(&format!(
+					"BUILD PHASE FAILED: Orient elapsed={:?}\n{error:#}",
+					phase_started.elapsed()
+				));
+				return Err(error).context("Build Orient phase failed");
+			}
+		};
 
 		let orient_report = format!("{orient_result:#?}");
 		tokio::fs::write(session_dir.join("build-orient.md"), &orient_report)
 			.await
 			.context("writing Build Orient report")?;
-
 		// Phase 2: Execute.
 		let execute_task = AgentTask::new(format!(
 			"{PROMPT_BUILD_EXECUTE}\n\n\
@@ -2492,13 +2506,41 @@ impl PipeRunner<'_> {
 			 ## Orientation Report\n\n{orient_report}"
 		));
 
-		let execute_result = self
-			.pipeline
-			.system
-			.runtime
-			.run_agent(execute_task)
-			.await
-			.context("Build Execute phase failed")?;
+		let phase_started = std::time::Instant::now();
+		section!("BUILD PHASE START: Execute");
+
+		let execute_result = match self.pipeline.system.runtime.run_agent(execute_task).await {
+			Ok(result) => {
+				section!(&format!(
+					"BUILD PHASE COMPLETE: Execute elapsed={:?}",
+					phase_started.elapsed()
+				));
+				result
+			}
+			Err(error) => {
+				section!(&format!(
+					"BUILD PHASE FAILED: Execute elapsed={:?}\n{error:#}",
+					phase_started.elapsed()
+				));
+
+				// Capture partial work before returning the error.
+				match WSSnapshot::capture(&workspace) {
+					Ok(snapshot) => {
+						let changes = workspace_before.diff(&snapshot);
+						section!(&format!(
+							"BUILD PARTIAL WORK: Execute files_changed={}",
+							changes.file_count()
+						));
+						let _ = self.write(&changes.to_markdown("Build failed during Execute"));
+					}
+					Err(snapshot_error) => {
+						section!(&format!("BUILD SNAPSHOT FAILED: {snapshot_error:#}"));
+					}
+				}
+
+				return Err(error).context("Build Execute phase failed");
+			}
+		};
 
 		let execute_report = format!("{execute_result:#?}");
 		tokio::fs::write(session_dir.join("build-execute.md"), &execute_report)
@@ -2515,13 +2557,41 @@ impl PipeRunner<'_> {
 			 ## Implementation Report\n\n{execute_report}"
 		));
 
-		let verify_result = self
-			.pipeline
-			.system
-			.runtime
-			.run_agent(verify_task)
-			.await
-			.context("Build Verify phase failed")?;
+		let phase_started = std::time::Instant::now();
+		section!("BUILD PHASE START: Verify");
+
+		let verify_result = match self.pipeline.system.runtime.run_agent(verify_task).await {
+			Ok(result) => {
+				section!(&format!(
+					"BUILD PHASE COMPLETE: Verify elapsed={:?}",
+					phase_started.elapsed()
+				));
+				result
+			}
+			Err(error) => {
+				section!(&format!(
+					"BUILD PHASE FAILED: Verify elapsed={:?}\n{error:#}",
+					phase_started.elapsed()
+				));
+
+				// Execute may have created files even though Verify failed.
+				match WSSnapshot::capture(&workspace) {
+					Ok(snapshot) => {
+						let changes = workspace_before.diff(&snapshot);
+						section!(&format!(
+							"BUILD PARTIAL WORK: Verify files_changed={}",
+							changes.file_count()
+						));
+						let _ = self.write(&changes.to_markdown("Build failed during Verify"));
+					}
+					Err(snapshot_error) => {
+						section!(&format!("BUILD SNAPSHOT FAILED: {snapshot_error:#}"));
+					}
+				}
+
+				return Err(error).context("Build Verify phase failed");
+			}
+		};
 
 		let verify_report = format!("{verify_result:#?}");
 		tokio::fs::write(session_dir.join("build-verify.md"), &verify_report)
@@ -2529,8 +2599,16 @@ impl PipeRunner<'_> {
 			.context("writing Build Verify report")?;
 
 		// Capture final workspace state.
-		let workspace_after = WSSnapshot::capture(&workspace)?;
+		section!("BUILD SNAPSHOT START");
+
+		let workspace_after =
+			WSSnapshot::capture(&workspace).context("capturing workspace after Build")?;
 		let changes = workspace_before.diff(&workspace_after);
+
+		section!(&format!(
+			"BUILD SNAPSHOT COMPLETE: files_changed={}",
+			changes.file_count()
+		));
 
 		self.write(&changes.to_markdown("Build completed"))?;
 
@@ -2538,6 +2616,8 @@ impl PipeRunner<'_> {
 			"Build phases completed; {} file(s) changed",
 			changes.file_count()
 		))?;
+
+		section!("BUILD STAGE COMPLETE");
 
 		Ok(RunResult::Build)
 	}
@@ -2952,3 +3032,11 @@ pub struct Context {
 //     }
 //   }
 // }
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct BuildPhaseEvent {
+	pub phase: String,
+	pub status: String, // "started", "completed", "failed"
+	pub elapsed_ms: Option<u128>,
+	pub error: Option<String>,
+}

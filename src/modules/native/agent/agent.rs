@@ -289,8 +289,8 @@ impl Agent {
 		let raw: LlmMode = prompt_ollama_json(&prompt).await?;
 
 		Ok(match raw.mode.as_str() {
-			"tool" => AgentMode::Tool,
-			_ => AgentMode::Chat,
+			"chat" => AgentMode::Chat,
+			_ => AgentMode::Tool,
 		})
 	}
 	async fn pick_action(&self, ctx: &AgentCtx) -> Result<AgentAction> {

@@ -320,29 +320,59 @@ pub fn language_from_extension(extension: &str) -> Option<String> {
 }
 pub async fn ollama_generate(prompt: &str, system: Option<&str>, json: bool) -> Result<String> {
 	let client = reqwest::Client::new();
+
 	let mut payload = serde_json::json!({
-			"model": "qwen3:8b",
-			"prompt": prompt,
-			"stream": false,
+		"model": DEFAULT_MODEL,
+		"prompt": prompt,
+		"stream": false,
 	});
+
 	if let Some(sys_msg) = system {
 		payload["system"] = serde_json::json!(sys_msg);
 	}
+
 	if json {
 		payload["format"] = serde_json::json!("json");
 	}
+
 	let response = client
-		.post(crate::AGENT_GEN_URL)
+		.post(AGENT_GEN_URL)
 		.json(&payload)
 		.send()
-		.await?;
-	let res: serde_json::Value = response.json().await?;
-	res["response"]
-		.as_str()
-		.map(|s| s.to_string())
-		.ok_or_else(|| anyhow!("Failed to parse response field from Ollama"))
-}
+		.await
+		.context("Failed to send Ollama request")?;
 
+	let status = response.status();
+	let body = response
+		.text()
+		.await
+		.context("Failed to read Ollama response body")?;
+
+	if !status.is_success() {
+		anyhow::bail!(
+			"Ollama returned HTTP {status}: {}",
+			body.chars().take(2_000).collect::<String>()
+		);
+	}
+
+	let res: serde_json::Value =
+		serde_json::from_str(&body).context("Ollama returned invalid response JSON")?;
+
+	if let Some(error) = res.get("error").and_then(|v| v.as_str()) {
+		anyhow::bail!("Ollama error: {error}");
+	}
+
+	res
+		.get("response")
+		.and_then(serde_json::Value::as_str)
+		.map(str::to_owned)
+		.ok_or_else(|| {
+			anyhow::anyhow!(
+				"Ollama response missing string field `response`: {}",
+				body.chars().take(2_000).collect::<String>()
+			)
+		})
+}
 pub fn preview_lines(text: &str, max_lines: usize) -> String {
 	let lines: Vec<&str> = text.lines().collect();
 	let (lines, truncated) = if lines.len() <= max_lines {
@@ -386,10 +416,17 @@ pub async fn prompt_ollama_json<T>(prompt: &str) -> Result<T>
 where
 	T: DeserializeOwned,
 {
-	let result = ollama_generate(prompt, Some("You are a helpful assistant"), true).await?;
-	Ok(serde_json::from_str(&result)?)
+	let raw = ollama_generate(prompt, Some("You are a helpful assistant"), true)
+		.await
+		.context("Ollama generation failed")?;
+	serde_json::from_str(&raw).with_context(|| {
+		format!(
+			"Failed to deserialize Ollama JSON response ({} bytes): {:?}",
+			raw.len(),
+			raw.chars().take(2_000).collect::<String>(),
+		)
+	})
 }
-
 pub fn structured_prompt_chat(ctx: &AgentCtx) -> String {
 	format!(
 		r#"
