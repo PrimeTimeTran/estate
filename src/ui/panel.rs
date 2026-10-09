@@ -2,7 +2,7 @@ use crate::{e, prelude::*};
 
 pub struct Panel<C, S> {
 	pub region: Region,
-	pub content: Box<dyn r#trait::View<C, S>>,
+	pub content: Box<dyn traits::View<C, S>>,
 	pub open: bool,
 	pub overlay: bool,
 	pub auto_hide: bool,
@@ -26,7 +26,7 @@ impl<C, S> Panel<C, S>
 where
 	C: Ctx,
 {
-	pub fn new(content: impl r#trait::View<C, S> + 'static, region: Region) -> Self {
+	pub fn new(content: impl traits::View<C, S> + 'static, region: Region) -> Self {
 		Self {
 			region,
 			content: Box::new(content),
@@ -36,7 +36,7 @@ where
 		}
 	}
 	pub fn from_config(
-		content: impl r#trait::View<C, S> + 'static,
+		content: impl traits::View<C, S> + 'static,
 		region: Region,
 		config: &PanelState,
 	) -> Self {
@@ -67,7 +67,7 @@ where
 		self.open
 	}
 }
-impl<C, S> r#trait::View<C, S> for Panel<C, S>
+impl<C, S> traits::View<C, S> for Panel<C, S>
 where
 	C: Ctx,
 {
@@ -92,7 +92,7 @@ impl DebugPanel {
 		}
 	}
 }
-impl<C, S> r#trait::View<C, S> for DebugPanel
+impl<C, S> traits::View<C, S> for DebugPanel
 where
 	C: Ctx,
 {

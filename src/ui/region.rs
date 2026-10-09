@@ -184,7 +184,7 @@ impl ActivityBar {
 		Self { buttons: vec![] }
 	}
 }
-impl<C, S> r#trait::View<C, S> for ActivityBar
+impl<C, S> traits::View<C, S> for ActivityBar
 where
 	C: Ctx,
 {
@@ -201,7 +201,7 @@ where
 pub struct PrimaryBar {
 	buttons: Vec<&'static str>,
 }
-impl<C, S> r#trait::View<C, S> for PrimaryBar
+impl<C, S> traits::View<C, S> for PrimaryBar
 where
 	C: Ctx,
 {

@@ -220,7 +220,7 @@ impl TaskManagerView {
 		}
 	}
 }
-impl<C, S> r#trait::View<C, S> for TaskManagerView
+impl<C, S> traits::View<C, S> for TaskManagerView
 where
 	C: Ctx,
 {

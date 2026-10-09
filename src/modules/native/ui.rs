@@ -36,7 +36,7 @@ where
 		todo!("")
 	}
 }
-impl<C, S> r#trait::View<C, S> for EguiVeable
+impl<C, S> traits::View<C, S> for EguiVeable
 where
 	C: Ctx,
 {

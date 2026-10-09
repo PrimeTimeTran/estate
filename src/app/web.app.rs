@@ -1,4 +1,4 @@
-use crate::{RuntimeState, prelude::*, r#trait::Context};
+use crate::{RuntimeState, prelude::*, traits::Context};
 use async_broadcast::{Sender, broadcast};
 
 impl Context for WebApp {

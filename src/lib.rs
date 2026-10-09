@@ -35,27 +35,34 @@
 pub mod app;
 pub mod data;
 
-pub mod r#const;
-pub use r#const::*;
+#[path = "./[const].rs"]
+pub mod consts;
+pub use consts::*;
 
 pub mod helper;
 
 #[path = "./[impl].rs"]
 pub mod impls;
+pub use impls::*;
 
 #[path = "./[macro].rs"]
 pub mod macros;
+pub use macros::*;
+
 pub mod model;
 pub mod modules;
+
 pub mod prelude;
+
 pub mod service;
 pub mod share;
 
 #[path = "./[struct].rs"]
 pub mod structs;
 
-pub mod r#trait;
-pub use r#trait::*;
+#[path = "./[trait].rs"]
+pub mod traits;
+pub use traits::*;
 
 pub mod ui;
 pub mod util;

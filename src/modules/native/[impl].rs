@@ -491,7 +491,7 @@ where
 		})
 	}
 }
-impl<C> r#trait::Worker<C> for HostWorker<C>
+impl<C> traits::Worker<C> for HostWorker<C>
 where
 	C: Ctx,
 {

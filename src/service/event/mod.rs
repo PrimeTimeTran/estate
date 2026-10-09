@@ -33,13 +33,12 @@ pub mod broadcast;
 pub use broadcast::*;
 
 #[path = "[struct].rs"]
-pub mod event_structs;
+pub mod event_struct;
+pub use event_struct::*;
 
 #[path = "[impl].rs"]
-pub mod impls;
-
-pub use event_structs::*;
-pub use impls::*;
+pub mod event_impl;
+pub use event_impl::*;
 
 /// # Create Events
 ///

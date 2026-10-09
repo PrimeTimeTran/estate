@@ -3,8 +3,6 @@ pub use ratatui::Frame;
 
 use super::{AiSession, *};
 
-
-
 impl AiSession {
 	fn create_readable(&self) -> String {
 		let current = Utc::now();
@@ -36,7 +34,7 @@ impl AiSession {
 	}
 }
 
-impl crate::r#trait::DateableSession for AiSession {
+impl crate::traits::DateableSession for AiSession {
 	fn start(&self) -> Option<DateTime<Utc>> {
 		Some(self.time_created)
 	}

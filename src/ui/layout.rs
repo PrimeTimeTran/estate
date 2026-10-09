@@ -374,7 +374,7 @@ where
 	fn draw_view(
 		ui: &mut egui::Ui,
 		rect: egui::Rect,
-		view: &mut dyn r#trait::View<C, S>,
+		view: &mut dyn traits::View<C, S>,
 		ctx: &mut AppContext<'_, C, S>,
 	) {
 		// while let Some(event) = ctx.next_event() {

@@ -54,10 +54,11 @@ pub use crate::{
 /// Helps prevent name collisions internally as well.
 ///
 pub use crate::{
-	impls::{self, self as i},
+	consts::{self, self as c, *},
+	impls::{self, self as i, *},
 	structs::{self, self as s, *},
 	// Verbose use/export to resolve name collisions with external crates.
-	r#trait::{self, self as t, Context, EventReceiver, *},
+	traits::{self, self as t, Context, EventReceiver, *},
 };
 
 /// A non wasm32 target is non browser code, server, native, desktop
@@ -70,7 +71,7 @@ pub use crate::{
 #[cfg(not(target_arch = "wasm32"))]
 pub use crate::{
 	app::{context::*, *},
-	r#const::*,
+	// r#const::*,
 	modules::{
 		ipc::{self, *},
 		native::{

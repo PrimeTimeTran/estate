@@ -1,4 +1,4 @@
-use crate::{prelude::*, r#trait::Context};
+use crate::{prelude::*, traits::Context};
 
 // #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 // use crate::NativeRuntime;
@@ -68,7 +68,7 @@ impl<C> App<C, Disconnected> {
 /// anchors (bookmarks), jobs (tasks), and more.
 ///
 /// Generic indirection adds complication but solves problems downstream.
-/// Uses Runtime [Runtime](`crate::r#trait::Runtime`).
+/// Uses Runtime [Runtime](`crate::traits::Runtime`).
 ///
 impl<C, S> App<C, S>
 where

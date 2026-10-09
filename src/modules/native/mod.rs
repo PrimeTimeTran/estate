@@ -10,6 +10,10 @@ pub mod discovery;
 pub mod native_impl;
 pub use native_impl::*;
 
+#[path = "./[trait].rs"]
+pub mod native_traits;
+pub use native_traits::*;
+
 pub mod monitor;
 pub mod poc;
 #[path = "[prelude].rs"]
@@ -24,9 +28,6 @@ pub mod task;
 pub mod ui;
 pub mod util;
 
-#[path = "./[trait].rs"]
-pub mod native_traits;
-
 pub mod r#const;
 pub use crate::modules::r#const::*;
 
@@ -35,8 +36,6 @@ pub use cursor::*;
 pub use prelude_native::*;
 pub use renderer::*;
 pub use util::*;
-
-pub use native_traits::*;
 
 // This compiles the module only if the "windows" feature is enabled AND the OS is Windows
 #[cfg(target_os = "windows")]

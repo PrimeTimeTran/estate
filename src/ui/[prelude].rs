@@ -35,7 +35,7 @@ pub use crate::proto::types::*;
 pub use crate::{
 	model::common::{Difficulty, Language},
 	proto::*,
-	r#trait::Runtime,
+	traits::Runtime,
 	ui::{
 		layout::*,
 		panel::*,
