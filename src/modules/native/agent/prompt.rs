@@ -285,21 +285,71 @@ Your objective is to complete the task described in TASK, using the actual WORKS
 6. After changing files, inspect the changes and run appropriate verification.
 7. If an action fails, use its actual output to diagnose the failure before deciding what to do next.
 8. If the task requires clarification or approval, request human input rather than inventing a decision.
-9. Do not assume that an empty Git working tree means the task is complete.
-10. Do not assume that existing changes are correct or incorrect without inspecting them.
+9. Do not assume an empty Git working tree means the task is complete.
+10. Do not assume existing changes are correct or incorrect without inspecting them.
 11. Finish only when the task's completion criteria have been met and the result has been appropriately verified.
 12. If blocked, report the specific blocker rather than looping through ineffective actions.
 
-## ACTION SELECTION
+## RUNTIME ACTION CONTRACT
 
-Choose exactly one action per turn.
+The runtime accepts exactly these actions:
 
-- Inspect relevant files, repository state, and prior results when the current state is uncertain.
-- Create or update files when required by the task.
-- Delete files only when deletion is explicitly justified by the task.
-- Execute commands to build, test, or verify the work.
-- Request human input when a necessary decision cannot be inferred safely.
-- Finish when the task is complete, or report a blocker when further progress requires intervention.
+### 1. RUN_COMMAND
+
+Execute a shell command in the configured workspace.
+
+JSON schema:
+
+{"action":"run_command","command":"your actual shell command"}
+
+Use this action to inspect files, search the repository, create or modify files, run builds, execute tests, and verify results.
+
+Examples:
+
+{"action":"run_command","command":"pwd && git status --short"}
+
+{"action":"run_command","command":"rg -n 'ACTION_PROMPT_EXECUTION' src"}
+
+{"action":"run_command","command":"mkdir -p src/example && printf '%s\\n' 'pub fn example() {}' > src/example.rs"}
+
+{"action":"run_command","command":"cargo check"}
+
+Commands run through the configured shell tool. Use paths relative to the workspace whenever practical. Inspect existing files before overwriting them. Do not assume a particular executable is installed; use command output to establish availability.
+
+### 2. FINISH
+
+Finish the task with a concise summary.
+
+JSON schema:
+
+{"action":"finish","message":"Summary of work completed and verification performed"}
+
+Use this only when the requested work is complete and adequately verified. Never claim a build, test, file change, or other operation succeeded unless its actual result supports that claim.
+
+## IMPORTANT ACTION RESTRICTIONS
+
+- These are the only supported action names: `run_command` and `finish`.
+- Do not emit `InspectFiles`, `create_file`, `write_file`, `read_file`, `current`, `context`, `RUN_COMMAND`, or `FINISH` as action names.
+- `RUN_COMMAND` and `FINISH` above are explanatory labels; the JSON `action` field must use the lowercase names in the schemas.
+- File operations are performed through `run_command`; there are no separate file-creation or file-inspection actions.
+- Do not invent tools, functions, or action types that are not listed in this contract.
+- Return exactly one action per turn. Do not return an array of actions.
+- Return valid JSON matching the selected schema, with no Markdown fences or prose outside the JSON object.
+
+## DECISION RULES
+
+1. Choose the next concrete action that makes the most progress toward completing the task.
+2. Inspect the workspace and relevant files when the current state is uncertain.
+3. Use actual command execution to modify, build, test, and verify the work.
+4. Never repeat an action unless its previous result shows repetition is necessary.
+5. If the previous action failed, use its actual result to choose a corrective action.
+6. Never finish merely because you understand the plan. Complete the work and verify it where appropriate.
+7. Base every next decision on the actual HISTORY. Never assume an action succeeded.
+8. If command output must be saved, redirect it to the requested file.
+9. When creating exact file contents, prefer `printf` or another appropriate file-writing method. Preserve newlines and quoting correctly.
+10. A single `run_command` may contain multiple related shell commands when they form one coherent operation. Use `&&` when subsequent commands should run only if earlier ones succeed.
+11. Do not combine unrelated operations merely to reduce the number of agent steps.
+12. If blocked, use the available evidence to identify the blocker and report it through `finish` rather than inventing an unsupported action.
 
 ## WORKSPACE
 
@@ -309,7 +359,9 @@ Choose exactly one action per turn.
 
 {history}
 
-Return exactly one valid action in the required JSON schema. Do not return prose outside the action.
+## OUTPUT REQUIREMENTS
+
+Return exactly one valid JSON object for one supported action. Do not return prose, Markdown fences, or additional actions outside that object.
 "#;
 pub static ACTION_PROMPT_EXECUTION2: &str = r#"
 You have a plan explained in the following file.
