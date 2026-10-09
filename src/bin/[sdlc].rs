@@ -28,15 +28,12 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	config.apply_cli(&cli)?;
 	logger::init_logging(&config)?;
 
-	let context = Arc::new(CtxSdlc::default());
+	let ctx = Arc::new(CtxSdlc::default());
 	let handle = tokio::runtime::Handle::current();
 	let events = EventBus::new();
-
-	let native_runtime = NativeRuntime::new(context, handle, events)?;
-
+	let native_runtime = NativeRuntime::new(ctx, handle, events.clone())?;
 	native_runtime.start_dispatcher();
-
-	let pipeline = Pipeline::new("Do the work required to build this CLI")
+	let pipeline = Pipeline::new("Do the work required to build this CLI", events.clone())
 		.await
 		.context("Pipeline::new")?;
 

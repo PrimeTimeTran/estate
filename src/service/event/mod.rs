@@ -76,7 +76,7 @@ pub mod create {
 		Event::app(kind)
 	}
 	pub fn sdlc(event: SdlcEvent) -> Event {
-		Event::sdlc(EventKind::Sdlc(event))
+		Event::sdlc(event)
 	}
 	pub fn ipc(event: Event) -> EventEnvelope<EventKind> {
 		EventEnvelope {
@@ -122,6 +122,7 @@ pub enum AppEvent {
 ///
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum EventKind {
+	Sdlc(SdlcEvent),
 	ApiError(String),
 	CacheInvalidated {
 		reason: String,
@@ -223,7 +224,7 @@ pub enum EventKind {
 	ModifierChanged {
 		modifiers: ModifierSnapshot,
 	},
-	Sdlc(SdlcEvent),
+
 	Agent(AgentEvent),
 	ActiveAppChanged {
 		name: String,
@@ -332,8 +333,8 @@ impl Event {
 	pub fn editor(kind: EventKind) -> Self {
 		Self::new(EventSource::Editor, kind)
 	}
-	pub fn sdlc(kind: EventKind) -> Self {
-		Self::new(EventSource::Sdlc, kind)
+	pub fn sdlc(event: SdlcEvent) -> Self {
+		Self::new(EventSource::Sdlc, EventKind::Sdlc(event))
 	}
 }
 impl EventBus {

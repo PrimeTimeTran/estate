@@ -1268,7 +1268,7 @@ impl Pipeline {
 		self.persist_session()?;
 		Ok(())
 	}
-	pub async fn new(intent: impl Into<String>) -> anyhow::Result<Self> {
+	pub async fn new(intent: impl Into<String>, event_tx: EventBus) -> anyhow::Result<Self> {
 		dotenvy::dotenv().ok();
 		let kontex = Kontex::new(special::Appp::Estate)?;
 		let session = match kontex.session_load::<AiSession>()? {
@@ -1304,7 +1304,6 @@ impl Pipeline {
 impl<C: Ctx> PipelineRuntime<C> {
 	pub fn new(pipeline: Pipeline, runtime: Arc<NativeRuntime<C>>) -> Self {
 		let stage = pipeline.stage().clone();
-
 		Self {
 			stage,
 			pipeline,
@@ -1347,7 +1346,6 @@ impl<C: Ctx> PipelineRuntime<C> {
 			events: self.events.clone(),
 		}
 	}
-
 	pub async fn run(&mut self, input_rx: &mut UnboundedReceiver<SdlcInput>) -> Result<()> {
 		let mut runner = PipeRunner {
 			pipeline: &mut self.pipeline,
