@@ -9,7 +9,7 @@ The tool should accept a single command-line argument and write that value to a 
 The CLI entrypoint must be:
 
 ```text
-hello-world.js
+hello-world.cjs
 ```
 
 The generated output file must be:
@@ -18,12 +18,12 @@ The generated output file must be:
 hello-world.md
 ```
 
-## Requirements
+## Required behavior
 
 From the repository root, the user must be able to run:
 
 ```bash
-node hello-world.js "hi"
+node hello-world.cjs "hi"
 ```
 
 and the command must create or overwrite `hello-world.md` so that the file contains the supplied value.
@@ -31,7 +31,7 @@ and the command must create or overwrite `hello-world.md` so that the file conta
 For example:
 
 ```bash
-node hello-world.js "hi"
+node hello-world.cjs "hi"
 ```
 
 must result in:
@@ -60,7 +60,7 @@ Add automated tests covering both:
    - Test the actual command-line entrypoint.
    - The test should invoke the equivalent of:
      ```bash
-     node hello-world.js "hi"
+     node hello-world.cjs "hi"
      ```
    - Verify that the expected `hello-world.md` file is created and contains the expected value.
 
@@ -70,10 +70,9 @@ Tests should avoid modifying unrelated repository files and should clean up any 
 
 The implementation is complete when all of the following are true:
 
-- Must use ESM syntax
-- `hello-world.js` exists at the repository root.
-- `hello-world.js` is executable through Node.js with no additional runtime setup.
-- Running `node hello-world.js "hi"` succeeds.
+- `hello-world.cjs` exists at the repository root.
+- `hello-world.cjs` is executable through Node.js with no additional runtime setup.
+- Running `node hello-world.cjs "hi"` succeeds.
 - Running the command creates or overwrites `hello-world.md` at the repository root.
 - `hello-world.md` contains the supplied argument.
 - The JavaScript logic has automated test coverage.

@@ -60,6 +60,7 @@ pub enum RunControl {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum SdlcEvent {
+	RunStarted,
 	Activity {
 		stage: Stage,
 		attempt: Attempt,
@@ -106,7 +107,6 @@ pub enum SdlcEvent {
 	PhaseChanged {
 		phase: Phase,
 	},
-	RunStarted,
 	StageRetrying {
 		stage: Stage,
 		number: u32,

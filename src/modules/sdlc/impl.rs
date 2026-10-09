@@ -13,7 +13,7 @@ impl AiSession {
 	}
 	pub fn new(title: impl Into<String>, dir: PathBuf) -> Result<Self> {
 		let now = Utc::now();
-		let prompt = include_str!("../../../ai/template/user.goal.md").to_string();
+		let prompt = include_str!("../../../public/ai/user.goal.md").to_string();
 		Ok(Self {
 			workspace: dir.clone(),
 			cwd: std::env::current_dir().unwrap_or_default(),
@@ -393,7 +393,7 @@ impl Evaluator {
 						Question::from(Score::new(
 							"How well does this goal define a useful timeframe or completion boundary \
 							 for the software task?",
-							[
+							[ 
 								"Unusable: there is no meaningful completion boundary",
 								"Weak: completion timing or boundaries are substantially unclear",
 								"Usable: the scope provides an implicit or approximate completion boundary",
@@ -2321,7 +2321,7 @@ impl PipeRunner<'_> {
 			return Err(anyhow!("SDLC session goal is empty"));
 		}
 		let prompt = p::gen_intent(&goal)?;
-		std::fs::write(SDLC_ARTIFACT_INTENT, &prompt).context("writing Intent prompt debug file")?;
+		std::fs::write(SYS_PROMPT_INTENT, &prompt).context("writing Intent prompt debug file")?;
 		if prompt.trim().is_empty() {
 			return Err(anyhow!("generated Intent prompt is empty"));
 		}
@@ -2353,9 +2353,7 @@ impl PipeRunner<'_> {
 		if prompt.trim().is_empty() {
 			return Err(anyhow!("generated Spec prompt is empty"));
 		}
-		std::fs::write("/tmp/estate-spec-prompt.md", &prompt)
-			.context("writing Spec prompt debug file")?;
-
+		std::fs::write(SYS_PROMPT_SPEC, &prompt).context("writing spec prompt debug file")?;
 		let generated = self.pipeline.run_task(&prompt).await?;
 		if generated.trim().is_empty() {
 			return Err(anyhow!("generated Spec artifact is empty"));
@@ -2385,8 +2383,7 @@ impl PipeRunner<'_> {
 		if prompt.trim().is_empty() {
 			return Err(anyhow!("generated Plan prompt is empty"));
 		}
-		// std::fs::write("/tmp/estate-plan-prompt.md", &prompt)
-		// 	.context("writing Plan prompt debug file")?;
+		std::fs::write(SYS_PROMPT_PLAN, &prompt).context("writing plan prompt debug file")?;
 		let generated = self.pipeline.run_task(&prompt).await?;
 		if generated.trim().is_empty() {
 			return Err(anyhow!("generated Plan artifact is empty"));
@@ -2493,7 +2490,6 @@ impl PipeRunner<'_> {
 		input: StageInput,
 	) -> Result<Execution> {
 		let time_started = Utc::now();
-
 		let result = match stage {
 			Stage::Intent => self.on_intent(input).await?,
 			Stage::Spec => self.on_spec(input).await?,
