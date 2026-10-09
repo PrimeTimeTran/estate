@@ -37,7 +37,7 @@ impl<C: Ctx> Host<C> {
 		Ok(self.start_hid_bridge()?)
 	}
 	pub fn start_ipc(&self) -> Result<()> {
-		let ipc = IpcServer::new(PathBuf::from(ESTATE_SOCKET), self.event_bus.clone());
+		let ipc = IpcServer::new(PathBuf::from(ESTATE_IPC_SOCKET), self.event_bus.clone());
 		self.worker.run_background(|_cancel| async move {
 			if let Err(error) = ipc.start().await {
 				tracing::error!(%error, "Estate IPC server stopped");

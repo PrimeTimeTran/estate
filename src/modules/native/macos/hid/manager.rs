@@ -558,7 +558,7 @@ impl MacosHid {
 		let enabled = true;
 		Ok(Self {
 			state: HidState::default(),
-			socket: PathBuf::from(HID_SOCKET),
+			socket: PathBuf::from(ESTATE_HID_SOCKET),
 			child: None,
 			bindings: default_bindings(),
 			pressed: HashSet::new(),

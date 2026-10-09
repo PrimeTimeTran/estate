@@ -5,7 +5,7 @@ use crate::prelude::*;
 impl EstateClient {
 	pub fn new() -> Self {
 		Self {
-			socket: PathBuf::from(ESTATE_SOCKET),
+			socket: PathBuf::from(ESTATE_IPC_SOCKET),
 		}
 	}
 	pub async fn connect(&self) -> anyhow::Result<EstateConnection> {

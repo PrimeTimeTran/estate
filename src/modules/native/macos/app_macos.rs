@@ -1,7 +1,6 @@
 use super::*;
 use crate::prelude::*;
 
-
 impl<C> App<C>
 where
 	C: Ctx,
@@ -55,7 +54,7 @@ impl App<Context> {
 		Ok(())
 	}
 	// pub async fn run_daemon(&mut self) -> Result<()> {
-	// 	let ipc = IpcServer::new(ESTATE_SOCKET, self.host.event_bus.clone());
+	// 	let ipc = IpcServer::new(ESTATE_IPC_SOCKET, self.host.event_bus.clone());
 	// 	let _handle = tokio::spawn(async move { ipc.start().await });
 	// 	// self.workers.push(handle);
 	// 	Ok(())

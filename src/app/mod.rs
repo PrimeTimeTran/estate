@@ -17,6 +17,11 @@ pub mod app_task;
 /// ./src/mobile
 pub mod context;
 pub mod host;
+
+#[path = "./[impl].rs"]
+pub mod app_impl;
+pub use app_impl::*;
+
 pub mod job;
 pub mod worker;
 

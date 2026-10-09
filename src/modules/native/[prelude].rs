@@ -59,7 +59,7 @@ pub use tokio::net::{UnixListener, UnixStream};
 /// cause compilation errors or runtime issues in the native platform targets.
 pub use crate::{
 	native::{
-		app_native::*, daemon::*, monitor::*, resolver::*, screens::*, state, ui::*, window::*,
+		daemon::*, monitor::*, resolver::*, screens::*, state, ui::*, window::*,
 	},
 	server::*,
 };

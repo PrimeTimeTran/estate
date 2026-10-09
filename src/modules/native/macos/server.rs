@@ -5,11 +5,11 @@ pub struct DaemonServer;
 impl DaemonServer {
 	pub async fn run() {
 		println!("🟢 daemon server running");
-		if Path::new(PATH_SOCKET).exists() {
-			std::fs::remove_file(PATH_SOCKET).unwrap();
+		if Path::new(ESTATE_DAEMON_SOCKET).exists() {
+			std::fs::remove_file(ESTATE_DAEMON_SOCKET).unwrap();
 		}
-		let listener = UnixListener::bind(PATH_SOCKET).expect("failed binding socket");
-		println!("listening on {}", PATH_SOCKET);
+		let listener = UnixListener::bind(ESTATE_DAEMON_SOCKET).expect("failed binding socket");
+		println!("listening on {}", ESTATE_DAEMON_SOCKET);
 		loop {
 			let (stream, _) = listener.accept().await.expect("accept failed");
 			tokio::spawn(async move {

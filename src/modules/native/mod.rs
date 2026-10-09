@@ -1,11 +1,15 @@
 use crate::prelude::*;
 
 pub mod agent;
-pub mod app_native;
 pub mod backend;
 pub mod cursor;
 pub mod daemon;
 pub mod discovery;
+
+#[path = "./[impl].rs"]
+pub mod native_impl;
+pub use native_impl::*;
+
 pub mod monitor;
 pub mod poc;
 #[path = "[prelude].rs"]
