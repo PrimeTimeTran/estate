@@ -2633,11 +2633,18 @@ impl PipeRunner<'_> {
 		input: StageInput,
 	) -> Result<Execution> {
 		let time_started = Utc::now();
+
 		let result = match stage {
 			Stage::Intent => self.on_intent(input).await?,
 			Stage::Spec => self.on_spec(input).await?,
 			Stage::Plan => self.on_plan(input).await?,
-			Stage::Build => self.on_build(input).await?,
+			Stage::Build => match self.on_build(input).await {
+				Ok(result) => result,
+				Err(error) => {
+					eprintln!("Build stage failed: {error:#}");
+					return Err(error);
+				}
+			},
 			Stage::QA => self.on_qa(input).await?,
 			Stage::Complete => RunResult::Complete,
 			Stage::Finalize => RunResult::Finalize,
