@@ -109,7 +109,7 @@ pub struct OllamaResponse {
 }
 
 #[derive(Debug)]
-pub struct PipelineRuntime {
+pub struct PipelineRuntime<Context: Ctx> {
 	pub activity: Vec<String>,
 	pub pipeline: Pipeline,
 	pub attempt: u32,
@@ -126,6 +126,9 @@ pub struct PipelineRuntime {
 	pub total_agent_calls: u32,
 	pub history: Vec<SdlcEvent>,
 	pub events: Vec<SdlcEvent>,
+	// pub host: Host<Context>,
+	pub runtime: Arc<NativeRuntime<Context>>,
+
 }
 #[derive(Debug, Clone)]
 pub struct PipelineRuntimeView {

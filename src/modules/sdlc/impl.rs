@@ -174,7 +174,7 @@ impl AiView {
 	pub fn is_input_active(&self) -> bool {
 		self.input_active
 	}
-	pub fn new(runtime: &PipelineRuntime) -> Self {
+	pub fn new(runtime: &PipelineRuntime<Context>) -> Self {
 		Self {
 			input_active: false,
 			input: String::new(),
@@ -1256,7 +1256,6 @@ impl Pipeline {
 			}
 		}
 	}
-
 	pub async fn init(&mut self, intent: impl Into<String>) -> Result<()> {
 		let kontex = Kontex::new(special::Appp::Estate)?;
 		let intent = intent.into();
@@ -1302,17 +1301,14 @@ impl Pipeline {
 		})
 	}
 }
-
-impl PipelineRuntime {
-	fn retry(&mut self, _stage: Stage) -> Result<()> {
-		Ok(())
-	}
-
-	pub fn new(pipeline: Pipeline) -> Self {
+impl<C: Ctx> PipelineRuntime<C> {
+	pub fn new(pipeline: Pipeline, runtime: Arc<NativeRuntime<C>>) -> Self {
 		let stage = pipeline.stage().clone();
+
 		Self {
 			stage,
 			pipeline,
+			runtime,
 			activity: vec![],
 			attempt: 0,
 			confidence: None,
@@ -1328,6 +1324,9 @@ impl PipelineRuntime {
 			error: None,
 			events: vec![],
 		}
+	}
+	fn retry(&mut self, _stage: Stage) -> Result<()> {
+		Ok(())
 	}
 	pub fn view(&self) -> PipelineRuntimeView {
 		PipelineRuntimeView {
@@ -1528,10 +1527,8 @@ impl sdlc_trait::Runner for PipeRunner<'_> {
 				RunControl::Continue => {
 					// apply() transitioned to the next stage.
 					stage = self.pipeline.stage();
-
 					// Every new stage starts at attempt 1.
 					self.pipeline.stage_attempt_reset();
-
 					tracing::info!(
 						stage = ?stage,
 						attempt = self.pipeline.stage_attempt(),
@@ -1963,7 +1960,7 @@ impl PipeRunner<'_> {
 			number: next_attempt.number,
 		});
 		self.emit(SdlcEvent::PhaseChanged {
-		  stage,
+			stage,
 			phase: Phase::Retrying,
 		});
 		self.pipeline.retry(stage)?;
@@ -1972,7 +1969,7 @@ impl PipeRunner<'_> {
 	async fn handle_evaluation(&mut self, execution: Execution, attempt: Attempt) -> Result<Outcome> {
 		let stage = execution.stage;
 		self.emit(SdlcEvent::PhaseChanged {
-		  stage,
+			stage,
 			phase: Phase::Evaluating,
 		});
 		self.emit(SdlcEvent::EvaluationStarted { stage });
@@ -2093,14 +2090,14 @@ impl PipeRunner<'_> {
 				number: attempt.number + 1,
 			});
 			self.emit(SdlcEvent::PhaseChanged {
-			  stage,
+				stage,
 				phase: Phase::Retrying,
 			});
 			self.pipeline.retry(stage)?;
 			return Ok(RunControl::Continue);
 		}
 		self.emit(SdlcEvent::PhaseChanged {
-		  stage,
+			stage,
 			phase: Phase::AwaitingHuman,
 		});
 		match self
@@ -2174,7 +2171,7 @@ impl PipeRunner<'_> {
 			});
 
 			self.emit(SdlcEvent::PhaseChanged {
-			  stage,
+				stage,
 				phase: Phase::Retrying,
 			});
 
@@ -2182,7 +2179,7 @@ impl PipeRunner<'_> {
 			return Ok(RunControl::Continue);
 		}
 		self.emit(SdlcEvent::PhaseChanged {
-		  stage,
+			stage,
 			phase: Phase::AwaitingHuman,
 		});
 		match self
@@ -2241,7 +2238,7 @@ impl PipeRunner<'_> {
 			});
 
 			self.emit(SdlcEvent::PhaseChanged {
-			  stage,
+				stage,
 				phase: Phase::Retrying,
 			});
 
@@ -2250,7 +2247,7 @@ impl PipeRunner<'_> {
 			return Ok(RunControl::Continue);
 		}
 		self.emit(SdlcEvent::PhaseChanged {
-		stage,
+			stage,
 			phase: Phase::AwaitingHuman,
 		});
 		match self
@@ -2858,3 +2855,51 @@ fn hithere() {
 		"Use stdout, stderr, and exit code from previous actions as evidence for the next action.",
 	];
 }
+
+impl Context {
+	fn new(state: NativeState, api: ApiService) -> Self {
+		Self { state, api }
+	}
+}
+impl Ctx for Context {
+	fn api(&self) -> &Self::Api {
+		&self.api
+	}
+	fn api_mut(&mut self) -> &mut Self::Api {
+		&mut self.api
+	}
+	fn initial_state() -> Self::AppState {
+		structs::S {
+			context: PhantomData,
+			state: PhantomData,
+			view: ViewType::MarkdownScreen,
+		}
+	}
+	type Api = ApiService;
+	type AppState = structs::S<Context>;
+	type EventReceiver = BroadcastReceiver<crate::e::Event>;
+	type EventSender = BroadcastSender<crate::e::Event>;
+	type GuiState = NativeGuiState;
+}
+
+impl Default for Context {
+	fn default() -> Self {
+		Self::new(NativeState::default(), ApiService::default())
+	}
+}
+
+#[derive(Clone)]
+pub struct Context {
+	pub state: NativeState,
+	pub api: ApiService,
+}
+
+// 
+// impl CtxSdlc {
+//   pub fn new() -> Self {
+//     Self {
+//       state: NativeState::default(),
+//       api: ApiService::new(client)
+//     }
+//   }
+// }

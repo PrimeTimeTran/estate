@@ -1,14 +1,15 @@
-// This script reads the first positional argument and writes it to hello-world.md
+// hello-world.cjs
 const fs = require('fs');
 const path = require('path');
 
-if (process.argv.length < 3) {
+const args = process.argv.slice(2);
+if (args.length === 0) {
   console.error('Usage: node hello-world.cjs <input>');
   process.exit(1);
 }
 
-const input = process.argv[2];
-const filePath = path.resolve(path.join(__dirname, 'hello-world.md'));
+const input = args[0];
+const filePath = path.join(process.cwd(), 'hello-world.md');
 
 try {
   fs.writeFileSync(filePath, input);

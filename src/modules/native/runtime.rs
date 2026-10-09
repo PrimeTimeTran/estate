@@ -177,33 +177,6 @@ where
 			tasks: Arc::new(RwLock::new(TaskManager::new())),
 		}))
 	}
-	// pub async fn new(handle: tokio::runtime::Handle) -> anyhow::Result<Self> {
-	// 	let store = NativeStateStore::new()?;
-	// 	let state_service = Arc::new(StateService::new(crate::STATE_PATH));
-	// 	let session_service = Arc::new(SessionService::new(Arc::clone(&state_service)));
-	// 	let state = store.load()?;
-	// 	let runtime_state = RuntimeState::new(state);
-	// 	let events = EventBus::new();
-	// 	let event_rx = Arc::new(Mutex::new(events.subscribe()));
-	// 	let services = NativeServices::connect().await?;
-	// 	let executor = NativeExecutor {
-	// 		handle: handle.clone(),
-	// 	};
-	// 	Ok(Self {
-	// 		event_rx,
-	// 		events,
-	// 		executor,
-	// 		handle,
-	// 		proxy: Arc::new(Mutex::new(None)),
-	// 		services,
-	// 		session_service,
-	// 		session: Session::default(),
-	// 		state_service,
-	// 		state: Arc::new(runtime_state),
-	// 		store,
-	// 		tasks: Arc::new(RwLock::new(TaskManager::new())),
-	// 	})
-	// }
 	pub fn attach_event_proxy(&self, proxy: EventLoopProxy<AppEvent>) {
 		*self.proxy.lock().unwrap() = Some(proxy);
 	}

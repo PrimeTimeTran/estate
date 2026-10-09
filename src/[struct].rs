@@ -54,7 +54,7 @@ pub struct EstateState {
 pub struct HostClock;
 
 #[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct HostClock {
 	#[cfg(feature = "native")]
 	pub handle: tokio::runtime::Handle,

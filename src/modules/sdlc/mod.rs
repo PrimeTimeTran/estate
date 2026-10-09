@@ -35,7 +35,7 @@ use r#fn::*;
 
 mod r#impl;
 use r#impl as i;
-use r#impl::*;
+pub use r#impl::{*, Context as CtxSdlc};
 
 mod prompt;
 use prompt as p;

@@ -210,6 +210,7 @@ where
 	type Worker = HostWorker<C>;
 }
 
+#[derive(Debug)]
 pub struct Host<C>
 where
 	C: Ctx,
@@ -228,6 +229,7 @@ where
 
 pub struct HostRenderer;
 
+#[derive(Clone, Debug)]
 pub struct HostWorker<C: Ctx> {
 	pub _phantom: PhantomData<C>,
 	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
