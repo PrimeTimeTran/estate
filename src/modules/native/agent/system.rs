@@ -151,7 +151,7 @@ pub struct AgentSystem {
 	pub event_rx: UnboundedReceiver<RuntimeEvent>,
 	pub ctx: AgentCtx,
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct CtxWorkspace {
 	pub files: Vec<FileInfo>,
 	pub cwd: PathBuf,

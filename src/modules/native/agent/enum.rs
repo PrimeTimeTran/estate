@@ -34,13 +34,13 @@ pub enum AgentStatus {
 	Thinking,
 	Error(String),
 }
-#[derive(Clone, Serialize, Deserialize, Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub enum AgentObservation {
 	Current { message: String },
 	RunCommand { result: ShellResult },
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub enum Artifact {
 	FileRead { path: String, content: String },
 	FileWrite { path: String },

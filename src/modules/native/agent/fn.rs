@@ -1,30 +1,51 @@
 use super::*;
 
+use anyhow::Context as CtxAnyhow;
+
 pub async fn build_action(prompt: &str) -> Result<LlmAction> {
 	let client = reqwest::Client::new();
 	let system_prompt: &str = JSON_PROMPT_EXECUTION;
+
 	let payload = serde_json::json!({
-			"model": "qwen3:8b",
-			"system": system_prompt,
-			"prompt": prompt,
-			"stream": false,
-			"format": "json"
+		"model": "qwen3:8b",
+		"system": system_prompt,
+		"prompt": prompt,
+		"stream": false,
+		"format": "json"
 	});
+
 	let res = client
 		.post(crate::AGENT_GEN_URL)
 		.json(&payload)
 		.send()
 		.await?
+		.error_for_status()?
 		.json::<serde_json::Value>()
 		.await?;
+
 	let response = res["response"].as_str().unwrap_or("");
-	let action: serde_json::Value = serde_json::from_str(response)?;
-	println!(
-		"action choice   {}",
-		action["message"].as_str().unwrap_or("")
-	);
-	let response_text = res["response"].as_str().unwrap_or("{}");
-	let raw: LlmAction = serde_json::from_str(response_text)?;
+
+	// Print the EXACT model output before any parsing or validation.
+	section!("RAW MODEL ACTION RESPONSE");
+	println!("response length: {} chars", response.len());
+	println!("response:\n{response}");
+	println!("end raw response");
+
+	// Parse once, with context so failures identify the stage.
+	let raw: LlmAction = serde_json::from_str(response)
+		.with_context(|| {
+			format!(
+				"Failed to deserialize model response as LlmAction ({} chars):\n{}",
+				response.len(),
+				response
+			)
+		})?;
+
+	println!("PARSED ACTION:");
+	println!("  action: {:?}", raw.action);
+	println!("  command: {:?}", raw.command);
+	println!("  message: {:?}", raw.message);
+
 	Ok(raw)
 }
 pub fn build_prompt(ctx: &AgentCtx) -> String {

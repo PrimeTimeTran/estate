@@ -40,7 +40,7 @@ impl Agent {
 		task: AgentTask,
 		event_tx: UnboundedSender<RuntimeEvent>,
 	) -> Result<TaskResult> {
-		let max_steps = 10;
+		let max_steps = 20;
 		let max_action_selection_errors = 3;
 
 		let ctx = AgentCtx::with_workspace(task.prompt.clone(), (*self.workspace).clone());
@@ -72,6 +72,11 @@ impl Agent {
 			let response = prompt_chat(&run.ctx).await?;
 			return Ok(TaskResult::completed_chat(task.id, run.ctx, response));
 		}
+
+		// Baseline for the entire agent run. Per-command snapshots below let us
+		// attribute changes to individual actions; this baseline captures the
+		// complete set of changes made during this run.
+		let run_workspace_before = WSSnapshot::capture(&self.workspace.cwd)?;
 
 		for step in 1..=max_steps {
 			println!(
@@ -121,18 +126,16 @@ impl Agent {
 						message: format!(
 							"INVALID ACTION RESPONSE\n\
 							Reason: {message}\n\n\
-							The model response was rejected before a valid action was selected. \
+							The response was rejected before a valid action was selected. \
 							No command from this response was executed.\n\n\
-							Return exactly ONE valid JSON object using one of these schemas:\n\
-							{{\"action\":\"run_command\",\"command\":\"actual shell command\"}}\n\
+							Return exactly ONE valid JSON object:\n\
+							{{\"action\":\"run_command\",\"command\":\"one non-interactive command\"}}\n\
 							{{\"action\":\"finish\",\"message\":\"summary of work and verification\"}}\n\n\
-							The only valid action values are `run_command` and `finish`.\n\
-							Do not use `run`, `RunCommand`, `git`, or another command name as \
-							the action. Put the complete shell command in the `command` field.\n\n\
-							Review the original task and recent HISTORY. Do not repeat a previous \
-							successful command unless further verification requires it. Do not \
-							repeat a failed command unchanged unless its failure is understood \
-							and retrying is justified.\n\
+							Only `run_command` and `finish` are supported. Put the shell command \
+							in `command`, not in `action`. Use bounded, non-interactive commands. \
+							Do not start an interactive shell, REPL, or persistent foreground process. \
+							Do not repeat successful commands without a reason or retry failed \
+							commands unchanged without understanding the failure.\n\
 							Return the corrected action now."
 						),
 					});
@@ -191,13 +194,28 @@ impl Agent {
 				AgentAction::RunCommand { command } => {
 					println!("COMMAND: {command}");
 
+					// Capture immediately before execution so changes can be
+					// attributed to this command rather than the entire run.
+					let workspace_before = WSSnapshot::capture(&self.workspace.cwd)?;
+
 					let mut shell_command = ShellCommand::shell(command.clone());
 					shell_command.cwd = Some(self.workspace.cwd.clone());
 
 					let result = match self.tools.shell.run(shell_command).await {
 						Ok(result) => result,
 						Err(error) => {
-							let message = format!("Shell execution failed for command `{command}`: {error:#}");
+							// Even if the shell tool errors, the command may have
+							// modified files before failing. Reconcile those changes.
+							let workspace_after = WSSnapshot::capture(&self.workspace.cwd)?;
+
+							let changed_paths =
+								reconcile_agent_artifacts(&mut run.ctx, &workspace_before, &workspace_after)?;
+
+							let message = format!(
+								"Shell execution failed for `{command}`: {error:#}\n\
+								Observed workspace changes:\n{}",
+								format_changed_files(&changed_paths),
+							);
 							eprintln!("{message}");
 
 							run.record_error(AgentError {
@@ -212,13 +230,10 @@ impl Agent {
 							run.ctx.history.push(AgentObservation::Current {
 								message: format!(
 									"{message}\n\n\
-									The shell tool did not return a completed ShellResult. \
-									Do not assume the command had no side effects.\n\
-									Review the error before deciding what to do next. Do not \
-									repeat the same command unchanged unless retrying is justified.\n\
-									Return exactly one valid JSON action:\n\
-									{{\"action\":\"run_command\",\"command\":\"corrected shell command\"}}\n\
-									{{\"action\":\"finish\",\"message\":\"blocker and work completed\"}}"
+									The shell tool did not return a completed result. \
+									Do not assume there were no side effects. Inspect the \
+									observed changes and error before choosing the next action. \
+									Do not retry unchanged without justification."
 								),
 							});
 
@@ -242,6 +257,18 @@ impl Agent {
 						result.stderr.len(),
 						result.stderr.lines().count(),
 						preview_lines(&result.stderr, SHELL_OUTPUT_PREVIEW_LINES)
+					);
+
+					// Reconcile the filesystem regardless of exit status. A failing
+					// command can still leave useful files or partial modifications.
+					let workspace_after = WSSnapshot::capture(&self.workspace.cwd)?;
+
+					let changed_paths =
+						reconcile_agent_artifacts(&mut run.ctx, &workspace_before, &workspace_after)?;
+
+					println!(
+						"FILES CHANGED BY ACTION:\n{}",
+						format_changed_files(&changed_paths),
 					);
 
 					let success = result.exit_code == Some(0);
@@ -277,6 +304,18 @@ impl Agent {
 						});
 					}
 
+					// Give the next model call observed filesystem evidence rather
+					// than relying on the model's claims about what it wrote.
+					run.ctx.history.push(AgentObservation::Current {
+						message: format!(
+							"Runtime filesystem reconciliation after command `{command}`:\n\
+							{}\n\
+							These changes were observed by the runtime. Inspect and verify \
+							the relevant files before claiming completion.",
+							format_changed_files(&changed_paths),
+						),
+					});
+
 					run
 						.ctx
 						.history
@@ -284,20 +323,57 @@ impl Agent {
 				}
 
 				AgentAction::Finish { message } => {
-					let did_work = run.commands.iter().any(|record| record.success);
+					// Capture the final diff too: this includes changes that occurred
+					// outside the last individual command's snapshot interval.
+					let workspace_final = WSSnapshot::capture(&self.workspace.cwd)?;
 
-					if !did_work {
-						run.ctx.history.push(AgentObservation::Current {
-							message: format!(
-								"Finish rejected: no successful command has been recorded. \
-								Continue working and verify the task. \
-								Proposed finish message: {message}"
-							),
+					let final_changed_paths =
+						reconcile_agent_artifacts(&mut run.ctx, &run_workspace_before, &workspace_final)?;
+
+					// A successful command alone is not evidence of task completion.
+					let validation = validate_agent_completion(
+						&self.workspace.cwd,
+						&run.ctx.artifacts,
+						&run.commands,
+						&final_changed_paths,
+					)?;
+
+					if !validation.is_valid() {
+						let errors = validation.errors();
+
+						let feedback = format!(
+							"COMPLETION REJECTED: runtime validation failed.\n\
+							You claimed the task was complete, but these checks failed:\n{}\n\n\
+							Correct the actual files, then inspect and verify them. \
+							Do not simply repeat the completion claim.",
+							errors.join("\n"),
+						);
+
+						eprintln!("{feedback}");
+
+						run.record_error(AgentError {
+							step: Some(step),
+							kind: "completion_validation".into(),
+							message: feedback.clone(),
+							raw_response: None,
+							recoverable: true,
+							timestamp: chrono::Utc::now(),
 						});
+
+						run
+							.ctx
+							.history
+							.push(AgentObservation::Current { message: feedback });
+
 						continue;
 					}
 
-					let result = TaskResult::completed_with_summary(task.id, run.ctx, message);
+					let final_message = format!(
+						"{message}\n\nRuntime-observed changed files:\n{}",
+						format_changed_files(&final_changed_paths),
+					);
+
+					let result = TaskResult::completed_with_summary(task.id, run.ctx, final_message);
 
 					let event = RuntimeEvent::Agent(AgentEvent::Finished {
 						result: result.clone(),
@@ -508,7 +584,7 @@ pub struct AgentContextInfo {
 	pub project_dir: PathBuf,
 	pub settings_file: Option<PathBuf>,
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct AgentCtx {
 	pub prompt: Option<String>,
 	pub task: Option<AgentTask>,
@@ -573,7 +649,7 @@ pub struct AgentError {
 	/// Timestamp when the error was recorded.
 	pub timestamp: chrono::DateTime<chrono::Utc>,
 }
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct AgentTask {
 	pub id: Uuid,
 	pub prompt: String,
@@ -601,3 +677,154 @@ pub struct LlmMode {
 // 		fn observe(&self) -> AgentContextInfo;
 // 	}
 // }
+
+fn format_changed_files(paths: &[std::path::PathBuf]) -> String {
+	if paths.is_empty() {
+		return "(no filesystem changes detected)".to_owned();
+	}
+
+	let mut paths = paths
+		.iter()
+		.map(|path| path.display().to_string())
+		.collect::<Vec<_>>();
+
+	paths.sort();
+	paths.dedup();
+
+	paths
+		.into_iter()
+		.map(|path| format!("- {path}"))
+		.collect::<Vec<_>>()
+		.join("\n")
+}
+
+use anyhow::Result;
+use std::path::{Path, PathBuf};
+
+pub struct AgentCompletionValidation {
+	errors: Vec<String>,
+}
+
+impl AgentCompletionValidation {
+	pub fn is_valid(&self) -> bool {
+		self.errors.is_empty()
+	}
+
+	pub fn errors(&self) -> &[String] {
+		&self.errors
+	}
+}
+
+pub fn validate_agent_completion(
+	workspace_root: &Path,
+	artifacts: &[Artifact],
+	commands: &[CommandRecord],
+	changed_paths: &[PathBuf],
+) -> Result<AgentCompletionValidation> {
+	let mut errors = Vec::new();
+	let mut paths: Vec<PathBuf> = artifacts
+		.iter()
+		.filter_map(|artifact| match artifact {
+			Artifact::FileRead { path, .. } | Artifact::FileWrite { path } => Some(PathBuf::from(path)),
+			Artifact::Observation(_) | Artifact::ToolOutput(_) => None,
+		})
+		.collect();
+
+	paths.extend(changed_paths.iter().cloned());
+	paths.sort();
+	paths.dedup();
+
+	if !changed_paths.is_empty() && !commands.iter().any(|command| command.success) {
+		errors.push(
+			"Files changed, but no command completed successfully. \
+			 Run an appropriate verification command before finishing."
+				.to_owned(),
+		);
+	}
+
+	Ok(AgentCompletionValidation { errors })
+}
+
+fn reconcile_agent_artifacts(
+	ctx: &mut AgentCtx,
+	before: &WSSnapshot,
+	after: &WSSnapshot,
+) -> Result<Vec<PathBuf>> {
+	let changes = before.diff(after);
+	let changed_paths = parse_git_status_paths(&changes.git_status);
+
+	for path in &changed_paths {
+		let absolute_path = if path.is_absolute() {
+			path.clone()
+		} else {
+			ctx.workspace.cwd.join(path)
+		};
+
+		let path_string = absolute_path.to_string_lossy().into_owned();
+
+		if absolute_path.is_file() {
+			ctx.workspace.add_file(absolute_path.clone())?;
+
+			let artifact = Artifact::FileWrite {
+				path: path_string.clone(),
+			};
+
+			// Avoid duplicate write artifacts for the same path.
+			if !ctx.artifacts.iter().any(|existing| {
+				matches!(
+					existing,
+					Artifact::FileWrite { path } if path == &path_string
+				)
+			}) {
+				ctx.artifacts.push(artifact);
+			}
+		} else {
+			// Remove stale workspace entries for deleted files.
+			ctx
+				.workspace
+				.files
+				.retain(|file| Path::new(&file.path) != absolute_path);
+
+			// Remove write artifacts for files that no longer exist.
+			ctx.artifacts.retain(|artifact| {
+				!matches!(
+					artifact,
+					Artifact::FileWrite { path } if path == &path_string
+				)
+			});
+		}
+	}
+
+	Ok(changed_paths)
+}
+
+fn parse_git_status_paths(status: &str) -> Vec<PathBuf> {
+	let mut paths = Vec::new();
+
+	for line in status.lines() {
+		// `git status --short` starts with two status columns.
+		if line.len() < 4 {
+			continue;
+		}
+
+		let status_code = &line[..2];
+		let path = line[3..].trim();
+
+		if path.is_empty() || status_code == "!!" {
+			continue;
+		}
+
+		// For renames, porcelain output is generally "old -> new".
+		let path = path
+			.rsplit_once(" -> ")
+			.map(|(_, new_path)| new_path)
+			.unwrap_or(path)
+			.trim_matches('"');
+
+		paths.push(PathBuf::from(path));
+	}
+
+	paths.sort();
+	paths.dedup();
+	paths
+}

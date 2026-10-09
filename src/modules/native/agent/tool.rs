@@ -171,7 +171,7 @@ pub struct AgentTools {
 	pub mcp: McpClient,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct FileInfo {
 	pub content: String,
 	pub extension: Option<String>,
@@ -208,7 +208,7 @@ impl ShellCommand {
 		}
 	}
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct ShellResult {
 	pub program: String,
 	pub args: Vec<String>,
