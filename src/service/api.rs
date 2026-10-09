@@ -1,7 +1,7 @@
 use crate::prelude::*;
 
 #[derive(Debug, Clone)]
-pub enum ApiConnection {
+enum ApiConnection {
 	Disconnected,
 	Connecting,
 	Connected(ApiClient),
@@ -160,3 +160,11 @@ pub struct StateService {
 pub struct ApiService {
 	pub connection: ApiConnection,
 }
+
+#[derive(Debug, Clone)]
+pub struct Connected {
+	pub api: ApiClient,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Disconnected;

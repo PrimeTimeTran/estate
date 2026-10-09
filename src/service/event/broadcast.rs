@@ -1,4 +1,5 @@
 use crate::prelude::*;
+use tokio::sync::broadcast;
 
 #[derive(Debug)]
 pub struct BroadcastReceiver<T> {
@@ -30,7 +31,7 @@ impl ReceivesEvents for BroadcastReceiver<e::Event> {
 
 #[derive(Debug, Clone)]
 pub struct BroadcastSender<T> {
-	pub tx: tokio::sync::broadcast::Sender<T>,
+	pub tx: broadcast::Sender<T>,
 }
 
 impl BroadcastSender<e::Event> {

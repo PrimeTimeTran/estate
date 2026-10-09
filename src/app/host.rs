@@ -210,14 +210,6 @@ where
 	type Worker = HostWorker<C>;
 }
 
-#[derive(Debug, Clone)]
-pub struct Connected {
-	pub api: ApiClient,
-}
-
-#[derive(Debug, Clone, Copy, Default)]
-pub struct Disconnected;
-
 pub struct Host<C>
 where
 	C: Ctx,
