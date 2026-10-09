@@ -171,7 +171,7 @@ pub struct AgentTools {
 	pub mcp: McpClient,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileInfo {
 	pub content: String,
 	pub extension: Option<String>,

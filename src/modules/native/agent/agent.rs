@@ -1,4 +1,5 @@
 use super::*;
+use serde::{Deserialize, Serialize};
 
 impl Agent {
 	pub fn new() -> Self {
@@ -40,83 +41,78 @@ impl Agent {
 		task: AgentTask,
 		event_tx: UnboundedSender<RuntimeEvent>,
 	) -> Result<TaskResult> {
-		let mut steps = 0;
 		let max_steps = 10;
 
-		// Initialize the context exactly once. Every action works against this
-		// same context, and every observation is appended to its history.
-		let mut ctx = AgentCtx::with_workspace(task.prompt.clone(), (*self.workspace).clone());
+		// One run, one context, one growing command/error history.
+		let ctx = AgentCtx::with_workspace(task.prompt.clone(), (*self.workspace).clone());
+		let mut run = AgentRun::new(ctx);
 
 		section!("AGENT run_agent_loop CONTEXT");
 
-		let prompt = ctx.prompt.as_deref().unwrap_or("");
+		let prompt = run.ctx.prompt.as_deref().unwrap_or("");
 		println!(
 			"ctx.prompt ({} chars, {} lines):\n{}",
 			prompt.len(),
 			prompt.lines().count(),
 			preview_lines(prompt, PROMPT_PREVIEW_LINES)
 		);
-		println!("ctx.workspace:\n{}", ctx.workspace);
-		println!("ctx.history ({} entries):", ctx.history.len());
-
-		for (i, entry) in ctx.history.iter().take(5).enumerate() {
-			println!("  [{}] {}", i + 1, preview(&format!("{entry:?}"), 500));
-		}
-
-		if ctx.history.len() > 5 {
-			println!("  ... {} more entries", ctx.history.len() - 5);
-		}
+		println!("ctx.workspace:\n{}", run.ctx.workspace);
+		println!("ctx.history ({} entries):", run.ctx.history.len());
 
 		let event = RuntimeEvent::Agent(AgentEvent::Thinking { task: task.clone() });
 
 		if let Err(error) = crate::agent::log::append_agent_event(&event) {
 			eprintln!("Failed to write agent event log: {error:#}");
 		}
-
 		let _ = event_tx.send(event);
 
-		let mode: AgentMode = self.pick_mode(&ctx).await?;
+		let mode = self.pick_mode(&run.ctx).await?;
 
 		if matches!(mode, AgentMode::Chat) {
-			let response = prompt_chat(&ctx).await?;
-			let result = TaskResult::completed_chat(task.id, ctx, response);
-
-			let event = RuntimeEvent::Agent(AgentEvent::Finished {
-				result: result.clone(),
-			});
-
-			if let Err(error) = crate::agent::log::append_agent_event(&event) {
-				eprintln!("Failed to write agent event log: {error:#}");
-			}
-
-			let _ = event_tx.send(event);
-			return Ok(result);
+			let response = prompt_chat(&run.ctx).await?;
+			return Ok(TaskResult::completed_chat(task.id, run.ctx, response));
 		}
 
-		loop {
-			steps += 1;
-
-			if steps > max_steps {
-				return Ok(TaskResult::failed(
-					task.id,
-					ctx,
-					"Infinite loop",
-					Some("Agent exceeded maximum reasoning steps".into()),
-				));
-			}
-
-			// The next decision sees the original task plus all observations
-			// accumulated from previous actions.
+		for step in 1..=max_steps {
 			println!(
-				"AGENT STEP {steps}/{max_steps}; history entries={}",
-				ctx.history.len()
+				"AGENT STEP {step}/{max_steps}; history={}; commands={}; errors={}",
+				run.ctx.history.len(),
+				run.commands.len(),
+				run.errors.len(),
 			);
 
-			let action = self.pick_action(&ctx).await?;
+			// Do not let a parse/selection error discard the entire run.
+			let action = match self.pick_action(&run.ctx).await {
+				Ok(action) => action,
+				Err(error) => {
+					let message = format!("Action selection failed: {error:#}");
+
+					eprintln!("{message}");
+
+					run.record_error(AgentError {
+						step: Some(step),
+						kind: "action_selection".into(),
+						message: message.clone(),
+						raw_response: None,
+						recoverable: true,
+						timestamp: chrono::Utc::now(),
+					});
+
+					run.ctx.history.push(AgentObservation::Current {
+						message: format!(
+							"{message}. The previous action was not executed. \
+							Choose an action supported by the required JSON schema."
+						),
+					});
+
+					continue;
+				}
+			};
 
 			match action {
 				AgentAction::Current { message } => {
 					let now = chrono::Local::now().format("%Y-%m-%d").to_string();
+
 					let response = format!("Context update: The current date is {now}. {message}");
 
 					let event = RuntimeEvent::Agent(AgentEvent::Working {
@@ -127,51 +123,73 @@ impl Agent {
 					if let Err(error) = crate::agent::log::append_agent_event(&event) {
 						eprintln!("Failed to write agent event log: {error:#}");
 					}
-
 					let _ = event_tx.send(event);
 
-					// Append; never replace the existing history.
-					ctx
+					run
+						.ctx
 						.history
 						.push(AgentObservation::Current { message: response });
 				}
 
-				AgentAction::Finish { message } => {
-					// Don't treat a generic context update as proof that work
-					// was performed. Check for actual work observations.
-					let did_work = ctx
-						.history
-						.iter()
-						.any(|observation| matches!(observation, AgentObservation::RunCommand { .. }));
+				AgentAction::Context { path } => {
+					let message = match path {
+						Some(path) => format!(
+							"Context requested for path: {path}. \
+							Inspect it using a supported command."
+						),
+						None => format!(
+							"Context requested. Current history entries: {}. \
+							Use supported commands to inspect the workspace.",
+							run.ctx.history.len()
+						),
+					};
 
-					if !did_work {
-						ctx.history.push(AgentObservation::Current {
-							message: format!(
-								"Finish rejected: no command execution has been recorded. \
-								Continue working on the task before finishing. \
-								Your proposed finish message was: {message}"
-							),
-						});
-						continue;
-					}
-
-					let result = TaskResult::completed_with_summary(task.id, ctx, message);
-
-					let event = RuntimeEvent::Agent(AgentEvent::Finished {
-						result: result.clone(),
+					let event = RuntimeEvent::Agent(AgentEvent::Working {
+						task: task.clone(),
+						message: message.clone(),
 					});
 
 					if let Err(error) = crate::agent::log::append_agent_event(&event) {
 						eprintln!("Failed to write agent event log: {error:#}");
 					}
-
 					let _ = event_tx.send(event);
-					return Ok(result);
+
+					run.ctx.history.push(AgentObservation::Current { message });
 				}
 
 				AgentAction::RunCommand { command } => {
+					println!("COMMAND: {command}");
+
 					let shell_command = ShellCommand::shell(command.clone());
-					let result = self.tools.shell.run(shell_command).await?;
+
+					// Capture tool errors instead of using `?`, which would
+					// return early and discard the in-memory run.
+					let result = match self.tools.shell.run(shell_command).await {
+						Ok(result) => result,
+						Err(error) => {
+							let message = format!("Command execution failed: {error:#}");
+
+							eprintln!("{message}");
+
+							run.record_error(AgentError {
+								step: Some(step),
+								kind: "command_execution".into(),
+								message: message.clone(),
+								raw_response: None,
+								recoverable: true,
+								timestamp: chrono::Utc::now(),
+							});
+
+							run.ctx.history.push(AgentObservation::Current {
+								message: format!(
+									"Command: {command}\n{message}\n\
+									Choose another command or adjust the approach."
+								),
+							});
+
+							continue;
+						}
+					};
 
 					section!("SHELL RESULT");
 					println!("command: {command}");
@@ -181,46 +199,110 @@ impl Agent {
 						"stdout ({} chars, {} lines):\n{}",
 						result.stdout.len(),
 						result.stdout.lines().count(),
-						preview_lines(&result.stdout, SHELL_OUTPUT_PREVIEW_LINES)
+						preview_lines(&result.stdout, SHELL_OUTPUT_PREVIEW_LINES,)
 					);
 
 					println!(
 						"stderr ({} chars, {} lines):\n{}",
 						result.stderr.len(),
 						result.stderr.lines().count(),
-						preview_lines(&result.stderr, SHELL_OUTPUT_PREVIEW_LINES)
+						preview_lines(&result.stderr, SHELL_OUTPUT_PREVIEW_LINES,)
 					);
 
-					// Preserve the complete result, not just a success message.
-					// The next model call can inspect exit status, stdout and stderr.
-					ctx.history.push(AgentObservation::RunCommand { result });
+					let success = result.exit_code == Some(0);
+
+					// Record every completed command, including nonzero exits.
+					run.record_command(CommandRecord {
+						step,
+						command: command.clone(),
+						exit_code: result.exit_code,
+						stdout: result.stdout.clone(),
+						stderr: result.stderr.clone(),
+						success,
+						error: if success {
+							None
+						} else {
+							Some(format!("Command exited with status {:?}", result.exit_code))
+						},
+						timestamp: chrono::Utc::now(),
+					});
+
+					if !success {
+						run.record_error(AgentError {
+							step: Some(step),
+							kind: "command_exit".into(),
+							message: format!(
+								"Command `{command}` exited with status {:?}. \
+								Stderr: {}",
+								result.exit_code,
+								preview(&result.stderr, 1000),
+							),
+							raw_response: None,
+							recoverable: true,
+							timestamp: chrono::Utc::now(),
+						});
+					}
+
+					// Keep the full tool result in the model-visible history.
+					run
+						.ctx
+						.history
+						.push(AgentObservation::RunCommand { result });
 				}
 
-				AgentAction::Context { .. } => {
-					let event = RuntimeEvent::Agent(AgentEvent::Working {
-						task: task.clone(),
-						message: "Inspecting agent context".into(),
+				AgentAction::Finish { message } => {
+					let did_work = run.commands.iter().any(|record| record.success);
+
+					if !did_work {
+						run.ctx.history.push(AgentObservation::Current {
+							message: format!(
+								"Finish rejected: no successful command has been \
+								recorded. Continue working and verify the task. \
+								Proposed finish message: {message}"
+							),
+						});
+						continue;
+					}
+
+					let result = TaskResult::completed_with_summary(task.id, run.ctx, message);
+
+					let event = RuntimeEvent::Agent(AgentEvent::Finished {
+						result: result.clone(),
 					});
 
 					if let Err(error) = crate::agent::log::append_agent_event(&event) {
 						eprintln!("Failed to write agent event log: {error:#}");
 					}
-
 					let _ = event_tx.send(event);
 
-					// Record what happened, but don't pretend that this supplied
-					// actual workspace or file contents.
-					ctx.history.push(AgentObservation::Current {
-						message: format!(
-							"Context action received. Current task has {} history \
-							entries. Inspect the workspace and prior command results \
-							before choosing the next action.",
-							ctx.history.len()
-						),
-					});
+					return Ok(result);
 				}
 			}
 		}
+
+		// Preserve the accumulated context and serialized records on exhaustion.
+		let message = format!(
+			"Agent exceeded {max_steps} reasoning steps; \
+			commands={}, errors={}.",
+			run.commands.len(),
+			run.errors.len(),
+		);
+
+		run.record_error(AgentError {
+			step: Some(max_steps),
+			kind: "step_limit".into(),
+			message: message.clone(),
+			raw_response: None,
+			recoverable: false,
+			timestamp: chrono::Utc::now(),
+		});
+
+		Ok(TaskResult::failed(
+			task.id,
+			run.ctx,
+			"Infinite loop",
+			Some(message),
+		))
 	}
 
 	pub fn with_cwd(cwd: impl Into<PathBuf>) -> Self {
@@ -244,6 +326,45 @@ impl Agent {
 impl Default for Agent {
 	fn default() -> Self {
 		Self::new()
+	}
+}
+impl AgentRun {
+	pub fn new(ctx: AgentCtx) -> Self {
+		Self {
+			ctx,
+			commands: Vec::new(),
+			errors: Vec::new(),
+		}
+	}
+	pub fn record_command(&mut self, record: CommandRecord) {
+		self.commands.push(record);
+	}
+	pub fn record_error(&mut self, error: AgentError) {
+		self.errors.push(error);
+	}
+	pub fn record_observation(&mut self, observation: AgentObservation) {
+		self.ctx.history.push(observation);
+	}
+	pub fn record_log(&mut self, message: impl Into<String>) {
+		self.ctx.logs.push(message.into());
+	}
+	pub fn step_count(&self) -> usize {
+		self.commands.len() + self.errors.len()
+	}
+	pub fn has_successful_command(&self) -> bool {
+		self.commands.iter().any(|command| command.success)
+	}
+	pub fn has_errors(&self) -> bool {
+		!self.errors.is_empty()
+	}
+	pub fn last_command(&self) -> Option<&CommandRecord> {
+		self.commands.last()
+	}
+	pub fn last_error(&self) -> Option<&AgentError> {
+		self.errors.last()
+	}
+	pub fn into_context(self) -> AgentCtx {
+		self.ctx
 	}
 }
 impl AgentTask {
@@ -340,7 +461,6 @@ impl TryFrom<LlmAction> for AgentAction {
 		}
 	}
 }
-
 #[derive(Debug, Clone)]
 pub struct Agent {
 	pub id: String,
@@ -358,7 +478,7 @@ pub struct AgentContextInfo {
 	pub project_dir: PathBuf,
 	pub settings_file: Option<PathBuf>,
 }
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentCtx {
 	pub prompt: Option<String>,
 	pub task: Option<AgentTask>,
@@ -368,12 +488,66 @@ pub struct AgentCtx {
 	pub logs: Vec<String>,
 	pub spawned_tasks: Vec<AgentTask>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentRun {
+	pub ctx: AgentCtx,
+	pub commands: Vec<CommandRecord>,
+	pub errors: Vec<AgentError>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CommandRecord {
+	/// One-based execution order within this agent run.
+	pub step: usize,
+
+	/// The command submitted to the shell.
+	pub command: String,
+
+	/// Process exit code, if one was produced.
+	pub exit_code: Option<i32>,
+
+	/// Captured standard output.
+	pub stdout: String,
+
+	/// Captured standard error.
+	pub stderr: String,
+
+	/// Whether the command completed successfully.
+	pub success: bool,
+
+	/// Error encountered while launching or executing the command, if any.
+	pub error: Option<String>,
+
+	/// Timestamp when the command record was created.
+	pub timestamp: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentError {
+	/// One-based agent step where the error occurred, if known.
+	pub step: Option<usize>,
+
+	/// Category of failure, e.g. "action_parse", "command", or "tool".
+	pub kind: String,
+
+	/// Human-readable error description.
+	pub message: String,
+
+	/// Raw model response, if the error occurred while parsing an action.
+	pub raw_response: Option<String>,
+
+	/// Whether the error was recoverable.
+	pub recoverable: bool,
+
+	/// Timestamp when the error was recorded.
+	pub timestamp: chrono::DateTime<chrono::Utc>,
+}
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct AgentTask {
 	pub id: Uuid,
 	pub prompt: String,
 }
-
 #[derive(Debug, Deserialize)]
 pub struct LlmAction {
 	pub action: String,
