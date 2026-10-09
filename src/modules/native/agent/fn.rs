@@ -30,10 +30,12 @@ pub async fn build_action(prompt: &str) -> Result<LlmAction> {
 pub fn build_prompt(ctx: &AgentCtx) -> String {
 	let workspace = format_workspace(&ctx.workspace);
 	let history = format_history(&ctx.history);
+
 	let prompt = ACTION_PROMPT_EXECUTION
 		.replace("{task}", ctx.prompt.as_deref().unwrap_or(""))
 		.replace("{workspace}", &workspace)
 		.replace("{history}", &history);
+
 	section!("build_prompt");
 	println!(
 		"prompt ({} lines, {} chars):\n{}",
@@ -41,6 +43,7 @@ pub fn build_prompt(ctx: &AgentCtx) -> String {
 		prompt.len(),
 		preview_lines(&prompt, PROMPT_PREVIEW_LINES)
 	);
+
 	prompt
 }
 pub fn build_prompt_from_ctx(ctx: &AgentCtx) -> String {
