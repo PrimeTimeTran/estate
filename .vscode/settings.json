@@ -112,6 +112,7 @@
     "rustflags",
     "rustup",
     "RWIN",
+    "seepd",
     "skhd",
     "sockaddr",
     "socklen",

@@ -383,7 +383,7 @@ impl DiscoveryStore {
 	pub fn write_discovery_result(&mut self) -> Result<()> {
 		let path = dirs::home_dir()
 			.ok_or_else(|| anyhow::anyhow!("could not determine home directory"))?
-			.join(INDEX_PATH);
+			.join(ESTATE_INDEX_PATH);
 		tracing::debug!(?path, "writing discovery result");
 		let mut master: serde_json::Value = if path.exists() {
 			tracing::debug!("loading existing master.json");
@@ -506,7 +506,7 @@ impl EstateDiscovery {
 	}
 	fn discover_config(&mut self, cwd: &Path) -> std::io::Result<()> {
 		if let Some(home) = dirs::home_dir() {
-			let config_dir = home.join(HOME_DIR);
+			let config_dir = home.join(ESTATE_HOME_DIR);
 			for name in INTRINSIC_FILES {
 				let path = config_dir.join(name);
 				if path.is_file() {

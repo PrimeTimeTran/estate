@@ -57,7 +57,7 @@ pub use event_impl::*;
 /// in downstream code.
 ///
 pub mod create {
-	use super::IntrinsicEvent as Event;
+	use super::event_struct::Event;
 	use crate::prelude::*;
 
 	pub fn daemon(kind: EventKind) -> Event {
@@ -113,7 +113,6 @@ pub enum AppEvent {
 		shift: bool,
 	},
 }
-
 /// ## [EventKind]
 ///
 /// Represent event lifecycle of events.
@@ -233,7 +232,6 @@ pub enum EventKind {
 	},
 	Unknown,
 }
-
 /// ## [EventSource]
 ///
 /// Useful for creating more detailed logs & traces in the future.
@@ -247,7 +245,6 @@ pub enum EventSource {
 	Filesystem,
 	Sdlc,
 }
-
 pub enum EventScope {
 	Local,
 	Process,
@@ -258,7 +255,6 @@ pub enum EventScope {
 pub trait EventPublisher<E> {
 	fn publish(&self, event: E) -> Result<()>;
 }
-
 /// Transport used by [`EventClient`] to subscribe to remote events.
 ///
 /// The transport owns the actual networking implementation.
@@ -279,22 +275,6 @@ pub trait EventTransport {
 	) -> impl std::future::Future<Output = Result<(), Self::Error>>;
 }
 
-impl<T> EventClient<T> {
-	pub fn new(events: EventBus, transport: T) -> Self {
-		Self { events, transport }
-	}
-}
-
-impl<T> EventClient<T>
-where
-	T: EventTransport,
-{
-	/// Subscribe to remote events and publish them into the local EventBus.
-	pub async fn subscribe(&mut self) -> Result<(), T::Error> {
-		self.transport.subscribe(self.events.clone()).await
-	}
-}
-
 /// Publish a protobuf event into the local application EventBus.
 ///
 /// This is the common final step for every transport.
@@ -303,7 +283,6 @@ pub fn emit_proto_event(events: &EventBus, event: proto_types::Event) -> Result<
 	events.emit(event);
 	Ok(())
 }
-
 /// Convert a wire/protobuf event into an application event.
 ///
 /// This is intentionally kept separate from the transport.
@@ -370,9 +349,18 @@ impl EventBus {
 		}
 	}
 }
-impl std::hash::Hash for EventBus {
-	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-		self.tx.same_channel(&self.tx).hash(state);
+impl<T> EventClient<T> {
+	pub fn new(events: EventBus, transport: T) -> Self {
+		Self { events, transport }
+	}
+}
+impl<T> EventClient<T>
+where
+	T: EventTransport,
+{
+	/// Subscribe to remote events and publish them into the local EventBus.
+	pub async fn subscribe(&mut self) -> Result<(), T::Error> {
+		self.transport.subscribe(self.events.clone()).await
 	}
 }
 impl EventSink<AppEvent> for EventLoopProxy<AppEvent> {
@@ -389,106 +377,8 @@ impl From<ProtoProblem> for ProblemLoaded {
 		}
 	}
 }
-
-/// ## [Event]
-///
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct Event {
-	pub id: u64,
-	pub kind: EventKind,
-	pub source: EventSource,
-	pub timestamp: u64,
+impl std::hash::Hash for EventBus {
+	fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+		self.tx.same_channel(&self.tx).hash(state);
+	}
 }
-
-/// ## [EventBus]
-///
-/// Enables disparate modules to talk to each other by sending and receiving
-/// messages called events.
-///
-/// <details>
-/// <summary>Diagram</summary>
-///
-/// ```mermaid
-/// flowchart TD
-///     EB["EventBus"]
-///     EB --> RX["subscribe() → BroadcastReceiver"]
-///     EB --> TX["sender() → BroadcastSender"]
-///
-///     RX --> R["Renderer"]
-///     TX --> R
-///
-///     R --> AC["AppContext"]
-///     AC --> PV["ProblemView::draw()"]
-///
-///     PV -->|send| PR["ProblemsRequested"]
-///     PR --> EB
-///
-///     EB --> RT["AppRuntime"]
-///     RT --> API["async API request"]
-///
-///     API -->|success| PL["ProblemsLoaded"]
-///     API -->|failure| PF["ProblemsLoadFailed"]
-///
-///     PL --> EB
-///     PF --> EB
-///
-///     RT --> S["Update application state"]
-/// ```
-/// </details>
-///
-/// The issue is it's not big enough. Doesn't scroll?
-#[derive(Debug, Clone)]
-pub struct EventBus {
-	pub tx: tokio::sync::broadcast::Sender<e::Event>,
-	// id: usize,
-}
-
-/// Client-side event service.
-///
-/// `T` is the transport used to receive events.
-///
-/// The transport is intentionally generic so this type can exist on both
-/// native and WASM without making the service itself depend on tonic.
-pub struct EventClient<T> {
-	pub events: EventBus,
-	pub transport: T,
-}
-
-/// ## Events Roadmap
-/// - 3 Even Paradigms/Types
-/// 	- In process events (notification module tells ui module an event occured with dispatch)
-/// 	- In network (K8s Cluster running inside of a VPN has multiple nodes that talk to each other)
-/// 	- Over the wire (Server wants users to know someone 'signed in')
-///
-/// The following structs will cover those cases and enable
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EventEnvelope<E> {
-	pub id: EventId,
-	pub timestamp: u64,
-	pub source: EventSource,
-	pub event: E,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EventId {
-	pub node: NodeId,
-	pub sequence: u64,
-}
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct NodeId;
-#[derive(Debug, Clone, Hash, Deserialize, Serialize)]
-pub struct ProblemLoaded {
-	pub id: String,
-	pub title: String,
-	pub slug: String,
-}
-
-type IntrinsicEvent = Event;
-
-/// ## [Klass] (Alias of EventKind)
-///
-/// Represents full event lifecycle for representing initial, pending,
-/// failed, repeated when necessary.
-///
-pub type Klass = EventKind;
-pub type Problem = ProtoProblem;

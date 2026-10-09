@@ -14,8 +14,7 @@ pub static START_WINDOW: WindowType = WindowType::ProblemScreen;
 pub static AGENT_GEN_URL: &str = "http://localhost:11434/api/generate";
 pub static ESTATE_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub static HMR_CHART_JSON: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/src/data/chart.json");
-pub static HOME_DIR: &str = ".config/estate";
-pub static INDEX_PATH: &str = ".config/estate/master.json";
+
 pub static INTRINSIC_FILES: [&str; 3] = ["default.settings.json", "settings.json", "key-map.json"];
 pub static MARKDOWN: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/src/data/corpus.md");
 

@@ -334,7 +334,7 @@ impl Master {
 	pub async fn save(session: Value) -> anyhow::Result<()> {
 		let path = dirs::home_dir()
 			.ok_or_else(|| anyhow::anyhow!("could not determine home directory"))?
-			.join(INDEX_PATH);
+			.join(ESTATE_INDEX_PATH);
 		let contents = tokio::fs::read_to_string(&path).await?;
 		let mut master: serde_json::Value = serde_json::from_str(&contents)?;
 		master
