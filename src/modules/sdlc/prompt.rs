@@ -7,7 +7,8 @@ pub fn for_intent(user_request: &str) -> String {
 pub fn gen_intent(goal: &str) -> Result<String> {
 	Ok(format!(
 		r#"
-You are defining the intent for an SDLC task.
+You are an SDLC Intent document writer.
+Your task is to transform the user's goal into a new Intent artifact using the supplied template.
 The user's goal is authoritative.
 
 ## User Goal
@@ -67,7 +68,7 @@ pub fn gen_spec(intent: &str) -> Result<String> {
 	}
 
 	Ok(format!(
-		r#"You are the Specification stage of an SDLC pipeline.
+		r#"You are an SDLC Specification document writer.
 
 Your job is to transform the approved Intent artifact below into a concrete,
 implementation-independent Specification.
@@ -181,7 +182,7 @@ pub fn gen_plan(intent: &str, spec: &str) -> Result<String> {
 		return Err(anyhow!("cannot generate Plan prompt from empty Spec"));
 	}
 	Ok(format!(
-		r#"You are the Plan stage of an SDLC pipeline.
+		r#"You are an SDLC Plan document writer.
 
 Your job is to transform the approved Intent and Specification into a
 concrete, repository-aware Implementation Plan.
@@ -406,14 +407,12 @@ The plan must:
 - avoid inventing requirements not present in the intent or specification
 
 Return only the contents of `plan.md`.
-			"#,
+"#,
 	)
 }
 pub fn revise_spec(intent: &str, current_spec: &str, evaluation: &QACheck) -> Result<String> {
 	Ok(format!(
-		r#"
-Revise the existing specification so that it meets the requirements
-of the evaluator.
+		r#"Revise the existing specification so that it meets the requirements of the evaluator.
 
 ## Intent
 

@@ -2336,7 +2336,7 @@ impl PipeRunner<'_> {
 		}
 
 		let prompt = format!(
-			"You are an SDLC Intent document writer.
+"You are an SDLC Intent document writer.
 Your task is to transform the user's goal into a new Intent artifact using the supplied template.
 
 RULES:
@@ -2423,12 +2423,10 @@ preamble, commentary, or an explanation of your process."
 			}
 			StageInput::Revision { evaluation } => {
 				println!("[SDLC] Spec input = Revision; evaluation = {evaluation:#?}");
-
 				let spec = self.pipeline.session_read("spec.md")?;
 				if spec.trim().is_empty() {
 					return Err(anyhow!("Cannot revise Spec because spec.md is empty"));
 				}
-
 				p::revise_spec(&intent, &spec, &evaluation)?
 			}
 		};
@@ -2495,9 +2493,9 @@ preamble, commentary, or an explanation of your process."
 		self.pipeline.persist_progress("Plan stage completed")?;
 		Ok(RunResult::Plan)
 	}
+ 	// SDLC_FORCE_CONTINUE=1 SDLC_PLAIN=1 \
+ 	// cargo run --bin sdlc --features sdlc
 	async fn on_build(&mut self, input: StageInput) -> Result<RunResult> {
-  	// SDLC_FORCE_CONTINUE=1 SDLC_PLAIN=1 \
-  	// cargo run --bin sdlc --features sdlc
 		let (stage, session_dir) = self.stage_dir();
 		if stage != Stage::Build {
 			return Err(anyhow::anyhow!(
