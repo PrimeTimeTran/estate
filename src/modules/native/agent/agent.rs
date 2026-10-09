@@ -35,7 +35,6 @@ impl Agent {
 				.unwrap_or_else(|| "Agent completed".to_string()),
 		)
 	}
-
 	pub async fn run_agent_loop(
 		&self,
 		task: AgentTask,
@@ -160,8 +159,8 @@ impl Agent {
 				AgentAction::RunCommand { command } => {
 					println!("COMMAND: {command}");
 
-					let shell_command = ShellCommand::shell(command.clone());
-
+					let mut shell_command = ShellCommand::shell(command.clone());
+					shell_command.cwd = Some(self.workspace.cwd.clone());
 					// Capture tool errors instead of using `?`, which would
 					// return early and discard the in-memory run.
 					let result = match self.tools.shell.run(shell_command).await {
