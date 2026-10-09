@@ -28,75 +28,64 @@ impl Agent {
 	) -> Result<GuardDecision> {
 		let command = match action {
 			AgentAction::RunCommand { command } => Some(command.as_str()),
-
-			AgentAction::RunProgram { program, args, .. } => match program.as_str() {
-				"sh" | "bash" | "zsh" => args
-					.iter()
-					.position(|arg| arg == "-c")
-					.and_then(|index| args.get(index + 1))
-					.map(String::as_str),
-				_ => None,
-			},
-
+			AgentAction::RunProgram { program, args, .. } => {
+				match program.as_str() {
+					"sh" | "bash" | "zsh" => args
+						.iter()
+						.position(|arg| arg == "-c")
+						.and_then(|index| args.get(index + 1))
+						.map(String::as_str),
+					_ => None,
+				}
+			}
+	
 			_ => None,
 		};
-
 		let Some(command) = command else {
 			return Ok(GuardDecision::Allow);
 		};
-
 		let command = command.trim();
-
 		if command.is_empty() {
-			return Ok(GuardDecision::Reject("Command cannot be empty.".into()));
-		}
-
-		if command.len() > 2_000 {
 			return Ok(GuardDecision::Reject(
-				"Command exceeds 2000 characters. Split the work into \
-			smaller operations and inspect each result."
+				"Command cannot be empty.".into(),
+			));
+		}
+		if command.len() > 10_000 {
+			return Ok(GuardDecision::Reject(
+				"Command exceeds the 10000-character limit. \
+				Split unusually large commands into smaller operations."
 					.into(),
 			));
 		}
-
-		let chain_count =
-			command.matches("&&").count() + command.matches("||").count() + command.matches(';').count();
-
-		if chain_count > 2 {
-			return Ok(GuardDecision::Reject(
-				"Too many chained operations. Run one bounded operation \
-			at a time and inspect its output."
-					.into(),
-			));
-		}
-
 		let count = guard
 			.recent_commands
 			.entry(command.to_string())
 			.or_insert(0);
 		*count += 1;
-
-		if *count > 1 {
+		if *count > 2 {
 			return Ok(GuardDecision::Reject(
-				"This command was already proposed during this run. \
-			Inspect the previous result and change your approach."
+				"This exact command has already been proposed multiple times. \
+				Inspect prior results and change your approach."
 					.into(),
 			));
 		}
-
-		let previously_executed = run
+	
+		// Compare against executed commands. Permit one retry, since a
+		// command may legitimately need to be rerun after a transient failure.
+		let previous_runs = run
 			.commands
 			.iter()
-			.any(|record| record.command.trim() == command);
-
-		if previously_executed {
+			.filter(|record| record.command.trim() == command)
+			.count();
+	
+		if previous_runs >= 2 {
 			return Ok(GuardDecision::Reject(
-				"This exact command has already been executed. \
-			Inspect its recorded output before choosing another action."
+				"This exact command has already been executed twice. \
+				Inspect its recorded output before attempting another approach."
 					.into(),
 			));
 		}
-
+	
 		Ok(GuardDecision::Allow)
 	}
 	fn reject_action(&self, run: &mut AgentRun, step: usize, reason: String) {
@@ -506,11 +495,8 @@ impl Agent {
 			.join(" ");
 
 		println!("PROGRAM: {display_command}");
-
 		let workspace_before = WSSnapshot::capture(&self.workspace.cwd)?;
-
 		let mut shell_command = ShellCommand::program(program.clone(), args.clone());
-
 		// The workspace root is authoritative. Do not trust an arbitrary
 		// working directory supplied by the model.
 		let _requested_cwd = cwd;
@@ -582,9 +568,7 @@ impl Agent {
 			"FILES CHANGED BY ACTION:\n{}",
 			format_changed_files(&changed_paths),
 		);
-
 		let success = result.exit_code == Some(0);
-
 		run.record_command(CommandRecord {
 			step,
 			command: display_command.clone(),
@@ -599,7 +583,6 @@ impl Agent {
 			},
 			timestamp: chrono::Utc::now(),
 		});
-
 		if !success {
 			run.record_error(AgentError {
 				step: Some(step),
@@ -615,7 +598,6 @@ impl Agent {
 				timestamp: chrono::Utc::now(),
 			});
 		}
-
 		run.ctx.history.push(AgentObservation::Current {
 			message: format!(
 				"Runtime filesystem reconciliation after program `{display_command}`:\n\
@@ -625,522 +607,13 @@ impl Agent {
 				format_changed_files(&changed_paths),
 			),
 		});
-
 		run
 			.ctx
 			.history
 			.push(AgentObservation::RunCommand { result });
-
 		Ok(())
 	}
 
-	pub async fn _run_agent_loop(
-		&self,
-		task: AgentTask,
-		event_tx: UnboundedSender<RuntimeEvent>,
-	) -> Result<TaskResult> {
-		let max_steps = 20;
-		let max_action_selection_errors = 3;
-
-		let ctx = AgentCtx::with_workspace(task.prompt.clone(), (*self.workspace).clone());
-		let mut run = AgentRun::new(ctx);
-		let mut consecutive_selection_errors = 0;
-
-		section!("AGENT run_agent_loop CONTEXT");
-
-		let prompt = run.ctx.prompt.as_deref().unwrap_or("");
-		println!(
-			"ctx.prompt ({} chars, {} lines):\n{}",
-			prompt.len(),
-			prompt.lines().count(),
-			preview_lines(prompt, PROMPT_PREVIEW_LINES)
-		);
-		println!("ctx.workspace:\n{}", run.ctx.workspace);
-		println!("ctx.history ({} entries):", run.ctx.history.len());
-
-		let event = RuntimeEvent::Agent(AgentEvent::Thinking { task: task.clone() });
-
-		if let Err(error) = crate::agent::log::append_agent_event(&event) {
-			eprintln!("Failed to write agent event log: {error:#}");
-		}
-		let _ = event_tx.send(event);
-
-		let mode = self.pick_mode(&run.ctx).await?;
-
-		if matches!(mode, AgentMode::Chat) {
-			let response = prompt_chat(&run.ctx).await?;
-			return Ok(TaskResult::completed_chat(task.id, run.ctx, response));
-		}
-
-		// Baseline for the entire agent run. Per-command snapshots below let us
-		// attribute changes to individual actions; this baseline captures the
-		// complete set of changes made during this run.
-		let run_workspace_before = WSSnapshot::capture(&self.workspace.cwd)?;
-
-		for step in 1..=max_steps {
-			println!(
-				"AGENT STEP {step}/{max_steps}; history={}; commands={}; errors={}; selection_errors={}",
-				run.ctx.history.len(),
-				run.commands.len(),
-				run.errors.len(),
-				consecutive_selection_errors,
-			);
-
-			let action = match self.pick_action(&run.ctx).await {
-				Ok(action) => {
-					consecutive_selection_errors = 0;
-					action
-				}
-				Err(error) => {
-					consecutive_selection_errors += 1;
-
-					let message = format!("Action selection failed: {error:#}");
-					eprintln!("{message}");
-
-					run.record_error(AgentError {
-						step: Some(step),
-						kind: "action_selection".into(),
-						message: message.clone(),
-						raw_response: None,
-						recoverable: consecutive_selection_errors < max_action_selection_errors,
-						timestamp: chrono::Utc::now(),
-					});
-
-					if consecutive_selection_errors >= max_action_selection_errors {
-						let failure = format!(
-							"{message}\n\
-							Reached {max_action_selection_errors} consecutive action-selection failures. \
-							Check the raw model response and LlmAction schema."
-						);
-
-						return Ok(TaskResult::failed(
-							task.id,
-							run.ctx,
-							"Action selection failed repeatedly",
-							Some(failure),
-						));
-					}
-
-					run.ctx.history.push(AgentObservation::Current {
-						message: format!(
-							"INVALID ACTION RESPONSE\n\
-							Reason: {message}\n\n\
-							The response was rejected before a valid action was selected. \
-							No command from this response was executed.\n\n\
-							Return exactly ONE valid JSON object:\n\
-							{{\"action\":\"run_command\",\"command\":\"one non-interactive command\"}}\n\
-							{{\"action\":\"finish\",\"message\":\"summary of work and verification\"}}\n\n\
-							Only `run_command` and `finish` are supported. Put the shell command \
-							in `command`, not in `action`. Use bounded, non-interactive commands. \
-							Do not start an interactive shell, REPL, or persistent foreground process. \
-							Do not repeat successful commands without a reason or retry failed \
-							commands unchanged without understanding the failure.\n\
-							Return the corrected action now."
-						),
-					});
-
-					continue;
-				}
-			};
-
-			match action {
-				AgentAction::RunProgram { program, args, cwd } => {
-					let display_command = std::iter::once(program.as_str())
-						.chain(args.iter().map(String::as_str))
-						.collect::<Vec<_>>()
-						.join(" ");
-
-					println!("PROGRAM: {display_command}");
-
-					let workspace_before = WSSnapshot::capture(&self.workspace.cwd)?;
-
-					let mut shell_command = ShellCommand::program(program.clone(), args.clone());
-
-					// The runtime workspace is authoritative; don't allow the model
-					// to execute in an arbitrary directory.
-					let _requested_cwd = cwd;
-					shell_command.cwd = Some(self.workspace.cwd.clone());
-
-					let result = match self.tools.shell.run(shell_command).await {
-						Ok(result) => result,
-						Err(error) => {
-							let workspace_after = WSSnapshot::capture(&self.workspace.cwd)?;
-
-							let changed_paths =
-								reconcile_agent_artifacts(&mut run.ctx, &workspace_before, &workspace_after)?;
-
-							let message = format!(
-								"Program execution failed for `{display_command}`: {error:#}\n\
-							Observed workspace changes:\n{}",
-								format_changed_files(&changed_paths),
-							);
-
-							eprintln!("{message}");
-
-							run.record_error(AgentError {
-								step: Some(step),
-								kind: "command_execution".into(),
-								message: message.clone(),
-								raw_response: None,
-								recoverable: true,
-								timestamp: chrono::Utc::now(),
-							});
-
-							run.ctx.history.push(AgentObservation::Current {
-								message: format!(
-									"{message}\n\
-								The program did not return a completed result. Inspect the error \
-								and observed changes before choosing the next action."
-								),
-							});
-
-							continue;
-						}
-					};
-
-					section!("PROGRAM RESULT");
-					println!("program: {program}");
-					println!("args: {args:?}");
-					println!("exit: {:?}", result.exit_code);
-
-					println!(
-						"stdout ({} chars, {} lines):\n{}",
-						result.stdout.len(),
-						result.stdout.lines().count(),
-						preview_lines(&result.stdout, SHELL_OUTPUT_PREVIEW_LINES)
-					);
-
-					println!(
-						"stderr ({} chars, {} lines):\n{}",
-						result.stderr.len(),
-						result.stderr.lines().count(),
-						preview_lines(&result.stderr, SHELL_OUTPUT_PREVIEW_LINES)
-					);
-
-					let workspace_after = WSSnapshot::capture(&self.workspace.cwd)?;
-
-					let changed_paths =
-						reconcile_agent_artifacts(&mut run.ctx, &workspace_before, &workspace_after)?;
-
-					println!(
-						"FILES CHANGED BY ACTION:\n{}",
-						format_changed_files(&changed_paths),
-					);
-
-					let success = result.exit_code == Some(0);
-
-					run.record_command(CommandRecord {
-						step,
-						command: display_command.clone(),
-						exit_code: result.exit_code,
-						stdout: result.stdout.clone(),
-						stderr: result.stderr.clone(),
-						success,
-						error: if success {
-							None
-						} else {
-							Some(format!("Program exited with status {:?}", result.exit_code))
-						},
-						timestamp: chrono::Utc::now(),
-					});
-
-					if !success {
-						run.record_error(AgentError {
-							step: Some(step),
-							kind: "command_exit".into(),
-							message: format!(
-								"Program `{display_command}` exited with status {:?}.\n\
-							Stderr:\n{}",
-								result.exit_code,
-								preview(&result.stderr, 1000),
-							),
-							raw_response: None,
-							recoverable: true,
-							timestamp: chrono::Utc::now(),
-						});
-					}
-
-					run.ctx.history.push(AgentObservation::Current {
-						message: format!(
-							"Runtime filesystem reconciliation after program `{display_command}`:\n\
-						{}\n\
-						These changes were observed by the runtime. Inspect and verify \
-						the relevant files before claiming completion.",
-							format_changed_files(&changed_paths),
-						),
-					});
-
-					run
-						.ctx
-						.history
-						.push(AgentObservation::RunCommand { result });
-				}
-				AgentAction::Current { message } => {
-					let now = chrono::Local::now().format("%Y-%m-%d").to_string();
-					let response = format!("Context update: The current date is {now}. {message}");
-
-					let event = RuntimeEvent::Agent(AgentEvent::Working {
-						task: task.clone(),
-						message: response.clone(),
-					});
-
-					if let Err(error) = crate::agent::log::append_agent_event(&event) {
-						eprintln!("Failed to write agent event log: {error:#}");
-					}
-					let _ = event_tx.send(event);
-
-					run
-						.ctx
-						.history
-						.push(AgentObservation::Current { message: response });
-				}
-
-				AgentAction::Context { path } => {
-					let message = match path {
-						Some(path) => format!(
-							"Context requested for path: {path}. \
-							Inspect it using a supported command, respecting the task's scope."
-						),
-						None => format!(
-							"Context requested. Current history entries: {}. \
-							Use supported commands to inspect only what the task authorizes.",
-							run.ctx.history.len()
-						),
-					};
-
-					let event = RuntimeEvent::Agent(AgentEvent::Working {
-						task: task.clone(),
-						message: message.clone(),
-					});
-
-					if let Err(error) = crate::agent::log::append_agent_event(&event) {
-						eprintln!("Failed to write agent event log: {error:#}");
-					}
-					let _ = event_tx.send(event);
-
-					run.ctx.history.push(AgentObservation::Current { message });
-				}
-
-				AgentAction::RunCommand { command } => {
-					println!("COMMAND: {command}");
-
-					// Capture immediately before execution so changes can be
-					// attributed to this command rather than the entire run.
-					let workspace_before = WSSnapshot::capture(&self.workspace.cwd)?;
-
-					let mut shell_command = ShellCommand::shell(command.clone());
-					shell_command.cwd = Some(self.workspace.cwd.clone());
-
-					let result = match self.tools.shell.run(shell_command).await {
-						Ok(result) => result,
-						Err(error) => {
-							// Even if the shell tool errors, the command may have
-							// modified files before failing. Reconcile those changes.
-							let workspace_after = WSSnapshot::capture(&self.workspace.cwd)?;
-
-							let changed_paths =
-								reconcile_agent_artifacts(&mut run.ctx, &workspace_before, &workspace_after)?;
-
-							let message = format!(
-								"Shell execution failed for `{command}`: {error:#}\n\
-								Observed workspace changes:\n{}",
-								format_changed_files(&changed_paths),
-							);
-							eprintln!("{message}");
-
-							run.record_error(AgentError {
-								step: Some(step),
-								kind: "command_execution".into(),
-								message: message.clone(),
-								raw_response: None,
-								recoverable: true,
-								timestamp: chrono::Utc::now(),
-							});
-
-							run.ctx.history.push(AgentObservation::Current {
-								message: format!(
-									"{message}\n\n\
-									The shell tool did not return a completed result. \
-									Do not assume there were no side effects. Inspect the \
-									observed changes and error before choosing the next action. \
-									Do not retry unchanged without justification."
-								),
-							});
-
-							continue;
-						}
-					};
-
-					section!("SHELL RESULT");
-					println!("command: {command}");
-					println!("exit: {:?}", result.exit_code);
-
-					println!(
-						"stdout ({} chars, {} lines):\n{}",
-						result.stdout.len(),
-						result.stdout.lines().count(),
-						preview_lines(&result.stdout, SHELL_OUTPUT_PREVIEW_LINES)
-					);
-
-					println!(
-						"stderr ({} chars, {} lines):\n{}",
-						result.stderr.len(),
-						result.stderr.lines().count(),
-						preview_lines(&result.stderr, SHELL_OUTPUT_PREVIEW_LINES)
-					);
-
-					// Reconcile the filesystem regardless of exit status. A failing
-					// command can still leave useful files or partial modifications.
-					let workspace_after = WSSnapshot::capture(&self.workspace.cwd)?;
-
-					let changed_paths =
-						reconcile_agent_artifacts(&mut run.ctx, &workspace_before, &workspace_after)?;
-
-					println!(
-						"FILES CHANGED BY ACTION:\n{}",
-						format_changed_files(&changed_paths),
-					);
-
-					let success = result.exit_code == Some(0);
-
-					run.record_command(CommandRecord {
-						step,
-						command: command.clone(),
-						exit_code: result.exit_code,
-						stdout: result.stdout.clone(),
-						stderr: result.stderr.clone(),
-						success,
-						error: if success {
-							None
-						} else {
-							Some(format!("Command exited with status {:?}", result.exit_code))
-						},
-						timestamp: chrono::Utc::now(),
-					});
-
-					if !success {
-						run.record_error(AgentError {
-							step: Some(step),
-							kind: "command_exit".into(),
-							message: format!(
-								"Command `{command}` exited with status {:?}.\n\
-								Stderr:\n{}",
-								result.exit_code,
-								preview(&result.stderr, 1000),
-							),
-							raw_response: None,
-							recoverable: true,
-							timestamp: chrono::Utc::now(),
-						});
-					}
-
-					// Give the next model call observed filesystem evidence rather
-					// than relying on the model's claims about what it wrote.
-					run.ctx.history.push(AgentObservation::Current {
-						message: format!(
-							"Runtime filesystem reconciliation after command `{command}`:\n\
-							{}\n\
-							These changes were observed by the runtime. Inspect and verify \
-							the relevant files before claiming completion.",
-							format_changed_files(&changed_paths),
-						),
-					});
-
-					run
-						.ctx
-						.history
-						.push(AgentObservation::RunCommand { result });
-				}
-
-				AgentAction::Finish { message } => {
-					// Capture the final diff too: this includes changes that occurred
-					// outside the last individual command's snapshot interval.
-					let workspace_final = WSSnapshot::capture(&self.workspace.cwd)?;
-
-					let final_changed_paths =
-						reconcile_agent_artifacts(&mut run.ctx, &run_workspace_before, &workspace_final)?;
-
-					// A successful command alone is not evidence of task completion.
-					let validation = validate_agent_completion(
-						&self.workspace.cwd,
-						&run.ctx.artifacts,
-						&run.commands,
-						&final_changed_paths,
-					)?;
-
-					if !validation.is_valid() {
-						let errors = validation.errors();
-
-						let feedback = format!(
-							"COMPLETION REJECTED: runtime validation failed.\n\
-							You claimed the task was complete, but these checks failed:\n{}\n\n\
-							Correct the actual files, then inspect and verify them. \
-							Do not simply repeat the completion claim.",
-							errors.join("\n"),
-						);
-
-						eprintln!("{feedback}");
-
-						run.record_error(AgentError {
-							step: Some(step),
-							kind: "completion_validation".into(),
-							message: feedback.clone(),
-							raw_response: None,
-							recoverable: true,
-							timestamp: chrono::Utc::now(),
-						});
-
-						run
-							.ctx
-							.history
-							.push(AgentObservation::Current { message: feedback });
-
-						continue;
-					}
-
-					let final_message = format!(
-						"{message}\n\nRuntime-observed changed files:\n{}",
-						format_changed_files(&final_changed_paths),
-					);
-
-					let result = TaskResult::completed_with_summary(task.id, run.ctx, final_message);
-
-					let event = RuntimeEvent::Agent(AgentEvent::Finished {
-						result: result.clone(),
-					});
-
-					if let Err(error) = crate::agent::log::append_agent_event(&event) {
-						eprintln!("Failed to write agent event log: {error:#}");
-					}
-					let _ = event_tx.send(event);
-
-					return Ok(result);
-				}
-			}
-		}
-
-		let message = format!(
-			"Agent exceeded {max_steps} reasoning steps; commands={}, errors={}.",
-			run.commands.len(),
-			run.errors.len(),
-		);
-
-		run.record_error(AgentError {
-			step: Some(max_steps),
-			kind: "step_limit".into(),
-			message: message.clone(),
-			raw_response: None,
-			recoverable: false,
-			timestamp: chrono::Utc::now(),
-		});
-
-		Ok(TaskResult::failed(
-			task.id,
-			run.ctx,
-			"Step limit exceeded",
-			Some(message),
-		))
-	}
 	pub async fn run_agent(&self, prompt: &str) -> Result<String> {
 		let task = AgentTask::new(prompt.to_string());
 		let (event_tx, _event_rx) = tokio::sync::mpsc::unbounded_channel();
