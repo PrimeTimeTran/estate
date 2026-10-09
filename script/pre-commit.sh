@@ -3,39 +3,38 @@
 set -e
 
 start_process() {
-    local name="$1"
-    shift
+  local name="$1"
+  shift
 
-    echo "🚀 Starting $name..."
-    "$@" &
-    LAST_PID=$!
+  echo "🚀 Starting $name..."
+  "$@" &
+  LAST_PID=$!
 
-    sleep 2
+  sleep 2
 
-    if ! kill -0 "$LAST_PID" 2>/dev/null; then
-        echo "❌ [$name] failed to start"
-        return 1
-    fi
+  if ! kill -0 "$LAST_PID" 2>/dev/null; then
+    echo "❌ [$name] failed to start"
+    return 1
+  fi
 
-    echo "✅ [$name] startup passed"
+  echo "✅ [$name] startup passed"
 }
 
 stop_process() {
-    local name="$1"
-    local pid="$2"
+  local name="$1"
+  local pid="$2"
 
-    echo "🛑 Stopping $name..."
-    kill "$pid" 2>/dev/null || true
-    wait "$pid" 2>/dev/null || true
+  echo "🛑 Stopping $name..."
+  kill "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
 }
 
 cleanup() {
-    [[ -n "${NATIVE_PID:-}" ]] && stop_process "Native" "$NATIVE_PID"
-    [[ -n "${SERVER_PID:-}" ]] && stop_process "Server" "$SERVER_PID"
+  [[ -n "${NATIVE_PID:-}" ]] && stop_process "Native" "$NATIVE_PID"
+  [[ -n "${SERVER_PID:-}" ]] && stop_process "Server" "$SERVER_PID"
 }
 
 trap cleanup EXIT
-
 
 echo "🦀 Checking native..."
 cargo native
@@ -54,7 +53,6 @@ SERVER_PID=$LAST_PID
 
 start_process "Native" cargo run-native
 NATIVE_PID=$LAST_PID
-
 
 # CLI / lifecycle tests go here.
 # --------------------------------------------------
@@ -90,7 +88,6 @@ echo "🎉 All checks passed"
 
 # echo "✅ [Server] startup passed"
 
-
 # echo "🦀 Checking native..."
 # cargo -q build --bin native --no-default-features --features native
 # echo "✅ [Native] build passed"
@@ -116,7 +113,6 @@ echo "🎉 All checks passed"
 # echo "🛑 Stopping server..."
 # kill "$SERVER_PID" 2>/dev/null || true
 # wait "$SERVER_PID" 2>/dev/null || true
-
 
 # echo "🌐 Checking web..."
 # cargo -q build \

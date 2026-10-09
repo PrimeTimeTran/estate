@@ -13,17 +13,17 @@ SERVER_PID=""
 NATIVE_PID=""
 
 cleanup() {
-    local pid
+  local pid
 
-    for pid in "$NATIVE_PID" "$SERVER_PID"; do
-        if [[ -n "$pid" ]]; then
-            kill "$pid" 2>/dev/null || true
-            wait "$pid" 2>/dev/null || true
-        fi
-    done
+  for pid in "$NATIVE_PID" "$SERVER_PID"; do
+    if [[ -n "$pid" ]]; then
+      kill "$pid" 2>/dev/null || true
+      wait "$pid" 2>/dev/null || true
+    fi
+  done
 
-    SERVER_PID=""
-    NATIVE_PID=""
+  SERVER_PID=""
+  NATIVE_PID=""
 }
 
 trap cleanup EXIT
@@ -36,64 +36,64 @@ TARGET="${CARGO_BUILD_TARGET:-$HOST}"
 TARGET_DIR="${CARGO_TARGET_DIR:-$WORKSPACE_ROOT/target}"
 
 if [[ "$TARGET_DIR" != /* ]]; then
-    TARGET_DIR="$WORKSPACE_ROOT/$TARGET_DIR"
+  TARGET_DIR="$WORKSPACE_ROOT/$TARGET_DIR"
 fi
 
 if [[ "$TARGET" == *windows* ]]; then
-    EXE=".exe"
+  EXE=".exe"
 else
-    EXE=""
+  EXE=""
 fi
 
 if [[ -n "${CARGO_BUILD_TARGET:-}" ]]; then
-    DEBUG_DIR="$TARGET_DIR/$TARGET/debug"
+  DEBUG_DIR="$TARGET_DIR/$TARGET/debug"
 else
-    DEBUG_DIR="$TARGET_DIR/debug"
+  DEBUG_DIR="$TARGET_DIR/debug"
 fi
 
 build() {
-    local bin="$1"
+  local bin="$1"
 
-    echo "🦀 Building $bin..."
-    (
-        cd "$WORKSPACE_ROOT"
-        "$CARGO_BIN" build --bin "$bin"
-    )
-    echo "✅ [$bin] build passed"
+  echo "🦀 Building $bin..."
+  (
+    cd "$WORKSPACE_ROOT"
+    "$CARGO_BIN" build --bin "$bin"
+  )
+  echo "✅ [$bin] build passed"
 }
 
 start() {
-    local bin="$1"
-    local path="$DEBUG_DIR/$bin$EXE"
-    local pid
+  local bin="$1"
+  local path="$DEBUG_DIR/$bin$EXE"
+  local pid
 
-    if [[ ! -f "$path" ]]; then
-        echo "❌ Executable not found: $path" >&2
-        exit 1
-    fi
+  if [[ ! -f "$path" ]]; then
+    echo "❌ Executable not found: $path" >&2
+    exit 1
+  fi
 
-    echo "🚀 Starting $bin..."
+  echo "🚀 Starting $bin..."
 
-    (
-        cd "$RUN_DIR"
-        exec "$path"
-    ) &
-    pid=$!
+  (
+    cd "$RUN_DIR"
+    exec "$path"
+  ) &
+  pid=$!
 
-    case "$bin" in
-        server) SERVER_PID="$pid" ;;
-        native) NATIVE_PID="$pid" ;;
-    esac
+  case "$bin" in
+  server) SERVER_PID="$pid" ;;
+  native) NATIVE_PID="$pid" ;;
+  esac
 
-    sleep 2
+  sleep 2
 
-    if ! kill -0 "$pid" 2>/dev/null; then
-        echo "❌ [$bin] failed to start" >&2
-        wait "$pid" || true
-        exit 1
-    fi
+  if ! kill -0 "$pid" 2>/dev/null; then
+    echo "❌ [$bin] failed to start" >&2
+    wait "$pid" || true
+    exit 1
+  fi
 
-    echo "✅ [$bin] startup passed"
+  echo "✅ [$bin] startup passed"
 }
 
 cd "$WORKSPACE_ROOT"

@@ -237,13 +237,14 @@ pub trait Renders {
 
 /// ## [Provide]
 ///
-/// Ensures we have platform agnostic APIs to  enables behavior.
+/// Ensures platform agnostic APIs exist.
 pub trait Provide<C: Ctx> {
+	fn clock(&self) -> &Self::Clock;
+	fn worker(&self) -> &Self::Worker;
+
 	type Clock: Clock;
 	type Worker;
 	// type Renderer: Renderer;
-	fn clock(&self) -> &Self::Clock;
-	fn worker(&self) -> &Self::Worker;
 	// fn renderer(&mut self) -> &mut Self::Renderer;
 }
 

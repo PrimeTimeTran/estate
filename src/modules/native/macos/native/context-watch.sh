@@ -24,10 +24,10 @@ PPID_VALUE=$PPID
 mkdir -p "$(dirname "$CONTEXT_FILE")" 2>/dev/null || true
 
 while true; do
-	WRITE_COUNT=$((WRITE_COUNT + 1))
+  WRITE_COUNT=$((WRITE_COUNT + 1))
 
-	FOCUS="$(
-		echo '{
+  FOCUS="$(
+    echo '{
 			"command_id": "focused",
 			"command": "getFocusedElement",
 			"attributes": [
@@ -36,8 +36,8 @@ while true; do
 				"AXURL"
 			]
 		}' |
-			axorc raw --stdin |
-			jq -c '
+      axorc raw --stdin |
+      jq -c '
 				select(.data) |
 				.data |
 				{
@@ -49,29 +49,29 @@ while true; do
 					path: (.path // [])
 				}
 			'
-	)"
+  )"
 
-	# macOS date does not provide GNU date's %N nanoseconds.
-	TIMESTAMP="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+  # macOS date does not provide GNU date's %N nanoseconds.
+  TIMESTAMP="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
-	TMP_FILE="${CONTEXT_FILE}.tmp"
+  TMP_FILE="${CONTEXT_FILE}.tmp"
 
-	if [[ -f "$CONTEXT_FILE" ]]; then
-		cp "$CONTEXT_FILE" "$TMP_FILE"
-	else
-		echo '{}' > "$TMP_FILE"
-	fi
+  if [[ -f "$CONTEXT_FILE" ]]; then
+    cp "$CONTEXT_FILE" "$TMP_FILE"
+  else
+    echo '{}' >"$TMP_FILE"
+  fi
 
-	jq \
-		--arg key "$KEY" \
-		--arg watcher_id "$WATCHER_ID" \
-		--arg launch_app "$LAUNCH_APP" \
-		--arg cli_command "$CLI_COMMAND" \
-		--arg pid "$PID" \
-		--arg ppid "$PPID_VALUE" \
-		--arg timestamp "$TIMESTAMP" \
-		--argjson writes "$WRITE_COUNT" \
-		'
+  jq \
+    --arg key "$KEY" \
+    --arg watcher_id "$WATCHER_ID" \
+    --arg launch_app "$LAUNCH_APP" \
+    --arg cli_command "$CLI_COMMAND" \
+    --arg pid "$PID" \
+    --arg ppid "$PPID_VALUE" \
+    --arg timestamp "$TIMESTAMP" \
+    --argjson writes "$WRITE_COUNT" \
+    '
 		.[$key] = {
 			watcher_id: $watcher_id,
 			writes: $writes,
@@ -82,19 +82,18 @@ while true; do
 			last_write_timestamp: $timestamp,
 		}
 		' \
-		"$TMP_FILE" > "${TMP_FILE}.next"
+    "$TMP_FILE" >"${TMP_FILE}.next"
 
-	mv "${TMP_FILE}.next" "$TMP_FILE"
-	mv "$TMP_FILE" "$CONTEXT_FILE"
+  mv "${TMP_FILE}.next" "$TMP_FILE"
+  mv "$TMP_FILE" "$CONTEXT_FILE"
 
-	# Pick a new random interval between 2 and 10 seconds.
-	SLEEP_SECONDS=$((RANDOM % 9 + 2))
+  # Pick a new random interval between 2 and 10 seconds.
+  SLEEP_SECONDS=$((RANDOM % 9 + 2))
 
-	echo "[$KEY] watcher=$WATCHER_ID write=$WRITE_COUNT focus=$(jq -r '.role // "-" ' <<< "$FOCUS") sleep=${SLEEP_SECONDS}s"
+  echo "[$KEY] watcher=$WATCHER_ID write=$WRITE_COUNT focus=$(jq -r '.role // "-" ' <<<"$FOCUS") sleep=${SLEEP_SECONDS}s"
 
-	sleep "$SLEEP_SECONDS"
+  sleep "$SLEEP_SECONDS"
 done
-
 
 # jq \
 # 		--arg key "$KEY" \

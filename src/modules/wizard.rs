@@ -280,6 +280,7 @@ impl View for Tooltip {
 		// ...
 	}
 }
+
 impl<C, S> Wizard<C, S> {
 	fn handle_key(&mut self, key: KeyEvent) -> Result<WizardAction, anyhow::Error> {
 		match self.step {

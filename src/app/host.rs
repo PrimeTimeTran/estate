@@ -53,14 +53,6 @@ fn time_now() -> String {
 	now.format(format).to_string()
 }
 
-impl<C: Ctx> Host<C> {
-	pub fn context_ref(&self) -> &C {
-		&self.context
-	}
-	pub fn api(&self) -> &C::Api {
-		self.context_ref().api()
-	}
-}
 impl Clock for HostClock {
 	type Handle<C: Ctx, J> = WorkHandle<C, J>;
 
@@ -140,6 +132,14 @@ impl Clock for HostClock {
 		WorkHandle::new(cancel)
 	}
 }
+impl<C: Ctx> Host<C> {
+	pub fn context_ref(&self) -> &C {
+		&self.context
+	}
+	pub fn api(&self) -> &C::Api {
+		self.context_ref().api()
+	}
+}
 impl<C> HostWorker<C>
 where
 	C: Ctx,
@@ -155,12 +155,7 @@ where
 			_phantom: PhantomData,
 		}
 	}
-}
 
-impl<C> HostWorker<C>
-where
-	C: Ctx,
-{
 	#[cfg(all(not(feature = "web")))]
 	pub fn block_on<F>(&self, future: F)
 	where
@@ -205,15 +200,14 @@ impl<C> Provide<C> for Host<C>
 where
 	C: Ctx,
 {
-	type Clock = HostClock;
-	type Worker = HostWorker<C>;
-
 	fn clock(&self) -> &Self::Clock {
 		&self.clock
 	}
 	fn worker(&self) -> &HostWorker<C> {
 		&self.worker
 	}
+	type Clock = HostClock;
+	type Worker = HostWorker<C>;
 }
 
 #[derive(Debug, Clone)]

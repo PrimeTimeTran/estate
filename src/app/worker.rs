@@ -1,6 +1,6 @@
 use crate::prelude::*;
 
-pub enum WorkerStatus {
+enum Status {
 	Starting,
 	Running,
 	Stopping,
@@ -31,6 +31,7 @@ where
 		Ok(())
 	}
 }
+
 impl<C, J> WorkHandle<C, J>
 where
 	C: Ctx,
@@ -91,13 +92,13 @@ where
 {
 	pub name: String,
 	pub handle: WorkHandle<C, S>,
-	pub status: WorkerStatus,
+	pub status: Status,
 }
 pub struct WorkerId(pub &'static str);
 pub struct WorkerInfo {
 	pub id: WorkerId,
 	pub name: String,
-	pub status: WorkerStatus,
+	pub status: Status,
 	pub started_at: Option<Instant>,
 }
 
