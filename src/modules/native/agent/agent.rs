@@ -27,11 +27,14 @@ impl Agent {
 		let task = AgentTask::new(prompt.to_string());
 		let (event_tx, _event_rx) = tokio::sync::mpsc::unbounded_channel();
 		let result = self.run_agent_loop(task, event_tx).await?;
-		Ok(result
-			.chat
-			.or(result.summary)
-			.unwrap_or_else(|| "Agent completed".to_string()))
+		Ok(
+			result
+				.chat
+				.or(result.summary)
+				.unwrap_or_else(|| "Agent completed".to_string()),
+		)
 	}
+
 	pub async fn run_agent_loop(
 		&self,
 		task: AgentTask,
@@ -39,6 +42,9 @@ impl Agent {
 	) -> Result<TaskResult> {
 		let mut steps = 0;
 		let max_steps = 10;
+
+		// Initialize the context exactly once. Every action works against this
+		// same context, and every observation is appended to its history.
 		let mut ctx = AgentCtx::with_workspace(task.prompt.clone(), (*self.workspace).clone());
 
 		section!("AGENT run_agent_loop CONTEXT");
@@ -52,33 +58,44 @@ impl Agent {
 		);
 		println!("ctx.workspace:\n{}", ctx.workspace);
 		println!("ctx.history ({} entries):", ctx.history.len());
+
 		for (i, entry) in ctx.history.iter().take(5).enumerate() {
 			println!("  [{}] {}", i + 1, preview(&format!("{entry:?}"), 500));
 		}
+
 		if ctx.history.len() > 5 {
 			println!("  ... {} more entries", ctx.history.len() - 5);
 		}
+
 		let event = RuntimeEvent::Agent(AgentEvent::Thinking { task: task.clone() });
+
 		if let Err(error) = crate::agent::log::append_agent_event(&event) {
 			eprintln!("Failed to write agent event log: {error:#}");
 		}
+
 		let _ = event_tx.send(event);
+
 		let mode: AgentMode = self.pick_mode(&ctx).await?;
+
 		if matches!(mode, AgentMode::Chat) {
 			let response = prompt_chat(&ctx).await?;
 			let result = TaskResult::completed_chat(task.id, ctx, response);
+
 			let event = RuntimeEvent::Agent(AgentEvent::Finished {
 				result: result.clone(),
 			});
+
 			if let Err(error) = crate::agent::log::append_agent_event(&event) {
 				eprintln!("Failed to write agent event log: {error:#}");
 			}
+
 			let _ = event_tx.send(event);
 			return Ok(result);
 		}
 
 		loop {
 			steps += 1;
+
 			if steps > max_steps {
 				return Ok(TaskResult::failed(
 					task.id,
@@ -87,74 +104,125 @@ impl Agent {
 					Some("Agent exceeded maximum reasoning steps".into()),
 				));
 			}
+
+			// The next decision sees the original task plus all observations
+			// accumulated from previous actions.
+			println!(
+				"AGENT STEP {steps}/{max_steps}; history entries={}",
+				ctx.history.len()
+			);
+
 			let action = self.pick_action(&ctx).await?;
+
 			match action {
 				AgentAction::Current { message } => {
 					let now = chrono::Local::now().format("%Y-%m-%d").to_string();
-					let response = format!("Context update: The current date is {}. {}", now, message);
+					let response = format!("Context update: The current date is {now}. {message}");
+
 					let event = RuntimeEvent::Agent(AgentEvent::Working {
 						task: task.clone(),
 						message: response.clone(),
 					});
+
 					if let Err(error) = crate::agent::log::append_agent_event(&event) {
 						eprintln!("Failed to write agent event log: {error:#}");
 					}
+
 					let _ = event_tx.send(event);
+
+					// Append; never replace the existing history.
 					ctx
 						.history
 						.push(AgentObservation::Current { message: response });
 				}
+
 				AgentAction::Finish { message } => {
-					if ctx.history.is_empty() {
-						return Err(anyhow!(
-							"Agent attempted to finish without performing any work"
-						));
+					// Don't treat a generic context update as proof that work
+					// was performed. Check for actual work observations.
+					let did_work = ctx
+						.history
+						.iter()
+						.any(|observation| matches!(observation, AgentObservation::RunCommand { .. }));
+
+					if !did_work {
+						ctx.history.push(AgentObservation::Current {
+							message: format!(
+								"Finish rejected: no command execution has been recorded. \
+								Continue working on the task before finishing. \
+								Your proposed finish message was: {message}"
+							),
+						});
+						continue;
 					}
+
 					let result = TaskResult::completed_with_summary(task.id, ctx, message);
+
 					let event = RuntimeEvent::Agent(AgentEvent::Finished {
 						result: result.clone(),
 					});
+
 					if let Err(error) = crate::agent::log::append_agent_event(&event) {
 						eprintln!("Failed to write agent event log: {error:#}");
 					}
+
 					let _ = event_tx.send(event);
 					return Ok(result);
 				}
+
 				AgentAction::RunCommand { command } => {
 					let shell_command = ShellCommand::shell(command.clone());
 					let result = self.tools.shell.run(shell_command).await?;
+
 					section!("SHELL RESULT");
+					println!("command: {command}");
 					println!("exit: {:?}", result.exit_code);
+
 					println!(
 						"stdout ({} chars, {} lines):\n{}",
 						result.stdout.len(),
 						result.stdout.lines().count(),
 						preview_lines(&result.stdout, SHELL_OUTPUT_PREVIEW_LINES)
 					);
+
 					println!(
 						"stderr ({} chars, {} lines):\n{}",
 						result.stderr.len(),
 						result.stderr.lines().count(),
 						preview_lines(&result.stderr, SHELL_OUTPUT_PREVIEW_LINES)
 					);
+
+					// Preserve the complete result, not just a success message.
+					// The next model call can inspect exit status, stdout and stderr.
 					ctx.history.push(AgentObservation::RunCommand { result });
 				}
+
 				AgentAction::Context { .. } => {
 					let event = RuntimeEvent::Agent(AgentEvent::Working {
 						task: task.clone(),
 						message: "Inspecting agent context".into(),
 					});
+
 					if let Err(error) = crate::agent::log::append_agent_event(&event) {
 						eprintln!("Failed to write agent event log: {error:#}");
 					}
+
 					let _ = event_tx.send(event);
+
+					// Record what happened, but don't pretend that this supplied
+					// actual workspace or file contents.
 					ctx.history.push(AgentObservation::Current {
-						message: "Agent context requested".into(),
+						message: format!(
+							"Context action received. Current task has {} history \
+							entries. Inspect the workspace and prior command results \
+							before choosing the next action.",
+							ctx.history.len()
+						),
 					});
 				}
 			}
 		}
 	}
+
 	pub fn with_cwd(cwd: impl Into<PathBuf>) -> Self {
 		Self::with_workspace(CtxWorkspace::from_cwd(cwd))
 	}
