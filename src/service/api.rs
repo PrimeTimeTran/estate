@@ -26,18 +26,15 @@ impl ApiService {
 			ApiConnection::Connected(_) => "Connected",
 		}
 	}
-}
-#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
-impl ApiService {
+
+	#[cfg(all(feature = "native", not(target_arch = "wasm32")))]
 	pub async fn connect(&mut self) -> anyhow::Result<()> {
 		self.connection = ApiConnection::Connecting;
 		let client = ApiClient::connect().await?;
 		self.connection = ApiConnection::Connected(client);
 		Ok(())
 	}
-}
-#[cfg(all(feature = "web", target_arch = "wasm32"))]
-impl ApiService {
+	#[cfg(all(feature = "web", target_arch = "wasm32"))]
 	pub fn connect(&mut self, base_url: impl Into<String>) {
 		self.connection = ApiConnection::Connecting;
 		let client = ApiClient::new(base_url);
