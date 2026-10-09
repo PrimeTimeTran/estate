@@ -1,4 +1,5 @@
 use super::*;
+use std::fmt::Write;
 
 use anyhow::Context as CtxAnyhow;
 
@@ -172,35 +173,114 @@ pub fn validate_shell_command(command: &str) -> anyhow::Result<()> {
 }
 
 pub async fn build_action(prompt: &str) -> Result<LlmAction> {
-	let client = reqwest::Client::new();
-	let system_prompt: &str = JSON_PROMPT_EXECUTION;
+	use std::time::Instant;
+
+	let started = Instant::now();
+
+	eprintln!("{}", format_kv("build_action:", "ENTER"));
+	eprintln!("{}", format_kv("MODEL:", DEFAULT_MODEL));
+	eprintln!("{}", format_kv("ENDPOINT:", crate::AGENT_GEN_URL));
+	eprintln!("{}", format_kv("PROMPT CHARS:", &prompt.len().to_string()));
+	eprintln!(
+		"{}",
+		format_kv(
+			"SYSTEM PROMPT CHARS:",
+			&JSON_PROMPT_EXECUTION.len().to_string()
+		)
+	);
 
 	let payload = serde_json::json!({
-		"model": "qwen3:8b",
-		"system": system_prompt,
+		"model": DEFAULT_MODEL,
+		"system": JSON_PROMPT_EXECUTION,
 		"prompt": prompt,
 		"stream": false,
 		"format": "json"
 	});
 
+	let client = reqwest::Client::builder()
+		.connect_timeout(std::time::Duration::from_secs(5))
+		.timeout(std::time::Duration::from_secs(120))
+		.build()
+		.context("building HTTP client")?;
+
+	eprintln!("{}", format_kv("HTTP:", "SENDING REQUEST"));
+	let request_started = std::time::Instant::now();
+
 	let res = client
 		.post(crate::AGENT_GEN_URL)
 		.json(&payload)
 		.send()
-		.await?
-		.error_for_status()?
-		.json::<serde_json::Value>()
-		.await?;
+		.await
+		.with_context(|| {
+			format!(
+				"sending model request to {} after {:?}",
+				crate::AGENT_GEN_URL,
+				request_started.elapsed()
+			)
+		})?;
+
+	eprintln!(
+		"{}",
+		format_kv(
+			"HTTP RESPONSE AFTER:",
+			&format!("{:?}", request_started.elapsed())
+		)
+	);
+	eprintln!("{}", format_kv("HTTP STATUS:", &res.status().to_string()));
+
+	// eprintln!(
+	// 	"{}",
+	// 	format_kv(
+	// 		"HTTP:",
+	// 		&format!("HEADERS RECEIVED after {:?}", request_started.elapsed())
+	// 	)
+	// );
+	// eprintln!("{}", format_kv("HTTP STATUS:", res.status().as_str()));
+
+	let status = res.status();
+
+	eprintln!("{}", format_kv("HTTP BODY:", "READING"));
+	let body_started = Instant::now();
+
+	let body = res
+		.text()
+		.await
+		.context("reading model HTTP response body")?;
+
+	eprintln!(
+		"{}",
+		format_kv(
+			"HTTP BODY:",
+			&format!("{} chars, read in {:?}", body.len(), body_started.elapsed())
+		)
+	);
+
+	if !status.is_success() {
+		eprintln!(
+			"{}",
+			format_kv("HTTP ERROR BODY:", &truncate_output(&body, 2_000))
+		);
+
+		return Err(anyhow::anyhow!("Model endpoint returned HTTP {status}"));
+	}
+
+	eprintln!("{}", format_kv("HTTP JSON:", "PARSING"));
+
+	let res: serde_json::Value =
+		serde_json::from_str(&body).context("parsing model HTTP response JSON")?;
 
 	let response = res["response"].as_str().unwrap_or("");
 
-	// Print the EXACT model output before any parsing or validation.
 	section!("RAW MODEL ACTION RESPONSE");
-	println!("response length: {} chars", response.len());
+	println!(
+		"{}",
+		format_kv("RESPONSE LENGTH:", &response.len().to_string())
+	);
 	println!("response:\n{response}");
 	println!("end raw response");
 
-	// Parse once, with context so failures identify the stage.
+	eprintln!("{}", format_kv("ACTION JSON:", "PARSING"));
+
 	let mut raw: LlmAction = serde_json::from_str(response).context("parsing model action JSON")?;
 
 	if raw.command.is_none() {
@@ -222,24 +302,64 @@ pub async fn build_action(prompt: &str) -> Result<LlmAction> {
 	println!("  command: {:?}", raw.command);
 	println!("  message: {:?}", raw.message);
 
+	eprintln!(
+		"{}",
+		format_kv("build_action TOTAL:", &format!("{:?}", started.elapsed()))
+	);
+	eprintln!("{}", format_kv("build_action:", "RETURN"));
+
 	Ok(raw)
 }
-pub fn build_prompt(ctx: &AgentCtx) -> String {
+pub fn build_prompt(run: &AgentRun) -> String {
+	let ctx = &run.ctx;
+
+	eprintln!("{}", format_kv("build_prompt:", "1️⃣ ENTER"));
+
 	let workspace = format_workspace(&ctx.workspace);
 	let history = format_history(&ctx.history, 3, 3);
+	let execution_ledger = format_execution_ledger(&run.commands, 5, 5, 4_000);
+	let plan_path = "/Users/future/kb/project/crates/estate/log/plan.md";
+
+	let plan = match std::fs::read_to_string(plan_path) {
+		Ok(content) => content,
+		Err(error) => {
+			eprintln!("{}", format_kv("PLAN READ ERROR:", &error.to_string()));
+			format!("ERROR: Could not read required plan.md at {plan_path}: {error}")
+		}
+	};
+
+	eprintln!(
+		"{}",
+		format_kv("CWD:", &ctx.workspace.cwd.to_str().unwrap())
+	);
+	eprintln!("{}", format_kv("PLAN PATH:", plan_path));
+	eprintln!(
+		"{}",
+		format_kv(
+			"TASK CHARS:",
+			&ctx.prompt.as_deref().unwrap_or("").len().to_string()
+		)
+	);
+
+	eprintln!("{workspace}");
+	eprintln!("{history}");
+	eprintln!("{execution_ledger}");
 
 	let prompt = ACTION_PROMPT_EXECUTION
 		.replace("{task}", ctx.prompt.as_deref().unwrap_or(""))
 		.replace("{workspace}", &workspace)
-		.replace("{history}", &history);
+		.replace("{history}", &history)
+		.replace("{execution_ledger}", &execution_ledger);
 
-	section!("build_prompt");
-	println!(
-		"prompt ({} lines, {} chars):\n{}",
-		prompt.lines().count(),
-		prompt.len(),
-		preview_lines(&prompt, PROMPT_PREVIEW_LINES)
+	eprintln!(
+		"{}",
+		format_kv("FINAL PROMPT CHARS:", &prompt.len().to_string())
 	);
+	eprintln!(
+		"{}",
+		format_kv("FINAL PROMPT LINES:", &prompt.lines().count().to_string())
+	);
+	eprintln!("{}", format_kv("build_prompt:", "⛔️ RETURN"));
 
 	prompt
 }
@@ -440,4 +560,22 @@ pub fn structured_prompt_chat(ctx: &AgentCtx) -> String {
 		&ctx.prompt.as_deref().unwrap_or(""),
 		format_history(&ctx.history, 3, 3)
 	)
+}
+
+#[derive(Clone, Debug)]
+pub struct ExecutionRecord {
+	pub step: usize,
+	pub action: String,
+	pub cwd: Option<PathBuf>,
+	pub outcome: ExecutionOutcome,
+	pub exit_code: Option<i32>,
+	pub stdout: String,
+	pub stderr: String,
+}
+
+#[derive(Clone, Debug)]
+pub enum ExecutionOutcome {
+	Succeeded,
+	Failed,
+	Rejected { reason: String },
 }

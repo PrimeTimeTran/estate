@@ -299,58 +299,7 @@ impl BuildStep {
 		}
 	}
 }
-//
-// pub fn build_step_prompt(
-// 	step: &BuildStep,
-// 	index: usize,
-// 	total: usize,
-// 	plan: &str,
-// 	workspace: &str,
-// ) -> String {
-// 	format!(
-// 		r#"
-// You are executing BUILD STEP {}/{}.
-//
-// CURRENT TASK:
-// {}
-//
-// COMPLETION CONDITION:
-// {}
-//
-// ---
-//
-// IMPLEMENTATION PLAN:
-// {}
-//
-// ---
-//
-// CURRENT WORKSPACE:
-// {}
-//
-// ---
-//
-// RULES:
-//
-// - Perform the work directly in the workspace.
-// - Inspect files before modifying them.
-// - Do not merely describe what should be done.
-// - Complete only the current build step.
-// - Preserve existing project conventions.
-// - Do not undo correct work from previous steps.
-// - Use run_command when inspection, file creation, editing, or verification is required.
-// - Before considering this step complete, verify the completion condition using actual evidence.
-// - Do not assume work succeeded because a command was issued.
-// - When this step is complete, stop.
-// "#,
-// 		index,
-// 		total,
-// 		step.instruction,
-// 		step.completion,
-// 		plan,
-// 		workspace,
-// 	)
-// }
-//
+
 #[derive(Debug, Clone)]
 pub struct BuildPlan {
 	pub goal: String,

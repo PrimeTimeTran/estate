@@ -289,20 +289,31 @@ impl Agent {
 		let raw: LlmMode = prompt_ollama_json(&prompt).await?;
 
 		Ok(match raw.mode.as_str() {
-			"chat" => AgentMode::Chat,
+			// "chat" => AgentMode::Chat,
 			_ => AgentMode::Tool,
 		})
 	}
-	async fn pick_action(&self, ctx: &AgentCtx) -> Result<AgentAction> {
-		let prompt = build_prompt(ctx);
+	async fn pick_action(&self, run: &AgentRun) -> Result<AgentAction> {
+		eprintln!("{}", format_kv("pick_action:", "ENTER"));
+		let prompt = build_prompt(run);
+		eprintln!(
+			"{}",
+			format_kv("pick_action prompt chars:", &prompt.len().to_string())
+		);
+		eprintln!("{}", format_kv("pick_action:", "CALLING build_action"));
 		let raw = build_action(&prompt).await?;
+		eprintln!("{}", format_kv("pick_action:", "build_action RETURNED"));
 		let action = AgentAction::try_from(raw)?;
+		eprintln!(
+			"{}",
+			format_kv("pick_action:", &format!("PARSED {action:?}"))
+		);
 		Ok(action)
 	}
 	async fn select_action(&self, run: &mut AgentRun, step: usize) -> Result<Option<AgentAction>> {
 		const MAX_SELECTION_ERRORS: usize = 3;
 
-		match self.pick_action(&run.ctx).await {
+		match self.pick_action(&run).await {
 			Ok(action) => {
 				// A valid response breaks the consecutive failure streak.
 				Ok(Some(action))
@@ -637,44 +648,42 @@ impl Agent {
 			(*self.workspace).clone(),
 		));
 
+		// Own the prompt so we can mutably borrow `run` afterward.
+		// let prompt = run.ctx.prompt.clone().unwrap_or_default();
 		let prompt = run.ctx.prompt.as_deref().unwrap_or("");
+
+		const PLAN: &str = include_str!("../../../../log/plan.md");
+		eprintln!(
+			"{}",
+			format_kv("TASK CONTAINS PLAN:", &prompt.contains(&PLAN).to_string())
+		);
 		let prompt_chars = prompt.chars().count();
 		let estimated_tokens = prompt_chars.div_ceil(6);
 
 		section!("AGENT run_agent_loop CONTEXT");
 
-		log_run(
-			&mut run.clone(),
-			format!(
-				"RUN START: prompt_chars={prompt_chars}, estimated_tokens={estimated_tokens} (1 token / 6 chars), prompt_lines={}, history={}, commands={}, errors={}, logs={}, files={}",
-				prompt.lines().count(),
-				run.ctx.history.len(),
-				run.commands.len(),
-				run.errors.len(),
-				run.ctx.logs.len(),
-				self.files_seen,
-			),
-		);
-
-		log_run(
-			&mut run.clone(),
-			format!(
-				"PROMPT PREVIEW:\n{}",
-				preview_lines(prompt, PROMPT_PREVIEW_LINES),
-			),
-		);
-
-		let context_log = format!(
-			"Initial context: prompt_chars={prompt_chars}, estimated_tokens={estimated_tokens}, workspace={}",
-			run.ctx.workspace,
-		);
-
-		run.record_log(context_log);
+		print_run_metrics(&prompt, &mut run.clone(), self.files_seen);
+		
+		run.record_log(format!(
+  		"Initial context: prompt_chars={prompt_chars}, estimated_tokens={estimated_tokens}, workspace={}",
+  		run.ctx.workspace,
+  	));
 
 		self.emit_thinking(&task, &event_tx);
 
 		log_run(&mut run, "Selecting agent mode");
 
+		let mode = match self.pick_mode(&run.ctx).await {
+			Ok(mode) => {
+				log_run(&mut run, format!("Mode selected: {mode:?}"));
+				mode
+			}
+			Err(error) => {
+				log_run(&mut run, format!("MODE SELECTION FAILED: {error:#}"));
+				return Err(error);
+			}
+		};
+		log_run(&mut run, "Selecting agent mode");
 		let mode = match self.pick_mode(&run.ctx).await {
 			Ok(mode) => {
 				log_run(&mut run, format!("Mode selected: {mode:?}"));
@@ -726,23 +735,12 @@ impl Agent {
 
 		let mut guard = AgentGuard::default();
 		log_run(
-			&mut run.clone(),
+			&mut run,
 			format!("Starting agent loop: max_steps={max_steps}"),
 		);
 
 		for step in 1..=max_steps {
-			log_run(
-				&mut run.clone(),
-				format!(
-					"STEP {step}/{max_steps}: history={}, commands={}, errors={}, logs={}, tokens={}, files={}",
-					run.clone().ctx.history.len(),
-					run.clone().commands.len(),
-					run.clone().errors.len(),
-					run.clone().ctx.logs.len(),
-					self.tokens_seen,
-					self.files_seen,
-				),
-			);
+			print_steps(&mut run, step, max_steps, self.tokens_seen, self.files_seen);
 			let action = match self.select_action(&mut run, step).await {
 				Ok(Some(action)) => {
 					log_run(
@@ -790,76 +788,55 @@ impl Agent {
 					return Err(error);
 				}
 			}
-
 			match action {
 				AgentAction::Current { message } => {
 					log_run(
 						&mut run,
 						format!("STEP {step}: CURRENT message_chars={}", message.len()),
 					);
-
 					self.handle_current(&task, &event_tx, &mut run, message);
-
 					log_run(&mut run, format!("STEP {step}: CURRENT handled"));
 				}
-
 				AgentAction::Context { path } => {
 					log_run(&mut run, format!("STEP {step}: CONTEXT path={path:?}"));
-
 					self.handle_context(&task, &event_tx, &mut run, path);
-
 					log_run(&mut run, format!("STEP {step}: CONTEXT handled"));
 				}
-
 				AgentAction::RunCommand { command } => {
 					log_run(
 						&mut run,
 						format!("STEP {step}: SHELL START command={command:?}"),
 					);
-
+					log_step(&mut run, step, format!("SHELL START command={command:?}"));
 					match self.execute_shell_action(&mut run, step, command).await {
-						Ok(()) => {
-							log_run(&mut run, format!("STEP {step}: SHELL HANDLER COMPLETE"));
-						}
+						Ok(()) => log_step(&mut run, step, "SHELL HANDLER COMPLETE"),
 						Err(error) => {
-							log_run(
-								&mut run,
-								format!("STEP {step}: SHELL HANDLER FAILED: {error:#}"),
-							);
+							log_step(&mut run, step, format!("SHELL HANDLER FAILED: {error:#}"));
 							return Err(error);
 						}
 					}
 				}
-
 				AgentAction::RunProgram { program, args, cwd } => {
 					log_run(
 						&mut run,
 						format!("STEP {step}: PROGRAM START program={program:?} args={args:?} cwd={cwd:?}"),
 					);
-
 					match self
 						.execute_program_action(&mut run, step, program, args, cwd)
 						.await
 					{
-						Ok(()) => {
-							log_run(&mut run, format!("STEP {step}: PROGRAM HANDLER COMPLETE"));
-						}
+						Ok(()) => log_step(&mut run, step, "PROGRAM HANDLER COMPLETE"),
 						Err(error) => {
-							log_run(
-								&mut run,
-								format!("STEP {step}: PROGRAM HANDLER FAILED: {error:#}"),
-							);
+							log_step(&mut run, step, format!("PROGRAM HANDLER FAILED: {error:#}"));
 							return Err(error);
 						}
 					}
 				}
-
 				AgentAction::Finish { message } => {
 					log_run(
 						&mut run,
 						format!("STEP {step}: FINISH requested message={message:?}"),
 					);
-
 					match self.try_finish(task.id, &mut run, &baseline, step, message) {
 						Ok(Some(result)) => {
 							log_run(&mut run, format!("STEP {step}: FINISH VALIDATED"));
@@ -1204,4 +1181,54 @@ fn log_run(run: &mut AgentRun, message: impl Into<String>) {
 
 	println!("{line}");
 	run.record_log(line);
+}
+
+fn print_run_metrics(prompt: &str, run: &mut AgentRun, files_seen: u128) {
+	let prompt = run.ctx.prompt.as_deref().unwrap_or("");
+	let prompt_chars = prompt.chars().count();
+	let estimated_tokens = prompt_chars.div_ceil(6);
+	log_run(
+		&mut run.clone(),
+		format!(
+			"RUN START: prompt_chars={prompt_chars}, estimated_tokens={estimated_tokens} (1 token / 6 chars), prompt_lines={}, history={}, commands={}, errors={}, logs={}, files={}",
+			prompt.lines().count(),
+			run.ctx.history.len(),
+			run.commands.len(),
+			run.errors.len(),
+			run.ctx.logs.len(),
+			files_seen,
+		),
+	);
+
+	log_run(
+		&mut run.clone(),
+		format!(
+			"PROMPT PREVIEW:\n{}",
+			preview_lines(prompt, PROMPT_PREVIEW_LINES),
+		),
+	);
+}
+
+fn log_step(run: &mut AgentRun, step: usize, message: impl std::fmt::Display) {
+	log_run(run, format!("STEP {step}: {message}"));
+}
+fn print_steps(
+	run: &mut AgentRun,
+	step: usize,
+	max_steps: usize,
+	tokens_seen: u128,
+	files_seen: u128,
+) {
+	log_run(
+		run,
+		format!(
+			"STEP {step}/{max_steps}: history={}, commands={}, errors={}, logs={}, tokens={}, files={}",
+			run.ctx.history.len(),
+			run.commands.len(),
+			run.errors.len(),
+			run.ctx.logs.len(),
+			tokens_seen,
+			files_seen,
+		),
+	);
 }
