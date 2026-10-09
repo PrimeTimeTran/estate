@@ -1,5 +1,8 @@
 use super::*;
-use serde::{Deserialize, Serialize};
+// use serde::{Deserialize, Serialize};
+// 
+// use anyhow::Result;
+// use std::path::{Path, PathBuf};
 
 impl Agent {
 	pub fn new() -> Self {
@@ -810,6 +813,16 @@ impl AgentCtx {
 	}
 }
 
+impl AgentCompletionValidation {
+	pub fn is_valid(&self) -> bool {
+		self.errors.is_empty()
+	}
+
+	pub fn errors(&self) -> &[String] {
+		&self.errors
+	}
+}
+
 impl TryFrom<LlmAction> for AgentAction {
 	type Error = anyhow::Error;
 
@@ -877,6 +890,9 @@ pub struct AgentBus {
 	pub tx: UnboundedSender<AgentEvent>,
 	pub event_tx: UnboundedSender<RuntimeEvent>,
 }
+pub struct AgentCompletionValidation {
+	pub errors: Vec<String>,
+}
 pub struct AgentContextInfo {
 	pub cwd: PathBuf,
 	pub workspace_dir: PathBuf,
@@ -895,10 +911,42 @@ pub struct AgentCtx {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentError {
+	/// One-based agent step where the error occurred, if known.
+	pub step: Option<usize>,
+
+	/// Category of failure, e.g. "action_parse", "command", or "tool".
+	pub kind: String,
+
+	/// Human-readable error description.
+	pub message: String,
+
+	/// Raw model response, if the error occurred while parsing an action.
+	pub raw_response: Option<String>,
+
+	/// Whether the error was recoverable.
+	pub recoverable: bool,
+
+	/// Timestamp when the error was recorded.
+	pub timestamp: chrono::DateTime<chrono::Utc>,
+}
+#[derive(Debug, Default)]
+pub struct AgentGuard {
+	consecutive_no_progress: usize,
+	recent_commands: std::collections::HashMap<String, usize>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentRun {
 	pub ctx: AgentCtx,
 	pub commands: Vec<CommandRecord>,
 	pub errors: Vec<AgentError>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub struct AgentTask {
+	pub id: Uuid,
+	pub prompt: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -929,31 +977,6 @@ pub struct CommandRecord {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgentError {
-	/// One-based agent step where the error occurred, if known.
-	pub step: Option<usize>,
-
-	/// Category of failure, e.g. "action_parse", "command", or "tool".
-	pub kind: String,
-
-	/// Human-readable error description.
-	pub message: String,
-
-	/// Raw model response, if the error occurred while parsing an action.
-	pub raw_response: Option<String>,
-
-	/// Whether the error was recoverable.
-	pub recoverable: bool,
-
-	/// Timestamp when the error was recorded.
-	pub timestamp: chrono::DateTime<chrono::Utc>,
-}
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-pub struct AgentTask {
-	pub id: Uuid,
-	pub prompt: String,
-}
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LlmAction {
 	pub action: String,
 	#[serde(default)]
@@ -981,197 +1004,3 @@ pub struct LlmMode {
 // 		fn observe(&self) -> AgentContextInfo;
 // 	}
 // }
-
-fn format_changed_files(paths: &[std::path::PathBuf]) -> String {
-	if paths.is_empty() {
-		return "(no filesystem changes detected)".to_owned();
-	}
-
-	let mut paths = paths
-		.iter()
-		.map(|path| path.display().to_string())
-		.collect::<Vec<_>>();
-
-	paths.sort();
-	paths.dedup();
-
-	paths
-		.into_iter()
-		.map(|path| format!("- {path}"))
-		.collect::<Vec<_>>()
-		.join("\n")
-}
-
-use anyhow::Result;
-use std::path::{Path, PathBuf};
-
-pub struct AgentCompletionValidation {
-	errors: Vec<String>,
-}
-
-impl AgentCompletionValidation {
-	pub fn is_valid(&self) -> bool {
-		self.errors.is_empty()
-	}
-
-	pub fn errors(&self) -> &[String] {
-		&self.errors
-	}
-}
-
-pub fn validate_agent_completion(
-	workspace_root: &Path,
-	artifacts: &[Artifact],
-	commands: &[CommandRecord],
-	changed_paths: &[PathBuf],
-) -> Result<AgentCompletionValidation> {
-	let mut errors = Vec::new();
-	let mut paths: Vec<PathBuf> = artifacts
-		.iter()
-		.filter_map(|artifact| match artifact {
-			Artifact::FileRead { path, .. } | Artifact::FileWrite { path } => Some(PathBuf::from(path)),
-			Artifact::Observation(_) | Artifact::ToolOutput(_) => None,
-		})
-		.collect();
-
-	paths.extend(changed_paths.iter().cloned());
-	paths.sort();
-	paths.dedup();
-
-	if !changed_paths.is_empty() && !commands.iter().any(|command| command.success) {
-		errors.push(
-			"Files changed, but no command completed successfully. \
-			 Run an appropriate verification command before finishing."
-				.to_owned(),
-		);
-	}
-
-	Ok(AgentCompletionValidation { errors })
-}
-
-fn reconcile_agent_artifacts(
-	ctx: &mut AgentCtx,
-	before: &WSSnapshot,
-	after: &WSSnapshot,
-) -> Result<Vec<PathBuf>> {
-	let changes = before.diff(after);
-	let changed_paths = parse_git_status_paths(&changes.git_status);
-
-	for path in &changed_paths {
-		let absolute_path = if path.is_absolute() {
-			path.clone()
-		} else {
-			ctx.workspace.cwd.join(path)
-		};
-
-		let path_string = absolute_path.to_string_lossy().into_owned();
-
-		if absolute_path.is_file() {
-			ctx.workspace.add_file(absolute_path.clone())?;
-
-			let artifact = Artifact::FileWrite {
-				path: path_string.clone(),
-			};
-
-			// Avoid duplicate write artifacts for the same path.
-			if !ctx.artifacts.iter().any(|existing| {
-				matches!(
-					existing,
-					Artifact::FileWrite { path } if path == &path_string
-				)
-			}) {
-				ctx.artifacts.push(artifact);
-			}
-		} else {
-			// Remove stale workspace entries for deleted files.
-			ctx
-				.workspace
-				.files
-				.retain(|file| Path::new(&file.path) != absolute_path);
-
-			// Remove write artifacts for files that no longer exist.
-			ctx.artifacts.retain(|artifact| {
-				!matches!(
-					artifact,
-					Artifact::FileWrite { path } if path == &path_string
-				)
-			});
-		}
-	}
-
-	Ok(changed_paths)
-}
-
-fn parse_git_status_paths(status: &str) -> Vec<PathBuf> {
-	let mut paths = Vec::new();
-
-	for line in status.lines() {
-		// `git status --short` starts with two status columns.
-		if line.len() < 4 {
-			continue;
-		}
-
-		let status_code = &line[..2];
-		let path = line[3..].trim();
-
-		if path.is_empty() || status_code == "!!" {
-			continue;
-		}
-
-		// For renames, porcelain output is generally "old -> new".
-		let path = path
-			.rsplit_once(" -> ")
-			.map(|(_, new_path)| new_path)
-			.unwrap_or(path)
-			.trim_matches('"');
-
-		paths.push(PathBuf::from(path));
-	}
-
-	paths.sort();
-	paths.dedup();
-	paths
-}
-
-fn validate_shell_command(command: &str) -> anyhow::Result<()> {
-	use anyhow::bail;
-
-	if command.trim().is_empty() {
-		bail!("Command cannot be empty.");
-	}
-
-	if command.len() > 2_000 {
-		bail!("Command exceeds the 2000-character limit.");
-	}
-
-	let chains =
-		command.matches("&&").count() + command.matches("||").count() + command.matches(';').count();
-
-	if chains > 2 {
-		bail!(
-			"Too many chained operations. Run one bounded operation \
-			at a time and inspect its result."
-		);
-	}
-
-	Ok(())
-}
-
-enum CommandSpec {
-	Shell { command: String },
-	Program { program: String, args: Vec<String> },
-}
-
-use std::collections::HashMap;
-
-#[derive(Debug, Default)]
-pub struct AgentGuard {
-	consecutive_no_progress: usize,
-	recent_commands: std::collections::HashMap<String, usize>,
-}
-
-#[derive(Debug)]
-pub enum GuardDecision {
-	Allow,
-	Reject(String),
-}

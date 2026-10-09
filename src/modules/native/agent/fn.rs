@@ -17,6 +17,160 @@ fn shell_quote(value: &str) -> String {
 	format!("'{}'", value.replace('\'', "'\\''"))
 }
 
+pub fn format_changed_files(paths: &[std::path::PathBuf]) -> String {
+	if paths.is_empty() {
+		return "(no filesystem changes detected)".to_owned();
+	}
+
+	let mut paths = paths
+		.iter()
+		.map(|path| path.display().to_string())
+		.collect::<Vec<_>>();
+
+	paths.sort();
+	paths.dedup();
+
+	paths
+		.into_iter()
+		.map(|path| format!("- {path}"))
+		.collect::<Vec<_>>()
+		.join("\n")
+}
+pub fn validate_agent_completion(
+	workspace_root: &Path,
+	artifacts: &[Artifact],
+	commands: &[CommandRecord],
+	changed_paths: &[PathBuf],
+) -> Result<AgentCompletionValidation> {
+	let mut errors = Vec::new();
+	let mut paths: Vec<PathBuf> = artifacts
+		.iter()
+		.filter_map(|artifact| match artifact {
+			Artifact::FileRead { path, .. } | Artifact::FileWrite { path } => Some(PathBuf::from(path)),
+			Artifact::Observation(_) | Artifact::ToolOutput(_) => None,
+		})
+		.collect();
+
+	paths.extend(changed_paths.iter().cloned());
+	paths.sort();
+	paths.dedup();
+
+	if !changed_paths.is_empty() && !commands.iter().any(|command| command.success) {
+		errors.push(
+			"Files changed, but no command completed successfully. \
+			 Run an appropriate verification command before finishing."
+				.to_owned(),
+		);
+	}
+
+	Ok(AgentCompletionValidation { errors })
+}
+pub fn reconcile_agent_artifacts(
+	ctx: &mut AgentCtx,
+	before: &WSSnapshot,
+	after: &WSSnapshot,
+) -> Result<Vec<PathBuf>> {
+	let changes = before.diff(after);
+	let changed_paths = parse_git_status_paths(&changes.git_status);
+
+	for path in &changed_paths {
+		let absolute_path = if path.is_absolute() {
+			path.clone()
+		} else {
+			ctx.workspace.cwd.join(path)
+		};
+
+		let path_string = absolute_path.to_string_lossy().into_owned();
+
+		if absolute_path.is_file() {
+			ctx.workspace.add_file(absolute_path.clone())?;
+
+			let artifact = Artifact::FileWrite {
+				path: path_string.clone(),
+			};
+
+			// Avoid duplicate write artifacts for the same path.
+			if !ctx.artifacts.iter().any(|existing| {
+				matches!(
+					existing,
+					Artifact::FileWrite { path } if path == &path_string
+				)
+			}) {
+				ctx.artifacts.push(artifact);
+			}
+		} else {
+			// Remove stale workspace entries for deleted files.
+			ctx
+				.workspace
+				.files
+				.retain(|file| Path::new(&file.path) != absolute_path);
+
+			// Remove write artifacts for files that no longer exist.
+			ctx.artifacts.retain(|artifact| {
+				!matches!(
+					artifact,
+					Artifact::FileWrite { path } if path == &path_string
+				)
+			});
+		}
+	}
+
+	Ok(changed_paths)
+}
+pub fn parse_git_status_paths(status: &str) -> Vec<PathBuf> {
+	let mut paths = Vec::new();
+
+	for line in status.lines() {
+		// `git status --short` starts with two status columns.
+		if line.len() < 4 {
+			continue;
+		}
+
+		let status_code = &line[..2];
+		let path = line[3..].trim();
+
+		if path.is_empty() || status_code == "!!" {
+			continue;
+		}
+
+		// For renames, porcelain output is generally "old -> new".
+		let path = path
+			.rsplit_once(" -> ")
+			.map(|(_, new_path)| new_path)
+			.unwrap_or(path)
+			.trim_matches('"');
+
+		paths.push(PathBuf::from(path));
+	}
+
+	paths.sort();
+	paths.dedup();
+	paths
+}
+pub fn validate_shell_command(command: &str) -> anyhow::Result<()> {
+	use anyhow::bail;
+
+	if command.trim().is_empty() {
+		bail!("Command cannot be empty.");
+	}
+
+	if command.len() > 2_000 {
+		bail!("Command exceeds the 2000-character limit.");
+	}
+
+	let chains =
+		command.matches("&&").count() + command.matches("||").count() + command.matches(';').count();
+
+	if chains > 2 {
+		bail!(
+			"Too many chained operations. Run one bounded operation \
+			at a time and inspect its result."
+		);
+	}
+
+	Ok(())
+}
+
 pub async fn build_action(prompt: &str) -> Result<LlmAction> {
 	let client = reqwest::Client::new();
 	let system_prompt: &str = JSON_PROMPT_EXECUTION;

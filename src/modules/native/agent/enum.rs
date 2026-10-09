@@ -1,4 +1,5 @@
 use super::*;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "action")]
@@ -64,6 +65,16 @@ pub enum Artifact {
 	FileWrite { path: String },
 	Observation(String),
 	ToolOutput(String),
+}
+pub enum CommandSpec {
+	Shell { command: String },
+	Program { program: String, args: Vec<String> },
+}
+
+#[derive(Debug)]
+pub enum GuardDecision {
+	Allow,
+	Reject(String),
 }
 
 #[derive(Clone, Debug)]
