@@ -654,13 +654,13 @@ pub struct AgentTask {
 	pub id: Uuid,
 	pub prompt: String,
 }
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LlmAction {
 	pub action: String,
-	pub path: Option<String>,
-	pub content: Option<String>,
 	pub command: Option<String>,
 	pub message: Option<String>,
+	pub args: Option<Vec<String>>,
+	pub cwd: Option<String>,
 }
 #[derive(Debug, Deserialize)]
 pub struct LlmMode {

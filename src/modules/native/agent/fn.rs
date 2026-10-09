@@ -2,6 +2,21 @@ use super::*;
 
 use anyhow::Context as CtxAnyhow;
 
+fn shell_quote(value: &str) -> String {
+	if value.is_empty() {
+		return "''".to_owned();
+	}
+
+	if value
+		.chars()
+		.all(|c| c.is_ascii_alphanumeric() || "_./:-=+".contains(c))
+	{
+		return value.to_owned();
+	}
+
+	format!("'{}'", value.replace('\'', "'\\''"))
+}
+
 pub async fn build_action(prompt: &str) -> Result<LlmAction> {
 	let client = reqwest::Client::new();
 	let system_prompt: &str = JSON_PROMPT_EXECUTION;
@@ -32,14 +47,21 @@ pub async fn build_action(prompt: &str) -> Result<LlmAction> {
 	println!("end raw response");
 
 	// Parse once, with context so failures identify the stage.
-	let raw: LlmAction = serde_json::from_str(response)
-		.with_context(|| {
-			format!(
-				"Failed to deserialize model response as LlmAction ({} chars):\n{}",
-				response.len(),
-				response
-			)
-		})?;
+	let mut raw: LlmAction = serde_json::from_str(response).context("parsing model action JSON")?;
+
+	if raw.command.is_none() {
+		if let Some(args) = raw.args.as_ref() {
+			if !args.is_empty() {
+				raw.command = Some(
+					args
+						.iter()
+						.map(|arg| shell_quote(arg))
+						.collect::<Vec<_>>()
+						.join(" "),
+				);
+			}
+		}
+	}
 
 	println!("PARSED ACTION:");
 	println!("  action: {:?}", raw.action);
