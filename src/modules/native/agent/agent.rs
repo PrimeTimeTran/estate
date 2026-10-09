@@ -1,8 +1,4 @@
 use super::*;
-// use serde::{Deserialize, Serialize};
-// 
-// use anyhow::Result;
-// use std::path::{Path, PathBuf};
 
 impl Agent {
 	pub fn new() -> Self {
@@ -10,6 +6,8 @@ impl Agent {
 			id: uuid::Uuid::new_v4().to_string(),
 			tools: AgentTools::default(),
 			workspace: Arc::new(CtxWorkspace::default()),
+			files_seen: 0,
+			tokens_seen: 0,
 		}
 	}
 	fn emit_thinking(&self, task: &AgentTask, event_tx: &UnboundedSender<RuntimeEvent>) {
@@ -31,17 +29,15 @@ impl Agent {
 	) -> Result<GuardDecision> {
 		let command = match action {
 			AgentAction::RunCommand { command } => Some(command.as_str()),
-			AgentAction::RunProgram { program, args, .. } => {
-				match program.as_str() {
-					"sh" | "bash" | "zsh" => args
-						.iter()
-						.position(|arg| arg == "-c")
-						.and_then(|index| args.get(index + 1))
-						.map(String::as_str),
-					_ => None,
-				}
-			}
-	
+			AgentAction::RunProgram { program, args, .. } => match program.as_str() {
+				"sh" | "bash" | "zsh" => args
+					.iter()
+					.position(|arg| arg == "-c")
+					.and_then(|index| args.get(index + 1))
+					.map(String::as_str),
+				_ => None,
+			},
+
 			_ => None,
 		};
 		let Some(command) = command else {
@@ -49,9 +45,7 @@ impl Agent {
 		};
 		let command = command.trim();
 		if command.is_empty() {
-			return Ok(GuardDecision::Reject(
-				"Command cannot be empty.".into(),
-			));
+			return Ok(GuardDecision::Reject("Command cannot be empty.".into()));
 		}
 		if command.len() > 10_000 {
 			return Ok(GuardDecision::Reject(
@@ -72,7 +66,7 @@ impl Agent {
 					.into(),
 			));
 		}
-	
+
 		// Compare against executed commands. Permit one retry, since a
 		// command may legitimately need to be rerun after a transient failure.
 		let previous_runs = run
@@ -80,7 +74,7 @@ impl Agent {
 			.iter()
 			.filter(|record| record.command.trim() == command)
 			.count();
-	
+
 		if previous_runs >= 2 {
 			return Ok(GuardDecision::Reject(
 				"This exact command has already been executed twice. \
@@ -88,7 +82,7 @@ impl Agent {
 					.into(),
 			));
 		}
-	
+
 		Ok(GuardDecision::Allow)
 	}
 	fn reject_action(&self, run: &mut AgentRun, step: usize, reason: String) {
@@ -273,6 +267,8 @@ impl Agent {
 	}
 	pub fn with_ctx(ctx: AgentCtx, _session: &AiSession) -> Result<Self> {
 		Ok(Self {
+			files_seen: 0,
+			tokens_seen: 0,
 			id: uuid::Uuid::new_v4().to_string(),
 			tools: AgentTools::default(),
 			workspace: Arc::new(ctx.workspace),
@@ -280,6 +276,8 @@ impl Agent {
 	}
 	pub fn with_workspace(workspace: CtxWorkspace) -> Self {
 		Self {
+			files_seen: 0,
+			tokens_seen: 0,
 			id: uuid::Uuid::new_v4().to_string(),
 			tools: AgentTools::default(),
 			workspace: Arc::new(workspace),
@@ -639,64 +637,257 @@ impl Agent {
 			(*self.workspace).clone(),
 		));
 
+		let prompt = run.ctx.prompt.as_deref().unwrap_or("");
+
+		section!("AGENT run_agent_loop CONTEXT");
+		log_run(
+			&mut run.clone(),
+			format!(
+				"RUN START: prompt_chars={}, prompt_lines={}, history={}, commands={}, errors={}, logs={}, tokens={}, files={}",
+				prompt.len(),
+				prompt.lines().count(),
+				run.ctx.history.len(),
+				run.commands.len(),
+				run.errors.len(),
+				run.ctx.logs.len(),
+				self.tokens_seen,
+				self.files_seen,
+			),
+		);
+
+		log_run(
+			&mut run.clone(),
+			format!(
+				"PROMPT PREVIEW:\n{}",
+				preview_lines(prompt, PROMPT_PREVIEW_LINES),
+			),
+		);
+
+		let context_log = format!(
+			"Initial context: prompt_chars={}, prompt_lines={}, workspace={}",
+			prompt.len(),
+			prompt.lines().count(),
+			run.ctx.workspace,
+		);
+
+		run.record_log(context_log);
+
 		self.emit_thinking(&task, &event_tx);
 
-		let mode = self.pick_mode(&run.ctx).await?;
+		log_run(&mut run, "Selecting agent mode");
+
+		let mode = match self.pick_mode(&run.ctx).await {
+			Ok(mode) => {
+				log_run(&mut run, format!("Mode selected: {mode:?}"));
+				mode
+			}
+			Err(error) => {
+				log_run(&mut run, format!("MODE SELECTION FAILED: {error:#}"));
+				return Err(error);
+			}
+		};
 
 		if matches!(mode, AgentMode::Chat) {
-			let response = prompt_chat(&run.ctx).await?;
+			log_run(&mut run, "Entering chat path");
+
+			let response = match prompt_chat(&run.ctx).await {
+				Ok(response) => response,
+				Err(error) => {
+					log_run(&mut run, format!("CHAT FAILED: {error:#}"));
+					return Err(error);
+				}
+			};
+
+			log_run(
+				&mut run,
+				format!("Chat completed: response_chars={}", response.len()),
+			);
+
 			return Ok(TaskResult::completed_chat(task.id, run.ctx, response));
 		}
 
-		let baseline = WSSnapshot::capture(&self.workspace.cwd)?;
+		log_run(
+			&mut run,
+			format!(
+				"Capturing baseline workspace snapshot: {}",
+				self.workspace.cwd.display()
+			),
+		);
+
+		let baseline = match WSSnapshot::capture(&self.workspace.cwd) {
+			Ok(snapshot) => {
+				log_run(&mut run, "Baseline workspace snapshot captured");
+				snapshot
+			}
+			Err(error) => {
+				log_run(&mut run, format!("BASELINE SNAPSHOT FAILED: {error:#}"));
+				return Err(error.into());
+			}
+		};
+
 		let mut guard = AgentGuard::default();
+		log_run(
+			&mut run.clone(),
+			format!("Starting agent loop: max_steps={max_steps}"),
+		);
 
 		for step in 1..=max_steps {
-			let Some(action) = self.select_action(&mut run, step).await? else {
-				return Ok(TaskResult::failed(
-					task.id,
-					run.ctx,
-					"Action selection failed",
-					Some("Too many consecutive invalid actions.".into()),
-				));
-			};
+			log_run(
+				&mut run.clone(),
+				format!(
+					"STEP {step}/{max_steps}: history={}, commands={}, errors={}, logs={}, tokens={}, files={}",
+					run.clone().ctx.history.len(),
+					run.clone().commands.len(),
+					run.clone().errors.len(),
+					run.clone().ctx.logs.len(),
+					self.tokens_seen,
+					self.files_seen,
+				),
+			);
+			let action = match self.select_action(&mut run, step).await {
+				Ok(Some(action)) => {
+					log_run(
+						&mut run,
+						format!("STEP {step}: selected action: {action:?}"),
+					);
+					action
+				}
+				Ok(None) => {
+					log_run(
+						&mut run,
+						format!("STEP {step}: action selection exhausted retries"),
+					);
 
-			match self.guard_action(&action, &run, &mut guard)? {
-				GuardDecision::Allow => {}
-				GuardDecision::Reject(reason) => {
+					return Ok(TaskResult::failed(
+						task.id,
+						run.ctx,
+						"Action selection failed",
+						Some("Too many consecutive invalid actions.".into()),
+					));
+				}
+				Err(error) => {
+					log_run(
+						&mut run,
+						format!("STEP {step}: ACTION SELECTION ERROR: {error:#}"),
+					);
+					return Err(error);
+				}
+			};
+			match self.guard_action(&action, &run, &mut guard) {
+				Ok(GuardDecision::Allow) => {
+					log_run(&mut run, format!("STEP {step}: guard allowed action"));
+				}
+				Ok(GuardDecision::Reject(reason)) => {
+					log_run(
+						&mut run,
+						format!("STEP {step}: GUARD REJECTED ACTION: {reason}"),
+					);
+
 					self.reject_action(&mut run, step, reason);
 					continue;
+				}
+				Err(error) => {
+					log_run(&mut run, format!("STEP {step}: GUARD ERROR: {error:#}"));
+					return Err(error);
 				}
 			}
 
 			match action {
 				AgentAction::Current { message } => {
+					log_run(
+						&mut run,
+						format!("STEP {step}: CURRENT message_chars={}", message.len()),
+					);
+
 					self.handle_current(&task, &event_tx, &mut run, message);
+
+					log_run(&mut run, format!("STEP {step}: CURRENT handled"));
 				}
 
 				AgentAction::Context { path } => {
+					log_run(&mut run, format!("STEP {step}: CONTEXT path={path:?}"));
+
 					self.handle_context(&task, &event_tx, &mut run, path);
+
+					log_run(&mut run, format!("STEP {step}: CONTEXT handled"));
 				}
 
 				AgentAction::RunCommand { command } => {
-					self.execute_shell_action(&mut run, step, command).await?;
+					log_run(
+						&mut run,
+						format!("STEP {step}: SHELL START command={command:?}"),
+					);
+
+					match self.execute_shell_action(&mut run, step, command).await {
+						Ok(()) => {
+							log_run(&mut run, format!("STEP {step}: SHELL HANDLER COMPLETE"));
+						}
+						Err(error) => {
+							log_run(
+								&mut run,
+								format!("STEP {step}: SHELL HANDLER FAILED: {error:#}"),
+							);
+							return Err(error);
+						}
+					}
 				}
 
 				AgentAction::RunProgram { program, args, cwd } => {
-					self
+					log_run(
+						&mut run,
+						format!("STEP {step}: PROGRAM START program={program:?} args={args:?} cwd={cwd:?}"),
+					);
+
+					match self
 						.execute_program_action(&mut run, step, program, args, cwd)
-						.await?;
+						.await
+					{
+						Ok(()) => {
+							log_run(&mut run, format!("STEP {step}: PROGRAM HANDLER COMPLETE"));
+						}
+						Err(error) => {
+							log_run(
+								&mut run,
+								format!("STEP {step}: PROGRAM HANDLER FAILED: {error:#}"),
+							);
+							return Err(error);
+						}
+					}
 				}
 
 				AgentAction::Finish { message } => {
-					if let Some(result) = self.try_finish(task.id, &mut run, &baseline, step, message)? {
-						self.emit_finished(&event_tx, result.clone());
-						return Ok(result);
+					log_run(
+						&mut run,
+						format!("STEP {step}: FINISH requested message={message:?}"),
+					);
+
+					match self.try_finish(task.id, &mut run, &baseline, step, message) {
+						Ok(Some(result)) => {
+							log_run(&mut run, format!("STEP {step}: FINISH VALIDATED"));
+							self.emit_finished(&event_tx, result.clone());
+							return Ok(result);
+						}
+						Ok(None) => {
+							log_run(
+								&mut run,
+								format!("STEP {step}: FINISH REJECTED; continuing loop"),
+							);
+						}
+						Err(error) => {
+							log_run(
+								&mut run,
+								format!("STEP {step}: FINISH VALIDATION ERROR: {error:#}"),
+							);
+							return Err(error);
+						}
 					}
 				}
 			}
 		}
-
+		log_run(
+			&mut run,
+			format!("STEP LIMIT REACHED: max_steps={max_steps}"),
+		);
 		Ok(self.fail_step_limit(task.id, run, max_steps))
 	}
 }
@@ -884,6 +1075,9 @@ pub struct Agent {
 	pub id: String,
 	pub tools: AgentTools,
 	pub workspace: Arc<CtxWorkspace>,
+	pub tokens_seen: u128,
+	pub files_seen: u128,
+	// pub tokens_seen: u128,
 }
 #[derive(Clone, Debug)]
 pub struct AgentBus {
@@ -1004,3 +1198,11 @@ pub struct LlmMode {
 // 		fn observe(&self) -> AgentContextInfo;
 // 	}
 // }
+
+fn log_run(run: &mut AgentRun, message: impl Into<String>) {
+	let message = message.into();
+	let line = format!("[AGENT] {message}");
+
+	println!("{line}");
+	run.record_log(line);
+}

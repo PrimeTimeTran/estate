@@ -226,7 +226,7 @@ pub async fn build_action(prompt: &str) -> Result<LlmAction> {
 }
 pub fn build_prompt(ctx: &AgentCtx) -> String {
 	let workspace = format_workspace(&ctx.workspace);
-	let history = format_history(&ctx.history);
+	let history = format_history(&ctx.history, 3, 3);
 
 	let prompt = ACTION_PROMPT_EXECUTION
 		.replace("{task}", ctx.prompt.as_deref().unwrap_or(""))
@@ -245,7 +245,7 @@ pub fn build_prompt(ctx: &AgentCtx) -> String {
 }
 pub fn build_prompt_from_ctx(ctx: &AgentCtx) -> String {
 	let workspace = format_workspace(&ctx.workspace);
-	let history = format_history(&ctx.history);
+	let history = format_history(&ctx.history, 3, 3);
 	let prompt = build_sys_action(
 		ACTION_PROMPT_EXECUTION,
 		&[&ctx.prompt.as_deref().unwrap_or(""), &workspace, &history],
@@ -401,6 +401,6 @@ pub fn structured_prompt_chat(ctx: &AgentCtx) -> String {
 			Respond normally. No JSON. Just text.
 		"#,
 		&ctx.prompt.as_deref().unwrap_or(""),
-		format_history(&ctx.history)
+		format_history(&ctx.history, 3, 3)
 	)
 }
