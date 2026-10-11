@@ -454,7 +454,7 @@ impl Evaluator {
 	async fn intent(&self, ctx: &CtxEvaluation) -> Result<QACheck> {
 		let time_started = Utc::now();
 		let intent = ctx.get(SrcArtifact::Intent)?;
-		tracing::info!("Evaluator intent {:?}", intent);
+		// tracing::info!("Evaluator intent {:?}", intent);
 		let response = self
 			.jev
 			.system_one(

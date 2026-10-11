@@ -4,9 +4,6 @@ use std::fmt::Write;
 
 pub fn build_prompt(run: &AgentRun) -> String {
 	let ctx = &run.ctx;
-
-	eprintln!("{}", fmt_kv("build_prompt:", "1️⃣ ENTER"));
-
 	let workspace = fmt_workspace(&ctx.workspace);
 	let history = fmt_history(&ctx.history, 3, 3);
 	let execution_ledger = fmt_execution(&run.commands, 5, 5, 4_000);
@@ -15,40 +12,48 @@ pub fn build_prompt(run: &AgentRun) -> String {
 	let plan = match std::fs::read_to_string(plan_path) {
 		Ok(content) => content,
 		Err(error) => {
-			eprintln!("{}", fmt_kv("PLAN READ ERROR:", &error.to_string()));
 			format!("ERROR: Could not read required plan.md at {plan_path}: {error}")
 		}
 	};
 
-	eprintln!("{}", fmt_kv("CWD:", &ctx.workspace.cwd.to_str().unwrap()));
-	eprintln!("{}", fmt_kv("PLAN PATH:", plan_path));
-	eprintln!(
-		"{}",
-		fmt_kv(
-			"TASK CHARS:",
-			&ctx.prompt.as_deref().unwrap_or("").len().to_string()
-		)
-	);
-
-	eprintln!("{workspace}");
-	eprintln!("{history}");
-	eprintln!("{execution_ledger}");
-
+	let task = ctx.prompt.as_deref().unwrap_or("");
 	let prompt = ACTION_PROMPT_EXECUTION
-		.replace("{task}", ctx.prompt.as_deref().unwrap_or(""))
+		.replace("{task}", task)
 		.replace("{workspace}", &workspace)
 		.replace("{history}", &history)
 		.replace("{execution_ledger}", &execution_ledger);
 
-	eprintln!(
-		"{}",
-		fmt_kv("FINAL PROMPT CHARS:", &prompt.len().to_string())
+	let report = format!(
+		"BUILD_PROMPT {:?}\n\
+		CWD: {}\n\
+		PLAN PATH: {plan_path}\n\
+		TASK CHARS: {}\n\
+		PLAN CHARS: {}\n\
+		\n\
+		--- WORKSPACE ---\n\
+		{workspace}\n\
+		\n\
+		--- HISTORY ---\n\
+		{history}\n\
+		\n\
+		--- EXECUTION LEDGER ---\n\
+		{execution_ledger}\n\
+		\n\
+		--- PLAN ---\n\
+		{plan}\n\
+		\n\
+		FINAL PROMPT CHARS: {}\n\
+		FINAL PROMPT LINES: {}\n\
+		build_prompt: ⛔️ RETURN",
+		truncate(&run.ctx.prompt.clone().unwrap(), 50),
+		ctx.workspace.cwd.display(),
+		task.len(),
+		plan.len(),
+		prompt.len(),
+		prompt.lines().count(),
 	);
-	eprintln!(
-		"{}",
-		fmt_kv("FINAL PROMPT LINES:", &prompt.lines().count().to_string())
-	);
-	eprintln!("{}", fmt_kv("build_prompt:", "⛔️ RETURN"));
+
+	section!(&report);
 
 	prompt
 }

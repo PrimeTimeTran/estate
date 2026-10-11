@@ -8,11 +8,9 @@ pub fn gen_intent(goal: &str) -> Result<String> {
 	if goal.trim().is_empty() {
 		return Err(anyhow!("cannot generate Intent prompt from empty goal"));
 	}
-
 	let prompt = SDLC_PROMPT_INTENT
 		.replace("{template}", SDLC_TEMPLATE_INTENT)
 		.replace("{goal}", goal);
-
 	Ok(prompt)
 }
 
@@ -20,11 +18,9 @@ pub fn gen_spec(intent: &str) -> Result<String> {
 	if intent.trim().is_empty() {
 		return Err(anyhow!("cannot generate Spec prompt from empty Intent"));
 	}
-
 	let prompt = SDLC_PROMPT_SPEC
 		.replace("{template}", SDLC_TEMPLATE_SPEC)
 		.replace("{intent}", intent);
-
 	Ok(prompt)
 }
 
@@ -35,12 +31,10 @@ pub fn gen_plan(intent: &str, spec: &str) -> Result<String> {
 	if spec.trim().is_empty() {
 		return Err(anyhow!("Spec artifact is empty"));
 	}
-
 	let prompt = SDLC_PROMPT_PLAN
 		.replace("{template}", SDLC_TEMPLATE_PLAN)
 		.replace("{intent}", intent)
 		.replace("{spec}", spec);
-
 	Ok(prompt)
 }
 pub fn plan_gen(intent: &str, spec: &str) -> String {

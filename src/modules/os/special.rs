@@ -95,17 +95,17 @@ impl FS {
 		let original_path = path.into();
 		let path = Self::ensure_parent(original_path.clone())?;
 
-		tracing::info!(
-			original = %original_path.display(),
-			resolved = %path.display(),
-			"FS::save path"
-		);
+		// tracing::info!(
+		// 	original = %original_path.display(),
+		// 	resolved = %path.display(),
+		// 	"FS::save path"
+		// );
 
 		let contents = serde_json::to_string_pretty(value)?;
 
 		fs::write(&path, contents).with_context(|| format!("write {}", path.display()))?;
 
-		tracing::info!(path = %path.display(), "FS::save succeeded");
+		// tracing::info!(path = %path.display(), "FS::save succeeded");
 		Ok(())
 	}
 
