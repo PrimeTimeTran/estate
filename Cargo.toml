@@ -66,7 +66,7 @@ path = "src/bin/[mpl].rs"
 # cargo run --bin native --no-default-features --features "native,daemon,macos"
 name = "hid"
 path = "src/bin/[hid].rs"
-required-features = ["native", "hid"]
+required-features = ["native"]
 
 [[bin]]
 name = "native"

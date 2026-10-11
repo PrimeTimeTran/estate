@@ -9,11 +9,8 @@ pub fn gen_intent(goal: &str) -> Result<String> {
 		return Err(anyhow!("cannot generate Intent prompt from empty goal"));
 	}
 
-	let prompt_template = std::fs::read_to_string(SDLC_PROMPT_INTENT)?;
-	let template = std::fs::read_to_string(SDLC_TEMPLATE_INTENT)?;
-
-	let prompt = prompt_template
-		.replace("{template}", &template)
+	let prompt = SDLC_PROMPT_INTENT
+		.replace("{template}", SDLC_TEMPLATE_INTENT)
 		.replace("{goal}", goal);
 
 	Ok(prompt)
@@ -24,11 +21,8 @@ pub fn gen_spec(intent: &str) -> Result<String> {
 		return Err(anyhow!("cannot generate Spec prompt from empty Intent"));
 	}
 
-	let prompt_template = std::fs::read_to_string(SDLC_PROMPT_SPEC)?;
-	let template = std::fs::read_to_string(SDLC_TEMPLATE_SPEC)?;
-
-	let prompt = prompt_template
-		.replace("{template}", &template)
+	let prompt = SDLC_PROMPT_SPEC
+		.replace("{template}", SDLC_TEMPLATE_SPEC)
 		.replace("{intent}", intent);
 
 	Ok(prompt)
@@ -41,11 +35,9 @@ pub fn gen_plan(intent: &str, spec: &str) -> Result<String> {
 	if spec.trim().is_empty() {
 		return Err(anyhow!("Spec artifact is empty"));
 	}
-	let prompt_template = std::fs::read_to_string(SDLC_PROMPT_PLAN)?;
-	let template = std::fs::read_to_string(SDLC_TEMPLATE_PLAN)?;
 
-	let prompt = prompt_template
-		.replace("{template}", &template)
+	let prompt = SDLC_PROMPT_PLAN
+		.replace("{template}", SDLC_TEMPLATE_PLAN)
 		.replace("{intent}", intent)
 		.replace("{spec}", spec);
 

@@ -92,9 +92,20 @@ impl FS {
 	where
 		T: Serialize,
 	{
-		let path = Self::ensure_parent(path)?;
+		let original_path = path.into();
+		let path = Self::ensure_parent(original_path.clone())?;
+
+		tracing::info!(
+			original = %original_path.display(),
+			resolved = %path.display(),
+			"FS::save path"
+		);
+
 		let contents = serde_json::to_string_pretty(value)?;
+
 		fs::write(&path, contents).with_context(|| format!("write {}", path.display()))?;
+
+		tracing::info!(path = %path.display(), "FS::save succeeded");
 		Ok(())
 	}
 
@@ -264,6 +275,12 @@ impl Kontex {
 		T: serde::Serialize,
 	{
 		let path = self.path(FW::Log)?.join("sdlc.current.json");
+
+		tracing::info!(
+				path = %path.display(),
+				parent_exists = path.parent().is_some_and(|p| p.exists()),
+				"Saving SDLC session"
+		);
 		FS::save(path, value)
 	}
 	pub fn log_read(&self, name: &str) -> Result<String> {

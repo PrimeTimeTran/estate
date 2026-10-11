@@ -10,6 +10,7 @@ pub const TODO: &'static str = r#"
 pub const SDLC_LOG_DIR: &str = "/Users/future/kb/project/crates/estate/log";
 pub const SDLC_LOG_FILE_NAME: &str = "events.jsonl";
 
+pub static DEFAULT_LOOP_TRIES: u32 = 3;
 pub static DEFAULT_NAUL_BAR: f64 = 0.40;
 pub static DEFAULT_MODEL: &str = "qwen3:8b";
 

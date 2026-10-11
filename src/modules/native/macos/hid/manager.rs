@@ -543,9 +543,9 @@ impl MacosHid {
 			.key_code
 			.map(|code| code.to_string())
 			.unwrap_or_default();
-		if app == "Zed" {
-			tracing::info!("Zed Focused");
-		}
+		// if app == "Zed" {
+		// tracing::info!("Zed Focused");
+		// }
 		println!(
 			"{:<10} | {:<17} | {:<17} | {:<7} | {:<16} | {:>5}",
 			app, left, right, special, event_display, key_code,

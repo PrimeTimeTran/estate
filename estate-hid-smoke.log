@@ -1,0 +1,5 @@
+TIME          LS LC LO LM | RS RC RO RM | FN CP | EVENT              FLAGS
+              -- --------- | --------- | -- -- | ------------------ ----------------
+Columns: LS LC LO LM = left modifiers, RS RC RO RM = right modifiers, FN CP = Fn/Caps
+Event flags are aggregate CoreGraphics state; left/right state is reconstructed from keycodes
+

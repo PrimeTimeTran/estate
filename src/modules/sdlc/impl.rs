@@ -214,7 +214,7 @@ impl Attempt {
 		Self {
 			stage: Stage::Intent,
 			number: 1,
-			max: 100,
+			max: DEFAULT_LOOP_TRIES,
 		}
 	}
 }
@@ -909,6 +909,7 @@ impl Pipeline {
 		Ok(())
 	}
 	fn session_save(session: &AiSession) -> Result<()> {
+		tracing::warn!("session_save");
 		FS::save(SpecialFile::WriteCurrent.path()?, session)?;
 		Ok(())
 	}
@@ -954,7 +955,7 @@ impl Pipeline {
 	}
 	fn next_attempt(&mut self, stage: Stage) -> Result<Attempt> {
 		let session = self.session()?;
-		let max = 100;
+		let max = DEFAULT_LOOP_TRIES;
 		let number = session
 			.stages
 			.iter()
@@ -1013,7 +1014,7 @@ impl Pipeline {
 					StageActor::Runner,
 					Utc::now(),
 					Some(Utc::now()),
-					error.to_string(),
+					format!("{error:#}"),
 					None,
 				),
 				Outcome::EvaluationFailed { execution, error } => (
@@ -1047,10 +1048,10 @@ impl Pipeline {
 		Ok(())
 	}
 	fn persist_session(&mut self) -> Result<()> {
+		tracing::warn!("persist_session");
 		let session = self.session()?;
 		Self::session_save(session)
 	}
-
 	fn push_stage_record(&mut self, record: StageRunRecord) -> Result<()> {
 		let session = self.session()?;
 		session.stages.push(record);
@@ -1924,13 +1925,20 @@ impl PipeRunner<'_> {
 					Decision::AwaitHuman
 				}
 			}
-			Outcome::ExecutionFailed { attempt, .. } => {
-				tracing::info!(
-					">>> ExecutionFailed: stage={:?} attempt={}/{}",
-					attempt.stage,
-					attempt.number,
-					attempt.max,
+			Outcome::ExecutionFailed { attempt, error, .. } => {
+				tracing::error!(
+						stage = ?attempt.stage,
+						attempt = attempt.number,
+						error = %error,
+						error_debug = ?error,
+						"SDLC execution failed"
 				);
+				// tracing::info!(
+				// 	">>> ExecutionFailed: stage={:?} attempt={}/{}",
+				// 	attempt.stage,
+				// 	attempt.number,
+				// 	attempt.max,
+				// );
 				if attempt.number < attempt.max {
 					tracing::info!(">>> attempt {}/{} -> Retry", attempt.number, attempt.max,);
 					Decision::Retry
@@ -2319,25 +2327,53 @@ impl PipeRunner<'_> {
 	}
 
 	async fn on_intent(&mut self, input: StageInput) -> Result<RunResult> {
-		let (stage, _session_dir) = self.stage_dir();
+		let (stage, session_dir) = self.stage_dir();
 		let goal = self.session().prompt.clone();
+
+		tracing::info!(
+			stage = ?stage,
+			session_dir = %session_dir.display(),
+			goal_len = goal.len(),
+			"Intent: start"
+		);
+
 		if stage != Stage::Intent {
 			return Err(anyhow!("cannot execute Intent stage while at {stage:?}"));
 		}
+
 		let prompt = p::gen_intent(&goal)?;
-		std::fs::write(SYS_PROMPT_INTENT, &prompt).context("writing Intent prompt debug file")?;
+		tracing::info!(prompt_len = prompt.len(), "Intent: prompt generated");
+
+		std::fs::write(SYS_PROMPT_INTENT, &prompt).context("Intent: writing prompt debug file")?;
+		tracing::info!("Intent: prompt debug file written");
+
 		let generated = self
 			.pipeline
 			.system
 			.runtime
 			.generate(&prompt)
 			.await
-			.context("generating Intent artifact from template and user goal")?;
+			.context("Intent: generating artifact")?;
+		tracing::info!(
+			generated_len = generated.len(),
+			"Intent: generation returned"
+		);
+
 		if generated.trim().is_empty() {
 			return Err(anyhow!("generated Intent artifact is empty"));
 		}
-		self.write(&generated)?;
-		self.pipeline.persist_progress("Intent stage completed")?;
+
+		self
+			.write(&generated)
+			.context("Intent: writing generated artifact")?;
+		tracing::info!("Intent: artifact written");
+
+		self
+			.pipeline
+			.persist_progress("Intent stage completed")
+			.context("Intent: persisting progress")?;
+		tracing::info!("Intent: progress persisted");
+
 		Ok(RunResult::Intent)
 	}
 	async fn on_spec(&mut self, input: StageInput) -> Result<RunResult> {
@@ -2704,9 +2740,19 @@ impl PipeRunner<'_> {
 	fn write(&mut self, content: &str) -> Result<()> {
 		let (stage, session_dir) = self.stage_dir();
 		let filename = format!("{stage:?}").to_lowercase() + ".md";
-		let output_path = session_dir.join(filename);
+		let output_path = session_dir.join(&filename);
 
-		Pipeline::write(output_path, content)?;
+		tracing::info!(
+				stage = ?stage,
+				session_dir = %session_dir.display(),
+				filename = %filename,
+				output_path = %output_path.display(),
+				content_len = content.len(),
+				"SDLC artifact write"
+		);
+
+		Pipeline::write(output_path, content).context("writing generated SDLC artifact")?;
+
 		Ok(())
 	}
 }
@@ -2738,7 +2784,7 @@ impl Stage {
 			Stage::Deploy => 6,
 			Stage::Maintain => 7,
 			Stage::Complete => 8,
-			Stage::Finalize => 100,
+			Stage::Finalize => DEFAULT_LOOP_TRIES,
 		};
 		rank(self) < rank(other)
 	}
