@@ -238,13 +238,3 @@ pub struct HostWorker<C: Ctx> {
 	pub shutdown: CancellationToken,
 }
 
-// #[tauri::command]
-// fn workers() -> Vec<WorkerInfo> {
-// host.workers().snapshot()
-// }
-//
-// #[tauri::command]
-// async fn stop_worker(id: WorkerId) -> Result<()> {
-// host.workers().stop(id).await
-// }
-//

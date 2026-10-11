@@ -2,6 +2,7 @@ use anyhow::Context as CtxAnyhow;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use std::io::IsTerminal;
 
+use std::time::{Duration, Instant};
 use estate::prelude::*;
 
 // 1. Normal run
@@ -50,7 +51,6 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 	let resume_from_build = std::env::var_os("SDLC_RESUME_BUILD").is_some();
 
-	use std::time::{Duration, Instant};
 	let session_started_at = chrono::Local::now().format("%H:%M:%S").to_string();
 	let session_started = Instant::now();
 
