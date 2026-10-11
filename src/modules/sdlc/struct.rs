@@ -110,24 +110,24 @@ pub struct OllamaResponse {
 
 #[derive(Debug)]
 pub struct PipelineRuntime<Context: Ctx> {
-    pub activity: Vec<String>,
-    pub attempt: u32,
-    pub confidence: Option<f64>,
-    pub error: Option<String>,
-    pub event_history: Vec<SdlcEvent>,
-    pub event_bus: EventBus,
-    pub history: Vec<SdlcEvent>,
-    pub message: Option<String>,
-    pub passed: Option<bool>,
-    pub phase: Phase,
-    pub pipeline: Pipeline,
-    pub runtime: Arc<NativeRuntime<Context>>,
-    pub score: Option<f64>,
-    pub stage: Stage,
-    pub stage_time_started: Instant,
-    pub time_started: Instant,
-    pub total_agent_calls: u32,
-    pub total_tokens: u64,
+	pub activity: Vec<String>,
+	pub attempt: u32,
+	pub confidence: Option<f64>,
+	pub error: Option<String>,
+	pub event_history: Vec<SdlcEvent>,
+	pub event_bus: EventBus,
+	pub history: Vec<SdlcEvent>,
+	pub message: Option<String>,
+	pub passed: Option<bool>,
+	pub phase: Phase,
+	pub pipeline: Pipeline,
+	pub runtime: Arc<NativeRuntime<Context>>,
+	pub score: Option<f64>,
+	pub stage: Stage,
+	pub stage_time_started: Instant,
+	pub time_started: Instant,
+	pub total_agent_calls: u32,
+	pub total_tokens: u64,
 }
 #[derive(Debug, Clone)]
 pub struct PipelineRuntimeView {
@@ -227,11 +227,11 @@ pub struct WSSnapshot {
 pub struct Intent {}
 pub struct Spec {}
 pub struct Plan {
-  name: String,
-  description: String,
-  framework: Option<String>,
-  language: Option<String>,
-  test_suite_lang: Option<String>,
-  test_suite_framework: Option<String>,
-  targets: Option<Vec<String>>,
+	name: String,
+	description: String,
+	framework: Option<String>,
+	language: Option<String>,
+	test_suite_lang: Option<String>,
+	test_suite_framework: Option<String>,
+	targets: Option<Vec<String>>,
 }

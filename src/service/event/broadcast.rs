@@ -33,7 +33,6 @@ impl SendsEvents for BroadcastSender<e::Event> {
 	}
 }
 
-
 #[derive(Debug)]
 pub struct BroadcastReceiver<T> {
 	pub id: u64,
@@ -44,4 +43,3 @@ pub struct BroadcastReceiver<T> {
 pub struct BroadcastSender<T> {
 	pub tx: broadcast::Sender<T>,
 }
-

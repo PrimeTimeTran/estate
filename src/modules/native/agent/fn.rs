@@ -1,6 +1,6 @@
 use super::*;
-use std::fmt::Write;
 use anyhow::Context as CtxAnyhow;
+use std::fmt::Write;
 
 pub fn build_prompt(run: &AgentRun) -> String {
 	let ctx = &run.ctx;
@@ -20,10 +20,7 @@ pub fn build_prompt(run: &AgentRun) -> String {
 		}
 	};
 
-	eprintln!(
-		"{}",
-		fmt_kv("CWD:", &ctx.workspace.cwd.to_str().unwrap())
-	);
+	eprintln!("{}", fmt_kv("CWD:", &ctx.workspace.cwd.to_str().unwrap()));
 	eprintln!("{}", fmt_kv("PLAN PATH:", plan_path));
 	eprintln!(
 		"{}",

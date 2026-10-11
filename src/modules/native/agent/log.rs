@@ -19,7 +19,6 @@ fn append_line(path: &str, message: &str) -> anyhow::Result<()> {
 	Ok(())
 }
 
-
 pub fn append_event(event: &impl Debug) -> anyhow::Result<()> {
 	let timestamp = chrono::Local::now().to_rfc3339();
 	let event = format!("{event:?}");

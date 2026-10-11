@@ -163,7 +163,6 @@ impl Agent {
 			message: msg.clone(),
 		});
 
-
 		if let Err(error) = crate::agent::log::append_event(&event) {
 			eprintln!("Failed to write agent event log: {error:#}");
 		}
