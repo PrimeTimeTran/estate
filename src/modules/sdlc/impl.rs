@@ -43,7 +43,7 @@ impl crate::traits::DateableSession for AiSession {
 	}
 }
 impl AiView {
-	pub fn apply(&mut self, event: SdlcEvent) {
+	pub fn apply(&mut self, event: e::SdlcEvent) {
 		match event {
 			SdlcEvent::RunStarted => {
 				self.runtime.phase = Phase::Starting;
@@ -916,18 +916,16 @@ impl Pipeline {
 		Ok(std::fs::write(path, contents)?)
 	}
 	fn emit(&self, event: SdlcEvent) {
-		let _ = self.event_tx.send(event.clone());
-
-		let path = std::path::Path::new(SDLC_LOG_DIR).join(SDLC_LOG_FILE_NAME);
-
-		if let Ok(mut file) = std::fs::OpenOptions::new()
-			.create(true)
-			.append(true)
-			.open(path)
-		{
-			let _ = serde_json::to_writer(&mut file, &event);
-			let _ = writeln!(file);
-		}
+		// let _ = self.event_tx.send(event.clone());
+		// let path = std::path::Path::new(SDLC_LOG_DIR).join(SDLC_LOG_FILE_NAME);
+		// if let Ok(mut file) = std::fs::OpenOptions::new()
+		// 	.create(true)
+		// 	.append(true)
+		// 	.open(path)
+		// {
+		// 	let _ = serde_json::to_writer(&mut file, &event);
+		// 	let _ = writeln!(file);
+		// }
 	}
 	fn evaluate_checks(&self, checks: &[CheckResult]) -> Vec<Metric> {
 		checks
@@ -1123,9 +1121,9 @@ impl Pipeline {
 		self.session()?.stage = stage;
 		Ok(())
 	}
-	pub fn subscribe(&self) -> broadcast::Receiver<SdlcEvent> {
-		self.event_tx.subscribe()
-	}
+	// pub fn subscribe(&self) -> broadcast::Receiver<SdlcEvent> {
+	// 	self.
+	// }
 
 	async fn evaluate(&self, execution: &Execution) -> Result<QACheck> {
 		self.qa.evaluate(execution).await
@@ -1289,25 +1287,27 @@ impl Pipeline {
 		};
 		let system = AgentSystem::new();
 		let generator = Box::new(LocalGenerator::new(system.runtime.clone(), DEFAULT_MODEL));
-		let (event_tx, _event_rx) = tokio::sync::broadcast::channel::<SdlcEvent>(256);
+		// let (event_tx, _event_rx) = tokio::sync::broadcast::channel::<SdlcEvent>(256);
 		Ok(Self {
 			qa,
 			system,
 			kontex,
 			generator,
 			session,
-			event_tx,
+			// event_tx,
 			stage_attempt: 0,
 		})
 	}
 }
 impl<C: Ctx> PipelineRuntime<C> {
 	pub fn new(pipeline: Pipeline, runtime: Arc<NativeRuntime<C>>) -> Self {
+		let event_bus = EventBus::new();
 		let stage = pipeline.stage().clone();
 		Self {
 			stage,
 			pipeline,
 			runtime,
+			event_bus,
 			activity: vec![],
 			attempt: 0,
 			confidence: None,
@@ -1321,7 +1321,7 @@ impl<C: Ctx> PipelineRuntime<C> {
 			total_agent_calls: 0,
 			total_tokens: 0,
 			error: None,
-			events: vec![],
+			event_history: vec![],
 		}
 	}
 	fn retry(&mut self, _stage: Stage) -> Result<()> {
@@ -1343,7 +1343,7 @@ impl<C: Ctx> PipelineRuntime<C> {
 			total_tokens: self.total_tokens,
 			total_agent_calls: self.total_agent_calls,
 			history: self.history.clone(),
-			events: self.events.clone(),
+			events: self.event_history.clone(),
 		}
 	}
 	pub async fn run(&mut self, input_rx: &mut UnboundedReceiver<SdlcInput>) -> Result<()> {

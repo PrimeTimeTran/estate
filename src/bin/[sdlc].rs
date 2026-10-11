@@ -42,7 +42,7 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	println!(">>> creating runtime");
 	println!(">>> runtime created");
 
-	let mut events = runtime.pipeline.subscribe();
+	let mut events = runtime.event_bus.subscribe();
 	let mut view = AiView::new(&runtime);
 
 	let (input_tx, mut input_rx) = tokio::sync::mpsc::unbounded_channel::<SdlcInput>();
@@ -129,25 +129,26 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 				event = events.recv() => {
 						match event {
 								Ok(event) => {
-										view.apply(event);
-										terminal.draw(|frame| {
+									if let e::EventKind::Sdlc(sdlc_event) = event.kind {
+											view.apply(sdlc_event);
+											terminal.draw(|frame| {
 												AiView::render(frame, &view);
-										})?;
-								}
+											})?;
+										}
+									}
 
 								Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
 										view.apply(SdlcEvent::Failed {
-												stage: Some(view.runtime.stage),
-												error: format!("TUI event receiver lagged by {n} events"),
+											stage: Some(view.runtime.stage),
+											error: format!("TUI event receiver lagged by {n} events"),
 										});
 
 										terminal.draw(|frame| {
-												AiView::render(frame, &view);
+											AiView::render(frame, &view);
 										})?;
 								}
-
 								Err(tokio::sync::broadcast::error::RecvError::Closed) => {
-										break Ok(());
+									break Ok(());
 								}
 						}
 				}

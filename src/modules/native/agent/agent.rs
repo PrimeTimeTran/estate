@@ -10,17 +10,24 @@ impl Agent {
 			tokens_seen: 0,
 		}
 	}
-	fn emit_thinking(&self, task: &AgentTask, event_tx: &UnboundedSender<RuntimeEvent>) {
-		let event = RuntimeEvent::Agent(AgentEvent::Thinking { task: task.clone() });
 
-		if let Err(error) = crate::agent::log::append_event(&event) {
+	fn emit_thinking(&self, task: &AgentTask, event_tx: &UnboundedSender<RuntimeEvent>) {
+		let mut log_task = task.clone();
+		log_task.prompt = crate::agent::log::truncate(&task.prompt, 50);
+
+		let log_event = RuntimeEvent::Agent(AgentEvent::Thinking { task: log_task });
+
+		if let Err(error) = crate::agent::log::append_event(&log_event) {
 			eprintln!("Failed to write agent event log: {error:#}");
 		}
+
+		let event = RuntimeEvent::Agent(AgentEvent::Thinking { task: task.clone() });
 
 		if let Err(error) = event_tx.send(event) {
 			eprintln!("Failed to emit thinking event: {error}");
 		}
 	}
+
 	fn guard_action(
 		&self,
 		action: &AgentAction,
@@ -150,11 +157,12 @@ impl Agent {
 				run.ctx.history.len(),
 			),
 		};
-
+		let msg = crate::agent::log::truncate(&message, 50);
 		let event = RuntimeEvent::Agent(AgentEvent::Working {
 			task: task.clone(),
-			message: message.clone(),
+			message: msg.clone(),
 		});
+
 
 		if let Err(error) = crate::agent::log::append_event(&event) {
 			eprintln!("Failed to write agent event log: {error:#}");
@@ -306,10 +314,7 @@ impl Agent {
 		let raw = build_action(&prompt).await?;
 		eprintln!("{}", fmt_kv("pick_action:", "build_action RETURNED"));
 		let action = AgentAction::try_from(raw)?;
-		eprintln!(
-			"{}",
-			fmt_kv("pick_action:", &format!("PARSED {action:?}"))
-		);
+		eprintln!("{}", fmt_kv("pick_action:", &format!("PARSED {action:?}")));
 		Ok(action)
 	}
 	async fn select_action(&self, run: &mut AgentRun, step: usize) -> Result<Option<AgentAction>> {

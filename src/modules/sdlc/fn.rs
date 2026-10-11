@@ -140,50 +140,6 @@ where
 	}
 }
 
-pub fn _build_steps() -> Vec<BuildStep> {
-	vec![
-		BuildStep::new(
-			"Read plan.md and identify the files that must be created or modified.",
-			"All planned files and their intended locations are identified.",
-		),
-		BuildStep::new(
-			"Inspect the relevant existing files and repository structure for the files identified by the plan.",
-			"Relevant existing files have been inspected and their current state is understood.",
-		),
-		BuildStep::new(
-			"Create the planned files and establish their basic structure.",
-			"Every planned file exists at its planned path.",
-		),
-		BuildStep::new(
-			"Implement the planned functionality in the files created or modified so far.",
-			"The planned functionality is implemented in the correct files.",
-		),
-		BuildStep::new(
-			"Inspect the implementation and compare it against the specification and plan.",
-			"The implementation has been checked against the specification and plan.",
-		),
-		BuildStep::new(
-			"Add the planned unit and integration tests.",
-			"All planned tests exist at their intended paths.",
-		),
-		BuildStep::new(
-			"Run the relevant tests and verification commands.",
-			"The relevant tests and verification commands have been executed.",
-		),
-		BuildStep::new(
-			"Inspect any failures and determine what implementation changes are required.",
-			"Each failure has been understood and a corrective action has been identified.",
-		),
-		BuildStep::new(
-			"Fix the implementation or tests based on the failures and rerun verification.",
-			"Previously failing verification now passes, or the remaining failure is explicitly understood.",
-		),
-		BuildStep::new(
-			"Review the completed implementation against the plan and identify any remaining work.",
-			"No required work from the plan remains incomplete.",
-		),
-	]
-}
 pub fn build_steps() -> Vec<&'static str> {
 	vec![
 		"Read plan.md and identify the files that must be created or modified.",

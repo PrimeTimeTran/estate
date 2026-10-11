@@ -110,23 +110,24 @@ pub struct OllamaResponse {
 
 #[derive(Debug)]
 pub struct PipelineRuntime<Context: Ctx> {
-	pub activity: Vec<String>,
-	pub attempt: u32,
-	pub confidence: Option<f64>,
-	pub error: Option<String>,
-	pub events: Vec<SdlcEvent>,
-	pub history: Vec<SdlcEvent>,
-	pub message: Option<String>,
-	pub passed: Option<bool>,
-	pub phase: Phase,
-	pub pipeline: Pipeline,
-	pub runtime: Arc<NativeRuntime<Context>>,
-	pub score: Option<f64>,
-	pub stage: Stage,
-	pub stage_time_started: Instant,
-	pub time_started: Instant,
-	pub total_agent_calls: u32,
-	pub total_tokens: u64,
+    pub activity: Vec<String>,
+    pub attempt: u32,
+    pub confidence: Option<f64>,
+    pub error: Option<String>,
+    pub event_history: Vec<SdlcEvent>,
+    pub event_bus: EventBus,
+    pub history: Vec<SdlcEvent>,
+    pub message: Option<String>,
+    pub passed: Option<bool>,
+    pub phase: Phase,
+    pub pipeline: Pipeline,
+    pub runtime: Arc<NativeRuntime<Context>>,
+    pub score: Option<f64>,
+    pub stage: Stage,
+    pub stage_time_started: Instant,
+    pub time_started: Instant,
+    pub total_agent_calls: u32,
+    pub total_tokens: u64,
 }
 #[derive(Debug, Clone)]
 pub struct PipelineRuntimeView {
@@ -179,7 +180,7 @@ pub struct Pipeline {
 	pub system: AgentSystem,
 	pub generator: Box<dyn Generator>,
 	pub session: AiSession,
-	pub event_tx: broadcast::Sender<SdlcEvent>,
+	// pub event_tx: broadcast::Sender<SdlcEvent>,
 	pub stage_attempt: u32,
 }
 pub struct PipeRunner<'a> {
