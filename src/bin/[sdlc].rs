@@ -1,4 +1,4 @@
-use anyhow::Context;
+use anyhow::Context as CtxAnyhow;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use std::io::IsTerminal;
 
@@ -46,16 +46,8 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let mut view = AiView::new(&runtime);
 
 	let (input_tx, mut input_rx) = tokio::sync::mpsc::unbounded_channel::<SdlcInput>();
-
 	let use_tui = std::env::var_os("SDLC_TUI").is_some();
 
-	// if !use_tui {
-	// println!(">>> starting runtime");
-	// runtime.run(&mut input_rx).await.context("runtime.run")?;
-	//
-	// println!(">>> runtime finished");
-	// return Ok(());
-	// }
 	let resume_from_build = std::env::var_os("SDLC_RESUME_BUILD").is_some();
 
 	use std::time::{Duration, Instant};
@@ -93,9 +85,7 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 		} else {
 			runtime.run(&mut input_rx).await.context("runtime.run")
 		};
-
 		ticker.abort();
-
 		println!(">>> runtime finished");
 		result?;
 		return Ok(());
@@ -140,7 +130,6 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 						match event {
 								Ok(event) => {
 										view.apply(event);
-
 										terminal.draw(|frame| {
 												AiView::render(frame, &view);
 										})?;

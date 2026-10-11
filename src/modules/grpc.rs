@@ -32,7 +32,6 @@ impl Server {
 		Ok(())
 	}
 }
-
 impl ServerBuilder {
 	pub fn new() -> Self {
 		Self { events: None }
@@ -52,8 +51,8 @@ impl ServerBuilder {
 }
 
 pub struct Server {
-	pub event_service: EventService,
 	pub events: EventBus,
+	pub event_service: EventService,
 }
 pub struct ServerBuilder {
 	events: Option<EventBus>,

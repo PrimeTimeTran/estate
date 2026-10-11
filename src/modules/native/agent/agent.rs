@@ -13,7 +13,7 @@ impl Agent {
 	fn emit_thinking(&self, task: &AgentTask, event_tx: &UnboundedSender<RuntimeEvent>) {
 		let event = RuntimeEvent::Agent(AgentEvent::Thinking { task: task.clone() });
 
-		if let Err(error) = crate::agent::log::append_agent_event(&event) {
+		if let Err(error) = crate::agent::log::append_event(&event) {
 			eprintln!("Failed to write agent event log: {error:#}");
 		}
 
@@ -122,7 +122,7 @@ impl Agent {
 			message: message.clone(),
 		});
 
-		if let Err(error) = crate::agent::log::append_agent_event(&event) {
+		if let Err(error) = crate::agent::log::append_event(&event) {
 			eprintln!("Failed to write agent event log: {error:#}");
 		}
 
@@ -156,7 +156,7 @@ impl Agent {
 			message: message.clone(),
 		});
 
-		if let Err(error) = crate::agent::log::append_agent_event(&event) {
+		if let Err(error) = crate::agent::log::append_event(&event) {
 			eprintln!("Failed to write agent event log: {error:#}");
 		}
 
@@ -215,7 +215,7 @@ impl Agent {
 
 		let final_message = format!(
 			"{message}\n\nRuntime-observed changed files:\n{}",
-			format_changed_files(&final_changed_paths),
+			fmt_changed_files(&final_changed_paths),
 		);
 
 		Ok(Some(TaskResult::completed_with_summary(
@@ -230,7 +230,7 @@ impl Agent {
 	fn emit_finished(&self, event_tx: &UnboundedSender<RuntimeEvent>, result: TaskResult) {
 		let event = RuntimeEvent::Agent(AgentEvent::Finished { result });
 
-		if let Err(error) = crate::agent::log::append_agent_event(&event) {
+		if let Err(error) = crate::agent::log::append_event(&event) {
 			eprintln!("Failed to write agent event log: {error:#}");
 		}
 
@@ -294,7 +294,7 @@ impl Agent {
 		})
 	}
 	async fn pick_action(&self, run: &AgentRun) -> Result<AgentAction> {
-		eprintln!("{}", format_kv("pick_action:", "ENTER"));
+		eprintln!("{}", fmt_kv("pick_action:", "ENTER"));
 		let prompt = build_prompt(run);
 
 		eprintln!("ACTION PROMPT CHARS: {}", prompt.len());
@@ -302,13 +302,13 @@ impl Agent {
 			"ACTION PROMPT CONTAINS PLAN: {}",
 			prompt.contains("# Plan:")
 		);
-		eprintln!("{}", format_kv("pick_action:", "CALLING build_action"));
+		eprintln!("{}", fmt_kv("pick_action:", "CALLING build_action"));
 		let raw = build_action(&prompt).await?;
-		eprintln!("{}", format_kv("pick_action:", "build_action RETURNED"));
+		eprintln!("{}", fmt_kv("pick_action:", "build_action RETURNED"));
 		let action = AgentAction::try_from(raw)?;
 		eprintln!(
 			"{}",
-			format_kv("pick_action:", &format!("PARSED {action:?}"))
+			fmt_kv("pick_action:", &format!("PARSED {action:?}"))
 		);
 		Ok(action)
 	}
@@ -390,7 +390,7 @@ impl Agent {
 				let message = format!(
 					"Shell execution failed for `{command}`: {error:#}\n\
 					Observed workspace changes:\n{}",
-					format_changed_files(&changed_paths),
+					fmt_changed_files(&changed_paths),
 				);
 
 				eprintln!("{message}");
@@ -442,7 +442,7 @@ impl Agent {
 
 		println!(
 			"FILES CHANGED BY ACTION:\n{}",
-			format_changed_files(&changed_paths),
+			fmt_changed_files(&changed_paths),
 		);
 
 		let success = result.exit_code == Some(0);
@@ -484,7 +484,7 @@ impl Agent {
 				{}\n\
 				These changes were observed by the runtime. Inspect and verify \
 				the relevant files before claiming completion.",
-				format_changed_files(&changed_paths),
+				fmt_changed_files(&changed_paths),
 			),
 		});
 
@@ -527,7 +527,7 @@ impl Agent {
 				let message = format!(
 					"Program execution failed for `{display_command}`: {error:#}\n\
 					Observed workspace changes:\n{}",
-					format_changed_files(&changed_paths),
+					fmt_changed_files(&changed_paths),
 				);
 
 				eprintln!("{message}");
@@ -580,7 +580,7 @@ impl Agent {
 
 		println!(
 			"FILES CHANGED BY ACTION:\n{}",
-			format_changed_files(&changed_paths),
+			fmt_changed_files(&changed_paths),
 		);
 		let success = result.exit_code == Some(0);
 		run.record_command(CommandRecord {
@@ -618,7 +618,7 @@ impl Agent {
 				{}\n\
 				These changes were observed by the runtime. Inspect and verify \
 				the relevant files before claiming completion.",
-				format_changed_files(&changed_paths),
+				fmt_changed_files(&changed_paths),
 			),
 		});
 		run
@@ -655,7 +655,7 @@ impl Agent {
 		const PLAN: &str = include_str!("../../../../log/plan.md");
 		eprintln!(
 			"{}",
-			format_kv("TASK CONTAINS PLAN:", &prompt.contains(&PLAN).to_string())
+			fmt_kv("TASK CONTAINS PLAN:", &prompt.contains(&PLAN).to_string())
 		);
 		eprintln!("PLAN CHARS: {}", PLAN.chars().count());
 		eprintln!("PROMPT CHARS: {}", prompt.chars().count());
@@ -1066,12 +1066,7 @@ pub struct AgentBus {
 pub struct AgentCompletionValidation {
 	pub errors: Vec<String>,
 }
-pub struct AgentContextInfo {
-	pub cwd: PathBuf,
-	pub workspace_dir: PathBuf,
-	pub project_dir: PathBuf,
-	pub settings_file: Option<PathBuf>,
-}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct AgentCtx {
 	pub prompt: Option<String>,
@@ -1147,6 +1142,17 @@ pub struct CommandRecord {
 
 	/// Timestamp when the command record was created.
 	pub timestamp: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Clone, Debug)]
+pub struct ExecutionRecord {
+	pub step: usize,
+	pub action: String,
+	pub cwd: Option<PathBuf>,
+	pub outcome: ExecutionOutcome,
+	pub exit_code: Option<i32>,
+	pub stdout: String,
+	pub stderr: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

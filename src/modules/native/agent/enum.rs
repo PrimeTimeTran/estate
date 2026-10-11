@@ -5,19 +5,13 @@ use std::collections::HashMap;
 #[serde(tag = "action")]
 pub enum AgentAction {
 	#[serde(rename = "finish")]
-	Finish {
-		message: String,
-	},
+	Finish { message: String },
 
 	#[serde(rename = "current")]
-	Current {
-		message: String,
-	},
+	Current { message: String },
 
 	#[serde(rename = "run_command")]
-	RunCommand {
-		command: String,
-	},
+	RunCommand { command: String },
 
 	#[serde(rename = "run_program")]
 	RunProgram {
@@ -28,9 +22,7 @@ pub enum AgentAction {
 	},
 
 	#[serde(rename = "context")]
-	Context {
-		path: Option<String>,
-	},
+	Context { path: Option<String> },
 }
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum AgentEvent {
@@ -69,6 +61,12 @@ pub enum Artifact {
 pub enum CommandSpec {
 	Shell { command: String },
 	Program { program: String, args: Vec<String> },
+}
+#[derive(Clone, Debug)]
+pub enum ExecutionOutcome {
+	Succeeded,
+	Failed,
+	Rejected { reason: String },
 }
 
 #[derive(Debug)]

@@ -122,7 +122,6 @@ impl RuntimeMetrics {
 
 	pub fn record_test(&mut self, passed: bool) {
 		self.tests_run += 1;
-
 		if passed {
 			self.tests_passed += 1;
 		} else {

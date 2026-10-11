@@ -105,7 +105,7 @@ pub enum SdlcEvent {
 		reason: String,
 	},
 	PhaseChanged {
-	  stage: Stage,
+		stage: Stage,
 		phase: Phase,
 	},
 	StageRetrying {

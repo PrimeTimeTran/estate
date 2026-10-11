@@ -111,24 +111,22 @@ pub struct OllamaResponse {
 #[derive(Debug)]
 pub struct PipelineRuntime<Context: Ctx> {
 	pub activity: Vec<String>,
-	pub pipeline: Pipeline,
 	pub attempt: u32,
-	pub stage: e::Stage,
-	pub time_started: Instant,
-	pub stage_time_started: Instant,
-	pub phase: Phase,
-	pub score: Option<f64>,
 	pub confidence: Option<f64>,
-	pub passed: Option<bool>,
-	pub message: Option<String>,
 	pub error: Option<String>,
-	pub total_tokens: u64,
-	pub total_agent_calls: u32,
-	pub history: Vec<SdlcEvent>,
 	pub events: Vec<SdlcEvent>,
-	// pub host: Host<Context>,
+	pub history: Vec<SdlcEvent>,
+	pub message: Option<String>,
+	pub passed: Option<bool>,
+	pub phase: Phase,
+	pub pipeline: Pipeline,
 	pub runtime: Arc<NativeRuntime<Context>>,
-
+	pub score: Option<f64>,
+	pub stage: Stage,
+	pub stage_time_started: Instant,
+	pub time_started: Instant,
+	pub total_agent_calls: u32,
+	pub total_tokens: u64,
 }
 #[derive(Debug, Clone)]
 pub struct PipelineRuntimeView {
@@ -152,6 +150,7 @@ pub struct PipelineState<S> {
 	stage: S,
 	attempt: u32,
 }
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QACheck {
 	pub confidence: f64,
@@ -222,4 +221,16 @@ pub struct WSChanges {
 #[derive(Debug, Clone)]
 pub struct WSSnapshot {
 	pub git_status: String,
+}
+
+pub struct Intent {}
+pub struct Spec {}
+pub struct Plan {
+  name: String,
+  description: String,
+  framework: Option<String>,
+  language: Option<String>,
+  test_suite_lang: Option<String>,
+  test_suite_framework: Option<String>,
+  targets: Option<Vec<String>>,
 }

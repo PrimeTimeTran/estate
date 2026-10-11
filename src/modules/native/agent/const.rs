@@ -5,3 +5,6 @@ pub const PROMPT_PREVIEW_LEN: usize = 500;
 pub const PROMPT_PREVIEW_LINES: usize = 3;
 pub const SHELL_OUTPUT_PREVIEW_LEN: usize = 2000;
 pub const SHELL_OUTPUT_PREVIEW_LINES: usize = 5;
+pub const LOG_DIR: &str = "/Users/future/kb/project/crates/estate/log";
+pub const AGENT_LOG: &str = "/Users/future/kb/project/crates/estate/log/agent.log";
+pub const AGENT_EVENT_LOG: &str = "/Users/future/kb/project/crates/estate/log/agent-event.log";

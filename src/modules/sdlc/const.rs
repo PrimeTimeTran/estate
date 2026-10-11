@@ -95,7 +95,6 @@ Distinguish verified facts from assumptions. Do not claim to have inspected file
 Finish after producing the report.
 "#;
 
-
 pub const PROMPT_BUILD_EXECUTE: &str = r#"You are in the EXECUTE phase of the SDLC Build stage.
 
 Your objective is to implement the outstanding requirements identified
@@ -135,7 +134,6 @@ Return an implementation report containing:
 Finish when the planned implementation is complete or further progress
 is blocked. Verification will be assessed in the next phase.
 "#;
-
 
 pub const PROMPT_BUILD_VERIFY: &str = r#"You are in the VERIFY phase of the SDLC Build stage.
 

@@ -269,7 +269,6 @@ pub trait EventPublisher<E> {
 /// events.
 pub trait EventTransport {
 	type Error;
-
 	fn subscribe(
 		&mut self,
 		events: EventBus,
