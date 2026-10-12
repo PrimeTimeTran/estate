@@ -128,7 +128,7 @@ where
 {
 	let started = Instant::now();
 	tokio::pin!(future);
-	let mut ticker = tokio::time::interval(c::STATUS_INTERVAL);
+	let mut ticker = tokio::time::interval(STATUS_INTERVAL);
 	loop {
 		tokio::select! {
 			result = &mut future => {
