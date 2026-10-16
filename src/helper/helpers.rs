@@ -21,7 +21,7 @@ pub fn print_section(title: &str, file: &str, line: u32) {
 	println!("{}", "-".repeat(80).dimmed());
 	println!("{}", title.bold().cyan());
 	println!(
-		"See {}",
+		" See {}",
 		hyperlink(&format!("{file}#{line}"), &source_url(&file, line)).dimmed()
 	);
 	println!("{}", "-".repeat(80).dimmed());
@@ -84,8 +84,18 @@ pub fn print_section_info(
 			.unwrap_or(0);
 
 		for (key, value) in values {
-			print!("  {:<key_width$}  ", key.dimmed());
-			println!("{value}");
+			let mut lines = value.lines();
+
+			if let Some(first_line) = lines.next() {
+				print!("  {:<key_width$}  ", key.dimmed());
+				println!("{first_line}");
+
+				let indent = key_width + 4;
+
+				for line in lines {
+					println!("{:indent$}{line}", "");
+				}
+			}
 		}
 	}
 

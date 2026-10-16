@@ -1494,9 +1494,10 @@ impl sdlc_trait::Runner for PipeRunner<'_> {
 			let attempt = self.next_attempt(stage)?;
 			section_info!(
 				"run",
-				metrics: [],
+				metrics: [
 				"stage" => stage,
 				"attempt" => attempt,
+				],
 			);
 			// 1. Execute the current stage.
 			let outcome = self
@@ -2493,18 +2494,26 @@ impl PipeRunner<'_> {
 		self.pipeline.system.add_file(plan_path);
 
 		let workspace_before = WSSnapshot::capture(&workspace)?;
-		let workspace_before = WSSnapshot::capture(&workspace)?;
+		let git_status = workspace_before.git_status.trim();
+
+		let mut values = Vec::new();
+
+		if !git_status.is_empty() {
+			for line in git_status.lines() {
+				values.push(("changed", line.to_string()));
+			}
+		}
 
 		section_info!(
 			"workspace",
 			metrics: [
 				"files" => self.pipeline.system.runtime.workspace.files.len(),
+				"git" => if git_status.is_empty() { "clean" } else { "dirty" },
 			],
-			"git status" => if workspace_before.git_status.is_empty() {
-				"clean".to_string()
-			} else {
-				workspace_before.git_status.clone()
-			},
+			"" => values.iter()
+				.map(|(_, value)| value.as_str())
+				.collect::<Vec<_>>()
+				.join("\n"),
 		);
 
 		// Phase 1: Orient.

@@ -438,11 +438,11 @@ pub async fn build_action(prompt: &str) -> Result<LlmAction> {
 			}
 		}
 	}
-
 	log_build_action(
 		request_started.elapsed(),
 		status,
 		body.len(),
+		body.lines().count(),
 		body_elapsed,
 		response.len(),
 		&raw,
@@ -510,6 +510,7 @@ fn log_build_action(
 	request_elapsed: std::time::Duration,
 	status: reqwest::StatusCode,
 	body_len: usize,
+	body_lines: usize,
 	body_elapsed: std::time::Duration,
 	response_len: usize,
 	action: &LlmAction,
@@ -519,12 +520,14 @@ fn log_build_action(
 		"build_action",
 		metrics: [
 			"status" => status,
-			"response after" => format!("{request_elapsed:?}"),
-			"total" => format!("{total_elapsed:?}"),
+			"response after" => format!("{:.3}s", request_elapsed.as_secs_f64()),
+			"total" => format!("{:.3}s", total_elapsed.as_secs_f64()),
+			"body chars" => body_len,
+			"body lines" => body_lines,
+			"read" => format!("{:.3}s", body_elapsed.as_secs_f64()),
 			"response chars" => response_len,
 		],
 		"request" => "SENDING",
-		"body" => format!("{body_len} chars, read in {body_elapsed:?}"),
 		"action JSON" => "PARSED",
 		"action" => format!("{:?}", action.action),
 		"command" => format!("{:?}", action.command),

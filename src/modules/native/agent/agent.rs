@@ -304,16 +304,16 @@ impl Agent {
 		// eprintln!("{}", fmt_kv("pick_action:", "ENTER"));
 		let prompt = build_prompt(run);
 
-		eprintln!("ACTION PROMPT CHARS: {}", prompt.len());
-		eprintln!(
-			"ACTION PROMPT CONTAINS PLAN: {}",
-			prompt.contains("# Plan:")
-		);
-		eprintln!("{}", fmt_kv("pick_action:", "CALLING build_action"));
+		// eprintln!("ACTION PROMPT CHARS: {}", prompt.len());
+		// eprintln!(
+		// 	"ACTION PROMPT CONTAINS PLAN: {}",
+		// 	prompt.contains("# Plan:")
+		// );
+		// eprintln!("{}", fmt_kv("pick_action:", "CALLING build_action"));
 		let raw = build_action(&prompt).await?;
-		eprintln!("{}", fmt_kv("pick_action:", "build_action RETURNED"));
+		// eprintln!("{}", fmt_kv("pick_action:", "build_action RETURNED"));
 		let action = AgentAction::try_from(raw)?;
-		eprintln!("{}", fmt_kv("pick_action:", &format!("PARSED {action:?}")));
+		// eprintln!("{}", fmt_kv("pick_action:", &format!("PARSED {action:?}")));
 		Ok(action)
 	}
 	async fn select_action(&self, run: &mut AgentRun, step: usize) -> Result<Option<AgentAction>> {
@@ -666,15 +666,19 @@ impl Agent {
 		let estimated_tokens = prompt_chars.div_ceil(6);
 
 		section_info!(
-			"🏗️ 🔁 run_agent_loop",
+			"🏗️ run_agent_loop 🔁",
 			metrics: [
-				"plan" => if contains_plan { "included" } else { "missing" },
-				"prompt" => format!("{prompt_chars} chars"),
-				"tokens≈" => estimated_tokens,
-				"plan size" => format!("{plan_chars} chars"),
+				"prompt lines" => prompt.lines().count(),
+				"prompt chars" => prompt_chars,
+				"prompt tokens ≈" => prompt_chars.div_ceil(6),
+
+				"plan lines" => plan.lines().count(),
+				"plan chars" => plan_chars,
+				"plan tokens ≈" => plan_chars.div_ceil(6),
+
+				"max steps" => max_steps,
 			],
 			"plan path" => plan_path.display(),
-			"max steps" => max_steps,
 		);
 
 		print_run_metrics(&prompt, &mut run.clone(), self.files_seen);
@@ -1201,27 +1205,29 @@ fn print_run_metrics(prompt: &str, run: &mut AgentRun, files_seen: u128) {
 	let prompt = run.ctx.prompt.as_deref().unwrap_or("");
 	let prompt_chars = prompt.chars().count();
 	let estimated_tokens = prompt_chars.div_ceil(6);
-	log_run(
-		&mut run.clone(),
-		format!(
-			"RUN START: prompt_chars={prompt_chars}, estimated_tokens={estimated_tokens} (1 token / 6 chars), prompt_lines={}, history={}, commands={}, errors={}, logs={}, files={}",
-			prompt.lines().count(),
-			run.ctx.history.len(),
-			run.commands.len(),
-			run.errors.len(),
-			run.ctx.logs.len(),
-			files_seen,
-		),
+
+	section_info!(
+		"RUN START",
+		metrics: [
+			// "prompt" => format!("{prompt_chars} chars"),
+			// "tokens ≈" => estimated_tokens,
+			// "prompt lines" => prompt.lines().count(),
+			"history" => run.ctx.history.len(),
+			"commands" => run.commands.len(),
+			"errors" => run.errors.len(),
+			"logs" => run.ctx.logs.len(),
+			"files" => files_seen,
+		],
 	);
-	log_run(
-		&mut run.clone(),
-		format!(
-			"PROMPT PREVIEW:\n{}",
-			preview_lines(prompt, PROMPT_PREVIEW_LINES),
-		),
+
+	section_info!(
+		"PROMPT PREVIEW",
+		metrics: [
+			"lines shown" => PROMPT_PREVIEW_LINES,
+		],
+		"preview" => preview_lines(prompt, PROMPT_PREVIEW_LINES),
 	);
 }
-
 fn log_step(run: &mut AgentRun, step: usize, message: impl std::fmt::Display) {
 	log_run(run, format!("STEP {step}: {message}"));
 }
