@@ -660,33 +660,7 @@ impl Agent {
 		let prompt = run.ctx.prompt.as_deref().unwrap_or("");
 		const PLAN: &str = include_str!("../../../../log/plan.md");
 
-		let prompt_chars = prompt.chars().count();
-		let plan_chars = PLAN.chars().count();
-		let contains_plan = prompt.contains(PLAN);
-		let estimated_tokens = prompt_chars.div_ceil(6);
-
-		section_info!(
-			"🏗️ run_agent_loop 🔁",
-			metrics: [
-				"prompt lines" => prompt.lines().count(),
-				"prompt chars" => prompt_chars,
-				"prompt tokens ≈" => prompt_chars.div_ceil(6),
-
-				"plan lines" => plan.lines().count(),
-				"plan chars" => plan_chars,
-				"plan tokens ≈" => plan_chars.div_ceil(6),
-
-				"max steps" => max_steps,
-			],
-			"plan path" => plan_path.display(),
-		);
-
-		print_run_metrics(&prompt, &mut run.clone(), self.files_seen);
-
-		run.record_log(format!(
-  		"Initial context: prompt_chars={prompt_chars}, estimated_tokens={estimated_tokens}, workspace={}",
-  		run.ctx.workspace,
-  	));
+		print_run_metrics(&mut run.clone(), self.files_seen, &plan_path, max_steps);
 
 		self.emit_thinking(&task, &event_tx);
 		log_run(&mut run, "Selecting agent mode");
@@ -1201,17 +1175,41 @@ fn log_run(run: &mut AgentRun, message: impl Into<String>) {
 	run.record_log(format!("[🤖 AGENT] {message}"));
 }
 
-fn print_run_metrics(prompt: &str, run: &mut AgentRun, files_seen: u128) {
+fn print_run_metrics(
+	run: &mut AgentRun,
+	files_seen: u128,
+	plan_path: &std::path::Path,
+	max_steps: usize,
+) {
 	let prompt = run.ctx.prompt.as_deref().unwrap_or("");
+	const PLAN: &str = include_str!("../../../../log/plan.md");
+
 	let prompt_chars = prompt.chars().count();
+	let plan_chars = PLAN.chars().count();
 	let estimated_tokens = prompt_chars.div_ceil(6);
+	let plan_tokens = plan_chars.div_ceil(6);
+	let contains_plan = prompt.contains(PLAN);
+
+	section_info!(
+		"🏗️ run_agent_loop 🔁",
+		metrics: [
+			"prompt lines" => prompt.lines().count(),
+			"prompt chars" => prompt_chars,
+			"prompt tokens ≈" => estimated_tokens,
+
+			"plan" => if contains_plan { "included" } else { "missing" },
+			"plan lines" => PLAN.lines().count(),
+			"plan chars" => plan_chars,
+			"plan tokens ≈" => plan_tokens,
+
+			"max steps" => max_steps,
+		],
+		"plan path" => plan_path.display(),
+	);
 
 	section_info!(
 		"RUN START",
 		metrics: [
-			// "prompt" => format!("{prompt_chars} chars"),
-			// "tokens ≈" => estimated_tokens,
-			// "prompt lines" => prompt.lines().count(),
 			"history" => run.ctx.history.len(),
 			"commands" => run.commands.len(),
 			"errors" => run.errors.len(),
@@ -1227,6 +1225,11 @@ fn print_run_metrics(prompt: &str, run: &mut AgentRun, files_seen: u128) {
 		],
 		"preview" => preview_lines(prompt, PROMPT_PREVIEW_LINES),
 	);
+
+	run.record_log(format!(
+		"Initial context: prompt_chars={prompt_chars}, estimated_tokens={estimated_tokens}, workspace={}",
+		run.ctx.workspace,
+	));
 }
 fn log_step(run: &mut AgentRun, step: usize, message: impl std::fmt::Display) {
 	log_run(run, format!("STEP {step}: {message}"));
