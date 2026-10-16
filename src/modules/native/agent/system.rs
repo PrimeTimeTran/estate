@@ -85,8 +85,14 @@ impl CtxWorkspace {
 	}
 	pub fn add_file(&mut self, path: impl Into<PathBuf>) -> Result<()> {
 		let path = path.into();
+
+		if self.files.iter().any(|file| file.path == path) {
+			return Ok(());
+		}
+
 		let file = FileInfo::from_path(&path)?;
 		self.files.push(file);
+
 		Ok(())
 	}
 	pub fn from_sdlc_session(session: &AiSession) -> Result<Self> {
