@@ -677,19 +677,6 @@ impl Agent {
   	));
 
 		self.emit_thinking(&task, &event_tx);
-
-		log_run(&mut run, "Selecting agent mode");
-
-		let mode = match self.pick_mode(&run.ctx).await {
-			Ok(mode) => {
-				log_run(&mut run, format!("Mode selected: {mode:?}"));
-				mode
-			}
-			Err(error) => {
-				log_run(&mut run, format!("MODE SELECTION FAILED: {error:#}"));
-				return Err(error);
-			}
-		};
 		log_run(&mut run, "Selecting agent mode");
 		let mode = match self.pick_mode(&run.ctx).await {
 			Ok(mode) => {
@@ -1053,6 +1040,7 @@ impl TryFrom<LlmAction> for AgentAction {
 		}
 	}
 }
+
 #[derive(Debug, Clone)]
 pub struct Agent {
 	pub id: String,
@@ -1062,11 +1050,13 @@ pub struct Agent {
 	pub files_seen: u128,
 	// pub tokens_seen: u128,
 }
+
 #[derive(Clone, Debug)]
 pub struct AgentBus {
 	pub tx: UnboundedSender<AgentEvent>,
 	pub event_tx: UnboundedSender<RuntimeEvent>,
 }
+
 pub struct AgentCompletionValidation {
 	pub errors: Vec<String>,
 }
@@ -1102,6 +1092,7 @@ pub struct AgentError {
 	/// Timestamp when the error was recorded.
 	pub timestamp: chrono::DateTime<chrono::Utc>,
 }
+
 #[derive(Debug, Default)]
 pub struct AgentGuard {
 	consecutive_no_progress: usize,
@@ -1176,7 +1167,7 @@ pub struct LlmAction {
 pub struct LlmMode {
 	pub mode: String,
 }
-//
+
 // mod traits {
 //  	use super::*;
 // 	pub trait CtxAgent {
@@ -1190,9 +1181,7 @@ pub struct LlmMode {
 
 fn log_run(run: &mut AgentRun, message: impl Into<String>) {
 	let message = message.into();
-
 	println!("{} {}", colorize(BOLD, "[🤖 AGENT]"), colorize(DIM, &message),);
-
 	run.record_log(format!("[🤖 AGENT] {message}"));
 }
 
@@ -1212,7 +1201,6 @@ fn print_run_metrics(prompt: &str, run: &mut AgentRun, files_seen: u128) {
 			files_seen,
 		),
 	);
-
 	log_run(
 		&mut run.clone(),
 		format!(

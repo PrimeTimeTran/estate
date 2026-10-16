@@ -51,10 +51,10 @@ pub fn fmt_output(label: &str, content: &str, max_chars: usize, max_lines: usize
 	let preview_lines = preview.lines().count();
 
 	let mut output = format!(
-		"{} | {} chars | {} lines\n",
+		"{} | {} lines | {} chars\n",
 		colorize(DIM, if truncated { "TRUNCATED" } else { "FULL" }),
-		total_chars,
 		total_lines,
+		total_chars,
 	);
 
 	output.push_str(&format!("\n{}", colorize(DIM, &preview)));
@@ -119,7 +119,7 @@ pub fn fmt_execution(
 	max_output_chars: usize,
 ) -> String {
 	if commands.is_empty() {
-		return colorize(DIM, "No commands have been executed yet.");
+		return colorize(DIM, "No commands have been executed yet.\n");
 	}
 	let start = commands.len().saturating_sub(max_records);
 	let recent = &commands[start..];

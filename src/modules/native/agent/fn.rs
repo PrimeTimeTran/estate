@@ -19,6 +19,7 @@ pub fn build_prompt(run: &AgentRun) -> String {
 	let plan_preview = fmt_output("PLAN", &plan, 2_000, 30);
 
 	let task = ctx.prompt.as_deref().unwrap_or("");
+
 	let prompt = ACTION_PROMPT_EXECUTION
 		.replace("{task}", task)
 		.replace("{workspace}", &workspace)
@@ -26,17 +27,19 @@ pub fn build_prompt(run: &AgentRun) -> String {
 		.replace("{execution_ledger}", &execution_ledger);
 
 	let mut report = format!(
-		"BUILD_PROMPT {:?}\n\
-		CWD: {}\n\
-		PLAN PATH: {plan_path}\n\
-		TASK CHARS: {}\n\
-		PLAN CHARS: {}\n",
-		truncate(task, 50),
-		ctx.workspace.cwd.display(),
-		task.len(),
-		plan.len(),
+		"{}\n{}\n{}\n",
+		fmt_kv("BUILD_PROMPT:", &format!("{:?}", truncate(task, 50))),
+		fmt_kv("CWD:", &ctx.workspace.cwd.display().to_string()),
+		fmt_kv(
+			"PLAN.MD:",
+			&format!(
+				"{} lines | {} chars | {} path",
+				plan.lines().count(),
+				plan.chars().count(),
+				plan_path
+			),
+		),
 	);
-
 	report.push_str(&fmt_section("WORKSPACE"));
 	report.push_str(&workspace);
 

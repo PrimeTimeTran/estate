@@ -295,6 +295,25 @@ where
 			event.get_integer_value_field(core_graphics::event::EventField::KEYBOARD_EVENT_KEYCODE);
 
 		match keycode {
+			53 => {
+				let mut state = scroll_state().lock().unwrap();
+				if state.active {
+					let original = state.original_position;
+					if let Ok(source) = CGEventSource::new(CGEventSourceStateID::CombinedSessionState) {
+						if let Ok(restore_event) = CGEvent::new_mouse_event(
+							source,
+							CGEventType::MouseMoved,
+							original,
+							CGMouseButton::Left,
+						) {
+							restore_event.post(CGEventTapLocation::HID);
+						}
+					}
+					state.active = false;
+					state.redirected = false;
+					SHIFT_HELD.store(false, Ordering::Relaxed);
+				}
+			}
 			// 18 => {
 			//     move_cursor_to(ScreenPosition::Left);
 			// }
