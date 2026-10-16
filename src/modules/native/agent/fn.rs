@@ -16,6 +16,8 @@ pub fn build_prompt(run: &AgentRun) -> String {
 		}
 	};
 
+	let plan_preview = fmt_output("PLAN", &plan, 2_000, 30);
+
 	let task = ctx.prompt.as_deref().unwrap_or("");
 	let prompt = ACTION_PROMPT_EXECUTION
 		.replace("{task}", task)
@@ -23,35 +25,38 @@ pub fn build_prompt(run: &AgentRun) -> String {
 		.replace("{history}", &history)
 		.replace("{execution_ledger}", &execution_ledger);
 
-	let report = format!(
+	let mut report = format!(
 		"BUILD_PROMPT {:?}\n\
 		CWD: {}\n\
 		PLAN PATH: {plan_path}\n\
 		TASK CHARS: {}\n\
-		PLAN CHARS: {}\n\
-		\n\
-		--- WORKSPACE ---\n\
-		{workspace}\n\
-		\n\
-		--- HISTORY ---\n\
-		{history}\n\
-		\n\
-		--- EXECUTION LEDGER ---\n\
-		{execution_ledger}\n\
-		\n\
-		--- PLAN ---\n\
-		{plan}\n\
-		\n\
-		FINAL PROMPT CHARS: {}\n\
-		FINAL PROMPT LINES: {}\n\
-		build_prompt: ⛔️ RETURN",
-		truncate(&run.ctx.prompt.clone().unwrap(), 50),
+		PLAN CHARS: {}\n",
+		truncate(task, 50),
 		ctx.workspace.cwd.display(),
 		task.len(),
 		plan.len(),
-		prompt.len(),
-		prompt.lines().count(),
 	);
+
+	report.push_str(&fmt_section("WORKSPACE"));
+	report.push_str(&workspace);
+
+	report.push_str(&fmt_section("HISTORY"));
+	report.push_str(&history);
+
+	report.push_str(&fmt_section("EXECUTION LEDGER"));
+	report.push_str(&execution_ledger);
+
+	report.push_str(&fmt_section("PLAN"));
+	report.push_str(&plan_preview);
+
+	report.push_str(&format!(
+		"\n{}\n",
+		fmt_kv("FINAL PROMPT CHARS:", &prompt.len().to_string()),
+	));
+	report.push_str(&format!(
+		"{}\n",
+		fmt_kv("FINAL PROMPT LINES:", &prompt.lines().count().to_string()),
+	));
 
 	section!(&report);
 
@@ -352,6 +357,7 @@ where
 }
 pub async fn build_action(prompt: &str) -> Result<LlmAction> {
 	use std::time::Instant;
+
 	let started = Instant::now();
 	eprintln!("{}", fmt_kv("build_action:", "ENTER"));
 	eprintln!("{}", fmt_kv("MODEL:", DEFAULT_MODEL));
@@ -378,8 +384,6 @@ pub async fn build_action(prompt: &str) -> Result<LlmAction> {
 		.timeout(std::time::Duration::from_secs(120))
 		.build()
 		.context("building HTTP client")?;
-
-	eprintln!("{}", fmt_kv("HTTP:", "SENDING REQUEST"));
 	let request_started = std::time::Instant::now();
 
 	let res = client
@@ -394,18 +398,8 @@ pub async fn build_action(prompt: &str) -> Result<LlmAction> {
 				request_started.elapsed()
 			)
 		})?;
-
-	eprintln!(
-		"{}",
-		fmt_kv(
-			"HTTP RESPONSE AFTER:",
-			&format!("{:?}", request_started.elapsed())
-		)
-	);
-	eprintln!("{}", fmt_kv("HTTP STATUS:", &res.status().to_string()));
 	let status = res.status();
 
-	eprintln!("{}", fmt_kv("HTTP BODY:", "READING"));
 	let body_started = Instant::now();
 
 	let body = res
@@ -413,14 +407,7 @@ pub async fn build_action(prompt: &str) -> Result<LlmAction> {
 		.await
 		.context("reading model HTTP response body")?;
 
-	eprintln!(
-		"{}",
-		fmt_kv(
-			"HTTP BODY:",
-			&format!("{} chars, read in {:?}", body.len(), body_started.elapsed())
-		)
-	);
-
+	let body_elapsed = body_started.elapsed();
 	if !status.is_success() {
 		eprintln!(
 			"{}",
@@ -430,22 +417,12 @@ pub async fn build_action(prompt: &str) -> Result<LlmAction> {
 		return Err(anyhow::anyhow!("Model endpoint returned HTTP {status}"));
 	}
 
-	eprintln!("{}", fmt_kv("HTTP JSON:", "PARSING"));
-
 	let res: serde_json::Value =
 		serde_json::from_str(&body).context("parsing model HTTP response JSON")?;
 	let response = res["response"]
 		.as_str()
 		.context("Ollama response JSON is missing a string `response` field")?;
-	eprintln!(
-		"{}",
-		fmt_kv("MODEL RESPONSE CHARS:", &response.len().to_string())
-	);
-
-	eprintln!("{}", fmt_kv("ACTION JSON:", "PARSING"));
 	let mut raw: LlmAction = serde_json::from_str(response).context("parsing model action JSON")?;
-	eprintln!("{}", fmt_kv("ACTION JSON:", "PARSED"));
-
 	if raw.command.is_none() {
 		if let Some(args) = raw.args.as_ref() {
 			if !args.is_empty() {
@@ -460,17 +437,15 @@ pub async fn build_action(prompt: &str) -> Result<LlmAction> {
 		}
 	}
 
-	println!("PARSED ACTION:");
-	println!("  action: {:?}", raw.action);
-	println!("  command: {:?}", raw.command);
-	println!("  message: {:?}", raw.message);
-
-	eprintln!(
-		"{}",
-		fmt_kv("build_action TOTAL:", &format!("{:?}", started.elapsed()))
+	log_build_action(
+		request_started.elapsed(),
+		status,
+		body.len(),
+		body_elapsed,
+		response.len(),
+		&raw,
+		started.elapsed(),
 	);
-	eprintln!("{}", fmt_kv("build_action:", "RETURN"));
-
 	Ok(raw)
 }
 pub async fn ollama_generate(prompt: &str, system: Option<&str>, json: bool) -> Result<String> {
@@ -527,4 +502,40 @@ pub async fn ollama_generate(prompt: &str, system: Option<&str>, json: bool) -> 
 				body.chars().take(2_000).collect::<String>()
 			)
 		})
+}
+
+fn log_build_action(
+	request_elapsed: std::time::Duration,
+	status: reqwest::StatusCode,
+	body_len: usize,
+	body_elapsed: std::time::Duration,
+	response_len: usize,
+	action: &LlmAction,
+	total_elapsed: std::time::Duration,
+) {
+	println!("{}", "-".repeat(80));
+	println!("{}", fmt_kv("REQUEST:", "SENDING"));
+	println!(
+		"{}",
+		fmt_kv("RESPONSE AFTER:", &format!("{request_elapsed:?}"))
+	);
+	println!("{}", fmt_kv("STATUS:", &status.to_string()));
+	println!(
+		"{}",
+		fmt_kv(
+			"BODY:",
+			&format!("{body_len} chars, read in {body_elapsed:?}")
+		)
+	);
+	println!(
+		"{}",
+		fmt_kv("MODEL RESPONSE CHARS:", &response_len.to_string())
+	);
+	println!("{}", fmt_kv("ACTION JSON:", "PARSED"));
+	println!("{}", fmt_kv("ACTION:", &format!("{:?}", action.action)));
+	println!("{}", fmt_kv("COMMAND:", &format!("{:?}", action.command)));
+	println!("{}", fmt_kv("MESSAGE:", &format!("{:?}", action.message)));
+	println!("{}", fmt_kv("TOTAL:", &format!("{total_elapsed:?}")));
+	println!("{}", fmt_kv("build_action:", "RETURN"));
+	println!("{}", "-".repeat(80));
 }

@@ -301,7 +301,7 @@ impl Agent {
 		})
 	}
 	async fn pick_action(&self, run: &AgentRun) -> Result<AgentAction> {
-		eprintln!("{}", fmt_kv("pick_action:", "ENTER"));
+		// eprintln!("{}", fmt_kv("pick_action:", "ENTER"));
 		let prompt = build_prompt(run);
 
 		eprintln!("ACTION PROMPT CHARS: {}", prompt.len());
@@ -326,7 +326,7 @@ impl Agent {
 			}
 			Err(error) => {
 				let message = format!("Action selection failed: {error:#}");
-				eprintln!("{message}");
+				tracing::error!(message);
 
 				let previous_failures = run
 					.errors
@@ -667,7 +667,7 @@ impl Agent {
 		let prompt_chars = prompt.chars().count();
 		let estimated_tokens = prompt_chars.div_ceil(6);
 
-		section!("AGENT run_agent_loop CONTEXT");
+		section!("🏗️ 🔁 run_agent_loop CONTEXT");
 
 		print_run_metrics(&prompt, &mut run.clone(), self.files_seen);
 
@@ -1190,10 +1190,10 @@ pub struct LlmMode {
 
 fn log_run(run: &mut AgentRun, message: impl Into<String>) {
 	let message = message.into();
-	let line = format!("[AGENT] {message}");
 
-	println!("{line}");
-	run.record_log(line);
+	println!("{} {}", colorize(BOLD, "[🤖 AGENT]"), colorize(DIM, &message),);
+
+	run.record_log(format!("[🤖 AGENT] {message}"));
 }
 
 fn print_run_metrics(prompt: &str, run: &mut AgentRun, files_seen: u128) {

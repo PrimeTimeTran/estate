@@ -10,8 +10,68 @@ pub const RED: &str = "\x1b[31m";
 pub const MAGENTA: &str = "\x1b[35m";
 pub const BOLD: &str = "\x1b[1m";
 
+pub fn fmt_section(title: &str) -> String {
+	format!("\n{}\n", colorize(CYAN, &format!("--- {title} ---")),)
+}
+
 pub fn fmt_kv(k: &str, v: &str) -> String {
 	format!("{} {}", colorize(BOLD, k), colorize(DIM, v),)
+}
+
+pub fn fmt_output(label: &str, content: &str, max_chars: usize, max_lines: usize) -> String {
+	let total_chars = content.chars().count();
+	let total_lines = content.lines().count();
+
+	let mut preview = String::new();
+	let mut truncated = false;
+
+	for (index, line) in content.lines().enumerate() {
+		if index >= max_lines {
+			truncated = true;
+			break;
+		}
+
+		if !preview.is_empty() {
+			preview.push('\n');
+		}
+
+		preview.push_str(line);
+
+		if preview.chars().count() > max_chars {
+			truncated = true;
+			break;
+		}
+	}
+
+	if preview.chars().count() > max_chars {
+		preview = preview.chars().take(max_chars).collect();
+		truncated = true;
+	}
+
+	let preview_lines = preview.lines().count();
+
+	let mut output = format!(
+		"{} | {} chars | {} lines\n",
+		colorize(DIM, if truncated { "TRUNCATED" } else { "FULL" }),
+		total_chars,
+		total_lines,
+	);
+
+	output.push_str(&format!("\n{}", colorize(DIM, &preview)));
+
+	if truncated {
+		output.push_str(&format!(
+			"\n{}",
+			colorize(
+				DIM,
+				&format!(
+					"... output truncated (showing up to {max_chars} chars, {max_lines} lines; preview has {preview_lines} lines)"
+				)
+			)
+		));
+	}
+
+	output
 }
 
 pub fn fmt_agent_metrics(
@@ -111,7 +171,7 @@ pub fn fmt_history<T: std::fmt::Debug>(
 	max_entries: usize,
 	max_lines_per_entry: usize,
 ) -> String {
-	let mut output = format!("{} ({})\n", colorize(CYAN, "HISTORY"), history.len(),);
+	let mut output = format!("{} entries\n", colorize(DIM, &history.len().to_string()),);
 	for (index, entry) in history.iter().take(max_entries).enumerate() {
 		let rendered = format!("{entry:#?}");
 		output.push_str(&format!(
