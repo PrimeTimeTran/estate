@@ -2534,10 +2534,15 @@ impl PipeRunner<'_> {
 				result
 			}
 			Err(error) => {
-				section!(&format!(
-					"BUILD PHASE FAILED: Orient elapsed={:?}\n{error:#}",
-					phase_started.elapsed()
-				));
+				section_info!(
+					"BUILD PHASE FAILED",
+					metrics: [
+						"phase" => "Orient",
+						"elapsed" => format!("{:?}", phase_started.elapsed()),
+					],
+					"error" => format!("{error:#}"),
+				);
+
 				return Err(error).context("Build Orient phase failed");
 			}
 		};
@@ -2567,23 +2572,38 @@ impl PipeRunner<'_> {
 				result
 			}
 			Err(error) => {
-				section!(&format!(
-					"BUILD PHASE FAILED: Execute elapsed={:?}\n{error:#}",
-					phase_started.elapsed()
-				));
+				section_info!(
+					"BUILD PHASE FAILED",
+					metrics: [
+						"phase" => "Execute",
+						"elapsed" => format!("{:?}", phase_started.elapsed()),
+					],
+					"error" => format!("{error:#}"),
+				);
 
 				// Capture partial work before returning the error.
 				match WSSnapshot::capture(&workspace) {
 					Ok(snapshot) => {
 						let changes = workspace_before.diff(&snapshot);
-						section!(&format!(
-							"BUILD PARTIAL WORK: Execute files_changed={}",
-							changes.file_count()
-						));
+
+						section_info!(
+							"BUILD PARTIAL WORK",
+							metrics: [
+								"phase" => "Execute",
+								"files changed" => changes.file_count(),
+							],
+						);
+
 						let _ = self.write(&changes.to_markdown("Build failed during Execute"));
 					}
 					Err(snapshot_error) => {
-						section!(&format!("BUILD SNAPSHOT FAILED: {snapshot_error:#}"));
+						section_info!(
+							"BUILD SNAPSHOT FAILED",
+							metrics: [
+								"phase" => "Execute",
+							],
+							"error" => format!("{snapshot_error:#}"),
+						);
 					}
 				}
 
@@ -2618,23 +2638,38 @@ impl PipeRunner<'_> {
 				result
 			}
 			Err(error) => {
-				section!(&format!(
-					"BUILD PHASE FAILED: Verify elapsed={:?}\n{error:#}",
-					phase_started.elapsed()
-				));
+				section_info!(
+					"BUILD PHASE FAILED",
+					metrics: [
+						"phase" => "Verify",
+						"elapsed" => format!("{:?}", phase_started.elapsed()),
+					],
+					"error" => format!("{error:#}"),
+				);
 
 				// Execute may have created files even though Verify failed.
 				match WSSnapshot::capture(&workspace) {
 					Ok(snapshot) => {
 						let changes = workspace_before.diff(&snapshot);
-						section!(&format!(
-							"BUILD PARTIAL WORK: Verify files_changed={}",
-							changes.file_count()
-						));
+
+						section_info!(
+							"BUILD PARTIAL WORK",
+							metrics: [
+								"phase" => "Verify",
+								"files changed" => changes.file_count(),
+							],
+						);
+
 						let _ = self.write(&changes.to_markdown("Build failed during Verify"));
 					}
 					Err(snapshot_error) => {
-						section!(&format!("BUILD SNAPSHOT FAILED: {snapshot_error:#}"));
+						section_info!(
+							"BUILD SNAPSHOT FAILED",
+							metrics: [
+								"phase" => "Verify",
+							],
+							"error" => format!("{snapshot_error:#}"),
+						);
 					}
 				}
 

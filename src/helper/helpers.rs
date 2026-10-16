@@ -1,7 +1,12 @@
 use crate::prelude::*;
 
 use owo_colors::OwoColorize;
+use std::sync::OnceLock;
+use std::time::Instant;
 use terminal_size::{Width, terminal_size};
+use unicode_width::UnicodeWidthStr;
+
+static PROCESS_START: OnceLock<Instant> = OnceLock::new();
 
 pub fn print(level: Level, message: impl Display) {
 	println!("{} {}", level.format(level.label()), message,);
@@ -34,29 +39,27 @@ pub fn print_section_info(
 		.map(|(Width(width), _)| width as usize)
 		.unwrap_or(80);
 
+	let started = PROCESS_START.get_or_init(Instant::now);
+	let elapsed = started.elapsed().as_secs();
+	let timestamp = format!(
+		"{:02}:{:02}:{:02}",
+		elapsed / 3600,
+		(elapsed / 60) % 60,
+		elapsed % 60,
+	);
+
 	let rule = "-".repeat(width);
 
-	let truncated = values.iter().any(|(_, value)| value.contains("…"));
+	println!("{}", rule.dimmed());
 
-	if truncated {
-		let marker = "…";
-		let padding = width.saturating_sub(marker.chars().count());
-
-		print!("{}", "-".repeat(padding).dimmed());
-		println!("{}", marker.dimmed());
-	} else {
-		println!("{}", rule.dimmed());
-	}
-
-	// Build the title-row adornment from all metrics.
 	let metric_text = metrics
 		.iter()
 		.map(|(key, value)| format!("{key} {value}"))
 		.collect::<Vec<_>>()
 		.join(" │ ");
 
-	let title_width = title.chars().count();
-	let metric_width = metric_text.chars().count();
+	let title_width = unicode_width::UnicodeWidthStr::width(title);
+	let metric_width = unicode_width::UnicodeWidthStr::width(metric_text.as_str());
 	let gap = width.saturating_sub(title_width + metric_width).max(1);
 
 	print!("{}", title.bold().cyan());
@@ -73,7 +76,6 @@ pub fn print_section_info(
 
 	println!();
 
-	// Detail rows, if supplied.
 	if !values.is_empty() {
 		let key_width = values
 			.iter()
@@ -87,6 +89,8 @@ pub fn print_section_info(
 		}
 	}
 
+	// Separate the source location from the section content.
+	println!();
 	println!(
 		"{}",
 		format!(
@@ -96,7 +100,10 @@ pub fn print_section_info(
 		.dimmed()
 	);
 
-	println!("{}", rule.dimmed());
+	// Elapsed process timer, right-aligned on the closing rule.
+	let dashes = width.saturating_sub(timestamp.len());
+	print!("{}", "-".repeat(dashes).dimmed());
+	println!("{}", timestamp.dimmed());
 }
 
 /// Prints a section and then panics.

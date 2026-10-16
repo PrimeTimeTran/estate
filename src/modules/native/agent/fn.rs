@@ -515,29 +515,20 @@ fn log_build_action(
 	action: &LlmAction,
 	total_elapsed: std::time::Duration,
 ) {
-	println!("{}", "-".repeat(80));
-	println!("{}", fmt_kv("REQUEST:", "SENDING"));
-	println!(
-		"{}",
-		fmt_kv("RESPONSE AFTER:", &format!("{request_elapsed:?}"))
+	section_info!(
+		"build_action",
+		metrics: [
+			"status" => status,
+			"response after" => format!("{request_elapsed:?}"),
+			"total" => format!("{total_elapsed:?}"),
+			"response chars" => response_len,
+		],
+		"request" => "SENDING",
+		"body" => format!("{body_len} chars, read in {body_elapsed:?}"),
+		"action JSON" => "PARSED",
+		"action" => format!("{:?}", action.action),
+		"command" => format!("{:?}", action.command),
+		"message" => format!("{:?}", action.message),
+		"return" => "OK",
 	);
-	println!("{}", fmt_kv("STATUS:", &status.to_string()));
-	println!(
-		"{}",
-		fmt_kv(
-			"BODY:",
-			&format!("{body_len} chars, read in {body_elapsed:?}")
-		)
-	);
-	println!(
-		"{}",
-		fmt_kv("MODEL RESPONSE CHARS:", &response_len.to_string())
-	);
-	println!("{}", fmt_kv("ACTION JSON:", "PARSED"));
-	println!("{}", fmt_kv("ACTION:", &format!("{:?}", action.action)));
-	println!("{}", fmt_kv("COMMAND:", &format!("{:?}", action.command)));
-	println!("{}", fmt_kv("MESSAGE:", &format!("{:?}", action.message)));
-	println!("{}", fmt_kv("TOTAL:", &format!("{total_elapsed:?}")));
-	println!("{}", fmt_kv("build_action:", "RETURN"));
-	println!("{}", "-".repeat(80));
 }
