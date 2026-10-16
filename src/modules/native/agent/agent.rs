@@ -187,9 +187,13 @@ impl Agent {
 
 		let validation = validate_agent_completion(
 			&self.workspace.cwd,
-			&run.ctx.artifacts,
+			run
+				.ctx
+				.task
+				.as_ref()
+				.map(|task| &task.completion_criteria)
+				.unwrap_or(&CompletionCriteria::default()),
 			&run.commands,
-			&final_changed_paths,
 		)?;
 
 		if !validation.is_valid() {
@@ -232,6 +236,8 @@ impl Agent {
 				AgentCtx::with_workspace(String::new(), (*self.workspace).clone()),
 			),
 			final_message,
+			run.commands.clone(),
+			run.errors.clone(),
 		)))
 	}
 	fn emit_finished(&self, event_tx: &UnboundedSender<RuntimeEvent>, result: TaskResult) {
@@ -266,7 +272,14 @@ impl Agent {
 			timestamp: chrono::Utc::now(),
 		});
 
-		TaskResult::failed(task_id, run.ctx, "Step limit exceeded", Some(message))
+		TaskResult::failed(
+			task_id,
+			run.ctx,
+			"Step limit exceeded",
+			Some(message),
+			run.commands,
+			run.errors,
+		)
 	}
 
 	pub fn with_cwd(cwd: impl Into<PathBuf>) -> Self {
@@ -454,6 +467,7 @@ impl Agent {
 		run.record_command(CommandRecord {
 			step,
 			command: command.clone(),
+			argv: None,
 			exit_code: result.exit_code,
 			stdout: result.stdout.clone(),
 			stderr: result.stderr.clone(),
@@ -590,6 +604,11 @@ impl Agent {
 		run.record_command(CommandRecord {
 			step,
 			command: display_command.clone(),
+			argv: Some(
+				std::iter::once(program.clone())
+					.chain(args.iter().cloned())
+					.collect(),
+			),
 			exit_code: result.exit_code,
 			stdout: result.stdout.clone(),
 			stderr: result.stderr.clone(),
@@ -649,18 +668,11 @@ impl Agent {
 		event_tx: UnboundedSender<RuntimeEvent>,
 	) -> Result<TaskResult> {
 		let max_steps = 20;
-		let mut workspace = (*self.workspace).clone();
-		let plan_path = workspace.cwd.join("log/plan.md");
-		let plan = std::fs::read_to_string(&plan_path)
-			.with_context(|| format!("Failed to load plan: {}", plan_path.display()))?;
-		workspace.add_file(plan_path.clone());
+		let mut context = AgentCtx::with_workspace(task.prompt.clone(), (*self.workspace).clone());
+		context.task = Some(task.clone());
+		let mut run = AgentRun::new(context);
 
-		let mut run = AgentRun::new(AgentCtx::with_workspace(task.prompt.clone(), workspace));
-
-		let prompt = run.ctx.prompt.as_deref().unwrap_or("");
-		const PLAN: &str = include_str!("../../../../log/plan.md");
-
-		print_run_metrics(&mut run.clone(), self.files_seen, &plan_path, max_steps);
+		print_run_metrics(&mut run.clone(), self.files_seen, max_steps);
 
 		self.emit_thinking(&task, &event_tx);
 		log_run(&mut run, "Selecting agent mode");
@@ -673,6 +685,14 @@ impl Agent {
 				log_run(&mut run, format!("MODE SELECTION FAILED: {error:#}"));
 				return Err(error);
 			}
+		};
+		let mode = if matches!(&mode, AgentMode::Chat)
+			&& task.completion_criteria.required_files.is_empty()
+			&& task.completion_criteria.required_commands.is_empty()
+		{
+			mode
+		} else {
+			AgentMode::Tool
 		};
 
 		if matches!(mode, AgentMode::Chat) {
@@ -740,6 +760,8 @@ impl Agent {
 						run.ctx,
 						"Action selection failed",
 						Some("Too many consecutive invalid actions.".into()),
+						run.commands,
+						run.errors,
 					));
 				}
 				Err(error) => {
@@ -896,12 +918,18 @@ impl AgentTask {
 		Self {
 			id: Uuid::new_v4(),
 			prompt,
+			completion_criteria: CompletionCriteria::default(),
 		}
+	}
+	pub fn with_completion_criteria(mut self, criteria: CompletionCriteria) -> Self {
+		self.completion_criteria = criteria;
+		self
 	}
 	pub fn from_session(session: &AiSession) -> Result<Self> {
 		Ok(Self {
 			id: Uuid::new_v4(),
 			prompt: session.prompt.clone(),
+			completion_criteria: CompletionCriteria::default(),
 		})
 	}
 }
@@ -1047,6 +1075,14 @@ pub struct AgentCompletionValidation {
 	pub errors: Vec<String>,
 }
 
+#[derive(Clone, Debug, Default, Serialize, Deserialize, Eq, PartialEq)]
+pub struct CompletionCriteria {
+	#[serde(default)]
+	pub required_files: Vec<PathBuf>,
+	#[serde(default)]
+	pub required_commands: Vec<Vec<String>>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct AgentCtx {
 	pub prompt: Option<String>,
@@ -1096,12 +1132,18 @@ pub struct AgentRun {
 pub struct AgentTask {
 	pub id: Uuid,
 	pub prompt: String,
+	#[serde(default)]
+	pub completion_criteria: CompletionCriteria,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommandRecord {
 	/// One-based execution order within this agent run.
 	pub step: usize,
+
+	/// Program and arguments for direct process execution, if applicable.
+	#[serde(default)]
+	pub argv: Option<Vec<String>>,
 
 	/// The command submitted to the shell.
 	pub command: String,
@@ -1175,20 +1217,11 @@ fn log_run(run: &mut AgentRun, message: impl Into<String>) {
 	run.record_log(format!("[🤖 AGENT] {message}"));
 }
 
-fn print_run_metrics(
-	run: &mut AgentRun,
-	files_seen: u128,
-	plan_path: &std::path::Path,
-	max_steps: usize,
-) {
+fn print_run_metrics(run: &mut AgentRun, files_seen: u128, max_steps: usize) {
 	let prompt = run.ctx.prompt.as_deref().unwrap_or("");
-	const PLAN: &str = include_str!("../../../../log/plan.md");
 
 	let prompt_chars = prompt.chars().count();
-	let plan_chars = PLAN.chars().count();
 	let estimated_tokens = prompt_chars.div_ceil(6);
-	let plan_tokens = plan_chars.div_ceil(6);
-	let contains_plan = prompt.contains(PLAN);
 
 	section_info!(
 		"🏗️ run_agent_loop 🔁",
@@ -1197,12 +1230,8 @@ fn print_run_metrics(
 			"prompt chars" => prompt_chars,
 			"prompt tokens ≈" => estimated_tokens,
 
-			"plan" => if contains_plan { "included" } else { "missing" },
-			"plan lines" => PLAN.lines().count(),
-			"plan chars" => plan_chars,
-			"plan tokens ≈" => plan_tokens,
-
 			"max steps" => max_steps,
+			"required outputs" => run.ctx.task.as_ref().map_or(0, |task| task.completion_criteria.required_files.len()),
 			"history" => run.ctx.history.len(),
 			"commands" => run.commands.len(),
 			"errors" => run.errors.len(),
@@ -1210,7 +1239,6 @@ fn print_run_metrics(
 			"files" => files_seen,
 			"preview lines" => PROMPT_PREVIEW_LINES,
 		],
-		"plan path" => plan_path.display(),
 		"prompt preview" => preview_lines(prompt, PROMPT_PREVIEW_LINES),
 	);
 

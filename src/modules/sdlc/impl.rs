@@ -12,15 +12,15 @@ impl AiSession {
 	fn empty() -> Result<()> {
 		Ok(())
 	}
-	pub fn new(title: impl Into<String>, dir: PathBuf) -> Result<Self> {
+	pub fn new(title: impl Into<String>, prompt: impl Into<String>, dir: PathBuf) -> Result<Self> {
 		let now = Utc::now();
-		let prompt = include_str!("../../../public/ai/user.goal.md").to_string();
+		let cwd = std::env::current_dir()?;
 		Ok(Self {
-			workspace: dir.clone(),
-			cwd: std::env::current_dir().unwrap_or_default(),
+			workspace: cwd.clone(),
+			cwd,
 			dir,
 			id: uuid::Uuid::new_v4(),
-			prompt,
+			prompt: prompt.into(),
 			stage: Stage::Intent,
 			stages: Vec::new(),
 			time_created: now,
@@ -616,7 +616,7 @@ impl Evaluator {
 		let intent = ctx.get(SrcArtifact::Intent)?;
 		let spec = ctx.get(SrcArtifact::Spec)?;
 		let plan = ctx.get(SrcArtifact::Plan)?;
-		let implementation = std::fs::read_dir(&self.session.dir)?
+		let implementation = std::fs::read_dir(&self.session.workspace)?
 			.filter_map(|entry| entry.ok())
 			.filter_map(|entry| {
 				let path = entry.path();
@@ -869,22 +869,20 @@ impl Outcome {
 	}
 }
 impl Pipeline {
-	fn checks_for(stage: Stage) -> Vec<(&'static str, Vec<&'static str>)> {
-		match stage {
-			Stage::Intent | Stage::Spec | Stage::Plan => Vec::new(),
-			Stage::Complete | Stage::Finalize => Vec::new(),
-			Stage::Deploy | Stage::Maintain => Vec::new(),
-			Stage::Build | Stage::QA => vec![
-				("cargo check", vec!["cargo", "check"]),
-				("cargo test", vec!["cargo", "test"]),
-				(
-					"cargo clippy",
-					vec!["cargo", "clippy", "--", "-D", "warnings"],
-				),
-				("cargo fmt", vec!["cargo", "fmt", "--", "--check"]),
-			],
-			_ => Vec::new(),
+	fn ensure_agent_completed(result: TaskResult, phase: &str) -> Result<TaskResult> {
+		if matches!(&result.status, crate::TaskStatus::Completed) {
+			return Ok(result);
 		}
+		let errors = result
+			.errors
+			.iter()
+			.map(|error| format!("{}: {}", error.kind, error.message))
+			.collect::<Vec<_>>()
+			.join("\n");
+		Err(anyhow!(
+			"Build {phase} agent did not complete ({:?})\n{errors}",
+			result.status
+		))
 	}
 	fn init_session_dir(kontex: &Kontex, title: &str) -> Result<PathBuf> {
 		let sessions_dir = kontex.path(FW::Session)?;
@@ -1159,14 +1157,55 @@ impl Pipeline {
 			})
 	}
 	async fn run_checks(&self, stage: Stage) -> Result<Vec<CheckResult>> {
-		let checks = Self::checks_for(stage);
-		let mut results = Vec::with_capacity(checks.len());
-		for (name, command) in checks {
-			let result = Command::new(command[0])
-				.args(&command[1..])
-				.current_dir(env!("CARGO_MANIFEST_DIR"))
+		if !matches!(stage, Stage::Build | Stage::QA) {
+			return Ok(Vec::new());
+		}
+		let plan_path = self.session.dir.join("plan.md");
+		let plan = std::fs::read_to_string(&plan_path)
+			.with_context(|| format!("reading build plan at {}", plan_path.display()))?;
+		let criteria = p::parse_completion_criteria(&plan)?;
+		let mut results = Vec::with_capacity(criteria.required_commands.len());
+		let workspace = self.session.workspace.canonicalize().with_context(|| {
+			format!(
+				"canonicalizing project workspace {}",
+				self.session.workspace.display()
+			)
+		})?;
+		for required_file in &criteria.required_files {
+			let candidate = workspace.join(required_file);
+			let (passed, output) = match candidate.canonicalize() {
+				Ok(path) if path.starts_with(&workspace) && path.is_file() => {
+					match std::fs::metadata(&path) {
+						Ok(metadata) if metadata.len() > 0 => (true, "File exists and is non-empty".into()),
+						Ok(_) => (false, "File is empty".into()),
+						Err(error) => (false, error.to_string()),
+					}
+				}
+				Ok(_) => (
+					false,
+					"Path is not a file inside the project workspace".into(),
+				),
+				Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+					(false, "Required file is missing".into())
+				}
+				Err(error) => (false, error.to_string()),
+			};
+			results.push(CheckResult {
+				name: format!("required file {}", required_file.display()),
+				passed,
+				output: Some(output),
+			});
+		}
+		for command in criteria.required_commands {
+			let (program, args) = command
+				.split_first()
+				.ok_or_else(|| anyhow!("Build Contract contains an empty command"))?;
+			let name = command.join(" ");
+			let result = Command::new(program)
+				.args(args)
+				.current_dir(&self.session.workspace)
 				.output()
-				.map_err(|error| anyhow::anyhow!("failed to run verification check `{name}`: {error}"))?;
+				.map_err(|error| anyhow!("failed to run verification check `{name}`: {error}"))?;
 			let stdout = String::from_utf8_lossy(&result.stdout);
 			let stderr = String::from_utf8_lossy(&result.stderr);
 			let output = match (stdout.is_empty(), stderr.is_empty()) {
@@ -1177,13 +1216,10 @@ impl Pipeline {
 			};
 			let passed = result.status.success();
 			results.push(CheckResult {
-				name: name.to_string(),
+				name,
 				passed,
 				output: Some(output),
 			});
-			if !passed {
-				break;
-			}
 		}
 		Ok(results)
 	}
@@ -1265,41 +1301,49 @@ impl Pipeline {
 		let title = Self::summarize_title(&intent).await?;
 		let dir = Self::init_session_dir(&kontex, &title)?;
 		Self::init_templates(&kontex, &dir)?;
-		let session = AiSession::new(title, dir)?;
+		let session = AiSession::new(title, intent, dir)?;
 		self.session = session;
 		self.stage_attempt = 1;
 		self.persist_session()?;
 		Ok(())
 	}
-	pub async fn new(intent: impl Into<String>, event_tx: EventBus) -> anyhow::Result<Self> {
+	pub async fn new(intent: impl Into<String>, _event_tx: EventBus) -> anyhow::Result<Self> {
 		dotenvy::dotenv().ok();
 		let kontex = Kontex::new(special::Appp::Estate)?;
-		let session = match kontex.session_load::<AiSession>()? {
-			Some(session) => session,
-			None => {
-				let intent = intent.into();
-				let title = Self::summarize_title(&intent).await?;
-				let dir = Self::init_session_dir(&kontex, &title)?;
-				Self::init_templates(&kontex, &dir)?;
-				let session = AiSession::new(title, dir)?;
-				kontex.session_save(&session)?;
-				session
-			}
-		};
+		let intent = intent.into();
+		let title = Self::summarize_title(&intent).await?;
+		let dir = Self::init_session_dir(&kontex, &title)?;
+		Self::init_templates(&kontex, &dir)?;
+		let session = AiSession::new(title, intent, dir)?;
+		kontex.session_save(&session)?;
+		Self::from_session(kontex, session)
+	}
+	pub async fn resume_saved(_event_tx: EventBus) -> anyhow::Result<Self> {
+		dotenvy::dotenv().ok();
+		let kontex = Kontex::new(special::Appp::Estate)?;
+		let mut session = kontex
+			.session_load::<AiSession>()?
+			.ok_or_else(|| anyhow::anyhow!("No saved SDLC session is available to resume"))?;
+		if session.workspace == session.dir || !session.workspace.is_dir() {
+			session.workspace = session.cwd.clone();
+			kontex.session_save(&session)?;
+		}
+		Self::from_session(kontex, session)
+	}
+	fn from_session(kontex: Kontex, session: AiSession) -> anyhow::Result<Self> {
 		let qa = Evaluator {
 			session: session.clone(),
 			jev: TypeSafeClient::from_env()?,
 		};
-		let system = AgentSystem::new();
+		let mut system = AgentSystem::new();
+		system.cwd(session.workspace.clone());
 		let generator = Box::new(LocalGenerator::new(system.runtime.clone(), DEFAULT_MODEL));
-		// let (event_tx, _event_rx) = tokio::sync::broadcast::channel::<SdlcEvent>(256);
 		Ok(Self {
 			qa,
 			system,
 			kontex,
 			generator,
 			session,
-			// event_tx,
 			stage_attempt: 0,
 		})
 	}
@@ -1470,9 +1514,57 @@ impl QACheck {
 		time_readable(self.time_completed)
 	}
 	pub fn with_evaluations(&self, checks: Vec<CheckResult>) -> Self {
-		todo!("with_evaluations")
+		let mut evaluation = self.clone();
+		for check in checks {
+			evaluation.passed &= check.passed;
+			evaluation.evaluations.push(Metric {
+				name: check.name,
+				passed: check.passed,
+				score: if check.passed { 1.0 } else { 0.0 },
+				confidence: 1.0,
+				explanation: check.output.unwrap_or_else(|| {
+					if check.passed {
+						"Verification command passed.".into()
+					} else {
+						"Verification command failed.".into()
+					}
+				}),
+			});
+		}
+		evaluation
 	}
 }
+
+#[cfg(test)]
+mod qa_check_tests {
+	use super::*;
+
+	#[test]
+	fn failed_deterministic_check_fails_semantic_qa() {
+		let now = Utc::now();
+		let semantic = QACheck {
+			confidence: 1.0,
+			passed: true,
+			score: 1.0,
+			stage: Stage::QA,
+			time_completed: now,
+			time_started: now,
+			time_total: chrono::Duration::zero(),
+			evaluations: Vec::new(),
+		};
+		let combined = semantic.with_evaluations(vec![CheckResult {
+			name: "node --test tests/hello-world.test.js".into(),
+			passed: false,
+			output: Some("1 test failed".into()),
+		}]);
+
+		assert!(!combined.passed);
+		assert_eq!(combined.evaluations.len(), 1);
+		assert!(!combined.evaluations[0].passed);
+		assert_eq!(combined.evaluations[0].explanation, "1 test failed");
+	}
+}
+
 impl SdlcInput {
 	pub fn text(&self) -> Option<&str> {
 		match self {
@@ -1813,7 +1905,7 @@ impl PipeRunner<'_> {
 		}
 	}
 	async fn evaluate(&self, execution: &Execution) -> Result<QACheck> {
-		tracing::info!("evaluatepipelinerunner {:?}", execution);
+		tracing::info!("evaluate pipeline runner {:?}", execution);
 		let stage = execution.stage;
 		let checks = self.pipeline.run_checks(stage).await?;
 		let structural = self.evaluate_checks(checks)?;
@@ -1852,117 +1944,127 @@ impl PipeRunner<'_> {
 	}
 
 	async fn handle_outcome(&self, outcome: &Outcome) -> Result<Decision> {
-		tracing::info!(">>> DECIDE");
-		// tracing::info!(">>> outcome = {outcome:#?}");
 		if std::env::var_os("SDLC_FORCE_EXIT").is_some() {
-			tracing::warn!(">>> SDLC_FORCE_EXIT=1 -> Exit");
+			section_info!(
+				"decision",
+				metrics: [
+					"override" => "SDLC_FORCE_EXIT",
+					"decision" => "Exit",
+				],
+				"" => "Forced exit",
+			);
 			return Ok(Decision::Exit);
 		}
+
 		if std::env::var_os("SDLC_FORCE_CONTINUE").is_some() {
-			tracing::warn!(">>> SDLC_FORCE_CONTINUE=1 -> Continue");
+			section_info!(
+				"decision",
+				metrics: [
+					"override" => "SDLC_FORCE_CONTINUE",
+					"decision" => "Continue",
+				],
+				"" => "Forced continue",
+			);
 			return Ok(Decision::Continue);
 		}
-		let decision = match outcome {
+
+		let (decision, stage, attempt, max_attempts, outcome_name, details) = match outcome {
 			Outcome::EvaluationFailed { execution, .. } => {
-				let attempt = execution.attempt;
-				tracing::info!(
-					">>> EvaluationFailed: stage={:?} attempt={}/{}",
+				let attempt = &execution.attempt;
+				let decision = if attempt.number < attempt.max {
+					Decision::Retry
+				} else {
+					Decision::AwaitHuman
+				};
+
+				(
+					decision,
 					attempt.stage,
 					attempt.number,
 					attempt.max,
-				);
-				if attempt.number < attempt.max {
-					tracing::info!(">>> attempt {}/{} -> Retry", attempt.number, attempt.max,);
-					Decision::Retry
-				} else {
-					tracing::info!(
-						">>> attempt {}/{} exhausted -> AwaitHuman",
-						attempt.number,
-						attempt.max,
-					);
-					Decision::AwaitHuman
-				}
+					"EvaluationFailed",
+					"Evaluation failed".to_string(),
+				)
 			}
+
 			Outcome::Complete { execution, .. } => {
-				tracing::info!(
-					">>> Complete: stage={:?} attempt={}/{}",
+				let decision = match &execution.result {
+					RunResult::Verification(verification) if verification.passed => Decision::Continue,
+					RunResult::Verification(_) => Decision::Retry,
+					_ if execution.stage == Stage::Complete => Decision::Complete,
+					_ => Decision::Continue,
+				};
+
+				let details = match &execution.result {
+					RunResult::Verification(verification) => {
+						format!("Verification passed={}", verification.passed)
+					}
+					_ => "Execution completed".to_string(),
+				};
+
+				(
+					decision,
 					execution.stage,
 					execution.attempt.number,
 					execution.attempt.max,
-				);
-				match &execution.result {
-					RunResult::Verification(verification) => {
-						if verification.passed {
-							tracing::info!(">>> QA passed -> Continue");
-							Decision::Continue
-						} else {
-							tracing::info!(">>> QA failed -> Retry");
-							Decision::Retry
-						}
-					}
-					_ if execution.stage == Stage::Complete => {
-						tracing::info!(">>> Execution -> Complete");
-						Decision::Complete
-					}
-					_ => {
-						tracing::info!(">>> Execution -> Continue");
-						Decision::Continue
-					}
-				}
+					"Complete",
+					details,
+				)
 			}
+
 			Outcome::NeedsRevision {
 				execution,
 				evaluation,
 			} => {
-				let attempt = execution.attempt;
-				tracing::info!(
-					">>> NeedsRevision: stage={:?} attempt={}/{} score={:.2} confidence={:.2}",
+				let attempt = &execution.attempt;
+				let decision = if attempt.number < attempt.max {
+					Decision::Revise
+				} else {
+					Decision::AwaitHuman
+				};
+
+				(
+					decision,
 					execution.stage,
 					attempt.number,
 					attempt.max,
-					evaluation.score,
-					evaluation.confidence,
-				);
-				if attempt.number < attempt.max {
-					tracing::info!(">>> attempt {}/{} -> Revise", attempt.number, attempt.max,);
-					Decision::Revise
-				} else {
-					tracing::info!(
-						">>> attempt {}/{} exhausted -> AwaitHuman",
-						attempt.number,
-						attempt.max,
-					);
-					Decision::AwaitHuman
-				}
+					"NeedsRevision",
+					format!(
+						"Revision required\nscore => {:.2}\nconfidence => {:.2}",
+						evaluation.score, evaluation.confidence,
+					),
+				)
 			}
+
 			Outcome::ExecutionFailed { attempt, error, .. } => {
-				tracing::error!(
-						stage = ?attempt.stage,
-						attempt = attempt.number,
-						error = %error,
-						error_debug = ?error,
-						"SDLC execution failed"
-				);
-				// tracing::info!(
-				// 	">>> ExecutionFailed: stage={:?} attempt={}/{}",
-				// 	attempt.stage,
-				// 	attempt.number,
-				// 	attempt.max,
-				// );
-				if attempt.number < attempt.max {
-					tracing::info!(">>> attempt {}/{} -> Retry", attempt.number, attempt.max,);
+				let decision = if attempt.number < attempt.max {
 					Decision::Retry
 				} else {
-					tracing::info!(
-						">>> attempt {}/{} exhausted -> AwaitHuman",
-						attempt.number,
-						attempt.max,
-					);
 					Decision::AwaitHuman
-				}
+				};
+
+				(
+					decision,
+					attempt.stage,
+					attempt.number,
+					attempt.max,
+					"ExecutionFailed",
+					format!("Execution error => {error}\nError debug => {error:?}"),
+				)
 			}
 		};
-		tracing::info!(">>> FINAL DECISION = {:?}", decision);
+
+		section_info!(
+			"SDLC decision",
+			metrics: [
+				"outcome" => outcome_name,
+				"stage" => format!("{stage:?}"),
+				"attempt" => format!("{attempt}/{max_attempts}"),
+				"decision" => format!("{decision:?}"),
+			],
+			"details" => details,
+		);
+
 		Ok(decision)
 	}
 	async fn handle_retry(&mut self, stage: Stage, attempt: Attempt) -> Result<()> {
@@ -2450,6 +2552,8 @@ impl PipeRunner<'_> {
 		if generated.trim().is_empty() {
 			return Err(anyhow!("generated Plan artifact is empty"));
 		}
+		p::parse_completion_criteria(&generated)
+			.context("generated Plan has no valid machine-readable Build Contract")?;
 		// Pipeline::write(output_path, generated)?;
 		self.write(&generated)?;
 		self.pipeline.persist_progress("Plan stage completed")?;
@@ -2494,6 +2598,7 @@ impl PipeRunner<'_> {
 		if plan.trim().is_empty() {
 			return Err(anyhow::anyhow!("Plan artifact is empty"));
 		}
+		let completion_criteria = p::parse_completion_criteria(&plan)?;
 
 		self.pipeline.system.add_file(intent_path);
 		self.pipeline.system.add_file(spec_path);
@@ -2542,6 +2647,7 @@ impl PipeRunner<'_> {
 
 		let orient_result = match self.pipeline.system.runtime.run_agent(orient_task).await {
 			Ok(result) => {
+				let result = Pipeline::ensure_agent_completed(result, "Orient")?;
 				section!(&format!(
 					"BUILD PHASE COMPLETE: Orient elapsed={:?}",
 					phase_started.elapsed()
@@ -2573,13 +2679,15 @@ impl PipeRunner<'_> {
 			 ## Specification\n\n{spec}\n\n\
 			 ## Plan\n\n{plan}\n\n\
 			 ## Orientation Report\n\n{orient_report}"
-		));
+		))
+		.with_completion_criteria(completion_criteria);
 
 		let phase_started = std::time::Instant::now();
 		section!("BUILD PHASE START: Execute");
 
 		let execute_result = match self.pipeline.system.runtime.run_agent(execute_task).await {
 			Ok(result) => {
+				let result = Pipeline::ensure_agent_completed(result, "Execute")?;
 				section!(&format!(
 					"BUILD PHASE COMPLETE: Execute elapsed={:?}",
 					phase_started.elapsed()
@@ -2646,6 +2754,7 @@ impl PipeRunner<'_> {
 
 		let verify_result = match self.pipeline.system.runtime.run_agent(verify_task).await {
 			Ok(result) => {
+				let result = Pipeline::ensure_agent_completed(result, "Verify")?;
 				section!(&format!(
 					"BUILD PHASE COMPLETE: Verify elapsed={:?}",
 					phase_started.elapsed()

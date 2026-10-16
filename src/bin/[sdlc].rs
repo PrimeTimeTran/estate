@@ -2,8 +2,8 @@ use anyhow::Context as CtxAnyhow;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use std::io::IsTerminal;
 
-use std::time::{Duration, Instant};
 use estate::prelude::*;
+use std::time::{Duration, Instant};
 
 // 1. Normal run
 // cargo -q run --bin sdlc --features sdlc
@@ -34,9 +34,16 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let events = EventBus::new();
 	let native_runtime = NativeRuntime::new(ctx, handle, events.clone())?;
 	native_runtime.start_dispatcher();
-	let pipeline = Pipeline::new("Do the work required to build this CLI", events.clone())
-		.await
-		.context("Pipeline::new")?;
+	let resume_from_build = std::env::var_os("SDLC_RESUME_BUILD").is_some();
+	let pipeline = if resume_from_build {
+		Pipeline::resume_saved(events.clone())
+			.await
+			.context("Pipeline::resume_saved")?
+	} else {
+		Pipeline::new(estate::modules::sdlc::SDLC_GOAL, events.clone())
+			.await
+			.context("Pipeline::new")?
+	};
 
 	let mut runtime = PipelineRuntime::<CtxSdlc>::new(pipeline, native_runtime);
 	println!(">>> pipeline created");
@@ -48,8 +55,6 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 	let (input_tx, mut input_rx) = tokio::sync::mpsc::unbounded_channel::<SdlcInput>();
 	let use_tui = std::env::var_os("SDLC_TUI").is_some();
-
-	let resume_from_build = std::env::var_os("SDLC_RESUME_BUILD").is_some();
 
 	let session_started_at = chrono::Local::now().format("%H:%M:%S").to_string();
 	let session_started = Instant::now();

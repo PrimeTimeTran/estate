@@ -1,3 +1,4 @@
+use crate::modules::native::agent::{AgentError, CommandRecord};
 use crate::prelude::*;
 
 use notify::{
@@ -147,9 +148,17 @@ impl TaskResult {
 			status: TaskStatus::Completed,
 			summary: None,
 			task_id,
+			commands: Vec::new(),
+			errors: Vec::new(),
 		}
 	}
-	pub fn completed_with_summary(task_id: Uuid, ctx: AgentCtx, summary: String) -> Self {
+	pub fn completed_with_summary(
+		task_id: Uuid,
+		ctx: AgentCtx,
+		summary: String,
+		commands: Vec<CommandRecord>,
+		errors: Vec<AgentError>,
+	) -> Self {
 		Self {
 			artifacts: ctx.artifacts,
 			chat: None,
@@ -158,6 +167,8 @@ impl TaskResult {
 			status: TaskStatus::Completed,
 			summary: Some(summary),
 			task_id,
+			commands,
+			errors,
 		}
 	}
 	pub fn failed(
@@ -165,6 +176,8 @@ impl TaskResult {
 		ctx: AgentCtx,
 		reason: impl Into<String>,
 		summary: Option<String>,
+		commands: Vec<CommandRecord>,
+		errors: Vec<AgentError>,
 	) -> Self {
 		Self {
 			artifacts: ctx.artifacts,
@@ -174,6 +187,8 @@ impl TaskResult {
 			status: TaskStatus::Failed(reason.into()),
 			summary,
 			task_id,
+			commands,
+			errors,
 		}
 	}
 }
@@ -198,6 +213,10 @@ pub struct TaskResult {
 	pub status: TaskStatus,
 	pub summary: Option<String>,
 	pub task_id: Uuid,
+	#[serde(default)]
+	pub commands: Vec<CommandRecord>,
+	#[serde(default)]
+	pub errors: Vec<AgentError>,
 }
 
 // #[derive(Debug)]

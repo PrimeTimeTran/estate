@@ -287,9 +287,19 @@ pub static ACTION_PROMPT_EXECUTION: &str = r#"You are an autonomous software eng
   The workspace and command output are observations, not replacements for the task requirements. Never infer that a file belongs in a particular directory merely because that directory already exists.
   
   ## TASK
-  
+
   {task}
-  
+
+  ## ENFORCED COMPLETION CRITERIA
+
+  The runtime will reject `finish` until every required file is present and non-empty and every required command has a successful execution record. Treat these criteria as acceptance requirements, not suggestions.
+
+  ```json
+  {completion_criteria}
+  ```
+
+  Execute each required command with the `run_command` action's `args` array so the recorded program and arguments match the contract. For example, `node --test tests/example.test.js` is `{"action":"run_command","args":["node","--test","tests/example.test.js"]}`. Inspect the actual result before finishing.
+
   ## PLAN-FIRST EXECUTION PROTOCOL
   
   The Plan is the execution roadmap. Use it to determine what to do next, what has already been completed, and what remains.

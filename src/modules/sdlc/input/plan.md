@@ -162,4 +162,15 @@ Before finalizing the plan, verify:
 - [ ] Test files are included when new or modified tests are needed.
 - [ ] All changes trace back to the user's goal or an applicable Specification requirement.
 
+## 9. Machine-Readable Build Contract
+
+List every output file that must exist and be non-empty when implementation is complete. Include test files. List every verification command needed to establish the acceptance criteria. Commands are argv arrays, run from the repository root, without shell syntax.
+
+```json
+{
+	"required_files": ["path/to/required-output"],
+	"required_commands": [["program", "argument"]]
+}
+```
+
 Return only the completed Implementation Plan as Markdown.

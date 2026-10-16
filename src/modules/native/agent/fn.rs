@@ -7,38 +7,25 @@ pub fn build_prompt(run: &AgentRun) -> String {
 	let workspace = fmt_workspace(&ctx.workspace);
 	let history = fmt_history(&ctx.history, 3, 3);
 	let execution_ledger = fmt_execution(&run.commands, 5, 5, 4_000);
-	let plan_path = "/Users/future/kb/project/crates/estate/log/plan.md";
-
-	let plan = match std::fs::read_to_string(plan_path) {
-		Ok(content) => content,
-		Err(error) => {
-			format!("ERROR: Could not read required plan.md at {plan_path}: {error}")
-		}
-	};
-
-	let plan_preview = fmt_output("PLAN", &plan, 2_000, 30);
-
 	let task = ctx.prompt.as_deref().unwrap_or("");
+	let completion_criteria = ctx
+		.task
+		.as_ref()
+		.and_then(|task| serde_json::to_string_pretty(&task.completion_criteria).ok())
+		.unwrap_or_else(|| "{}".into());
 
 	let prompt = ACTION_PROMPT_EXECUTION
 		.replace("{task}", task)
 		.replace("{workspace}", &workspace)
 		.replace("{history}", &history)
-		.replace("{execution_ledger}", &execution_ledger);
+		.replace("{execution_ledger}", &execution_ledger)
+		.replace("{completion_criteria}", &completion_criteria);
 
 	let mut report = format!(
 		"{}\n{}\n{}\n",
 		fmt_kv("BUILD_PROMPT:", &format!("{:?}", truncate(task, 50))),
 		fmt_kv("CWD:", &ctx.workspace.cwd.display().to_string()),
-		fmt_kv(
-			"PLAN.MD:",
-			&format!(
-				"{} lines | {} chars | {} path",
-				plan.lines().count(),
-				plan.chars().count(),
-				plan_path
-			),
-		),
+		fmt_kv("REQUIRED OUTPUTS:", &completion_criteria),
 	);
 	report.push_str(&fmt_section("WORKSPACE"));
 	report.push_str(&workspace);
@@ -48,9 +35,6 @@ pub fn build_prompt(run: &AgentRun) -> String {
 
 	report.push_str(&fmt_section("EXECUTION LEDGER"));
 	report.push_str(&execution_ledger);
-
-	report.push_str(&fmt_section("PLAN"));
-	report.push_str(&plan_preview);
 
 	report.push_str(&format!(
 		"\n{}\n",
@@ -222,32 +206,184 @@ pub fn structured_prompt_chat(ctx: &AgentCtx) -> String {
 }
 pub fn validate_agent_completion(
 	workspace_root: &Path,
-	artifacts: &[Artifact],
+	criteria: &CompletionCriteria,
 	commands: &[CommandRecord],
-	changed_paths: &[PathBuf],
 ) -> Result<AgentCompletionValidation> {
 	let mut errors = Vec::new();
-	let mut paths: Vec<PathBuf> = artifacts
-		.iter()
-		.filter_map(|artifact| match artifact {
-			Artifact::FileRead { path, .. } | Artifact::FileWrite { path } => Some(PathBuf::from(path)),
-			Artifact::Observation(_) | Artifact::ToolOutput(_) => None,
-		})
-		.collect();
+	let workspace_root = workspace_root.canonicalize().with_context(|| {
+		format!(
+			"canonicalizing agent workspace {}",
+			workspace_root.display()
+		)
+	})?;
+	for required_file in &criteria.required_files {
+		if required_file.is_absolute()
+			|| required_file
+				.components()
+				.any(|component| matches!(component, std::path::Component::ParentDir))
+		{
+			errors.push(format!(
+				"Required file path must stay inside the workspace: {}",
+				required_file.display(),
+			));
+			continue;
+		}
 
-	paths.extend(changed_paths.iter().cloned());
-	paths.sort();
-	paths.dedup();
+		let path = workspace_root.join(required_file);
+		let path = match path.canonicalize() {
+			Ok(path) => path,
+			Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+				errors.push(format!(
+					"Required output is missing: {}",
+					required_file.display()
+				));
+				continue;
+			}
+			Err(error) => {
+				errors.push(format!(
+					"Could not inspect required output {}: {error}",
+					required_file.display(),
+				));
+				continue;
+			}
+		};
+		if !path.starts_with(&workspace_root) {
+			errors.push(format!(
+				"Required output resolves outside the workspace: {}",
+				required_file.display(),
+			));
+			continue;
+		}
+		match std::fs::metadata(&path) {
+			Ok(metadata) if metadata.is_file() && metadata.len() > 0 => {}
+			Ok(metadata) if !metadata.is_file() => errors.push(format!(
+				"Required output is not a file: {}",
+				required_file.display(),
+			)),
+			Ok(_) => errors.push(format!(
+				"Required output is empty: {}",
+				required_file.display(),
+			)),
+			Err(error) if error.kind() == std::io::ErrorKind::NotFound => errors.push(format!(
+				"Required output is missing: {}",
+				required_file.display(),
+			)),
+			Err(error) => errors.push(format!(
+				"Could not inspect required output {}: {error}",
+				required_file.display(),
+			)),
+		}
+	}
 
-	if !changed_paths.is_empty() && !commands.iter().any(|command| command.success) {
-		errors.push(
-			"Files changed, but no command completed successfully. \
-			 Run an appropriate verification command before finishing."
-				.to_owned(),
-		);
+	for required_command in &criteria.required_commands {
+		if !commands.iter().any(|command| {
+			command.success && command.argv.as_deref() == Some(required_command.as_slice())
+		}) {
+			errors.push(format!(
+				"Required verification command did not succeed: {}",
+				required_command.join(" ")
+			));
+		}
 	}
 
 	Ok(AgentCompletionValidation { errors })
+}
+
+#[cfg(test)]
+mod completion_tests {
+	use super::*;
+
+	struct TempWorkspace(PathBuf);
+
+	impl TempWorkspace {
+		fn new() -> Self {
+			let path = std::env::temp_dir().join(format!("estate-agent-test-{}", uuid::Uuid::new_v4()));
+			std::fs::create_dir_all(&path).unwrap();
+			Self(path)
+		}
+	}
+
+	impl Drop for TempWorkspace {
+		fn drop(&mut self) {
+			let _ = std::fs::remove_dir_all(&self.0);
+		}
+	}
+
+	fn successful_command(command: &str) -> CommandRecord {
+		CommandRecord {
+			step: 1,
+			command: command.into(),
+			argv: Some(command.split_whitespace().map(str::to_owned).collect()),
+			exit_code: Some(0),
+			stdout: String::new(),
+			stderr: String::new(),
+			success: true,
+			error: None,
+			timestamp: chrono::Utc::now(),
+		}
+	}
+
+	#[test]
+	fn completion_requires_nonempty_outputs_and_successful_checks() {
+		let workspace = TempWorkspace::new();
+		let criteria = CompletionCriteria {
+			required_files: vec![PathBuf::from("hello-world.cjs")],
+			required_commands: vec![vec![
+				"node".into(),
+				"--test".into(),
+				"tests/hello-world.test.js".into(),
+			]],
+		};
+		let commands = vec![successful_command("touch hello-world.cjs")];
+
+		let missing = validate_agent_completion(&workspace.0, &criteria, &commands).unwrap();
+		assert!(!missing.is_valid());
+		assert!(missing.errors.iter().any(|error| error.contains("missing")));
+		assert!(
+			missing
+				.errors
+				.iter()
+				.any(|error| error.contains("verification command"))
+		);
+
+		std::fs::write(workspace.0.join("hello-world.cjs"), "").unwrap();
+		let empty = validate_agent_completion(&workspace.0, &criteria, &commands).unwrap();
+		assert!(empty.errors.iter().any(|error| error.contains("empty")));
+
+		std::fs::write(
+			workspace.0.join("hello-world.cjs"),
+			"module.exports = {};\n",
+		)
+		.unwrap();
+		let verified = validate_agent_completion(
+			&workspace.0,
+			&criteria,
+			&[successful_command("node --test tests/hello-world.test.js")],
+		)
+		.unwrap();
+		assert!(verified.is_valid(), "{:?}", verified.errors);
+	}
+
+	#[test]
+	fn action_prompt_includes_runtime_completion_criteria() {
+		let task =
+			AgentTask::new("implement the plan".into()).with_completion_criteria(CompletionCriteria {
+				required_files: vec![PathBuf::from("hello-world.cjs")],
+				required_commands: vec![vec![
+					"node".into(),
+					"--test".into(),
+					"tests/hello-world.test.js".into(),
+				]],
+			});
+		let mut context = AgentCtx::with_workspace(task.prompt.clone(), CtxWorkspace::default());
+		context.task = Some(task);
+
+		let prompt = build_prompt(&AgentRun::new(context));
+
+		assert!(prompt.contains("hello-world.cjs"));
+		assert!(prompt.contains("tests/hello-world.test.js"));
+		assert!(prompt.contains("args"));
+	}
 }
 pub fn validate_shell_command(command: &str) -> anyhow::Result<()> {
 	use anyhow::bail;

@@ -37,6 +37,62 @@ pub fn gen_plan(intent: &str, spec: &str) -> Result<String> {
 		.replace("{spec}", spec);
 	Ok(prompt)
 }
+
+pub fn parse_completion_criteria(
+	plan: &str,
+) -> Result<crate::modules::native::agent::CompletionCriteria> {
+	let lines = plan.lines().collect::<Vec<_>>();
+	let contract_index = lines
+		.iter()
+		.position(|line| {
+			let heading = line.trim().strip_prefix("##").map(str::trim).unwrap_or("");
+			let title = heading
+				.split_once(". ")
+				.filter(|(number, _)| !number.is_empty() && number.chars().all(|c| c.is_ascii_digit()))
+				.map_or(heading, |(_, title)| title);
+			title == "Machine-Readable Build Contract"
+		})
+		.ok_or_else(|| anyhow!("Plan is missing the Machine-Readable Build Contract section"))?;
+	let contract = lines[contract_index + 1..].join("\n");
+	let json = contract
+		.trim_start()
+		.strip_prefix("```json")
+		.and_then(|contract| contract.split_once("```").map(|(json, _)| json.trim()))
+		.ok_or_else(|| anyhow!("Build Contract must contain a fenced JSON object"))?;
+	let criteria: crate::modules::native::agent::CompletionCriteria =
+		serde_json::from_str(json).context("parsing Plan Build Contract")?;
+	if criteria.required_files.is_empty() {
+		return Err(anyhow!(
+			"Build Contract must list at least one required output file"
+		));
+	}
+	if criteria.required_commands.is_empty() {
+		return Err(anyhow!(
+			"Build Contract must list at least one verification command"
+		));
+	}
+	for path in &criteria.required_files {
+		if path.as_os_str().is_empty()
+			|| path.is_absolute()
+			|| path
+				.components()
+				.any(|component| matches!(component, std::path::Component::ParentDir))
+		{
+			return Err(anyhow!(
+				"Build Contract contains an invalid output path: {}",
+				path.display()
+			));
+		}
+	}
+	if criteria.required_commands.iter().any(|command| {
+		command.is_empty() || command[0].trim().is_empty() || command.iter().any(String::is_empty)
+	}) {
+		return Err(anyhow!(
+			"Build Contract contains an empty verification command"
+		));
+	}
+	Ok(criteria)
+}
 pub fn plan_gen(intent: &str, spec: &str) -> String {
 	format!(
 		r#"
@@ -175,4 +231,37 @@ pub fn tests_gen(intent: &str, spec: &str, plan: &str) -> String {
 			Return only the contents of `tests.md`.
 		"#,
 	)
+}
+
+#[cfg(test)]
+mod completion_contract_tests {
+	use super::*;
+
+	#[test]
+	fn parses_machine_readable_build_contract() {
+		let plan = r#"## 9. Machine-Readable Build Contract
+```json
+{
+  "required_files": ["hello-world.cjs", "tests/hello-world.test.js"],
+  "required_commands": [["node", "--test", "tests/hello-world.test.js"]]
+}
+```
+"#;
+		let criteria = parse_completion_criteria(plan).unwrap();
+		assert_eq!(criteria.required_files.len(), 2);
+		assert_eq!(
+			criteria.required_commands[0],
+			["node", "--test", "tests/hello-world.test.js"]
+		);
+	}
+
+	#[test]
+	fn rejects_contract_paths_outside_the_workspace() {
+		let plan = r#"## Machine-Readable Build Contract
+```json
+{"required_files":["../outside"],"required_commands":[["node","--test"]]}
+```
+"#;
+		assert!(parse_completion_criteria(plan).is_err());
+	}
 }

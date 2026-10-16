@@ -20,8 +20,7 @@ impl AgentRuntime {
 	}
 	pub async fn send_prompt(&self, prompt: &str) -> Result<String> {
 		let task = AgentTask::new(prompt.to_string());
-		let cwd = std::env::current_dir()?;
-		let agent = Agent::with_cwd(cwd);
+		let agent = Agent::with_workspace(self.workspace.clone());
 		agent.run_agent(prompt).await
 	}
 
@@ -77,8 +76,7 @@ impl AgentRuntime {
 		Ok(generated.to_string())
 	}
 	pub async fn run_agent(&self, task: AgentTask) -> Result<TaskResult> {
-		let cwd = std::env::current_dir()?;
-		let agent = Agent::with_cwd(cwd);
+		let agent = Agent::with_workspace(self.workspace.clone());
 		agent.run_agent_loop(task, self.event_tx.clone()).await
 	}
 	pub async fn spawn_agent(&self, task: AgentTask) {

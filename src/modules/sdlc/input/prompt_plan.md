@@ -5,6 +5,7 @@ Transform the approved Intent and Specification into a concrete, repository-awar
 You are determining HOW the approved Specification should be implemented.
 
 RULES:
+
 1. The Specification is the source of truth for what must be built.
 2. The template is the source of truth for the document structure.
 3. The Plan defines how the Specification will be implemented.
@@ -20,8 +21,10 @@ RULES:
 13. The Execution Work Order must be actionable and reflect actual dependencies.
 14. Fill in every section of the supplied template.
 15. Return only the completed Markdown Implementation Plan.
+16. Complete the Machine-Readable Build Contract in the template. List every planned output file, including tests, and represent each verification command as an argv array (program followed by arguments). Use commands that can be executed from the repository root. Do not use shell operators or omit required behavioral tests.
 
 Before responding, verify that the output contains all six sections:
+
 - Overview
 - Context & References
 - Proposed Changes
