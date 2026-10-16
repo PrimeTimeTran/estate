@@ -36,7 +36,17 @@ pub fn print_section_info(
 
 	let rule = "-".repeat(width);
 
-	println!("{}", rule.dimmed());
+	let truncated = values.iter().any(|(_, value)| value.contains("…"));
+
+	if truncated {
+		let marker = "…";
+		let padding = width.saturating_sub(marker.chars().count());
+
+		print!("{}", "-".repeat(padding).dimmed());
+		println!("{}", marker.dimmed());
+	} else {
+		println!("{}", rule.dimmed());
+	}
 
 	// Build the title-row adornment from all metrics.
 	let metric_text = metrics

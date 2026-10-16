@@ -2492,13 +2492,20 @@ impl PipeRunner<'_> {
 		self.pipeline.system.add_file(spec_path);
 		self.pipeline.system.add_file(plan_path);
 
-		section!(&format!(
-			"Build workspace files: {}",
-			self.pipeline.system.runtime.workspace.files.len()
-		));
-
 		let workspace_before = WSSnapshot::capture(&workspace)?;
-		section!(&format!("workspace_before:\n{:?}", workspace_before));
+		let workspace_before = WSSnapshot::capture(&workspace)?;
+
+		section_info!(
+			"workspace",
+			metrics: [
+				"files" => self.pipeline.system.runtime.workspace.files.len(),
+			],
+			"git status" => if workspace_before.git_status.is_empty() {
+				"clean".to_string()
+			} else {
+				workspace_before.git_status.clone()
+			},
+		);
 
 		// Phase 1: Orient.
 		let orient_task = AgentTask::new(format!(
