@@ -1,6 +1,7 @@
 use crate::prelude::*;
 
 use owo_colors::OwoColorize;
+use terminal_size::{Width, terminal_size};
 
 pub fn print(level: Level, message: impl Display) {
 	println!("{} {}", level.format(level.label()), message,);
@@ -19,6 +20,137 @@ pub fn print_section(title: &str, file: &str, line: u32) {
 		hyperlink(&format!("{file}#{line}"), &source_url(&file, line)).dimmed()
 	);
 	println!("{}", "-".repeat(80).dimmed());
+}
+
+// pub fn print_section_info(
+// 	title: &str,
+// 	file: &str,
+// 	line: u32,
+// 	metrics: &[(&str, String)],
+// 	values: &[(&str, String)],
+// ) {
+// 	const WIDTH: usize = 80;
+//
+// 	let file = normalize_file(file);
+// 	let rule = "-".repeat(WIDTH);
+//
+// 	println!("{}", rule.dimmed());
+//
+// 	// Compact, right-side title adornment.
+// 	let metric_text = metrics
+// 		.iter()
+// 		.map(|(key, value)| format!("{key} {value}"))
+// 		.collect::<Vec<_>>()
+// 		.join(" │ ");
+//
+// 	let title_width = title.chars().count();
+// 	let metric_width = metric_text.chars().count();
+// 	let gap = WIDTH.saturating_sub(title_width + metric_width).max(1);
+//
+// 	print!("{}", title.bold().cyan());
+// 	print!("{}", " ".repeat(gap));
+//
+// 	for (index, (key, value)) in metrics.iter().enumerate() {
+// 		if index > 0 {
+// 			print!(" {}", "│".dimmed());
+// 			print!(" ");
+// 		}
+//
+// 		print!("{} {}", key.dimmed(), value.yellow());
+// 	}
+//
+// 	println!();
+//
+// 	// Dense, aligned key-value rows.
+// 	if !values.is_empty() {
+// 		let key_width = values
+// 			.iter()
+// 			.map(|(key, _)| key.chars().count())
+// 			.max()
+// 			.unwrap_or(0);
+//
+// 		for (key, value) in values {
+// 			print!("  {:<key_width$}  ", key.dimmed());
+// 			println!("{}", value);
+// 		}
+// 	}
+//
+// 	println!(
+// 		"{}",
+// 		format!(
+// 			"See {}",
+// 			hyperlink(&format!("{file}#{line}"), &source_url(&file, line))
+// 		)
+// 		.dimmed()
+// 	);
+//
+// 	println!("{}", rule.dimmed());
+// }
+pub fn print_section_info(
+	title: &str,
+	file: &str,
+	line: u32,
+	metrics: &[(&str, String)],
+	values: &[(&str, String)],
+) {
+	let file = normalize_file(file);
+	let width = terminal_size()
+		.map(|(Width(width), _)| width as usize)
+		.unwrap_or(80);
+
+	let rule = "-".repeat(width);
+
+	println!("{}", rule.dimmed());
+
+	// Build the title-row adornment from all metrics.
+	let metric_text = metrics
+		.iter()
+		.map(|(key, value)| format!("{key} {value}"))
+		.collect::<Vec<_>>()
+		.join(" │ ");
+
+	let title_width = title.chars().count();
+	let metric_width = metric_text.chars().count();
+	let gap = width.saturating_sub(title_width + metric_width).max(1);
+
+	print!("{}", title.bold().cyan());
+	print!("{}", " ".repeat(gap));
+
+	for (index, (key, value)) in metrics.iter().enumerate() {
+		if index > 0 {
+			print!(" {}", "│".dimmed());
+			print!(" ");
+		}
+
+		print!("{} {}", key.dimmed(), value.yellow());
+	}
+
+	println!();
+
+	// Detail rows, if supplied.
+	if !values.is_empty() {
+		let key_width = values
+			.iter()
+			.map(|(key, _)| key.chars().count())
+			.max()
+			.unwrap_or(0);
+
+		for (key, value) in values {
+			print!("  {:<key_width$}  ", key.dimmed());
+			println!("{value}");
+		}
+	}
+
+	println!(
+		"{}",
+		format!(
+			"See {}",
+			hyperlink(&format!("{file}#{line}"), &source_url(&file, line))
+		)
+		.dimmed()
+	);
+
+	println!("{}", rule.dimmed());
 }
 
 /// Prints a section and then panics.

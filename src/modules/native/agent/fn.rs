@@ -362,16 +362,15 @@ pub async fn build_action(prompt: &str) -> Result<LlmAction> {
 	use std::time::Instant;
 
 	let started = Instant::now();
-	eprintln!("{}", fmt_kv("build_action:", "ENTER"));
-	eprintln!("{}", fmt_kv("MODEL:", DEFAULT_MODEL));
-	eprintln!("{}", fmt_kv("ENDPOINT:", crate::AGENT_GEN_URL));
-	eprintln!("{}", fmt_kv("PROMPT CHARS:", &prompt.len().to_string()));
-	eprintln!(
-		"{}",
-		fmt_kv(
-			"SYSTEM PROMPT CHARS:",
-			&JSON_PROMPT_EXECUTION.len().to_string()
-		)
+
+	section_info!(
+		"build_action",
+		metrics: [
+			"model" => DEFAULT_MODEL,
+			"elapsed" => format!("{:.1?}", started.elapsed()),
+			"prompt" => format!("{} chars", prompt.len()),
+			"system" => format!("{} chars", JSON_PROMPT_EXECUTION.len()),
+		],
 	);
 
 	let payload = serde_json::json!({

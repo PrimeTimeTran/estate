@@ -69,6 +69,29 @@ macro_rules! section {
 }
 pub use section;
 
+#[macro_export]
+macro_rules! section_info {
+    (
+        $title:expr,
+        metrics: [$($metric_key:expr => $metric_value:expr),* $(,)?],
+        $($key:expr => $value:expr),* $(,)?
+    ) => {
+        $crate::helpers::print_section_info(
+            $title,
+            file!(),
+            line!(),
+            &[
+                $(($metric_key, format!("{}", $metric_value))),*
+            ],
+            &[
+                $(($key, format!("{}", $value))),*
+            ],
+        )
+    };
+}
+
+pub use section_info;
+
 /// ## [panic_section!]
 ///
 /// Print a section header for grouping output when reading through dense text.

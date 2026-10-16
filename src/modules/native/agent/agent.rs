@@ -653,21 +653,29 @@ impl Agent {
 		let plan_path = workspace.cwd.join("log/plan.md");
 		let plan = std::fs::read_to_string(&plan_path)
 			.with_context(|| format!("Failed to load plan: {}", plan_path.display()))?;
-		workspace.add_file(plan_path);
+		workspace.add_file(plan_path.clone());
+
 		let mut run = AgentRun::new(AgentCtx::with_workspace(task.prompt.clone(), workspace));
+
 		let prompt = run.ctx.prompt.as_deref().unwrap_or("");
 		const PLAN: &str = include_str!("../../../../log/plan.md");
-		eprintln!(
-			"{}",
-			fmt_kv("TASK CONTAINS PLAN:", &prompt.contains(&PLAN).to_string())
-		);
-		eprintln!("PLAN CHARS: {}", PLAN.chars().count());
-		eprintln!("PROMPT CHARS: {}", prompt.chars().count());
-		eprintln!("PLAN INCLUDED: {}", prompt.contains(PLAN));
+
 		let prompt_chars = prompt.chars().count();
+		let plan_chars = PLAN.chars().count();
+		let contains_plan = prompt.contains(PLAN);
 		let estimated_tokens = prompt_chars.div_ceil(6);
 
-		section!("🏗️ 🔁 run_agent_loop CONTEXT");
+		section_info!(
+			"🏗️ 🔁 run_agent_loop",
+			metrics: [
+				"plan" => if contains_plan { "included" } else { "missing" },
+				"prompt" => format!("{prompt_chars} chars"),
+				"tokens≈" => estimated_tokens,
+				"plan size" => format!("{plan_chars} chars"),
+			],
+			"plan path" => plan_path.display(),
+			"max steps" => max_steps,
+		);
 
 		print_run_metrics(&prompt, &mut run.clone(), self.files_seen);
 
@@ -1181,7 +1189,11 @@ pub struct LlmMode {
 
 fn log_run(run: &mut AgentRun, message: impl Into<String>) {
 	let message = message.into();
-	println!("{} {}", colorize(BOLD, "[🤖 AGENT]"), colorize(DIM, &message),);
+	println!(
+		"{} {}",
+		colorize(BOLD, "[🤖 AGENT]"),
+		colorize(DIM, &message),
+	);
 	run.record_log(format!("[🤖 AGENT] {message}"));
 }
 
