@@ -1,13 +1,12 @@
-use std::sync::LazyLock;
-
 use super::*;
+use std::path::PathBuf;
 
 pub const TODO: &'static str = r#"
 	- Question prompt
 	- Add progressive disclosure
 "#;
 
-pub const SDLC_LOG_DIR: &str = "/Users/future/kb/project/crates/estate/log";
+pub const SDLC_LOG_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/log");
 pub const SDLC_LOG_FILE_NAME: &str = "events.jsonl";
 
 pub const SDLC_TEMPLATE_INTENT: &str = include_str!("input/intent.md");
@@ -36,11 +35,6 @@ pub static DEFAULT_LOOP_TRIES: u32 = 3;
 pub static DEFAULT_NAUL_BAR: f64 = 0.40;
 pub static DEFAULT_MODEL: &str = "qwen3:8b";
 
-pub static SYS_PROMPT_INTENT: &str =
-	"/Users/future/kb/project/crates/estate/log/SYS_PROMPT_INTENT.md";
-pub static SYS_PROMPT_SPEC: &str = "/Users/future/kb/project/crates/estate/log/SYS_PROMPT_SPEC.md";
-pub static SYS_PROMPT_PLAN: &str = "/Users/future/kb/project/crates/estate/log/SYS_PROMPT_PLAN.md";
-
-pub static OLLAMA_REQUEST: &str = "/Users/future/kb/project/crates/estate/log/ollama-request.json";
-pub static OLLAMA_RESPONSE: &str =
-	"/Users/future/kb/project/crates/estate/log/ollama-response.json";
+pub fn sdlc_log_file(name: &str) -> PathBuf {
+	PathBuf::from(SDLC_LOG_DIR).join(name)
+}

@@ -769,7 +769,10 @@ impl t::Generator for LocalGenerator {
 			"prompt": prompt,
 			"stream": false,
 		});
-		std::fs::write(OLLAMA_REQUEST, serde_json::to_string_pretty(&request)?)?;
+		std::fs::write(
+			sdlc_log_file("ollama-request.json"),
+			serde_json::to_string_pretty(&request)?,
+		)?;
 		let response = reqwest::Client::new()
 			.post(AGENT_GEN_URL)
 			.json(&request)
@@ -777,7 +780,7 @@ impl t::Generator for LocalGenerator {
 			.await?
 			.error_for_status()?;
 		let body = response.text().await?;
-		std::fs::write(OLLAMA_RESPONSE, &body)?;
+		std::fs::write(sdlc_log_file("ollama-response.json"), &body)?;
 		let response: OllamaResponse =
 			serde_json::from_str(&body).context("invalid Ollama response")?;
 		let artifact = response.response.trim();
@@ -2351,7 +2354,8 @@ impl PipeRunner<'_> {
 		let prompt = p::gen_intent(&goal)?;
 		tracing::info!(prompt_len = prompt.len(), "Intent: prompt generated");
 
-		std::fs::write(SYS_PROMPT_INTENT, &prompt).context("Intent: writing prompt debug file")?;
+		std::fs::write(sdlc_log_file("SYS_PROMPT_INTENT.md"), &prompt)
+			.context("Intent: writing prompt debug file")?;
 		tracing::info!("Intent: prompt debug file written");
 
 		let generated = self
@@ -2403,7 +2407,8 @@ impl PipeRunner<'_> {
 		if prompt.trim().is_empty() {
 			return Err(anyhow!("generated Spec prompt is empty"));
 		}
-		std::fs::write(SYS_PROMPT_SPEC, &prompt).context("writing Spec prompt debug file")?;
+		std::fs::write(sdlc_log_file("SYS_PROMPT_SPEC.md"), &prompt)
+			.context("writing Spec prompt debug file")?;
 		let generated = self
 			.pipeline
 			.system
@@ -2433,7 +2438,8 @@ impl PipeRunner<'_> {
 		if prompt.trim().is_empty() {
 			return Err(anyhow!("Generated Plan prompt is empty"));
 		}
-		std::fs::write(SYS_PROMPT_PLAN, &prompt).context("writing plan prompt debug file")?;
+		std::fs::write(sdlc_log_file("SYS_PROMPT_PLAN.md"), &prompt)
+			.context("writing plan prompt debug file")?;
 		let generated = self
 			.pipeline
 			.system

@@ -1,4 +1,5 @@
 use super::*;
+use crate::modules::sdlc::sdlc_log_file;
 
 impl AgentRuntime {
 	pub fn workspace(&self) -> &CtxWorkspace {
@@ -38,8 +39,11 @@ impl AgentRuntime {
 			},
 		});
 
-		std::fs::write(OLLAMA_REQUEST, serde_json::to_string_pretty(&request)?)
-			.context("writing Ollama request debug file")?;
+		std::fs::write(
+			sdlc_log_file("ollama-request.json"),
+			serde_json::to_string_pretty(&request)?,
+		)
+		.context("writing Ollama request debug file")?;
 
 		let response = reqwest::Client::new()
 			.post(AGENT_GEN_URL)
@@ -55,7 +59,8 @@ impl AgentRuntime {
 			.await
 			.context("reading Ollama response body")?;
 
-		std::fs::write(OLLAMA_RESPONSE, &body).context("writing Ollama response debug file")?;
+		std::fs::write(sdlc_log_file("ollama-response.json"), &body)
+			.context("writing Ollama response debug file")?;
 
 		let response: OllamaResponse =
 			serde_json::from_str(&body).context("invalid Ollama response")?;
