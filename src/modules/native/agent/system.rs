@@ -66,6 +66,8 @@ impl CtxWorkspace {
 	pub fn new(files: Vec<FileInfo>) -> Self {
 		Self {
 			files,
+			files_wip: Vec::new(),
+			files_todo: Vec::new(),
 			cwd: std::env::current_dir().unwrap_or_default(),
 		}
 	}
@@ -80,6 +82,8 @@ impl CtxWorkspace {
 		}
 		Ok(Self {
 			files,
+			files_wip: Vec::new(),
+			files_todo: Vec::new(),
 			cwd: session.dir.clone(),
 		})
 	}
@@ -110,11 +114,18 @@ impl CtxWorkspace {
 			FileInfo::from_path(&path)
 		})
 		.collect::<Result<Vec<_>>>()?;
-		Ok(Self { cwd, files })
+		Ok(Self {
+			cwd,
+			files,
+			files_wip: Vec::new(),
+			files_todo: Vec::new(),
+		})
 	}
 	pub fn load() -> anyhow::Result<Self> {
 		Ok(Self {
 			files: Vec::new(),
+			files_wip: Vec::new(),
+			files_todo: Vec::new(),
 			cwd: std::env::current_dir()?,
 		})
 	}
@@ -122,6 +133,8 @@ impl CtxWorkspace {
 		Self {
 			cwd: cwd.into(),
 			files: Vec::new(),
+			files_wip: Vec::new(),
+			files_todo: Vec::new(),
 		}
 	}
 }
@@ -129,6 +142,8 @@ impl Default for CtxWorkspace {
 	fn default() -> Self {
 		Self {
 			files: Vec::new(),
+			files_wip: Vec::new(),
+			files_todo: Vec::new(),
 			cwd: std::env::current_dir().unwrap_or_default(),
 		}
 	}
@@ -160,5 +175,7 @@ pub struct AgentSystem {
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct CtxWorkspace {
 	pub files: Vec<FileInfo>,
+	pub files_wip: Vec<FileInfo>,
+	pub files_todo: Vec<FileInfo>,
 	pub cwd: PathBuf,
 }

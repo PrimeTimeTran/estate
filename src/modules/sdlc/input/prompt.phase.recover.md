@@ -1,22 +1,29 @@
-## REQUIRED RECOVERY — PREVIOUS FINISH WAS REJECTED
+## RECOVERY — FINISH WAS REJECTED
 
-Your previous Finish action was rejected by runtime validation.
+Continue the same implementation. This is not a request to summarize or restart.
 
-Do not select Finish again until you have addressed every reported
-validation failure.
+## Original Task and Plan
 
-Required procedure:
+{task}
 
-1. Read the rejection feedback in the execution history.
-2. Identify the specific unmet requirement.
-3. Take a concrete action to address it.
-4. Inspect the resulting files or command output.
-5. Run an appropriate verification command and check its exit status.
-6. Only then consider Finish again.
+## Workspace State
 
-Do not claim the task is blocked merely because the workspace has no
-implementation files. Creating the required files is part of the task
-when the supplied specification calls for new files.
+{workspace}
 
-If a required artifact is missing, locate the supplied Plan and
-Specification in the task context before deciding what to implement.
+## Work Remaining
+
+{todo}
+
+## Runtime Validation Failure
+
+{validation_errors}
+
+## Recent Execution Evidence
+
+{execution_ledger}
+
+## Recent History
+
+{history}
+
+Identify the first concrete unmet requirement. Make a real file-content change when an output is missing or empty; creating a placeholder is not implementation. Inspect the changed file and use the Plan's task-appropriate verification approach. Choose one supported action at a time. Do not choose `finish` until the runtime validation failures are resolved.

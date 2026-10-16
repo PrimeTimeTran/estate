@@ -292,13 +292,13 @@ pub static ACTION_PROMPT_EXECUTION: &str = r#"You are an autonomous software eng
 
   ## ENFORCED COMPLETION CRITERIA
 
-  The runtime will reject `finish` until every required file is present and non-empty and every required command has a successful execution record. Treat these criteria as acceptance requirements, not suggestions.
+  The runtime rejects `finish` when a Plan-listed output is missing or empty. The Build Verify phase chooses and runs task-appropriate checks; the runtime does not prescribe a command list.
 
   ```json
-  {completion_criteria}
+  {expected_outputs}
   ```
 
-  Execute each required command with the `run_command` action's `args` array so the recorded program and arguments match the contract. For example, `node --test tests/example.test.js` is `{"action":"run_command","args":["node","--test","tests/example.test.js"]}`. Inspect the actual result before finishing.
+  Choose file actions and verification programs based on the Plan and the host environment. The orchestrator verifies expected outputs from the Plan, but does not prescribe a command list.
 
   ## PLAN-FIRST EXECUTION PROTOCOL
   

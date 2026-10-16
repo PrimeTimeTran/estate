@@ -172,7 +172,8 @@ pub fn fmt_history<T: std::fmt::Debug>(
 	max_lines_per_entry: usize,
 ) -> String {
 	let mut output = format!("{} entries\n", colorize(DIM, &history.len().to_string()),);
-	for (index, entry) in history.iter().take(max_entries).enumerate() {
+	let start = history.len().saturating_sub(max_entries);
+	for (index, entry) in history.iter().enumerate().skip(start) {
 		let rendered = format!("{entry:#?}");
 		output.push_str(&format!(
 			"{} {}\n",

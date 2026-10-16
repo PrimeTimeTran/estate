@@ -1,28 +1,40 @@
 # Build a Node.js CLI Hello World Tool
 
-Create a small Node.js CLI tool in the repository root.
+Create a Node.js CLI tool in the repository root.
 
 ## Goal
 
-The tool should accept a single command-line argument and write that value to a Markdown file.
+The tool is executed/called with a single CLI argument and writes that value to a `.md` file.
 
 The CLI entrypoint must be:
 
-```text
+```sh
 hello-world.cjs
 ```
 
-The generated output file must be:
+If the tool is called with
 
-```text
+```sh
+node hello-world.cjs 'hey there'
+```
+
+Then a file is generated named
+
+```sh
 hello-world.md
+```
+
+With this content
+
+```md
+hey there
 ```
 
 ## Required behavior
 
 From the repository root, the user must be able to run:
 
-```bash
+```sh
 node hello-world.cjs "hi"
 ```
 
@@ -30,13 +42,13 @@ and the command must create or overwrite `hello-world.md` so that the file conta
 
 For example:
 
-```bash
+```sh
 node hello-world.cjs "hi"
 ```
 
 must result in:
 
-```text
+```sh
 hello-world.md
 ```
 
@@ -59,9 +71,11 @@ Add automated tests covering both:
 2. **CLI behavior**
    - Test the actual command-line entrypoint.
    - The test should invoke the equivalent of:
-     ```bash
+
+     ```sh
      node hello-world.cjs "hi"
      ```
+
    - Verify that the expected `hello-world.md` file is created and contains the expected value.
 
 Tests should avoid modifying unrelated repository files and should clean up any temporary files they create.

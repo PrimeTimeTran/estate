@@ -1166,15 +1166,15 @@ impl Pipeline {
 		let plan_path = self.session.dir.join("plan.md");
 		let plan = std::fs::read_to_string(&plan_path)
 			.with_context(|| format!("reading build plan at {}", plan_path.display()))?;
-		let criteria = p::parse_completion_criteria(&plan)?;
-		let mut results = Vec::with_capacity(criteria.required_commands.len());
+		let expected_outputs = p::expected_outputs_from_plan(&plan)?;
+		let mut results = Vec::with_capacity(expected_outputs.len());
 		let workspace = self.session.workspace.canonicalize().with_context(|| {
 			format!(
 				"canonicalizing project workspace {}",
 				self.session.workspace.display()
 			)
 		})?;
-		for required_file in &criteria.required_files {
+		for required_file in &expected_outputs {
 			let candidate = workspace.join(required_file);
 			let (passed, output) = match candidate.canonicalize() {
 				Ok(path) if path.starts_with(&workspace) && path.is_file() => {
@@ -1195,31 +1195,6 @@ impl Pipeline {
 			};
 			results.push(CheckResult {
 				name: format!("required file {}", required_file.display()),
-				passed,
-				output: Some(output),
-			});
-		}
-		for command in criteria.required_commands {
-			let (program, args) = command
-				.split_first()
-				.ok_or_else(|| anyhow!("Build Contract contains an empty command"))?;
-			let name = command.join(" ");
-			let result = Command::new(program)
-				.args(args)
-				.current_dir(&self.session.workspace)
-				.output()
-				.map_err(|error| anyhow!("failed to run verification check `{name}`: {error}"))?;
-			let stdout = String::from_utf8_lossy(&result.stdout);
-			let stderr = String::from_utf8_lossy(&result.stderr);
-			let output = match (stdout.is_empty(), stderr.is_empty()) {
-				(false, false) => format!("{stdout}\n{stderr}"),
-				(false, true) => stdout.into_owned(),
-				(true, false) => stderr.into_owned(),
-				(true, true) => String::new(),
-			};
-			let passed = result.status.success();
-			results.push(CheckResult {
-				name,
 				passed,
 				output: Some(output),
 			});
@@ -1583,7 +1558,11 @@ impl sdlc_trait::Runner for PipeRunner<'_> {
 	type Output = ();
 	/// "What happens next?"
 	/// Orchestrates the SDLC state machine:
-	/// run stage -> persist outcome -> handle_outcome -> apply -> follow control.
+	/// 1. run/execute stage -> Given the current stage, do business logic
+	/// 2. persist outcome -> update the execution results, logs, state, etc
+	/// 3. handle_outcome -> given the outcome decide what to do next.
+	/// 4. apply -> given an outcome of execution handle business logic of that decision with run control.
+	/// 5. control -> continue, retry, or exit. there is no other possibility.
 	async fn run(&mut self, input_rx: &mut Self::Context) -> Result<Self::Output> {
 		let mut pending_input = None;
 		let mut stage = self.pipeline.stage();
@@ -1602,57 +1581,33 @@ impl sdlc_trait::Runner for PipeRunner<'_> {
 				.execute(stage, attempt, &mut pending_input)
 				.await
 				.with_context(|| format!("run_stage({stage:?})"))?;
-
-			// tracing::info!(
-			// 	stage = ?stage,
-			// 	attempt = attempt.number,
-			// 	">>> RUN STAGE COMPLETE"
-			// );
-
 			// 2. Persist the execution and evaluation result.
 			self.pipeline.persist_outcome(&outcome)?;
 
 			// 3. Decide what should happen next.
 			let decision = self.handle_outcome(&outcome).await?;
 
-			// tracing::info!(
-			// 	stage = ?stage,
-			// 	attempt = attempt.number,
-			// 	decision = ?decision,
-			// 	">>> DECISION"
-			// );
-
 			// 4. Apply the decision.
+  		// apply() transitions to the next stage.
 			let control = self
 				.apply(outcome, decision, input_rx, &mut pending_input)
 				.await?;
 
 			match control {
 				RunControl::Continue => {
-					// apply() transitioned to the next stage.
 					stage = self.pipeline.stage();
 					// Every new stage starts at attempt 1.
 					self.pipeline.stage_attempt_reset();
 					tracing::info!(
 						stage = ?stage,
 						attempt = self.pipeline.stage_attempt(),
-						">>> TRANSITION"
+						">>> Runner continuing."
 					);
 				}
 				RunControl::RetryStage => {
-					tracing::info!(
-						stage = ?stage,
-						">>> RETRY"
-					);
 					continue;
 				}
-
 				RunControl::Exit => {
-					tracing::info!(
-						stage = ?stage,
-						attempt = attempt.number,
-						">>> EXIT"
-					);
 					return Ok(());
 				}
 			}
@@ -2555,8 +2510,8 @@ impl PipeRunner<'_> {
 		if generated.trim().is_empty() {
 			return Err(anyhow!("generated Plan artifact is empty"));
 		}
-		p::parse_completion_criteria(&generated)
-			.context("generated Plan has no valid machine-readable Build Contract")?;
+		p::expected_outputs_from_plan(&generated)
+			.context("generated Plan has no valid expected-output inventory")?;
 		// Pipeline::write(output_path, generated)?;
 		self.write(&generated)?;
 		self.pipeline.persist_progress("Plan stage completed")?;
@@ -2601,7 +2556,7 @@ impl PipeRunner<'_> {
 		if plan.trim().is_empty() {
 			return Err(anyhow::anyhow!("Plan artifact is empty"));
 		}
-		let completion_criteria = p::parse_completion_criteria(&plan)?;
+		let expected_outputs = p::expected_outputs_from_plan(&plan)?;
 
 		self.pipeline.system.add_file(intent_path);
 		self.pipeline.system.add_file(spec_path);
@@ -2683,7 +2638,8 @@ impl PipeRunner<'_> {
 			 ## Plan\n\n{plan}\n\n\
 			 ## Orientation Report\n\n{orient_report}"
 		))
-		.with_completion_criteria(completion_criteria);
+		.with_expected_outputs(expected_outputs)
+		.with_recovery_prompt(PROMPT_PHASE_RECOVER);
 
 		let phase_started = std::time::Instant::now();
 		section!("BUILD PHASE START: Execute");

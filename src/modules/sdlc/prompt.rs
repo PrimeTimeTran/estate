@@ -38,9 +38,7 @@ pub fn gen_plan(intent: &str, spec: &str) -> Result<String> {
 	Ok(prompt)
 }
 
-pub fn parse_completion_criteria(
-	plan: &str,
-) -> Result<crate::modules::native::agent::CompletionCriteria> {
+pub fn expected_outputs_from_plan(plan: &str) -> Result<Vec<PathBuf>> {
 	let lines = plan.lines().collect::<Vec<_>>();
 	let contract_index = lines
 		.iter()
@@ -50,28 +48,39 @@ pub fn parse_completion_criteria(
 				.split_once(". ")
 				.filter(|(number, _)| !number.is_empty() && number.chars().all(|c| c.is_ascii_digit()))
 				.map_or(heading, |(_, title)| title);
-			title == "Machine-Readable Build Contract"
+			title == "Machine-Readable Output Inventory" || title == "Machine-Readable Build Contract"
 		})
-		.ok_or_else(|| anyhow!("Plan is missing the Machine-Readable Build Contract section"))?;
+		.ok_or_else(|| anyhow!("Plan is missing the Machine-Readable Output Inventory section"))?;
 	let contract = lines[contract_index + 1..].join("\n");
 	let json = contract
 		.trim_start()
 		.strip_prefix("```json")
 		.and_then(|contract| contract.split_once("```").map(|(json, _)| json.trim()))
-		.ok_or_else(|| anyhow!("Build Contract must contain a fenced JSON object"))?;
-	let criteria: crate::modules::native::agent::CompletionCriteria =
-		serde_json::from_str(json).context("parsing Plan Build Contract")?;
-	if criteria.required_files.is_empty() {
-		return Err(anyhow!(
-			"Build Contract must list at least one required output file"
-		));
+		.ok_or_else(|| anyhow!("Output Inventory must contain a fenced JSON object"))?;
+	#[derive(serde::Deserialize)]
+	struct OutputInventory {
+		#[serde(default, alias = "required_files")]
+		expected_outputs: Vec<PathBuf>,
 	}
-	if criteria.required_commands.is_empty() {
-		return Err(anyhow!(
-			"Build Contract must list at least one verification command"
-		));
+	let inventory: OutputInventory =
+		serde_json::from_str(json).context("parsing Plan output inventory")?;
+	let mut expected_outputs = inventory.expected_outputs;
+	for line in plan.lines() {
+		let Some((_, location)) = line.split_once("Test Location:") else {
+			continue;
+		};
+		let Some((_, location)) = location.split_once('`') else {
+			continue;
+		};
+		let Some((location, _)) = location.split_once('`') else {
+			continue;
+		};
+		let path = PathBuf::from(location.trim());
+		if !expected_outputs.contains(&path) {
+			expected_outputs.push(path);
+		}
 	}
-	for path in &criteria.required_files {
+	for path in &expected_outputs {
 		if path.as_os_str().is_empty()
 			|| path.is_absolute()
 			|| path
@@ -79,19 +88,12 @@ pub fn parse_completion_criteria(
 				.any(|component| matches!(component, std::path::Component::ParentDir))
 		{
 			return Err(anyhow!(
-				"Build Contract contains an invalid output path: {}",
+				"Plan contains an invalid output path: {}",
 				path.display()
 			));
 		}
 	}
-	if criteria.required_commands.iter().any(|command| {
-		command.is_empty() || command[0].trim().is_empty() || command.iter().any(String::is_empty)
-	}) {
-		return Err(anyhow!(
-			"Build Contract contains an empty verification command"
-		));
-	}
-	Ok(criteria)
+	Ok(expected_outputs)
 }
 pub fn plan_gen(intent: &str, spec: &str) -> String {
 	format!(
@@ -238,30 +240,39 @@ mod completion_contract_tests {
 	use super::*;
 
 	#[test]
-	fn parses_machine_readable_build_contract() {
-		let plan = r#"## 9. Machine-Readable Build Contract
+	fn parses_plan_output_inventory_without_commands() {
+		let plan = r#"## 9. Machine-Readable Output Inventory
 ```json
 {
-  "required_files": ["hello-world.cjs", "tests/hello-world.test.js"],
-  "required_commands": [["node", "--test", "tests/hello-world.test.js"]]
+  "expected_outputs": ["hello-world.cjs", "tests/hello-world.test.js"]
 }
 ```
 "#;
-		let criteria = parse_completion_criteria(plan).unwrap();
-		assert_eq!(criteria.required_files.len(), 2);
-		assert_eq!(
-			criteria.required_commands[0],
-			["node", "--test", "tests/hello-world.test.js"]
-		);
+		let outputs = expected_outputs_from_plan(plan).unwrap();
+		assert_eq!(outputs.len(), 2);
 	}
 
 	#[test]
-	fn rejects_contract_paths_outside_the_workspace() {
-		let plan = r#"## Machine-Readable Build Contract
+	fn rejects_output_paths_outside_the_workspace() {
+		let plan = r#"## Machine-Readable Output Inventory
 ```json
-{"required_files":["../outside"],"required_commands":[["node","--test"]]}
+{"expected_outputs":["../outside"]}
 ```
 "#;
-		assert!(parse_completion_criteria(plan).is_err());
+		assert!(expected_outputs_from_plan(plan).is_err());
+	}
+
+	#[test]
+	fn includes_test_locations_in_expected_outputs() {
+		let plan = r#"## 5.1 Unit Tests
+- [ ] **Test Location:** `test/hello-world.test.js`
+
+## 9. Machine-Readable Output Inventory
+```json
+{"expected_outputs":["hello-world.cjs"]}
+```
+"#;
+		let outputs = expected_outputs_from_plan(plan).unwrap();
+		assert!(outputs.contains(&PathBuf::from("test/hello-world.test.js")));
 	}
 }

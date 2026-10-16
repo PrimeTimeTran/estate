@@ -8,28 +8,51 @@ pub fn build_prompt(run: &AgentRun) -> String {
 	let history = fmt_history(&ctx.history, 3, 3);
 	let execution_ledger = fmt_execution(&run.commands, 5, 5, 4_000);
 	let task = ctx.prompt.as_deref().unwrap_or("");
-	let completion_criteria = ctx
+	let recovery_error = run
+		.errors
+		.iter()
+		.rev()
+		.find(|error| error.kind == "completion_validation")
+		.map(|error| error.message.as_str());
+	let expected_outputs = ctx
 		.task
 		.as_ref()
-		.and_then(|task| serde_json::to_string_pretty(&task.completion_criteria).ok())
-		.unwrap_or_else(|| "{}".into());
-
-	let prompt = ACTION_PROMPT_EXECUTION
-		.replace("{task}", task)
-		.replace("{workspace}", &workspace)
-		.replace("{history}", &history)
-		.replace("{execution_ledger}", &execution_ledger)
-		.replace("{completion_criteria}", &completion_criteria);
+		.and_then(|task| serde_json::to_string_pretty(&task.expected_outputs).ok())
+		.unwrap_or_else(|| "[]".into());
+	let prompt = if let Some(validation_errors) = recovery_error {
+		let recovery_template = ctx
+			.task
+			.as_ref()
+			.and_then(|task| task.recovery_prompt.as_deref())
+			.unwrap_or(DEFAULT_RECOVERY_PROMPT);
+		recovery_template
+			.replace("{task}", task)
+			.replace("{workspace}", &workspace)
+			.replace("{todo}", &ctx.todo.join("\n"))
+			.replace("{validation_errors}", validation_errors)
+			.replace(
+				"{execution_ledger}",
+				&fmt_execution(&run.commands, 3, 3, 2_000),
+			)
+			.replace("{history}", &fmt_history(&ctx.history, 2, 3))
+			.replace("{expected_outputs}", &expected_outputs)
+	} else {
+		ACTION_PROMPT_EXECUTION
+			.replace("{task}", task)
+			.replace("{workspace}", &workspace)
+			.replace("{history}", &history)
+			.replace("{execution_ledger}", &execution_ledger)
+			.replace("{expected_outputs}", &expected_outputs)
+	};
 
 	let mut report = format!(
 		"{}\n{}\n{}\n",
 		fmt_kv("BUILD_PROMPT:", &format!("{:?}", truncate(task, 50))),
 		fmt_kv("CWD:", &ctx.workspace.cwd.display().to_string()),
-		fmt_kv("REQUIRED OUTPUTS:", &completion_criteria),
+		fmt_kv("EXPECTED OUTPUTS:", &expected_outputs),
 	);
 	report.push_str(&fmt_section("WORKSPACE"));
 	report.push_str(&workspace);
-
 	report.push_str(&fmt_section("HISTORY"));
 	report.push_str(&history);
 
@@ -206,8 +229,7 @@ pub fn structured_prompt_chat(ctx: &AgentCtx) -> String {
 }
 pub fn validate_agent_completion(
 	workspace_root: &Path,
-	criteria: &CompletionCriteria,
-	commands: &[CommandRecord],
+	expected_outputs: &[PathBuf],
 ) -> Result<AgentCompletionValidation> {
 	let mut errors = Vec::new();
 	let workspace_root = workspace_root.canonicalize().with_context(|| {
@@ -216,196 +238,132 @@ pub fn validate_agent_completion(
 			workspace_root.display()
 		)
 	})?;
-	for required_file in &criteria.required_files {
+	for required_file in expected_outputs {
 		if required_file.is_absolute()
 			|| required_file
 				.components()
 				.any(|component| matches!(component, std::path::Component::ParentDir))
 		{
 			errors.push(format!(
-				"Required file path must stay inside the workspace: {}",
-				required_file.display(),
+				"Output path escapes workspace: {}",
+				required_file.display()
 			));
 			continue;
 		}
-
 		let path = workspace_root.join(required_file);
-		let path = match path.canonicalize() {
-			Ok(path) => path,
+		match path.canonicalize() {
+			Ok(path) if path.starts_with(&workspace_root) && path.is_file() => {
+				match std::fs::metadata(&path) {
+					Ok(metadata) if metadata.len() > 0 => {}
+					Ok(_) => errors.push(format!(
+						"Expected output is empty: {}",
+						required_file.display()
+					)),
+					Err(error) => errors.push(format!(
+						"Could not inspect {}: {error}",
+						required_file.display()
+					)),
+				}
+			}
+			Ok(_) => errors.push(format!(
+				"Expected output is not a workspace file: {}",
+				required_file.display()
+			)),
 			Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
 				errors.push(format!(
-					"Required output is missing: {}",
+					"Expected output is missing: {}",
 					required_file.display()
 				));
-				continue;
 			}
-			Err(error) => {
-				errors.push(format!(
-					"Could not inspect required output {}: {error}",
-					required_file.display(),
-				));
-				continue;
-			}
-		};
-		if !path.starts_with(&workspace_root) {
-			errors.push(format!(
-				"Required output resolves outside the workspace: {}",
-				required_file.display(),
-			));
-			continue;
-		}
-		match std::fs::metadata(&path) {
-			Ok(metadata) if metadata.is_file() && metadata.len() > 0 => {}
-			Ok(metadata) if !metadata.is_file() => errors.push(format!(
-				"Required output is not a file: {}",
-				required_file.display(),
-			)),
-			Ok(_) => errors.push(format!(
-				"Required output is empty: {}",
-				required_file.display(),
-			)),
-			Err(error) if error.kind() == std::io::ErrorKind::NotFound => errors.push(format!(
-				"Required output is missing: {}",
-				required_file.display(),
-			)),
 			Err(error) => errors.push(format!(
-				"Could not inspect required output {}: {error}",
-				required_file.display(),
+				"Could not inspect {}: {error}",
+				required_file.display()
 			)),
 		}
 	}
-
-	for required_command in &criteria.required_commands {
-		if !commands.iter().any(|command| {
-			command.success && command.argv.as_deref() == Some(required_command.as_slice())
-		}) {
-			errors.push(format!(
-				"Required verification command did not succeed: {}",
-				required_command.join(" ")
-			));
-		}
-	}
-
 	Ok(AgentCompletionValidation { errors })
 }
 
+const DEFAULT_RECOVERY_PROMPT: &str = r#"
+You are continuing an implementation after runtime verification rejected the previous finish.
+Read the supplied task and Plan, inspect the current workspace, then address the reported failures directly.
+Choose one concrete action at a time. Do not claim completion or choose finish until the failed checks are corrected and inspected.
+
+## Task and Plan
+{task}
+
+## Current workspace
+{workspace}
+
+## Work remaining
+{todo}
+
+## Runtime verification failures
+{validation_errors}
+
+## Recent execution evidence
+{execution_ledger}
+
+## Recent history
+{history}
+
+Return exactly one supported action JSON object.
+"#;
+
 #[cfg(test)]
-mod completion_tests {
+mod agent_recovery_tests {
 	use super::*;
 
-	struct TempWorkspace(PathBuf);
-
-	impl TempWorkspace {
-		fn new() -> Self {
-			let path = std::env::temp_dir().join(format!("estate-agent-test-{}", uuid::Uuid::new_v4()));
-			std::fs::create_dir_all(&path).unwrap();
-			Self(path)
-		}
-	}
-
-	impl Drop for TempWorkspace {
-		fn drop(&mut self) {
-			let _ = std::fs::remove_dir_all(&self.0);
-		}
-	}
-
-	fn successful_command(command: &str) -> CommandRecord {
-		CommandRecord {
-			step: 1,
-			command: command.into(),
-			argv: Some(command.split_whitespace().map(str::to_owned).collect()),
-			exit_code: Some(0),
-			stdout: String::new(),
-			stderr: String::new(),
-			success: true,
-			error: None,
-			timestamp: chrono::Utc::now(),
-		}
-	}
-
 	#[test]
-	fn completion_requires_nonempty_outputs_and_successful_checks() {
-		let workspace = TempWorkspace::new();
-		let criteria = CompletionCriteria {
-			required_files: vec![PathBuf::from("hello-world.cjs")],
-			required_commands: vec![vec![
-				"node".into(),
-				"--test".into(),
-				"tests/hello-world.test.js".into(),
-			]],
-		};
-		let commands = vec![successful_command("touch hello-world.cjs")];
+	fn completion_rejects_missing_and_empty_outputs() {
+		let workspace = std::env::temp_dir().join(format!("agent-test-{}", uuid::Uuid::new_v4()));
+		std::fs::create_dir_all(&workspace).unwrap();
+		let outputs = vec![PathBuf::from("hello-world.cjs")];
 
-		let missing = validate_agent_completion(&workspace.0, &criteria, &commands).unwrap();
+		let missing = validate_agent_completion(&workspace, &outputs).unwrap();
 		assert!(!missing.is_valid());
 		assert!(missing.errors.iter().any(|error| error.contains("missing")));
-		assert!(
-			missing
-				.errors
-				.iter()
-				.any(|error| error.contains("verification command"))
-		);
 
-		std::fs::write(workspace.0.join("hello-world.cjs"), "").unwrap();
-		let empty = validate_agent_completion(&workspace.0, &criteria, &commands).unwrap();
+		std::fs::write(workspace.join("hello-world.cjs"), "").unwrap();
+		let empty = validate_agent_completion(&workspace, &outputs).unwrap();
 		assert!(empty.errors.iter().any(|error| error.contains("empty")));
 
-		std::fs::write(
-			workspace.0.join("hello-world.cjs"),
-			"module.exports = {};\n",
-		)
-		.unwrap();
-		let verified = validate_agent_completion(
-			&workspace.0,
-			&criteria,
-			&[successful_command("node --test tests/hello-world.test.js")],
-		)
-		.unwrap();
-		assert!(verified.is_valid(), "{:?}", verified.errors);
+		std::fs::remove_dir_all(workspace).unwrap();
 	}
 
 	#[test]
-	fn action_prompt_includes_runtime_completion_criteria() {
-		let task =
-			AgentTask::new("implement the plan".into()).with_completion_criteria(CompletionCriteria {
-				required_files: vec![PathBuf::from("hello-world.cjs")],
-				required_commands: vec![vec![
-					"node".into(),
-					"--test".into(),
-					"tests/hello-world.test.js".into(),
-				]],
-			});
+	fn rejected_finish_uses_compact_recovery_prompt() {
+		let task = AgentTask::new("implement the Plan".into())
+			.with_expected_outputs(vec![PathBuf::from("hello-world.cjs")])
+			.with_recovery_prompt("Recovery: {validation_errors}\nTODO: {todo}\nTask: {task}");
 		let mut context = AgentCtx::with_workspace(task.prompt.clone(), CtxWorkspace::default());
 		context.task = Some(task);
+		context.todo = vec!["Write hello-world.cjs".into()];
+		let mut run = AgentRun::new(context);
+		run.record_error(AgentError {
+			step: Some(1),
+			kind: "completion_validation".into(),
+			message: "Expected output is empty: hello-world.cjs".into(),
+			raw_response: None,
+			recoverable: true,
+			timestamp: chrono::Utc::now(),
+		});
 
-		let prompt = build_prompt(&AgentRun::new(context));
-
-		assert!(prompt.contains("hello-world.cjs"));
-		assert!(prompt.contains("tests/hello-world.test.js"));
-		assert!(prompt.contains("args"));
+		let prompt = build_prompt(&run);
+		assert!(prompt.contains("Recovery: Expected output is empty"));
+		assert!(prompt.contains("TODO: Write hello-world.cjs"));
+		assert!(!prompt.contains("PLAN-FIRST EXECUTION PROTOCOL"));
 	}
 }
+
 pub fn validate_shell_command(command: &str) -> anyhow::Result<()> {
 	use anyhow::bail;
-
 	if command.trim().is_empty() {
 		bail!("Command cannot be empty.");
 	}
-
 	if command.len() > 2_000 {
 		bail!("Command exceeds the 2000-character limit.");
 	}
-
-	let chains =
-		command.matches("&&").count() + command.matches("||").count() + command.matches(';').count();
-
-	if chains > 2 {
-		bail!(
-			"Too many chained operations. Run one bounded operation \
-			at a time and inspect its result."
-		);
-	}
-
 	Ok(())
 }
 
@@ -416,50 +374,59 @@ pub fn reconcile_agent_artifacts(
 ) -> Result<Vec<PathBuf>> {
 	let changes = before.diff(after);
 	let changed_paths = parse_git_status_paths(&changes.git_status);
-
 	for path in &changed_paths {
 		let absolute_path = if path.is_absolute() {
 			path.clone()
 		} else {
 			ctx.workspace.cwd.join(path)
 		};
-
 		let path_string = absolute_path.to_string_lossy().into_owned();
-
 		if absolute_path.is_file() {
 			ctx.workspace.add_file(absolute_path.clone())?;
-
-			let artifact = Artifact::FileWrite {
-				path: path_string.clone(),
-			};
-
-			// Avoid duplicate write artifacts for the same path.
-			if !ctx.artifacts.iter().any(|existing| {
-				matches!(
-					existing,
-					Artifact::FileWrite { path } if path == &path_string
-				)
-			}) {
-				ctx.artifacts.push(artifact);
+			if !ctx
+				.artifacts
+				.iter()
+				.any(|existing| matches!(existing, Artifact::FileWrite { path } if path == &path_string))
+			{
+				ctx
+					.artifacts
+					.push(Artifact::FileWrite { path: path_string });
 			}
 		} else {
-			// Remove stale workspace entries for deleted files.
 			ctx
 				.workspace
 				.files
 				.retain(|file| Path::new(&file.path) != absolute_path);
-
-			// Remove write artifacts for files that no longer exist.
-			ctx.artifacts.retain(|artifact| {
-				!matches!(
-					artifact,
-					Artifact::FileWrite { path } if path == &path_string
-				)
-			});
+			ctx.artifacts.retain(
+				|artifact| !matches!(artifact, Artifact::FileWrite { path } if path == &path_string),
+			);
 		}
 	}
-
 	Ok(changed_paths)
+}
+
+pub fn touched_required_output(command: &str, expected_outputs: &[PathBuf]) -> Option<PathBuf> {
+	let tokens = command
+		.split_whitespace()
+		.map(|token| token.trim_matches(['\'', '"']))
+		.collect::<Vec<_>>();
+	let touch_index = tokens
+		.iter()
+		.position(|token| token.rsplit('/').next() == Some("touch"))?;
+	let arguments = tokens
+		.iter()
+		.skip(touch_index + 1)
+		.take_while(|token| !matches!(**token, "&&" | "||" | ";" | "|"))
+		.filter(|token| !token.starts_with('-'))
+		.collect::<Vec<_>>();
+	expected_outputs
+		.iter()
+		.find(|required| {
+			arguments
+				.iter()
+				.any(|argument| Path::new(argument).ends_with(*required))
+		})
+		.cloned()
 }
 pub fn shell_quote(value: &str) -> String {
 	if value.is_empty() {

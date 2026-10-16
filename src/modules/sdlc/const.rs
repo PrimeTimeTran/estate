@@ -22,6 +22,7 @@ pub const SDLC_GOAL: &str = include_str!("input/user.goal.md");
 pub const PROMPT_BUILD_ORIENT: &str = include_str!("input/prompt.phase.orient.md");
 pub const PROMPT_BUILD_EXECUTE: &str = include_str!("input/prompt.phase.execute.md");
 pub const PROMPT_BUILD_VERIFY: &str = include_str!("input/prompt.phase.verify.md");
+pub const PROMPT_PHASE_RECOVER: &str = include_str!("input/prompt.phase.recover.md");
 
 pub const DEMO_COMPLETE_DELAY: Duration = Duration::from_secs(1);
 pub const DEMO_EVALUATION_TIME: Duration = Duration::from_secs(1);

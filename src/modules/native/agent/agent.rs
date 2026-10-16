@@ -34,6 +34,29 @@ impl Agent {
 		run: &AgentRun,
 		guard: &mut AgentGuard,
 	) -> Result<GuardDecision> {
+		let touch_command = match action {
+			AgentAction::RunCommand { command } => Some(command.clone()),
+			AgentAction::RunProgram { program, args, .. }
+				if program.rsplit('/').next() == Some("touch") =>
+			{
+				Some(
+					std::iter::once(program.clone())
+						.chain(args.iter().cloned())
+						.collect::<Vec<_>>()
+						.join(" "),
+				)
+			}
+			_ => None,
+		};
+		if let (Some(command), Some(task)) = (touch_command, run.ctx.task.as_ref()) {
+			if let Some(path) = touched_required_output(&command, &task.expected_outputs) {
+				return Ok(GuardDecision::Reject(format!(
+					"`touch` only creates an empty placeholder for required output `{}`. Write the implementation contents to that file; do not create placeholder files.",
+					path.display(),
+				)));
+			}
+		}
+
 		let command = match action {
 			AgentAction::RunCommand { command } => Some(command.as_str()),
 			AgentAction::RunProgram { program, args, .. } => match program.as_str() {
@@ -185,18 +208,15 @@ impl Agent {
 
 		let final_changed_paths = reconcile_agent_artifacts(&mut run.ctx, baseline, &workspace_final)?;
 
-		let validation = validate_agent_completion(
-			&self.workspace.cwd,
-			run
-				.ctx
-				.task
-				.as_ref()
-				.map(|task| &task.completion_criteria)
-				.unwrap_or(&CompletionCriteria::default()),
-			&run.commands,
-		)?;
+		let expected_outputs = run
+			.ctx
+			.task
+			.as_ref()
+			.map_or(&[][..], |task| task.expected_outputs.as_slice());
+		let validation = validate_agent_completion(&self.workspace.cwd, expected_outputs)?;
 
 		if !validation.is_valid() {
+			run.ctx.todo = validation.errors.clone();
 			let feedback = format!(
 				"COMPLETION REJECTED: runtime validation failed.\n\
 				You claimed the task was complete, but these checks failed:\n{}\n\n\
@@ -670,6 +690,11 @@ impl Agent {
 		let max_steps = 20;
 		let mut context = AgentCtx::with_workspace(task.prompt.clone(), (*self.workspace).clone());
 		context.task = Some(task.clone());
+		context.todo = task
+			.expected_outputs
+			.iter()
+			.map(|path| format!("Implement and verify {}", path.display()))
+			.collect();
 		let mut run = AgentRun::new(context);
 
 		print_run_metrics(&mut run.clone(), self.files_seen, max_steps);
@@ -686,10 +711,7 @@ impl Agent {
 				return Err(error);
 			}
 		};
-		let mode = if matches!(&mode, AgentMode::Chat)
-			&& task.completion_criteria.required_files.is_empty()
-			&& task.completion_criteria.required_commands.is_empty()
-		{
+		let mode = if matches!(&mode, AgentMode::Chat) && task.expected_outputs.is_empty() {
 			mode
 		} else {
 			AgentMode::Tool
@@ -918,18 +940,24 @@ impl AgentTask {
 		Self {
 			id: Uuid::new_v4(),
 			prompt,
-			completion_criteria: CompletionCriteria::default(),
+			expected_outputs: Vec::new(),
+			recovery_prompt: None,
 		}
 	}
-	pub fn with_completion_criteria(mut self, criteria: CompletionCriteria) -> Self {
-		self.completion_criteria = criteria;
+	pub fn with_expected_outputs(mut self, paths: Vec<PathBuf>) -> Self {
+		self.expected_outputs = paths;
+		self
+	}
+	pub fn with_recovery_prompt(mut self, prompt: impl Into<String>) -> Self {
+		self.recovery_prompt = Some(prompt.into());
 		self
 	}
 	pub fn from_session(session: &AiSession) -> Result<Self> {
 		Ok(Self {
 			id: Uuid::new_v4(),
 			prompt: session.prompt.clone(),
-			completion_criteria: CompletionCriteria::default(),
+			expected_outputs: Vec::new(),
+			recovery_prompt: None,
 		})
 	}
 }
@@ -944,6 +972,7 @@ impl AgentCtx {
 			artifacts: Vec::new(),
 			logs: Vec::new(),
 			spawned_tasks: Vec::new(),
+			todo: Vec::new(),
 		}
 	}
 	pub fn init() -> Self {
@@ -955,6 +984,7 @@ impl AgentCtx {
 			artifacts: Vec::new(),
 			logs: Vec::new(),
 			spawned_tasks: Vec::new(),
+			todo: Vec::new(),
 		}
 	}
 	pub fn with_workspace(user_prompt: String, workspace: CtxWorkspace) -> Self {
@@ -966,6 +996,7 @@ impl AgentCtx {
 			artifacts: Vec::new(),
 			logs: Vec::new(),
 			spawned_tasks: Vec::new(),
+			todo: Vec::new(),
 		}
 	}
 	pub fn from_session(session: &AiSession) -> Result<Self> {
@@ -984,6 +1015,7 @@ impl AgentCtx {
 			artifacts: Vec::new(),
 			logs: Vec::new(),
 			spawned_tasks: Vec::new(),
+			todo: Vec::new(),
 		})
 	}
 }
@@ -1075,14 +1107,6 @@ pub struct AgentCompletionValidation {
 	pub errors: Vec<String>,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, Eq, PartialEq)]
-pub struct CompletionCriteria {
-	#[serde(default)]
-	pub required_files: Vec<PathBuf>,
-	#[serde(default)]
-	pub required_commands: Vec<Vec<String>>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct AgentCtx {
 	pub prompt: Option<String>,
@@ -1092,6 +1116,8 @@ pub struct AgentCtx {
 	pub artifacts: Vec<Artifact>,
 	pub logs: Vec<String>,
 	pub spawned_tasks: Vec<AgentTask>,
+	#[serde(default)]
+	pub todo: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1133,7 +1159,9 @@ pub struct AgentTask {
 	pub id: Uuid,
 	pub prompt: String,
 	#[serde(default)]
-	pub completion_criteria: CompletionCriteria,
+	pub expected_outputs: Vec<PathBuf>,
+	#[serde(default)]
+	pub recovery_prompt: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1231,7 +1259,7 @@ fn print_run_metrics(run: &mut AgentRun, files_seen: u128, max_steps: usize) {
 			"prompt tokens ≈" => estimated_tokens,
 
 			"max steps" => max_steps,
-			"required outputs" => run.ctx.task.as_ref().map_or(0, |task| task.completion_criteria.required_files.len()),
+			"expected outputs" => run.ctx.task.as_ref().map_or(0, |task| task.expected_outputs.len()),
 			"history" => run.ctx.history.len(),
 			"commands" => run.commands.len(),
 			"errors" => run.errors.len(),
