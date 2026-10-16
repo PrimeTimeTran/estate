@@ -1,4 +1,5 @@
 use jev_sdk::{NoulAnswer, ScoreAnswer};
+
 pub use ratatui::Frame;
 
 use super::{AiSession, *};
@@ -1491,18 +1492,23 @@ impl sdlc_trait::Runner for PipeRunner<'_> {
 		self.emit(SdlcEvent::RunStarted);
 		loop {
 			let attempt = self.next_attempt(stage)?;
-			section!(&format!("stage = {}, attempt = {}", stage, attempt));
+			section_info!(
+				"run",
+				metrics: [],
+				"stage" => stage,
+				"attempt" => attempt,
+			);
 			// 1. Execute the current stage.
 			let outcome = self
 				.execute(stage, attempt, &mut pending_input)
 				.await
 				.with_context(|| format!("run_stage({stage:?})"))?;
 
-			tracing::info!(
-				stage = ?stage,
-				attempt = attempt.number,
-				">>> RUN STAGE COMPLETE"
-			);
+			// tracing::info!(
+			// 	stage = ?stage,
+			// 	attempt = attempt.number,
+			// 	">>> RUN STAGE COMPLETE"
+			// );
 
 			// 2. Persist the execution and evaluation result.
 			self.pipeline.persist_outcome(&outcome)?;
@@ -1510,12 +1516,12 @@ impl sdlc_trait::Runner for PipeRunner<'_> {
 			// 3. Decide what should happen next.
 			let decision = self.handle_outcome(&outcome).await?;
 
-			tracing::info!(
-				stage = ?stage,
-				attempt = attempt.number,
-				decision = ?decision,
-				">>> DECISION"
-			);
+			// tracing::info!(
+			// 	stage = ?stage,
+			// 	attempt = attempt.number,
+			// 	decision = ?decision,
+			// 	">>> DECISION"
+			// );
 
 			// 4. Apply the decision.
 			let control = self
