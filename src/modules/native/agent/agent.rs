@@ -1203,27 +1203,15 @@ fn print_run_metrics(
 			"plan tokens ≈" => plan_tokens,
 
 			"max steps" => max_steps,
-		],
-		"plan path" => plan_path.display(),
-	);
-
-	section_info!(
-		"RUN START",
-		metrics: [
 			"history" => run.ctx.history.len(),
 			"commands" => run.commands.len(),
 			"errors" => run.errors.len(),
 			"logs" => run.ctx.logs.len(),
 			"files" => files_seen,
+			"preview lines" => PROMPT_PREVIEW_LINES,
 		],
-	);
-
-	section_info!(
-		"PROMPT PREVIEW",
-		metrics: [
-			"lines shown" => PROMPT_PREVIEW_LINES,
-		],
-		"preview" => preview_lines(prompt, PROMPT_PREVIEW_LINES),
+		"plan path" => plan_path.display(),
+		"prompt preview" => preview_lines(prompt, PROMPT_PREVIEW_LINES),
 	);
 
 	run.record_log(format!(
