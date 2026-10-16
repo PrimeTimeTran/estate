@@ -13,15 +13,15 @@ pub const SDLC_TEMPLATE_INTENT: &str = include_str!("input/intent.md");
 pub const SDLC_TEMPLATE_SPEC: &str = include_str!("input/spec.md");
 pub const SDLC_TEMPLATE_PLAN: &str = include_str!("input/plan.md");
 
-pub const SDLC_PROMPT_INTENT: &str = include_str!("input/prompt_intent.md");
-pub const SDLC_PROMPT_SPEC: &str = include_str!("input/prompt_spec.md");
-pub const SDLC_PROMPT_PLAN: &str = include_str!("input/prompt_plan.md");
+pub const SDLC_PROMPT_INTENT: &str = include_str!("input/prompt.writer.intent.md");
+pub const SDLC_PROMPT_SPEC: &str = include_str!("input/prompt.writer.spec.md");
+pub const SDLC_PROMPT_PLAN: &str = include_str!("input/prompt.writer.plan.md");
 
 pub const SDLC_GOAL: &str = include_str!("input/user.goal.md");
 
-pub const PROMPT_BUILD_ORIENT: &str = include_str!("input/PROMPT_BUILD_ORIENT.md");
-pub const PROMPT_BUILD_EXECUTE: &str = include_str!("input/PROMPT_BUILD_EXECUTE.md");
-pub const PROMPT_BUILD_VERIFY: &str = include_str!("input/PROMPT_BUILD_VERIFY.md");
+pub const PROMPT_BUILD_ORIENT: &str = include_str!("input/prompt.phase.orient.md");
+pub const PROMPT_BUILD_EXECUTE: &str = include_str!("input/prompt.phase.execute.md");
+pub const PROMPT_BUILD_VERIFY: &str = include_str!("input/prompt.phase.verify.md");
 
 pub const DEMO_COMPLETE_DELAY: Duration = Duration::from_secs(1);
 pub const DEMO_EVALUATION_TIME: Duration = Duration::from_secs(1);

@@ -1,5 +1,14 @@
 use crate::{prelude::*, ui::PanelState};
 
+const DEFAULT_CTX_WINDOW_SIZE: u32 = 16_384;
+
+pub fn ctx_window_size() -> u32 {
+	std::env::var("CTX_WINDOW_SIZE")
+		.ok()
+		.and_then(|value| value.parse().ok())
+		.unwrap_or(DEFAULT_CTX_WINDOW_SIZE)
+}
+
 // Estate daemon process identity / control socket.
 pub static ESTATE_PID: &str = "/tmp/estate-daemon.pid";
 pub static ESTATE_DAEMON_SOCKET: &str = "/tmp/estate-daemon.sock";

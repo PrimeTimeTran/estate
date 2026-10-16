@@ -514,6 +514,9 @@ pub async fn build_action(prompt: &str) -> Result<LlmAction> {
 		"system": JSON_PROMPT_EXECUTION,
 		"prompt": prompt,
 		"stream": false,
+		"options": {
+			"num_ctx": ctx_window_size(),
+		},
 		"format": "json"
 	});
 
@@ -593,6 +596,9 @@ pub async fn ollama_generate(prompt: &str, system: Option<&str>, json: bool) -> 
 		"model": DEFAULT_MODEL,
 		"prompt": prompt,
 		"stream": false,
+		"options": {
+			"num_ctx": ctx_window_size(),
+		},
 	});
 
 	if let Some(sys_msg) = system {

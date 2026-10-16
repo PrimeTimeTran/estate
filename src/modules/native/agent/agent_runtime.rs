@@ -34,7 +34,7 @@ impl AgentRuntime {
 			"prompt": prompt,
 			"stream": false,
 			"options": {
-				"num_ctx": 8192,
+				"num_ctx": ctx_window_size(),
 			},
 		});
 

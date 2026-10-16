@@ -8,7 +8,6 @@ The SDLC module is responsible for orchestrating structured software development
 
 The system should remain modular and usable independently of any particular editor, UI framework, or model provider.
 
-
 - **Separate orchestration from execution.** The SDLC pipeline determines what should happen next; the agent runtime handles model interaction and tool execution.
 - **Make state explicit.** Stages, attempts, outcomes, and transitions should be represented through structured state rather than inferred from log messages.
 - **Use persistent artifacts.** Intent, specification, plan, execution results, and verification evidence should be inspectable after a run.

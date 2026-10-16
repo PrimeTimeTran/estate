@@ -768,6 +768,9 @@ impl t::Generator for LocalGenerator {
 			"model": self.model,
 			"prompt": prompt,
 			"stream": false,
+			"options": {
+				"num_ctx": ctx_window_size(),
+			},
 		});
 		std::fs::write(
 			sdlc_log_file("ollama-request.json"),
@@ -2456,7 +2459,7 @@ impl PipeRunner<'_> {
 		let prompt = p::gen_intent(&goal)?;
 		tracing::info!(prompt_len = prompt.len(), "Intent: prompt generated");
 
-		std::fs::write(sdlc_log_file("SYS_PROMPT_INTENT.md"), &prompt)
+		std::fs::write(sdlc_log_file("prompt.intent.md"), &prompt)
 			.context("Intent: writing prompt debug file")?;
 		tracing::info!("Intent: prompt debug file written");
 
@@ -2509,7 +2512,7 @@ impl PipeRunner<'_> {
 		if prompt.trim().is_empty() {
 			return Err(anyhow!("generated Spec prompt is empty"));
 		}
-		std::fs::write(sdlc_log_file("SYS_PROMPT_SPEC.md"), &prompt)
+		std::fs::write(sdlc_log_file("prompt.spec.md"), &prompt)
 			.context("writing Spec prompt debug file")?;
 		let generated = self
 			.pipeline
@@ -2540,7 +2543,7 @@ impl PipeRunner<'_> {
 		if prompt.trim().is_empty() {
 			return Err(anyhow!("Generated Plan prompt is empty"));
 		}
-		std::fs::write(sdlc_log_file("SYS_PROMPT_PLAN.md"), &prompt)
+		std::fs::write(sdlc_log_file("prompt.plan.md"), &prompt)
 			.context("writing plan prompt debug file")?;
 		let generated = self
 			.pipeline
