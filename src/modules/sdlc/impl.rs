@@ -1588,7 +1588,7 @@ impl sdlc_trait::Runner for PipeRunner<'_> {
 			let decision = self.handle_outcome(&outcome).await?;
 
 			// 4. Apply the decision.
-  		// apply() transitions to the next stage.
+			// apply() transitions to the next stage.
 			let control = self
 				.apply(outcome, decision, input_rx, &mut pending_input)
 				.await?;
@@ -2500,6 +2500,13 @@ impl PipeRunner<'_> {
 		}
 		std::fs::write(sdlc_log_file("prompt.plan.md"), &prompt)
 			.context("writing plan prompt debug file")?;
+		// tracing::info!(
+		// 	generated_len = prompt.len(),
+		// 	has_inventory = prompt.contains("Machine-Readable Output Inventory"),
+		// 	has_build_contract = prompt.contains("Machine-Readable Build Contract"),
+		// 	generated_start = %prompt.chars().take(300).collect::<String>(),
+		// 	"Plan: inspect prompt artifact"
+		// );
 		let generated = self
 			.pipeline
 			.system
@@ -2510,10 +2517,23 @@ impl PipeRunner<'_> {
 		if generated.trim().is_empty() {
 			return Err(anyhow!("generated Plan artifact is empty"));
 		}
-		p::expected_outputs_from_plan(&generated)
+		// tracing::info!(
+		// 	generated_len = generated.len(),
+		// 		has_inventory = generated.contains("Machine-Readable Output Inventory"),
+		// 		has_build_contract = generated.contains("Machine-Readable Build Contract"),
+		// 		generated_start = %generated.chars().take(300).collect::<String>(),
+		// 		"Plan: inspect generated artifact"
+		// );
+		std::fs::write(sdlc_log_file("plan.md"), &generated)
+			.context("writing generated Plan debug file")?;
+		let expected_outputs = p::expected_outputs_from_plan(&generated)
 			.context("generated Plan has no valid expected-output inventory")?;
-		// Pipeline::write(output_path, generated)?;
-		self.write(&generated)?;
+		if expected_outputs.is_empty() {
+			return Err(anyhow!("generated Plan has no expected output files"));
+		}
+		self
+			.write(&generated)
+			.context("writing generated Plan to the SDLC session")?;
 		self.pipeline.persist_progress("Plan stage completed")?;
 		Ok(RunResult::Plan)
 	}
