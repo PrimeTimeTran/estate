@@ -23,17 +23,24 @@ impl AgentRuntime {
 		let agent = Agent::with_cwd(cwd);
 		agent.run_agent(prompt).await
 	}
+
 	pub async fn generate(&self, prompt: &str) -> Result<String> {
 		if prompt.trim().is_empty() {
 			return Err(anyhow!("generation prompt is empty"));
 		}
+
 		let request = serde_json::json!({
 			"model": DEFAULT_MODEL,
 			"prompt": prompt,
 			"stream": false,
+			"options": {
+				"num_ctx": 8192,
+			},
 		});
+
 		std::fs::write(OLLAMA_REQUEST, serde_json::to_string_pretty(&request)?)
 			.context("writing Ollama request debug file")?;
+
 		let response = reqwest::Client::new()
 			.post(AGENT_GEN_URL)
 			.json(&request)
@@ -42,20 +49,26 @@ impl AgentRuntime {
 			.context("sending one-shot Ollama generation request")?
 			.error_for_status()
 			.context("Ollama returned an unsuccessful HTTP status")?;
+
 		let body = response
 			.text()
 			.await
 			.context("reading Ollama response body")?;
+
 		std::fs::write(OLLAMA_RESPONSE, &body).context("writing Ollama response debug file")?;
+
 		let response: OllamaResponse =
 			serde_json::from_str(&body).context("invalid Ollama response")?;
+
 		let generated = response.response.trim();
+
 		if generated.is_empty() {
 			return Err(anyhow!(
 				"Ollama returned an empty response (done_reason={:?})",
 				response.done_reason,
 			));
 		}
+
 		Ok(generated.to_string())
 	}
 	pub async fn run_agent(&self, task: AgentTask) -> Result<TaskResult> {
