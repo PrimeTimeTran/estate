@@ -53,9 +53,9 @@ pub type PipelineId = uuid::Uuid;
 
 #[derive(Debug)]
 pub enum RunControl {
-	Continue,
-	Exit,
-	RetryStage,
+    Continue,
+    RetryStage,
+    Exit(PipelineStatus),
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -171,26 +171,6 @@ pub enum StageInput {
 	Revision { evaluation: QACheck },
 }
 
-#[derive(Debug)]
-pub enum Outcome {
-	Complete {
-		execution: Execution,
-		evaluation: QACheck,
-	},
-	NeedsRevision {
-		execution: Execution,
-		evaluation: QACheck,
-	},
-	ExecutionFailed {
-		stage: Stage,
-		attempt: Attempt,
-		error: anyhow::Error,
-	},
-	EvaluationFailed {
-		execution: Execution,
-		error: anyhow::Error,
-	},
-}
 pub enum StageOutcomeEvaluation {
 	Passed(Evaluation),
 	FailedQuality(Evaluation),

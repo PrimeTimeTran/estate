@@ -43,6 +43,9 @@ use generator::*;
 mod r#impl;
 use r#impl as i;
 
+mod outcome;
+use outcome::*;
+
 pub mod pipeline;
 pub use pipeline::*;
 

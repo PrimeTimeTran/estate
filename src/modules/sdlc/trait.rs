@@ -6,7 +6,6 @@ impl Clone for Box<dyn GeneratorTrait> {
 	}
 }
 
-// Identity & Persistence
 #[async_trait::async_trait]
 pub trait GeneratorTrait: Send + Sync + Debug {
 	async fn generate(&self, prompt: &str) -> Result<String>;
@@ -18,6 +17,7 @@ pub trait GeneratorTrait: Send + Sync + Debug {
 // Steps to complete the pipeline
 pub trait PipelineTrait {
 	type Stage: StageTrait;
+
 	fn id(&self) -> &PipelineId;
 	fn state(&self) -> &PipelineState<Self::Stage>;
 	fn name(&self) -> &'static str;
@@ -25,6 +25,36 @@ pub trait PipelineTrait {
 		""
 	}
 	fn stages(&self) -> &[Self::Stage];
+	fn stage(&self, name: &str) -> Option<&Self::Stage> {
+		self.stages().iter().find(|stage| stage.name() == name)
+	}
+	fn first_stage(&self) -> Option<&Self::Stage> {
+		self.stages().first()
+	}
+	fn next_stage(&self, current: &str) -> Option<&Self::Stage> {
+		let stages = self.stages();
+		let index = stages.iter().position(|stage| stage.name() == current)?;
+		stages.get(index + 1)
+	}
+	fn previous_stage(&self, current: &str) -> Option<&Self::Stage> {
+		let stages = self.stages();
+		let index = stages.iter().position(|stage| stage.name() == current)?;
+		index.checked_sub(1).and_then(|index| stages.get(index))
+	}
+	fn validate(&self) -> Result<()> {
+		let stages = self.stages();
+		anyhow::ensure!(!stages.is_empty(), "Pipeline has no stages");
+		for (index, stage) in stages.iter().enumerate() {
+			anyhow::ensure!(
+				!stages[..index]
+					.iter()
+					.any(|previous| previous.name() == stage.name()),
+				"Duplicate stage name: {}",
+				stage.name(),
+			);
+		}
+		Ok(())
+	}
 }
 #[async_trait::async_trait]
 pub trait RunnerTrait {

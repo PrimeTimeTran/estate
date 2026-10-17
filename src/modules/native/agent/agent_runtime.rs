@@ -26,9 +26,9 @@ impl AgentRuntime {
 
 	pub async fn generate(&self, prompt: &str) -> Result<String> {
 		if prompt.trim().is_empty() {
-			return Err(anyhow!("generation prompt is empty"));
+			return Err(anyhow!("AgentRuntime generate prompt is empty"));
 		}
-
+		const AGENT_GEN_URL: &str = "http://127.0.0.1:11434/api/generate";
 		let request = serde_json::json!({
 			"model": DEFAULT_MODEL,
 			"prompt": prompt,
@@ -44,19 +44,39 @@ impl AgentRuntime {
 		)
 		.context("writing Ollama request debug file")?;
 
+		let started = std::time::Instant::now();
+
+		tracing::info!(url = AGENT_GEN_URL, "Ollama: sending request");
+
 		let response = reqwest::Client::new()
 			.post(AGENT_GEN_URL)
 			.json(&request)
 			.send()
 			.await
-			.context("sending one-shot Ollama generation request")?
-			.error_for_status()
-			.context("Ollama returned an unsuccessful HTTP status")?;
+			.context("sending one-shot Ollama generation request")?;
+
+		tracing::info!(
+		  elapsed_ms = started.elapsed().as_millis(),
+			status = %response.status(),
+			"Ollama: response headers received"
+		);
+
+		let status = response.status();
 
 		let body = response
 			.text()
 			.await
 			.context("reading Ollama response body")?;
+
+		tracing::info!(
+			status = %status,
+			body_len = body.len(),
+			"Ollama: response body received"
+		);
+
+		if !status.is_success() {
+			return Err(anyhow!("Ollama HTTP {status}: {body}"));
+		}
 
 		std::fs::write(sdlc_log_file("ollama-response.json"), &body)
 			.context("writing Ollama response debug file")?;

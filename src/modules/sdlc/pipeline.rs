@@ -16,6 +16,23 @@ impl Pipeline {
 			result.status
 		))
 	}
+	fn from_session(kontex: Kontex, session: AiSession) -> anyhow::Result<Self> {
+		let qa = Evaluator {
+			session: session.clone(),
+			jev: TypeSafeClient::from_env()?,
+		};
+		let mut system = AgentSystem::new();
+		system.cwd(session.workspace.clone());
+		let generator = Box::new(LocalGenerator::new(system.runtime.clone(), DEFAULT_MODEL));
+		Ok(Self {
+			qa,
+			system,
+			kontex,
+			generator,
+			session,
+			stage_attempt: 0,
+		})
+	}
 	fn init_session_dir(kontex: &Kontex, title: &str) -> Result<PathBuf> {
 		let sessions_dir = kontex.path(FW::Session)?;
 		let dir = sessions_dir;
@@ -107,10 +124,10 @@ impl Pipeline {
 		persist_evaluation(session, evaluation, attempt)?;
 		self.persist()
 	}
-	fn persist_outcome(&mut self, outcome: &Outcome) -> Result<()> {
+	fn persist_outcome(&mut self, outcome: &AttemptOutcome) -> Result<()> {
 		let (stage, attempt, status, actor, time_started, time_completed, description, evaluation) =
 			match outcome {
-				Outcome::Complete {
+				AttemptOutcome::Complete {
 					execution,
 					evaluation,
 				} => (
@@ -123,7 +140,7 @@ impl Pipeline {
 					format!("Stage Completed: {}", execution.stage),
 					Some(evaluation.clone()),
 				),
-				Outcome::NeedsRevision {
+				AttemptOutcome::NeedsRevision {
 					execution,
 					evaluation,
 				} => (
@@ -136,7 +153,7 @@ impl Pipeline {
 					format!("Needs Revision: {}", execution.stage),
 					Some(evaluation.clone()),
 				),
-				Outcome::ExecutionFailed {
+				AttemptOutcome::ExecutionFailed {
 					stage,
 					attempt,
 					error,
@@ -150,7 +167,7 @@ impl Pipeline {
 					format!("{error:#}"),
 					None,
 				),
-				Outcome::EvaluationFailed { execution, error } => (
+				AttemptOutcome::EvaluationFailed { execution, error } => (
 					execution.stage,
 					execution.attempt,
 					Status::EvaluationFailed,
@@ -185,6 +202,7 @@ impl Pipeline {
 		let session = self.session()?;
 		Self::session_save(session)
 	}
+
 	fn push_stage_record(&mut self, record: StageRunRecord) -> Result<()> {
 		let session = self.session()?;
 		session.stages.push(record);
@@ -255,26 +273,23 @@ impl Pipeline {
 		self.session()?.stage = stage;
 		Ok(())
 	}
-	// pub fn subscribe(&self) -> broadcast::Receiver<SdlcEvent> {
-	// 	self.
-	// }
 
-	async fn evaluate(&self, execution: &Execution) -> Result<QACheck> {
+	pub async fn evaluate(&self, execution: &Execution) -> Result<QACheck> {
 		self.qa.evaluate(execution).await
 	}
-	async fn resume(&mut self) -> Result<()> {
+	pub async fn resume(&mut self) -> Result<()> {
 		self.persist_progress("SDLC session resumed")?;
 		self.persist()?;
 		Ok(())
 	}
-	async fn resume_from(&mut self, stage: Stage) -> Result<()> {
+	pub async fn resume_from(&mut self, stage: Stage) -> Result<()> {
 		tracing::info!("resume_from sprintpi pipeline");
 		self.set_stage(stage)?;
 		self.persist_progress(&format!("SDLC session resumed from {stage}"))?;
 		self.persist()?;
 		Ok(())
 	}
-	async fn run_task(&mut self, prompt: &str) -> Result<String> {
+	pub async fn run_task(&mut self, prompt: &str) -> Result<String> {
 		self
 			.system
 			.runtime
@@ -287,7 +302,7 @@ impl Pipeline {
 					.unwrap_or_else(|| "Agent completed".to_string())
 			})
 	}
-	async fn run_checks(&self, stage: Stage) -> Result<Vec<CheckResult>> {
+	pub async fn run_checks(&self, stage: Stage) -> Result<Vec<CheckResult>> {
 		if !matches!(stage, Stage::Build | Stage::QA) {
 			return Ok(Vec::new());
 		}
@@ -329,10 +344,10 @@ impl Pipeline {
 		}
 		Ok(results)
 	}
-	async fn summarize_title(intent: &str) -> Result<String> {
+	pub async fn summarize_title(intent: &str) -> Result<String> {
 		Ok(String::from("create-sdlc-pipeline"))
 	}
-	async fn wait_for_intervention(
+	pub async fn wait_for_intervention(
 		&mut self,
 		stage: Stage,
 		attempt: Attempt,
@@ -436,27 +451,10 @@ impl Pipeline {
 		}
 		Self::from_session(kontex, session)
 	}
-	fn from_session(kontex: Kontex, session: AiSession) -> anyhow::Result<Self> {
-		let qa = Evaluator {
-			session: session.clone(),
-			jev: TypeSafeClient::from_env()?,
-		};
-		let mut system = AgentSystem::new();
-		system.cwd(session.workspace.clone());
-		let generator = Box::new(LocalGenerator::new(system.runtime.clone(), DEFAULT_MODEL));
-		Ok(Self {
-			qa,
-			system,
-			kontex,
-			generator,
-			session,
-			stage_attempt: 0,
-		})
-	}
 }
 
 #[async_trait::async_trait]
-impl sdlc_trait::RunnerTrait for PipelineRunner<'_> {
+impl<'a, Context: Ctx> sdlc_trait::RunnerTrait for PipelineRunner<'a, Context> {
 	type Context = UnboundedReceiver<SdlcInput>;
 	type Output = ();
 	/// "What happens next?"
@@ -467,8 +465,9 @@ impl sdlc_trait::RunnerTrait for PipelineRunner<'_> {
 	/// 4. apply -> given an outcome of execution handle business logic of that decision with run control.
 	/// 5. control -> continue, retry, or exit. there is no other possibility.
 	async fn run(&mut self, input_rx: &mut Self::Context) -> Result<Self::Output> {
+		tracing::info!("sdlc_trait::RunnerTrait for PipelineRunner");
 		let mut pending_input = None;
-		let mut stage = self.pipeline.stage();
+		let mut stage = self.runtime.pipeline.stage();
 		self.emit(SdlcEvent::RunStarted);
 		loop {
 			let attempt = self.next_attempt(stage)?;
@@ -485,7 +484,7 @@ impl sdlc_trait::RunnerTrait for PipelineRunner<'_> {
 				.await
 				.with_context(|| format!("run_stage({stage:?})"))?;
 			// 2. Persist the execution and evaluation result.
-			self.pipeline.persist_outcome(&outcome)?;
+			self.runtime.pipeline.persist_outcome(&outcome)?;
 
 			// 3. Decide what should happen next.
 			let decision = self.handle_outcome(&outcome).await?;
@@ -498,31 +497,184 @@ impl sdlc_trait::RunnerTrait for PipelineRunner<'_> {
 
 			match control {
 				RunControl::Continue => {
-					stage = self.pipeline.stage();
+					stage = self.runtime.pipeline.stage();
 					// Every new stage starts at attempt 1.
-					self.pipeline.stage_attempt_reset();
+					self.runtime.pipeline.stage_attempt_reset();
 					tracing::info!(
 						stage = ?stage,
-						attempt = self.pipeline.stage_attempt(),
+						attempt = self.runtime.pipeline.stage_attempt(),
 						">>> Runner continuing."
 					);
 				}
 				RunControl::RetryStage => {
 					continue;
 				}
-				RunControl::Exit => {
+				RunControl::Exit(status) => {
+					tracing::info!(?status, "RunnerTrait exiting");
 					return Ok(());
 				}
 			}
 		}
 	}
 }
-impl PipelineRunner<'_> {
+impl<'a, Context: Ctx> PipelineRunner<'a, Context> {
+	/// Run the entire pipeline from its current state.
+	pub async fn run(
+		&mut self,
+		input_rx: &mut UnboundedReceiver<SdlcInput>,
+	) -> Result<PipelineOutcome> {
+		tracing::info!("Context: Ctx> PipelineRunner");
+		let mut pending_input = None;
+		let mut stage = self.runtime.pipeline.stage();
+		let mut stage_outcomes: Vec<StageOutcome> = Vec::new();
+		self.emit(SdlcEvent::RunStarted);
+		loop {
+			let attempt = self.next_attempt(stage)?;
+			section_info!(
+				"run",
+				metrics: [
+				"stage" => stage,
+				"attempt" => attempt,
+				],
+			);
+			// 1. Execute the current stage.
+			tracing::info!(?stage, ?attempt, ">>> execute ENTER");
+
+			let outcome = self
+				.execute(stage, attempt, &mut pending_input)
+				.await
+				.with_context(|| format!("run_stage({stage:?})"))?;
+
+			tracing::info!(?stage, "<<< execute EXIT");
+			// 2. Persist the execution and evaluation result.
+			self.runtime.pipeline.persist_outcome(&outcome)?;
+			tracing::info!("persist_outcome");
+
+			// 3. Decide what should happen next.
+			let decision = self.handle_outcome(&outcome).await?;
+			tracing::info!("handle_outcome");
+
+			// 4. Apply the decision.
+			// apply() transitions to the next stage.
+			let control = self
+				.apply(outcome, decision, input_rx, &mut pending_input)
+				.await?;
+
+			tracing::info!("apply");
+
+			match control {
+				RunControl::Continue => {
+					tracing::info!("continue");
+					stage = self.runtime.pipeline.stage();
+					// Every new stage starts at attempt 1.
+					self.runtime.pipeline.stage_attempt_reset();
+					tracing::info!(
+						stage = ?stage,
+						attempt = self.runtime.pipeline.stage_attempt(),
+						">>> Runner continuing."
+					);
+				}
+				RunControl::RetryStage => {
+					tracing::info!("RetryStage");
+					continue;
+				}
+				RunControl::Exit(status) => {
+					tracing::info!(?status, "Pipeline exiting");
+
+					return Ok(PipelineOutcome {
+						status,
+						stages: stage_outcomes,
+					});
+				}
+			}
+		}
+	}
+
+	/// Resume execution from the saved state.
+	pub async fn resume(&mut self) -> Result<PipelineOutcome> {
+		todo!("run")
+	}
+
+	/// Run a specific stage, respecting its prerequisites.
+	pub async fn run_stage(&mut self, stage: Stage) -> Result<StageOutcome> {
+		todo!("run")
+	}
+
+	/// Run a stage while explicitly allowing existing upstream artifacts.
+	pub async fn run_stage_with(
+		&mut self,
+		stage: Stage,
+		options: StageRunOptions,
+	) -> Result<Outcome> {
+		todo!("run")
+	}
+
+	/// Evaluate an existing artifact without rerunning the stage.
+	pub async fn evaluate_stage(&mut self, stage: Stage) -> Result<Evaluation> {
+		todo!("run")
+	}
+
+	/// Prepare a stage without executing it.
+	pub async fn prepare_stage(&mut self, stage: Stage) -> Result<()> {
+		todo!("run")
+	}
+
+	/// Retry the selected stage using the existing retry policy.
+	pub async fn retry_stage(&mut self, stage: Stage) -> Result<Outcome> {
+		todo!("run")
+	}
+
+	/// Save the current pipeline state and stage checkpoint.
+	pub async fn checkpoint(&mut self) -> Result<()> {
+		todo!("run")
+	}
+
+	/// Execute exactly one attempt.
+	async fn execute_attempt_with_input(
+		&mut self,
+		stage: Stage,
+		pending_input: &mut Option<SdlcInput>,
+	) -> Result<AttemptOutcome> {
+		let attempt = self.next_attempt(stage)?;
+
+		section_info!(
+				"execute_attempt",
+				metrics: [
+						"stage" => stage,
+						"attempt" => attempt,
+				],
+		);
+
+		let outcome = self
+			.execute(stage, attempt, pending_input)
+			.await
+			.with_context(|| format!("execute_attempt({stage:?})"))?;
+
+		self.runtime.pipeline.persist_outcome(&outcome)?;
+
+		Ok(outcome)
+	}
+	/// Convenience API for executing one attempt.
+	pub async fn execute_attempt(&mut self, stage: Stage) -> Result<AttemptOutcome> {
+		// pub async fn execute_attempt(&mut self, stage: Stage) -> Result<AttemptOutcome> {
+		// 1. Prepare the stage.
+		// 2. Increment/create the attempt.
+		// 3. Execute the stage.
+		// 4. Evaluate the execution.
+		// 5. Return the attempt outcome.
+		let mut pending_input = None;
+
+		self
+			.execute_attempt_with_input(stage, &mut pending_input)
+			.await
+	}
+}
+impl<'a, Context: Ctx> PipelineRunner<'a, Context> {
 	fn next_attempt(&mut self, stage: Stage) -> Result<Attempt> {
-		self.pipeline.next_attempt(stage)
+		self.runtime.next_attempt(stage)
 	}
 	fn emit(&self, event: SdlcEvent) {
-		self.pipeline.emit(event);
+		self.runtime.emit(event);
 	}
 	fn evaluate_checks(&self, checks: Vec<CheckResult>) -> Result<Vec<CheckResult>> {
 		todo!("evaluate_checks")
@@ -542,18 +694,18 @@ impl PipelineRunner<'_> {
 			e::Stage::QA => Stage::Build,
 			stage => stage,
 		};
-		self.pipeline.session.stage = stage;
+		self.runtime.pipeline.session.stage = stage;
 		Ok(stage)
 	}
 	fn persist(&mut self, msg: &str) -> Result<()> {
-		self.pipeline.persist_progress(msg)?;
+		self.runtime.pipeline.persist_progress(msg)?;
 		Ok(())
 	}
 	fn retry(&mut self, stage: Stage) -> Result<()> {
-		self.pipeline.retry(stage)
+		self.runtime.pipeline.retry(stage)
 	}
 	fn session(&mut self) -> &AiSession {
-		&self.pipeline.session
+		&self.runtime.pipeline.session
 	}
 	fn stage_dir(&mut self) -> (Stage, PathBuf) {
 		let session = &self.session();
@@ -564,34 +716,39 @@ impl PipelineRunner<'_> {
 		session.dir.clone()
 	}
 	fn transition(&mut self, next: Stage) -> Result<()> {
-		self.pipeline.transition(next)
+		self.runtime.pipeline.transition(next)
 	}
 
 	/// "Given this decision, what actions/state changes must happen?"
 	///
 	/// Applies the decision to the pipeline/session and returns control
 	/// to the outer run loop.
+
 	async fn apply(
 		&mut self,
-		outcome: Outcome,
+		outcome: AttemptOutcome,
 		decision: Decision,
 		input_rx: &mut UnboundedReceiver<SdlcInput>,
 		pending_input: &mut Option<SdlcInput>,
 	) -> Result<RunControl> {
 		let stage = outcome.stage();
 		let attempt = outcome.attempt();
+
 		match decision {
 			Decision::Continue => {
 				let next = stage
 					.next()
 					.ok_or_else(|| anyhow!("Stage {stage:?} has no next stage"))?;
+
 				self.transition(next)?;
 				self.emit(SdlcEvent::StageTransitioned {
 					from: stage,
 					to: next,
 				});
+
 				Ok(RunControl::Continue)
 			}
+
 			Decision::Retry => {
 				if attempt.number >= attempt.max {
 					tracing::warn!(
@@ -600,6 +757,7 @@ impl PipelineRunner<'_> {
 						max = attempt.max,
 						"maximum stage attempts reached"
 					);
+
 					self.emit(SdlcEvent::Failed {
 						stage: Some(stage),
 						error: format!(
@@ -607,35 +765,45 @@ impl PipelineRunner<'_> {
 							attempt.max
 						),
 					});
-					self.pipeline.persist_progress(&format!(
+
+					self.runtime.pipeline.persist_progress(&format!(
 						"{} exhausted maximum attempts ({})",
 						stage, attempt.max
 					))?;
-					return Ok(RunControl::Exit);
+
+					return Ok(RunControl::Exit(PipelineStatus::Failed));
 				}
+
 				let next_attempt = attempt.number + 1;
-				self.pipeline.persist_progress(&format!(
+
+				self.runtime.pipeline.persist_progress(&format!(
 					"Retrying stage {} (attempt {}/{})",
 					stage, next_attempt, attempt.max,
 				))?;
-				self.pipeline.stage_attempt_increment();
+
+				self.runtime.pipeline.stage_attempt_increment();
 				self.handle_retry(stage, attempt).await?;
+
 				Ok(RunControl::RetryStage)
 			}
+
 			Decision::Revise => {
 				self
+					.runtime
 					.pipeline
 					.persist_progress(&format!("Revising stage {}", stage))?;
-				// self
-				// 	.handle_revision(stage, attempt, outcome, input_rx, pending_input)
-				// 	.await?;
+
+				// TODO: Restore revision handling here if this branch is
+				// intended to perform the revision directly.
 				Ok(RunControl::RetryStage)
 			}
+
 			Decision::AwaitHuman => {
 				self.emit(SdlcEvent::PhaseChanged {
 					stage,
 					phase: Phase::AwaitingHuman,
 				});
+
 				let intervention = self
 					.wait_for_intervention(
 						stage,
@@ -644,51 +812,81 @@ impl PipelineRunner<'_> {
 						input_rx,
 					)
 					.await?;
+
 				match intervention {
 					Intervention::Retry => {
-						self.pipeline.stage_attempt_increment();
+						if attempt.number >= attempt.max {
+							return Ok(RunControl::Exit(PipelineStatus::Failed));
+						}
+
+						self.runtime.pipeline.stage_attempt_increment();
 						self.handle_retry(stage, attempt).await?;
+
 						Ok(RunControl::RetryStage)
 					}
+
 					Intervention::Revision { evaluation } => {
 						*pending_input = Some(SdlcInput::Revision { evaluation });
-						self.pipeline.retry(stage)?;
+						self.runtime.pipeline.retry(stage)?;
+
 						Ok(RunControl::RetryStage)
 					}
+
 					Intervention::Revise => {
 						self
 							.handle_revision(stage, attempt, outcome, input_rx, pending_input)
 							.await?;
+
 						Ok(RunControl::RetryStage)
 					}
+
 					Intervention::Reviewed => Ok(RunControl::RetryStage),
+
 					Intervention::ProvideContext(context) => {
 						*pending_input = None;
+
 						self
+							.runtime
 							.pipeline
 							.persist_progress(&format!("Human provided context: {context}"))?;
+
 						Ok(RunControl::RetryStage)
 					}
-					Intervention::Abort => Ok(RunControl::Exit),
-					Intervention::Human(_) => Ok(RunControl::Exit),
+
+					Intervention::Abort => {
+						self.emit(SdlcEvent::Failed {
+							stage: Some(stage),
+							error: "aborted by user".into(),
+						});
+
+						Ok(RunControl::Exit(PipelineStatus::Interrupted))
+					}
+
+					Intervention::Human(_) => Ok(RunControl::Exit(PipelineStatus::Interrupted)),
 				}
 			}
+
 			Decision::Fail => {
 				self.emit(SdlcEvent::Failed {
 					stage: Some(stage),
-					error: format!("Stage {stage:?} failed on attempt {}", attempt.number + 1),
+					error: format!("Stage {stage:?} failed on attempt {}", attempt.number),
 				});
+
 				self
+					.runtime
 					.pipeline
 					.persist_progress(&format!("{} failed", stage))?;
-				Ok(RunControl::Exit)
+
+				Ok(RunControl::Exit(PipelineStatus::Failed))
 			}
+
 			Decision::Exit => {
 				self.emit(SdlcEvent::Failed {
 					stage: Some(stage),
-					error: format!("Stage {stage:?} exited on attempt {}", attempt.number + 1),
+					error: format!("Stage {stage:?} exited on attempt {}", attempt.number),
 				});
-				Ok(RunControl::Exit)
+
+				Ok(RunControl::Exit(PipelineStatus::Interrupted))
 			}
 			Decision::Complete => {
 				self.emit(SdlcEvent::PhaseChanged {
@@ -696,10 +894,11 @@ impl PipelineRunner<'_> {
 					phase: Phase::Completed,
 				});
 				self
+					.runtime
 					.pipeline
 					.persist_progress(&format!("{} completed", stage))?;
 				self.emit(SdlcEvent::Completed);
-				Ok(RunControl::Exit)
+				Ok(RunControl::Exit(PipelineStatus::Complete))
 			}
 		}
 	}
@@ -722,7 +921,7 @@ impl PipelineRunner<'_> {
 		let input = input_rx.recv().await.context("SDLC input channel closed")?;
 		match input {
 			SdlcInput::Retry => {
-				self.pipeline.retry(stage)?;
+				self.runtime.pipeline.retry(stage)?;
 				Ok(RunControl::Continue)
 			}
 			SdlcInput::Reviewed => {
@@ -739,20 +938,20 @@ impl PipelineRunner<'_> {
 
 			SdlcInput::Human(input) => {
 				*pending_input = Some(SdlcInput::Human(input));
-				self.pipeline.retry(stage)?;
+				self.runtime.pipeline.retry(stage)?;
 
 				Ok(RunControl::Continue)
 			}
 
 			SdlcInput::ProvideContext(context) => {
 				*pending_input = Some(SdlcInput::ProvideContext(context));
-				self.pipeline.retry(stage)?;
+				self.runtime.pipeline.retry(stage)?;
 
 				Ok(RunControl::Continue)
 			}
 			SdlcInput::Revision { evaluation } => {
 				*pending_input = Some(SdlcInput::Revision { evaluation });
-				self.pipeline.retry(stage)?;
+				self.runtime.pipeline.retry(stage)?;
 				Ok(RunControl::Continue)
 			}
 			SdlcInput::Abort => {
@@ -761,16 +960,16 @@ impl PipelineRunner<'_> {
 					error: "aborted by user".into(),
 				});
 
-				Ok(RunControl::Exit)
+				Ok(RunControl::Exit(PipelineStatus::Interrupted))
 			}
 		}
 	}
 	async fn evaluate(&self, execution: &Execution) -> Result<QACheck> {
 		tracing::info!("evaluate pipeline runner {:?}", execution);
 		let stage = execution.stage;
-		let checks = self.pipeline.run_checks(stage).await?;
+		let checks = self.runtime.pipeline.run_checks(stage).await?;
 		let structural = self.evaluate_checks(checks)?;
-		let semantic = self.pipeline.qa.evaluate(&execution).await?;
+		let semantic = self.runtime.pipeline.qa.evaluate(&execution).await?;
 		Ok(semantic.with_evaluations(structural))
 	}
 	async fn execute(
@@ -778,7 +977,7 @@ impl PipelineRunner<'_> {
 		stage: Stage,
 		attempt: Attempt,
 		pending_input: &mut Option<SdlcInput>,
-	) -> Result<Outcome> {
+	) -> Result<AttemptOutcome> {
 		self.emit(SdlcEvent::PhaseChanged {
 			stage,
 			phase: Phase::Executing,
@@ -791,10 +990,12 @@ impl PipelineRunner<'_> {
 			}
 			None => StageInput::Initial,
 		};
+		tracing::info!(?stage, ?attempt, ">>> route_execution ENTER");
+
 		let execution = match self.route_execution(stage, attempt, input).await {
 			Ok(execution) => execution,
 			Err(error) => {
-				return Ok(Outcome::ExecutionFailed {
+				return Ok(AttemptOutcome::ExecutionFailed {
 					stage,
 					attempt,
 					error,
@@ -804,7 +1005,7 @@ impl PipelineRunner<'_> {
 		self.handle_evaluation(execution, attempt).await
 	}
 
-	async fn handle_outcome(&self, outcome: &Outcome) -> Result<Decision> {
+	async fn handle_outcome(&self, outcome: &AttemptOutcome) -> Result<Decision> {
 		if std::env::var_os("SDLC_FORCE_EXIT").is_some() {
 			section_info!(
 				"decision",
@@ -830,7 +1031,7 @@ impl PipelineRunner<'_> {
 		}
 
 		let (decision, stage, attempt, max_attempts, outcome_name, details) = match outcome {
-			Outcome::EvaluationFailed { execution, .. } => {
+			AttemptOutcome::EvaluationFailed { execution, .. } => {
 				let attempt = &execution.attempt;
 				let decision = if attempt.number < attempt.max {
 					Decision::Retry
@@ -848,7 +1049,7 @@ impl PipelineRunner<'_> {
 				)
 			}
 
-			Outcome::Complete { execution, .. } => {
+			AttemptOutcome::Complete { execution, .. } => {
 				let decision = match &execution.result {
 					RunResult::Verification(verification) if verification.passed => Decision::Continue,
 					RunResult::Verification(_) => Decision::Retry,
@@ -873,7 +1074,7 @@ impl PipelineRunner<'_> {
 				)
 			}
 
-			Outcome::NeedsRevision {
+			AttemptOutcome::NeedsRevision {
 				execution,
 				evaluation,
 			} => {
@@ -897,7 +1098,7 @@ impl PipelineRunner<'_> {
 				)
 			}
 
-			Outcome::ExecutionFailed { attempt, error, .. } => {
+			AttemptOutcome::ExecutionFailed { attempt, error, .. } => {
 				let decision = if attempt.number < attempt.max {
 					Decision::Retry
 				} else {
@@ -942,18 +1143,26 @@ impl PipelineRunner<'_> {
 			stage,
 			phase: Phase::Retrying,
 		});
-		self.pipeline.retry(stage)?;
+		self.runtime.pipeline.retry(stage)?;
 		Ok(())
 	}
-	async fn handle_evaluation(&mut self, execution: Execution, attempt: Attempt) -> Result<Outcome> {
+	async fn handle_evaluation(
+		&mut self,
+		execution: Execution,
+		attempt: Attempt,
+	) -> Result<AttemptOutcome> {
 		let stage = execution.stage;
+
 		self.emit(SdlcEvent::PhaseChanged {
 			stage,
 			phase: Phase::Evaluating,
 		});
+
 		self.emit(SdlcEvent::EvaluationStarted { stage });
+
 		tracing::info!("handle_evaluation {:?}", execution);
-		match self.pipeline.evaluate(&execution).await {
+
+		match self.runtime.pipeline.evaluate(&execution).await {
 			Ok(evaluation) => {
 				self.emit(SdlcEvent::Evaluated {
 					stage,
@@ -961,27 +1170,33 @@ impl PipelineRunner<'_> {
 					confidence: evaluation.confidence,
 					passed: evaluation.passed,
 				});
-				self.pipeline.persist_evaluation(&evaluation, attempt);
+
+				self
+					.runtime
+					.pipeline
+					.persist_evaluation(&evaluation, attempt);
+
 				if evaluation.passed {
-					Ok(Outcome::Complete {
+					Ok(AttemptOutcome::Complete {
 						execution,
 						evaluation,
 					})
 				} else {
-					Ok(Outcome::NeedsRevision {
+					Ok(AttemptOutcome::NeedsRevision {
 						execution,
 						evaluation,
 					})
 				}
 			}
-			Err(error) => Ok(Outcome::EvaluationFailed { execution, error }),
+
+			Err(error) => Ok(AttemptOutcome::EvaluationFailed { execution, error }),
 		}
 	}
 	async fn handle_revision(
 		&mut self,
 		stage: Stage,
 		attempt: Attempt,
-		_outcome: Outcome,
+		_outcome: AttemptOutcome,
 		input_rx: &mut UnboundedReceiver<SdlcInput>,
 		pending_input: &mut Option<SdlcInput>,
 	) -> Result<()> {
@@ -996,18 +1211,18 @@ impl PipelineRunner<'_> {
 		{
 			Intervention::Revision { evaluation } => {
 				*pending_input = Some(SdlcInput::Revision { evaluation });
-				self.pipeline.retry(stage)?;
+				self.runtime.pipeline.retry(stage)?;
 			}
 			Intervention::Human(input) => {
 				*pending_input = Some(SdlcInput::Human(input));
-				self.pipeline.retry(stage)?;
+				self.runtime.pipeline.retry(stage)?;
 			}
 			Intervention::Retry => {
-				self.pipeline.retry(stage)?;
+				self.runtime.pipeline.retry(stage)?;
 			}
 			Intervention::ProvideContext(context) => {
 				*pending_input = Some(SdlcInput::ProvideContext(context));
-				self.pipeline.retry(stage)?;
+				self.runtime.pipeline.retry(stage)?;
 			}
 			Intervention::Reviewed => {
 				let next = stage
@@ -1020,7 +1235,7 @@ impl PipelineRunner<'_> {
 				});
 			}
 			Intervention::Revise => {
-				self.pipeline.retry(stage)?;
+				self.runtime.pipeline.retry(stage)?;
 			}
 			Intervention::Abort => {
 				self.emit(SdlcEvent::Failed {
@@ -1039,7 +1254,7 @@ impl PipelineRunner<'_> {
 				});
 			}
 			Intervention::Revise => {
-				self.pipeline.retry(stage)?;
+				self.runtime.pipeline.retry(stage)?;
 			}
 			Intervention::Abort => {
 				self.emit(SdlcEvent::Failed {
@@ -1072,7 +1287,7 @@ impl PipelineRunner<'_> {
 				stage,
 				phase: Phase::Retrying,
 			});
-			self.pipeline.retry(stage)?;
+			self.runtime.pipeline.retry(stage)?;
 			return Ok(RunControl::Continue);
 		}
 		self.emit(SdlcEvent::PhaseChanged {
@@ -1085,19 +1300,19 @@ impl PipelineRunner<'_> {
 		{
 			Intervention::Revision { evaluation } => {
 				*pending_input = Some(SdlcInput::Revision { evaluation });
-				self.pipeline.retry(stage)?;
+				self.runtime.pipeline.retry(stage)?;
 
 				Ok(RunControl::Continue)
 			}
 			Intervention::Human(input) => {
 				*pending_input = Some(SdlcInput::Human(input.as_str().to_owned()));
-				self.pipeline.retry(stage)?;
+				self.runtime.pipeline.retry(stage)?;
 
 				Ok(RunControl::Continue)
 			}
 
 			Intervention::Retry => {
-				self.pipeline.retry(stage)?;
+				self.runtime.pipeline.retry(stage)?;
 
 				Ok(RunControl::Continue)
 			}
@@ -1105,13 +1320,13 @@ impl PipelineRunner<'_> {
 			Intervention::ProvideContext(context) => {
 				let _ = context;
 
-				self.pipeline.retry(stage)?;
+				self.runtime.pipeline.retry(stage)?;
 
 				Ok(RunControl::Continue)
 			}
 
 			Intervention::Reviewed => {
-				self.pipeline.retry(stage)?;
+				self.runtime.pipeline.retry(stage)?;
 
 				Ok(RunControl::Continue)
 			}
@@ -1122,10 +1337,10 @@ impl PipelineRunner<'_> {
 					error: error.to_string(),
 				});
 
-				Ok(RunControl::Exit)
+				Ok(RunControl::Exit(PipelineStatus::Interrupted))
 			}
 			Intervention::Revise => {
-				self.pipeline.retry(stage)?;
+				self.runtime.pipeline.retry(stage)?;
 
 				Ok(RunControl::Continue)
 			}
@@ -1154,7 +1369,7 @@ impl PipelineRunner<'_> {
 				phase: Phase::Retrying,
 			});
 
-			self.pipeline.retry(stage)?;
+			self.runtime.pipeline.retry(stage)?;
 			return Ok(RunControl::Continue);
 		}
 		self.emit(SdlcEvent::PhaseChanged {
@@ -1167,38 +1382,44 @@ impl PipelineRunner<'_> {
 		{
 			Intervention::Human(input) => {
 				*pending_input = Some(SdlcInput::Human(input.to_string()));
-				self.pipeline.retry(stage)?;
+				self.runtime.pipeline.retry(stage)?;
 				Ok(RunControl::Continue)
 			}
 			Intervention::Retry => {
-				self.pipeline.retry(stage)?;
+				self.runtime.pipeline.retry(stage)?;
 				Ok(RunControl::Continue)
 			}
 			Intervention::ProvideContext(context) => {
 				// If ProvideContext eventually becomes stage input,
 				// this is where it should be stored.
 				let _ = context;
-				self.pipeline.retry(stage)?;
+				self.runtime.pipeline.retry(stage)?;
 				Ok(RunControl::Continue)
 			}
 			Intervention::Reviewed => {
-				self.pipeline.retry(stage)?;
+				self.runtime.pipeline.retry(stage)?;
 				Ok(RunControl::Continue)
 			}
 			Intervention::Abort => {
-				self.emit(SdlcEvent::Failed {
-					stage: Some(stage),
-					error: "aborted by user".into(),
+				self.emit(SdlcEvent::PhaseChanged {
+					stage,
+					phase: Phase::Failed,
 				});
-				Ok(RunControl::Exit)
+
+				self
+					.runtime
+					.pipeline
+					.persist_progress("Pipeline interrupted: aborted by user")?;
+
+				Ok(RunControl::Exit(PipelineStatus::Interrupted))
 			}
 			Intervention::Revise => {
-				self.pipeline.retry(stage)?;
+				self.runtime.pipeline.retry(stage)?;
 				Ok(RunControl::Continue)
 			}
 			Intervention::Revision { evaluation } => {
 				*pending_input = Some(SdlcInput::Revision { evaluation });
-				self.pipeline.retry(stage)?;
+				self.runtime.pipeline.retry(stage)?;
 				Ok(RunControl::Continue)
 			}
 		}
@@ -1221,7 +1442,7 @@ impl PipelineRunner<'_> {
 				phase: Phase::Retrying,
 			});
 
-			self.pipeline.retry(stage)?;
+			self.runtime.pipeline.retry(stage)?;
 
 			return Ok(RunControl::Continue);
 		}
@@ -1241,19 +1462,19 @@ impl PipelineRunner<'_> {
 			Intervention::Revision { evaluation } => {
 				*pending_input = Some(SdlcInput::Revision { evaluation });
 
-				self.pipeline.retry(stage)?;
+				self.runtime.pipeline.retry(stage)?;
 
 				Ok(RunControl::Continue)
 			}
 			Intervention::Human(input) => {
 				*pending_input = Some(SdlcInput::Human(input.to_string()));
-				self.pipeline.retry(stage)?;
+				self.runtime.pipeline.retry(stage)?;
 
 				Ok(RunControl::Continue)
 			}
 
 			Intervention::Retry => {
-				self.pipeline.retry(stage)?;
+				self.runtime.pipeline.retry(stage)?;
 
 				Ok(RunControl::Continue)
 			}
@@ -1261,7 +1482,7 @@ impl PipelineRunner<'_> {
 			Intervention::ProvideContext(context) => {
 				let _ = context;
 
-				self.pipeline.retry(stage)?;
+				self.runtime.pipeline.retry(stage)?;
 
 				Ok(RunControl::Continue)
 			}
@@ -1282,17 +1503,16 @@ impl PipelineRunner<'_> {
 
 				Ok(RunControl::Continue)
 			}
-
 			Intervention::Abort => {
 				self.emit(SdlcEvent::Failed {
 					stage: Some(stage),
-					error: "aborted by user".into(),
+					error: "aborted by user: quality requirements not met".into(),
 				});
 
-				Ok(RunControl::Exit)
+				Ok(RunControl::Exit(PipelineStatus::NeedsRevision))
 			}
 			Intervention::Revise => {
-				self.pipeline.retry(stage)?;
+				self.runtime.pipeline.retry(stage)?;
 
 				Ok(RunControl::Continue)
 			}
@@ -1322,6 +1542,7 @@ impl PipelineRunner<'_> {
 		tracing::info!("Intent: prompt debug file written");
 
 		let generated = self
+			.runtime
 			.pipeline
 			.system
 			.runtime
@@ -1343,6 +1564,7 @@ impl PipelineRunner<'_> {
 		tracing::info!("Intent: artifact written");
 
 		self
+			.runtime
 			.pipeline
 			.persist_progress("Intent stage completed")
 			.context("Intent: persisting progress")?;
@@ -1355,12 +1577,12 @@ impl PipelineRunner<'_> {
 		if stage != Stage::Spec {
 			return Err(anyhow!("cannot execute Spec stage while at {stage:?}"));
 		}
-		let intent = self.pipeline.session_read("intent.md")?;
+		let intent = self.runtime.pipeline.session_read("intent.md")?;
 		let is_revision = matches!(input, StageInput::Revision { .. });
 		let prompt = match input {
 			StageInput::Initial => p::gen_spec(&intent)?,
 			StageInput::Revision { evaluation } => {
-				let spec = self.pipeline.session_read("spec.md")?;
+				let spec = self.runtime.pipeline.session_read("spec.md")?;
 				if spec.trim().is_empty() {
 					return Err(anyhow!("Cannot revise Spec because spec.md is empty"));
 				}
@@ -1373,6 +1595,7 @@ impl PipelineRunner<'_> {
 		std::fs::write(sdlc_log_file("prompt.spec.md"), &prompt)
 			.context("writing Spec prompt debug file")?;
 		let generated = self
+			.runtime
 			.pipeline
 			.system
 			.runtime
@@ -1383,7 +1606,7 @@ impl PipelineRunner<'_> {
 			return Err(anyhow!("generated Spec artifact is empty"));
 		}
 		self.write(&generated)?;
-		self.pipeline.persist_progress(if is_revision {
+		self.runtime.pipeline.persist_progress(if is_revision {
 			"Spec revision completed"
 		} else {
 			"Spec stage completed"
@@ -1391,26 +1614,53 @@ impl PipelineRunner<'_> {
 		Ok(RunResult::Spec)
 	}
 	async fn on_plan(&mut self, input: StageInput) -> Result<RunResult> {
+		tracing::info!("on_plan: ENTER");
+
 		let (stage, session_dir) = self.stage_dir();
+		tracing::info!(?stage, ?session_dir, "on_plan: stage_dir");
+
 		if stage != Stage::Plan {
 			return Err(anyhow!("cannot execute Plan stage while at {stage:?}"));
 		}
-		let intent = self.pipeline.session_read("intent.md")?;
-		let spec = self.pipeline.session_read("spec.md")?;
+
+		let intent = self.runtime.pipeline.session_read("intent.md")?;
+		let spec = self.runtime.pipeline.session_read("spec.md")?;
+		tracing::info!(
+			intent_len = intent.len(),
+			spec_len = spec.len(),
+			"on_plan: inputs loaded"
+		);
 		let prompt = p::gen_plan(&intent, &spec)?;
+		tracing::info!(prompt_len = prompt.len(), "on_plan: prompt generated");
 		if prompt.trim().is_empty() {
 			return Err(anyhow!("Generated Plan prompt is empty"));
 		}
 		std::fs::write(sdlc_log_file("prompt.plan.md"), &prompt)
 			.context("writing plan prompt debug file")?;
-		// tracing::info!(
-		// 	generated_len = prompt.len(),
-		// 	has_inventory = prompt.contains("Machine-Readable Output Inventory"),
-		// 	has_build_contract = prompt.contains("Machine-Readable Build Contract"),
-		// 	generated_start = %prompt.chars().take(300).collect::<String>(),
-		// 	"Plan: inspect prompt artifact"
-		// );
+		tracing::info!("on_plan: runtime.generate ENTER");
 		let generated = self
+			.runtime
+			.pipeline
+			.system
+			.runtime
+			.generate(&prompt)
+			.await
+			.context("generating Plan artifact from Intent and Spec")?;
+
+		tracing::info!(
+			generated_len = generated.len(),
+			"on_plan: runtime.generate EXIT"
+		);
+		// Keep the rest of your existing on_plan implementation.
+		tracing::info!(
+			generated_len = prompt.len(),
+			has_inventory = prompt.contains("Machine-Readable Output Inventory"),
+			has_build_contract = prompt.contains("Machine-Readable Build Contract"),
+			generated_start = %prompt.chars().take(300).collect::<String>(),
+			"Plan: inspect prompt artifact"
+		);
+		let generated = self
+			.runtime
 			.pipeline
 			.system
 			.runtime
@@ -1420,13 +1670,13 @@ impl PipelineRunner<'_> {
 		if generated.trim().is_empty() {
 			return Err(anyhow!("generated Plan artifact is empty"));
 		}
-		// tracing::info!(
-		// 	generated_len = generated.len(),
-		// 		has_inventory = generated.contains("Machine-Readable Output Inventory"),
-		// 		has_build_contract = generated.contains("Machine-Readable Build Contract"),
-		// 		generated_start = %generated.chars().take(300).collect::<String>(),
-		// 		"Plan: inspect generated artifact"
-		// );
+		tracing::info!(
+			generated_len = generated.len(),
+				has_inventory = generated.contains("Machine-Readable Output Inventory"),
+				has_build_contract = generated.contains("Machine-Readable Build Contract"),
+				generated_start = %generated.chars().take(300).collect::<String>(),
+				"Plan: inspect generated artifact"
+		);
 		std::fs::write(sdlc_log_file("plan.md"), &generated)
 			.context("writing generated Plan debug file")?;
 		let expected_outputs = p::expected_outputs_from_plan(&generated)
@@ -1437,7 +1687,10 @@ impl PipelineRunner<'_> {
 		self
 			.write(&generated)
 			.context("writing generated Plan to the SDLC session")?;
-		self.pipeline.persist_progress("Plan stage completed")?;
+		self
+			.runtime
+			.pipeline
+			.persist_progress("Plan stage completed")?;
 		Ok(RunResult::Plan)
 	}
 	// SDLC_FORCE_CONTINUE=1 SDLC_PLAIN=1 cargo run --bin sdlc --features sdlc
@@ -1451,9 +1704,9 @@ impl PipelineRunner<'_> {
 			));
 		}
 
-		self.pipeline.persist_progress("Build started")?;
+		self.runtime.pipeline.persist_progress("Build started")?;
 
-		let workspace = self.pipeline.session.workspace_owned();
+		let workspace = self.runtime.pipeline.session.workspace_owned();
 
 		// Load the SDLC artifacts.
 		let intent_path = session_dir.join("intent.md");
@@ -1481,9 +1734,9 @@ impl PipelineRunner<'_> {
 		}
 		let expected_outputs = p::expected_outputs_from_plan(&plan)?;
 
-		self.pipeline.system.add_file(intent_path);
-		self.pipeline.system.add_file(spec_path);
-		self.pipeline.system.add_file(plan_path);
+		self.runtime.pipeline.system.add_file(intent_path);
+		self.runtime.pipeline.system.add_file(spec_path);
+		self.runtime.pipeline.system.add_file(plan_path);
 
 		let workspace_before = WSSnapshot::capture(&workspace)?;
 		let git_status = workspace_before.git_status.trim();
@@ -1499,7 +1752,7 @@ impl PipelineRunner<'_> {
 		section_info!(
 			"workspace",
 			metrics: [
-				"files" => self.pipeline.system.runtime.workspace.files.len(),
+				"files" => self.runtime.pipeline.system.runtime.workspace.files.len(),
 				"git" => if git_status.is_empty() { "clean" } else { "dirty" },
 			],
 			"" => values.iter()
@@ -1526,7 +1779,14 @@ impl PipelineRunner<'_> {
 		let phase_started = Instant::now();
 		section!("BUILD PHASE START: Orient");
 
-		let orient_result = match self.pipeline.system.runtime.run_agent(orient_task).await {
+		let orient_result = match self
+			.runtime
+			.pipeline
+			.system
+			.runtime
+			.run_agent(orient_task)
+			.await
+		{
 			Ok(result) => {
 				let result = Pipeline::ensure_agent_completed(result, "Orient")?;
 				section!(&format!(
@@ -1567,7 +1827,14 @@ impl PipelineRunner<'_> {
 		let phase_started = std::time::Instant::now();
 		section!("BUILD PHASE START: Execute");
 
-		let execute_result = match self.pipeline.system.runtime.run_agent(execute_task).await {
+		let execute_result = match self
+			.runtime
+			.pipeline
+			.system
+			.runtime
+			.run_agent(execute_task)
+			.await
+		{
 			Ok(result) => {
 				let result = Pipeline::ensure_agent_completed(result, "Execute")?;
 				section!(&format!(
@@ -1634,7 +1901,14 @@ impl PipelineRunner<'_> {
 		let phase_started = std::time::Instant::now();
 		section!("BUILD PHASE START: Verify");
 
-		let verify_result = match self.pipeline.system.runtime.run_agent(verify_task).await {
+		let verify_result = match self
+			.runtime
+			.pipeline
+			.system
+			.runtime
+			.run_agent(verify_task)
+			.await
+		{
 			Ok(result) => {
 				let result = Pipeline::ensure_agent_completed(result, "Verify")?;
 				section!(&format!(
@@ -1702,7 +1976,7 @@ impl PipelineRunner<'_> {
 
 		self.write(&changes.to_markdown("Build completed"))?;
 
-		self.pipeline.persist_progress(&format!(
+		self.runtime.pipeline.persist_progress(&format!(
 			"Build phases completed; {} file(s) changed",
 			changes.file_count()
 		))?;
@@ -1712,8 +1986,8 @@ impl PipelineRunner<'_> {
 		Ok(RunResult::Build)
 	}
 	async fn on_qa(&mut self, input: StageInput) -> Result<RunResult> {
-		let verification = self.run_qa_checks(self.pipeline.stage()).await?;
-		self.pipeline.persist_progress(&format!(
+		let verification = self.run_qa_checks(self.runtime.pipeline.stage()).await?;
+		self.runtime.pipeline.persist_progress(&format!(
 			"Verification completed: passed={}",
 			verification.passed
 		))?;
@@ -1727,6 +2001,7 @@ impl PipelineRunner<'_> {
 		input: StageInput,
 	) -> Result<Execution> {
 		let time_started = Utc::now();
+		tracing::info!(?stage, "route_execution: dispatching");
 
 		let result = match stage {
 			Stage::Intent => self.on_intent(input).await?,
@@ -1760,9 +2035,9 @@ impl PipelineRunner<'_> {
 	}
 	async fn run_qa_checks(&mut self, stage: Stage) -> Result<Verification> {
 		tracing::info!("run_qa_checks");
-		let checks = self.pipeline.run_checks(stage).await?;
-		let evaluations = self.pipeline.evaluate_checks(&checks);
-		let passed = self.pipeline.is_passing(&checks, &evaluations);
+		let checks = self.runtime.pipeline.run_checks(stage).await?;
+		let evaluations = self.runtime.pipeline.evaluate_checks(&checks);
+		let passed = self.runtime.pipeline.is_passing(&checks, &evaluations);
 		Ok(Verification {
 			passed,
 			checks,
@@ -1788,6 +2063,7 @@ impl PipelineRunner<'_> {
 		input_rx: &mut UnboundedReceiver<SdlcInput>,
 	) -> Result<Intervention> {
 		self
+			.runtime
 			.pipeline
 			.wait_for_intervention(stage, attempt, reason, input_rx)
 			.await
@@ -1811,6 +2087,7 @@ impl PipelineRunner<'_> {
 		Ok(())
 	}
 }
+
 impl<C: Ctx> PipelineRuntime<C> {
 	pub fn new(pipeline: Pipeline, runtime: Arc<NativeRuntime<C>>) -> Self {
 		let event_bus = EventBus::new();
@@ -1858,10 +2135,12 @@ impl<C: Ctx> PipelineRuntime<C> {
 			events: self.event_history.clone(),
 		}
 	}
-	pub async fn run(&mut self, input_rx: &mut UnboundedReceiver<SdlcInput>) -> Result<()> {
-		let mut runner = PipelineRunner {
-			pipeline: &mut self.pipeline,
-		};
+	pub async fn run(
+		&mut self,
+		input_rx: &mut UnboundedReceiver<SdlcInput>,
+	) -> Result<PipelineOutcome> {
+		tracing::info!("PipelineRuntime<C>");
+		let mut runner = PipelineRunner { runtime: self };
 		runner.run(input_rx).await.context("PipelineRunner::run")
 	}
 	pub async fn run_simulated(
@@ -1913,7 +2192,6 @@ impl<C: Ctx> PipelineRuntime<C> {
 				to: next,
 			});
 		}
-
 		self.pipeline.emit(SdlcEvent::Completed);
 		sleep(DEMO_COMPLETE_DELAY).await;
 		Ok(())
@@ -1922,15 +2200,33 @@ impl<C: Ctx> PipelineRuntime<C> {
 		&mut self,
 		stage: Stage,
 		input_rx: &mut UnboundedReceiver<SdlcInput>,
-	) -> Result<()> {
+	) -> Result<PipelineOutcome> {
 		tracing::info!("resume_from pipeline runtime");
-		let session_dir = self.pipeline.session.dir.clone();
 		self.pipeline.resume_from(stage).await?;
-		let mut runner = PipelineRunner {
-			pipeline: &mut self.pipeline,
-		};
-
+		let mut runner = PipelineRunner { runtime: self };
 		runner.run(input_rx).await.context("PipelineRunner::run")
+	}
+}
+impl<C: Ctx> PipelineRuntime<C> {
+	pub async fn run_stage(&mut self, stage: Stage) -> Result<StageOutcome> {
+		let mut runner = PipelineRunner { runtime: self };
+		runner
+			.run_stage(stage)
+			.await
+			.context("PipelineRuntime::run_stage")
+	}
+	pub async fn execute_attempt(&mut self, stage: Stage) -> Result<AttemptOutcome> {
+		let mut runner: PipelineRunner<'_, C> = PipelineRunner { runtime: self };
+		runner
+			.execute_attempt(stage)
+			.await
+			.context("PipelineRuntime::execute_attempt")
+	}
+	fn next_attempt(&mut self, stage: Stage) -> Result<Attempt> {
+		self.pipeline.next_attempt(stage)
+	}
+	fn emit(&self, event: SdlcEvent) {
+		self.pipeline.emit(event)
 	}
 }
 
@@ -1941,11 +2237,10 @@ pub struct Pipeline {
 	pub system: AgentSystem,
 	pub generator: Box<dyn GeneratorTrait>,
 	pub session: AiSession,
-	// pub event_tx: broadcast::Sender<SdlcEvent>,
 	pub stage_attempt: u32,
 }
-pub struct PipelineRunner<'a> {
-	pub pipeline: &'a mut Pipeline,
+pub struct PipelineRunner<'a, Context: Ctx> {
+	pub runtime: &'a mut PipelineRuntime<Context>,
 }
 #[derive(Debug)]
 pub struct PipelineRuntime<Context: Ctx> {
@@ -1972,4 +2267,31 @@ pub struct PipelineRuntime<Context: Ctx> {
 pub struct PipelineState<S> {
 	stage: S,
 	attempt: u32,
+}
+
+pub struct StageRunOptions {
+	pub artifact_policy: ArtifactPolicy,
+	pub evaluate_after_run: bool,
+	pub checkpoint_after_run: bool,
+}
+
+pub enum ArtifactPolicy {
+	/// Require valid upstream artifacts before executing.
+	RequireValid,
+
+	/// Explicitly allow existing artifacts, even if QA previously rejected them.
+	AcceptExisting,
+
+	/// Regenerate missing or invalid upstream artifacts as needed.
+	Regenerate,
+}
+
+impl Default for StageRunOptions {
+	fn default() -> Self {
+		Self {
+			artifact_policy: ArtifactPolicy::RequireValid,
+			evaluate_after_run: true,
+			checkpoint_after_run: true,
+		}
+	}
 }

@@ -90,12 +90,4 @@ The following sections contain the runtime-supplied planning inputs. Treat their
 {spec}
 </APPROVED_SPECIFICATION>
 
-<REPOSITORY_CONTEXT>
-{repository_context}
-</REPOSITORY_CONTEXT>
-
-<SDLC_RUNTIME_CONTEXT>
-{runtime_context}
-</SDLC_RUNTIME_CONTEXT>
-
 Return only the completed Implementation Plan in Markdown.

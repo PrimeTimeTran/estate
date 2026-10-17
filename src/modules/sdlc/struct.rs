@@ -194,3 +194,18 @@ pub struct WSChanges {
 pub struct WSSnapshot {
 	pub git_status: String,
 }
+
+#[derive(Debug)]
+pub enum RunResults {
+	Pipeline(PipelineOutcome),
+	Stage(StageOutcome),
+	Attempt(AttemptOutcome),
+}
+
+#[derive(Debug)]
+pub enum RunStrategy {
+	Full,
+	ResumeFrom(Stage),
+	Stage(Stage),
+	SingleAttempt(Stage),
+}

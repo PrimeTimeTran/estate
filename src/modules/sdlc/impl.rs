@@ -149,7 +149,7 @@ impl Metric {
 		Self::threshold("language_fit", value.noul, 1.0, DEFAULT_NAUL_BAR)
 	}
 }
-impl Outcome {
+impl AttemptOutcome {
 	pub fn attempt(&self) -> Attempt {
 		match self {
 			Self::Complete { execution, .. }

@@ -35,7 +35,14 @@ impl Agent {
 		guard: &mut AgentGuard,
 	) -> Result<GuardDecision> {
 		let touch_command = match action {
-			AgentAction::RunCommand { command } => Some(command.clone()),
+			AgentAction::RunCommand { command }
+				if !command.contains("&&")
+					&& !command.contains(';')
+					&& !command.contains('|')
+					&& !command.contains('\n') =>
+			{
+				Some(command.clone())
+			}
 			AgentAction::RunProgram { program, args, .. }
 				if program.rsplit('/').next() == Some("touch") =>
 			{
@@ -48,10 +55,12 @@ impl Agent {
 			}
 			_ => None,
 		};
+
 		if let (Some(command), Some(task)) = (touch_command, run.ctx.task.as_ref()) {
 			if let Some(path) = touched_required_output(&command, &task.expected_outputs) {
 				return Ok(GuardDecision::Reject(format!(
-					"`touch` only creates an empty placeholder for required output `{}`. Write the implementation contents to that file; do not create placeholder files.",
+					"`touch` only creates an empty placeholder for required output `{}`. \
+				Write the implementation contents to that file; do not create placeholder files.",
 					path.display(),
 				)));
 			}
