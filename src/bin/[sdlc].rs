@@ -2,7 +2,7 @@ use anyhow::Context as CtxAnyhow;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use std::io::IsTerminal;
 
-use estate::prelude::*;
+use estate::prelude::{sdlc::Context as CtxSdlc, *};
 use std::time::{Duration, Instant};
 
 // 1. Normal run

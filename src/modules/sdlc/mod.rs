@@ -30,6 +30,9 @@ pub mod sdlc_enum;
 pub use sdlc_enum as e;
 pub use sdlc_enum::{Status, *};
 
+mod evaluator;
+use evaluator::*;
+
 mod r#fn;
 use r#fn as f;
 use r#fn::*;
@@ -39,6 +42,9 @@ use generator::*;
 
 mod r#impl;
 use r#impl as i;
+
+pub mod pipeline;
+pub use pipeline::*;
 
 mod prompt;
 use prompt as p;
@@ -52,6 +58,12 @@ pub use r#struct::{AiSession, *};
 pub mod sdlc_trait;
 use sdlc_trait as t;
 use sdlc_trait::*;
+
+mod stage;
+use stage::*;
+
+mod workspace;
+use workspace::*;
 
 mod ui;
 use ui as u;

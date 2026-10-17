@@ -22,9 +22,7 @@ use crate::{
 		agent::{Agent, AgentCtx},
 		resolver::*,
 		task::TaskResult,
-	},
-	prelude::{structs as ext_structs, *},
-	sdlc::{format_elapsed, r#struct::AiView},
+	}, prelude::{structs as ext_structs, *}, sdlc::{format_elapsed, pipeline::PipelineRuntime, r#struct::AiView},
 };
 
 pub fn body(chunk: Rect) -> Vec<Rect> {

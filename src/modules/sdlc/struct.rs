@@ -15,7 +15,7 @@ pub struct AiSession {
 	pub cwd: PathBuf,
 }
 pub struct AiView {
-	pub runtime: PipelineRuntimeView,
+	pub runtime: SSPipelineRuntime,
 	pub paused: bool,
 	pub show_logs: bool,
 	pub input: String,
@@ -41,6 +41,15 @@ pub struct BuildResult {
 	pub commands: Vec<CommandResult>,
 	pub agent_summary: Option<String>,
 }
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct BuildPhaseEvent {
+	pub phase: String,
+	pub status: String,
+	pub elapsed_ms: Option<u128>,
+	pub error: Option<String>,
+}
+
 pub struct Check {
 	pub name: String,
 	pub command: String,
@@ -108,50 +117,6 @@ pub struct OllamaResponse {
 	pub done_reason: Option<String>,
 }
 
-#[derive(Debug)]
-pub struct PipelineRuntime<Context: Ctx> {
-	pub activity: Vec<String>,
-	pub attempt: u32,
-	pub confidence: Option<f64>,
-	pub error: Option<String>,
-	pub event_history: Vec<SdlcEvent>,
-	pub event_bus: EventBus,
-	pub history: Vec<SdlcEvent>,
-	pub message: Option<String>,
-	pub passed: Option<bool>,
-	pub phase: Phase,
-	pub pipeline: Pipeline,
-	pub runtime: Arc<NativeRuntime<Context>>,
-	pub score: Option<f64>,
-	pub stage: Stage,
-	pub stage_time_started: Instant,
-	pub time_started: Instant,
-	pub total_agent_calls: u32,
-	pub total_tokens: u64,
-}
-#[derive(Debug, Clone)]
-pub struct PipelineRuntimeView {
-	pub activity: Vec<String>,
-	pub attempt: u32,
-	pub confidence: Option<f64>,
-	pub error: Option<String>,
-	pub events: Vec<SdlcEvent>,
-	pub history: Vec<SdlcEvent>,
-	pub message: Option<String>,
-	pub passed: Option<bool>,
-	pub phase: Phase,
-	pub score: Option<f64>,
-	pub stage: Stage,
-	pub stage_time_started: Instant,
-	pub time_started: Instant,
-	pub total_agent_calls: u32,
-	pub total_tokens: u64,
-}
-pub struct PipelineState<S> {
-	stage: S,
-	attempt: u32,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QACheck {
 	pub confidence: f64,
@@ -173,19 +138,25 @@ pub struct QAEvaluation {
 	pub revision: Option<String>,
 }
 
-#[derive(Debug)]
-pub struct Pipeline {
-	pub kontex: Kontex,
-	pub qa: Evaluator,
-	pub system: AgentSystem,
-	pub generator: Box<dyn Generator>,
-	pub session: AiSession,
-	// pub event_tx: broadcast::Sender<SdlcEvent>,
-	pub stage_attempt: u32,
+#[derive(Debug, Clone)]
+pub struct SSPipelineRuntime {
+	pub activity: Vec<String>,
+	pub attempt: u32,
+	pub confidence: Option<f64>,
+	pub error: Option<String>,
+	pub events: Vec<SdlcEvent>,
+	pub history: Vec<SdlcEvent>,
+	pub message: Option<String>,
+	pub passed: Option<bool>,
+	pub phase: Phase,
+	pub score: Option<f64>,
+	pub stage: Stage,
+	pub stage_time_started: Instant,
+	pub time_started: Instant,
+	pub total_agent_calls: u32,
+	pub total_tokens: u64,
 }
-pub struct PipeRunner<'a> {
-	pub pipeline: &'a mut Pipeline,
-}
+
 #[derive(Debug)]
 pub struct StageError;
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -222,16 +193,4 @@ pub struct WSChanges {
 #[derive(Debug, Clone)]
 pub struct WSSnapshot {
 	pub git_status: String,
-}
-
-pub struct Intent {}
-pub struct Spec {}
-pub struct Plan {
-	name: String,
-	description: String,
-	framework: Option<String>,
-	language: Option<String>,
-	test_suite_lang: Option<String>,
-	test_suite_framework: Option<String>,
-	targets: Option<Vec<String>>,
 }

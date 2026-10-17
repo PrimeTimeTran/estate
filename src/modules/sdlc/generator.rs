@@ -1,7 +1,7 @@
 use super::{AiSession, *};
 
 #[async_trait]
-impl t::Generator for ApiGenerator {
+impl t::GeneratorTrait for ApiGenerator {
 	async fn generate(&self, prompt: &str) -> Result<String> {
 		todo!("API generate")
 	}
@@ -11,12 +11,12 @@ impl t::Generator for ApiGenerator {
 	async fn with_session(&mut self, session: &AiSession, prompt: String) -> Result<TaskResult> {
 		todo!("with_session")
 	}
-	fn clone_box(&self) -> Box<dyn Generator> {
+	fn clone_box(&self) -> Box<dyn GeneratorTrait> {
 		Box::new(self.clone())
 	}
 }
 #[async_trait]
-impl t::Generator for LocalGenerator {
+impl t::GeneratorTrait for LocalGenerator {
 	async fn generate(&self, prompt: &str) -> Result<String> {
 		let request = serde_json::json!({
 			"model": self.model,
@@ -72,7 +72,7 @@ impl t::Generator for LocalGenerator {
 		let result = self.runtime.from_session(task, session).await?;
 		Ok(result)
 	}
-	fn clone_box(&self) -> Box<dyn Generator> {
+	fn clone_box(&self) -> Box<dyn GeneratorTrait> {
 		Box::new(self.clone())
 	}
 }
