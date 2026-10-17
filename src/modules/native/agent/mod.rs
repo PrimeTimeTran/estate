@@ -26,8 +26,8 @@ pub use r#enum::*;
 mod r#fn;
 pub use r#fn::*;
 
-mod fmt;
-use fmt::*;
+pub mod fmt;
+pub use fmt::*;
 
 pub mod agent;
 pub use agent::*;

@@ -33,9 +33,9 @@ pub use sdlc_enum::{Status, *};
 mod evaluator;
 use evaluator::*;
 
-mod r#fn;
-use r#fn as f;
-use r#fn::*;
+pub mod r#fn;
+pub use r#fn as f;
+pub use r#fn::*;
 
 mod generator;
 use generator::*;

@@ -1,143 +1,16 @@
 use anyhow::bail;
 
 use super::*;
+fn verify_created_files(plan: &BuildPlan, workspace: &CtxWorkspace) -> Result<()> {
+	for file in &plan.files {
+		let path = workspace.cwd.join(&file.path);
 
-pub fn git_status() -> Result<String> {
-	let output = std::process::Command::new("git")
-		.args(["status", "--short"])
-		.output()?;
-	if !output.status.success() {
-		return Err(anyhow::anyhow!(
-			"git status failed: {}",
-			String::from_utf8_lossy(&output.stderr)
-		));
-	}
-	Ok(String::from_utf8(output.stdout)?)
-}
-pub fn format_elapsed(duration: Duration) -> String {
-	let total_seconds = duration.as_secs();
-	let hours = total_seconds / 3600;
-	let minutes = (total_seconds % 3600) / 60;
-	let seconds = total_seconds % 60;
-
-	if hours > 0 {
-		format!("{hours}h {minutes}m {seconds}s")
-	} else if minutes > 0 {
-		format!("{minutes}m {seconds}s")
-	} else {
-		format!("{seconds}s")
-	}
-}
-pub fn slugify(input: &str) -> String {
-	let slug = input
-		.to_lowercase()
-		.chars()
-		.map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
-		.collect::<String>();
-	let slug = slug
-		.split('-')
-		.filter(|s| !s.is_empty())
-		.take(8)
-		.collect::<Vec<_>>()
-		.join("-");
-	if slug.is_empty() {
-		return "untitled".into();
-	}
-	// Windows reserved device names.
-	let reserved = [
-		"con", "prn", "aux", "nul", "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8",
-		"com9", "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9",
-	];
-	if reserved.contains(&slug.as_str()) {
-		format!("session-{slug}")
-	} else {
-		slug
-	}
-}
-pub fn persist_evaluation(
-	session: &mut AiSession,
-	evaluation: &QACheck,
-	attempt: Attempt,
-) -> Result<()> {
-	let status = if evaluation.passed {
-		Status::Completed
-	} else {
-		Status::NeedsRevision
-	};
-	let record = StageRunRecord {
-		description: Some(String::from("Evaluation Complete")),
-		actor: StageActor::Evaluator,
-		attempt,
-		evaluation: Some(evaluation.clone()),
-		stage: evaluation.stage,
-		time_started: evaluation.time_started,
-		time_completed: Some(Utc::now()),
-		status,
-	};
-	let time_started = evaluation.time_started;
-	let time_completed = Utc::now();
-	session.stages.push(record);
-	session.time_updated = Utc::now();
-	Ok(())
-}
-pub fn time_readable(time: chrono::DateTime<chrono::Utc>) -> String {
-	time.format("%B %-d, %Y at %-I:%M:%S %p UTC").to_string()
-}
-pub fn short_duration_readable(duration: chrono::Duration) -> String {
-	let seconds = duration.num_seconds();
-	let hours = seconds / 3600;
-	let minutes = (seconds % 3600) / 60;
-	let seconds = seconds % 60;
-
-	match (hours, minutes, seconds) {
-		(h, m, _) if h > 0 => format!("{h} hours {m} minutes"),
-		(_, m, s) if m > 0 => format!("{m} minutes {s} seconds"),
-		(_, _, s) => format!("{s} seconds"),
-	}
-}
-pub fn duration_readable(duration: chrono::Duration) -> String {
-	let millis = duration.num_milliseconds();
-	if millis < 1000 {
-		return format!("{millis} ms");
-	}
-	let seconds = millis / 1000;
-	let hours = seconds / 3600;
-	let minutes = (seconds % 3600) / 60;
-	let seconds = seconds % 60;
-	match (hours, minutes, seconds) {
-		(h, m, _) if h > 0 => format!("{h}h {m}m"),
-		(_, m, s) if m > 0 => format!("{m}m {s}s"),
-		(_, _, s) => format!("{s}s"),
-	}
-}
-pub fn log_step_transition(from: Stage, to: Stage) -> Result<()> {
-	let path: PathBuf = env::current_dir()?.join("current_step.txt");
-	let mut file = OpenOptions::new().create(true).append(true).open(path)?;
-	writeln!(file, "{:?} -> {:?}", from, to)?;
-	Ok(())
-}
-pub async fn monitor<F, T>(
-	stage: Stage,
-	attempt: u32,
-	run_started: Instant,
-	phase: &'static str,
-	future: F,
-) -> T
-where
-	F: Future<Output = T>,
-{
-	let started = Instant::now();
-	tokio::pin!(future);
-	let mut ticker = tokio::time::interval(STATUS_INTERVAL);
-	loop {
-		tokio::select! {
-			result = &mut future => {
-				return result;
-			}
-			_ = ticker.tick() => {
-			}
+		if !path.exists() {
+			bail!("planned file does not exist: {}", path.display());
 		}
 	}
+
+	Ok(())
 }
 
 pub fn build_steps() -> Vec<&'static str> {
@@ -229,16 +102,149 @@ pub fn build_step_prompt(
     "#,
 	)
 }
-fn verify_created_files(plan: &BuildPlan, workspace: &CtxWorkspace) -> Result<()> {
-	for file in &plan.files {
-		let path = workspace.cwd.join(&file.path);
 
-		if !path.exists() {
-			bail!("planned file does not exist: {}", path.display());
+pub fn duration_readable(duration: chrono::Duration) -> String {
+	let millis = duration.num_milliseconds();
+	if millis < 1000 {
+		return format!("{millis} ms");
+	}
+	let seconds = millis / 1000;
+	let hours = seconds / 3600;
+	let minutes = (seconds % 3600) / 60;
+	let seconds = seconds % 60;
+	match (hours, minutes, seconds) {
+		(h, m, _) if h > 0 => format!("{h}h {m}m"),
+		(_, m, s) if m > 0 => format!("{m}m {s}s"),
+		(_, _, s) => format!("{s}s"),
+	}
+}
+pub fn format_elapsed(duration: Duration) -> String {
+	let total_seconds = duration.as_secs();
+	let hours = total_seconds / 3600;
+	let minutes = (total_seconds % 3600) / 60;
+	let seconds = total_seconds % 60;
+
+	if hours > 0 {
+		format!("{hours}h {minutes}m {seconds}s")
+	} else if minutes > 0 {
+		format!("{minutes}m {seconds}s")
+	} else {
+		format!("{seconds}s")
+	}
+}
+
+pub fn git_status() -> Result<String> {
+	let output = std::process::Command::new("git")
+		.args(["status", "--short"])
+		.output()?;
+	if !output.status.success() {
+		return Err(anyhow::anyhow!(
+			"git status failed: {}",
+			String::from_utf8_lossy(&output.stderr)
+		));
+	}
+	Ok(String::from_utf8(output.stdout)?)
+}
+pub fn persist_evaluation(
+	session: &mut AiSession,
+	evaluation: &QACheck,
+	attempt: Attempt,
+) -> Result<()> {
+	let status = if evaluation.passed {
+		Status::Completed
+	} else {
+		Status::NeedsRevision
+	};
+	let record = StageRunRecord {
+		description: Some(String::from("Evaluation Complete")),
+		actor: StageActor::Evaluator,
+		attempt,
+		evaluation: Some(evaluation.clone()),
+		stage: evaluation.stage,
+		time_started: evaluation.time_started,
+		time_completed: Some(Utc::now()),
+		status,
+	};
+	let time_started = evaluation.time_started;
+	let time_completed = Utc::now();
+	session.stages.push(record);
+	session.time_updated = Utc::now();
+	Ok(())
+}
+pub fn time_readable(time: chrono::DateTime<chrono::Utc>) -> String {
+	time.format("%B %-d, %Y at %-I:%M:%S %p UTC").to_string()
+}
+pub fn log_step_transition(from: Stage, to: Stage) -> Result<()> {
+	let path: PathBuf = env::current_dir()?.join("current_step.txt");
+	let mut file = OpenOptions::new().create(true).append(true).open(path)?;
+	writeln!(file, "{:?} -> {:?}", from, to)?;
+	Ok(())
+}
+
+pub fn sdlc_log_file(name: &str) -> PathBuf {
+	PathBuf::from(SDLC_LOG_DIR).join(name)
+}
+pub fn short_duration_readable(duration: chrono::Duration) -> String {
+	let seconds = duration.num_seconds();
+	let hours = seconds / 3600;
+	let minutes = (seconds % 3600) / 60;
+	let seconds = seconds % 60;
+
+	match (hours, minutes, seconds) {
+		(h, m, _) if h > 0 => format!("{h} hours {m} minutes"),
+		(_, m, s) if m > 0 => format!("{m} minutes {s} seconds"),
+		(_, _, s) => format!("{s} seconds"),
+	}
+}
+pub fn slugify(input: &str) -> String {
+	let slug = input
+		.to_lowercase()
+		.chars()
+		.map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+		.collect::<String>();
+	let slug = slug
+		.split('-')
+		.filter(|s| !s.is_empty())
+		.take(8)
+		.collect::<Vec<_>>()
+		.join("-");
+	if slug.is_empty() {
+		return "untitled".into();
+	}
+	// Windows reserved device names.
+	let reserved = [
+		"con", "prn", "aux", "nul", "com1", "com2", "com3", "com4", "com5", "com6", "com7", "com8",
+		"com9", "lpt1", "lpt2", "lpt3", "lpt4", "lpt5", "lpt6", "lpt7", "lpt8", "lpt9",
+	];
+	if reserved.contains(&slug.as_str()) {
+		format!("session-{slug}")
+	} else {
+		slug
+	}
+}
+
+pub async fn monitor<F, T>(
+	stage: Stage,
+	attempt: u32,
+	run_started: Instant,
+	phase: &'static str,
+	future: F,
+) -> T
+where
+	F: Future<Output = T>,
+{
+	let started = Instant::now();
+	tokio::pin!(future);
+	let mut ticker = tokio::time::interval(STATUS_INTERVAL);
+	loop {
+		tokio::select! {
+			result = &mut future => {
+				return result;
+			}
+			_ = ticker.tick() => {
+			}
 		}
 	}
-
-	Ok(())
 }
 
 #[derive(Debug, Clone)]

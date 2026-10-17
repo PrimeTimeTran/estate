@@ -15,16 +15,7 @@ Do not introduce requirements, features, or scope that are not justified by the 
 
 ## 2. Context & References
 
-### 2.1 Repository Context
-
-- **Repository Root:** [Verified absolute repository root supplied by runtime or established by inspection]
-- **Baseline Branch:** [Verified branch, or Unknown]
-- **Baseline Commit:** [Verified commit, or Unknown]
-- **Working Tree State:** [Relevant existing changes, or Unknown]
-- **Relevant Architecture:** [Existing modules, components, types, interfaces, services, and extension points]
-- **Repository Evidence:** [Relevant files, symbols, configuration, tests, or inspection results supporting the proposed design]
-
-### 2.2 Source References
+### 2.1 Source References
 
 - **Approved Intent:** [Supplied artifact reference]
 - **Approved Specification:** [Supplied artifact reference]
@@ -33,7 +24,7 @@ Do not introduce requirements, features, or scope that are not justified by the 
 
 Use the artifact references supplied by the runtime. Do not assume fixed artifact directories or machine-specific paths.
 
-### 2.3 Requirements and Assumptions
+### 2.2 Requirements and Assumptions
 
 Summarize the requirements that materially affect implementation.
 

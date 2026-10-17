@@ -152,7 +152,7 @@ impl Metric {
 impl AttemptOutcome {
 	pub fn attempt(&self) -> Attempt {
 		match self {
-			Self::Complete { execution, .. }
+			Self::Progress { execution, .. }
 			| Self::NeedsRevision { execution, .. }
 			| Self::EvaluationFailed { execution, .. } => execution.attempt,
 			Self::ExecutionFailed { attempt, .. } => *attempt,
@@ -160,7 +160,7 @@ impl AttemptOutcome {
 	}
 	pub fn stage(&self) -> Stage {
 		match self {
-			Self::Complete { execution, .. }
+			Self::Progress { execution, .. }
 			| Self::NeedsRevision { execution, .. }
 			| Self::EvaluationFailed { execution, .. } => execution.stage,
 			Self::ExecutionFailed { stage, .. } => *stage,

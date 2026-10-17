@@ -23,7 +23,7 @@ pub enum Outcome {
 
 #[derive(Debug)]
 pub enum AttemptOutcome {
-	Complete {
+	Progress {
 		execution: Execution,
 		evaluation: QACheck,
 	},

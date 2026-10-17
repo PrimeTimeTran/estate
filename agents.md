@@ -4,6 +4,7 @@
 
 Estate is a local-first development platform that provides context, workspace boundaries, event capture, and AI-assisted software development workflows.
 
+
 The SDLC module is responsible for orchestrating structured software development through explicit stages, persistent artifacts, agent execution, evaluation, and verification. It should behave as a controlled workflow rather than an unconstrained autonomous coding loop.
 
 The system should remain modular and usable independently of any particular editor, UI framework, or model provider.

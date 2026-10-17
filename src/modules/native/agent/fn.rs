@@ -1,6 +1,7 @@
 use super::*;
+use crate::prelude::*;
 use anyhow::Context as CtxAnyhow;
-use std::fmt::Write;
+// use std::fmt::Write;
 
 pub fn build_prompt(run: &AgentRun) -> String {
 	let ctx = &run.ctx;
@@ -502,7 +503,7 @@ pub async fn build_action(prompt: &str) -> Result<LlmAction> {
 		.with_context(|| {
 			format!(
 				"sending model request to {} after {:?}",
-				crate::AGENT_GEN_URL,
+				AGENT_GEN_URL,
 				request_started.elapsed()
 			)
 		})?;

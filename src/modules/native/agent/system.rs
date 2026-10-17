@@ -1,6 +1,5 @@
 use super::*;
 use crate::prelude::*;
-use std::fmt::{self, Display};
 
 pub async fn handle_event(event: AgentEvent, runtime: &AgentRuntime) {
 	match event {
@@ -149,7 +148,7 @@ impl Default for CtxWorkspace {
 	}
 }
 impl Display for CtxWorkspace {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		writeln!(f, "CWD: {}", self.cwd.display())?;
 		writeln!(f, "FILES: {}", self.files.len())?;
 		if self.files.is_empty() {

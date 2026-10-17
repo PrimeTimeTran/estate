@@ -1,10 +1,7 @@
 use anyhow::Context as CtxAnyhow;
-use estate::prelude::{sdlc::Context as CtxSdlc, *};
-use std::time::Instant;
-
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
+use estate::prelude::{sdlc::Context as CtxSdlc, *};
 use std::io::IsTerminal;
-use std::time::Duration;
 
 // 1. Normal run
 // cargo -q run --bin sdlc --features sdlc
@@ -20,46 +17,45 @@ use std::time::Duration;
 //
 // 4. Bypass decide
 // rm -rf log && \
-// SDLC_RESUME_BUILD=1 SDLC_FORCE_CONTINUE=1 SDLC_PLAIN=1 \
+// SDLC_RESUME=1 SDLC_FORCE_CONTINUE=1 SDLC_PLAIN=1 \
 // cargo run --bin sdlc --features sdlc
 // SDLC_PLAIN=1 cargo run --bin sdlc --features sdlc
+
 #[tokio::main]
 pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
+	dotenvy::dotenv().ok();
 	let cli = cli::context::parse();
 	let mut config = LogConfig::load()?;
 	config.apply_cli(&cli)?;
 	logger::init_logging(&config)?;
 
+	// 1. Initialize shared execution infrastructure.
 	let ctx = Arc::new(CtxSdlc::default());
 	let handle = tokio::runtime::Handle::current();
 	let event_bus = EventBus::new();
 
-	let native_runtime = NativeRuntime::new(ctx, handle, event_bus.clone())?;
-	native_runtime.start_dispatcher();
+	let host_runtime = NativeRuntime::new(ctx, handle, event_bus.clone())?;
+	host_runtime.start_dispatcher();
 
-	let resume_from_build = std::env::var_os("SDLC_RESUME_BUILD").is_some();
+	// 2. Initialize runtime, session, and pipeline.
+	let resume = std::env::var_os("SDLC_RESUME").is_some();
 
-	let pipeline = if resume_from_build {
-		Pipeline::resume_saved(event_bus.clone())
+	let (mut runtime, mut pipeline) =
+		_Runtime::<CtxSdlc>::initialize(SDLC_GOAL, resume, host_runtime, event_bus)
 			.await
-			.context("Pipeline::resume_saved")?
-	} else {
-		Pipeline::new(SDLC_GOAL, event_bus.clone())
-			.await
-			.context("Pipeline::new")?
-	};
+			.context("_Runtime::initialize")?;
 
-	let mut runtime = PipelineRuntime::<CtxSdlc>::new(pipeline, native_runtime);
-
+	// 3. Prepare observers and input.
 	let mut events = runtime.event_bus.subscribe();
-	let mut view = AiView::new(&runtime);
+	let mut view = AiView::new(&runtime, &pipeline);
 
 	let (input_tx, mut input_rx) = tokio::sync::mpsc::unbounded_channel::<SdlcInput>();
 
 	let use_tui = std::env::var_os("SDLC_TUI").is_some();
 	let is_real_run = std::env::var_os("DRY_RUN").is_none();
 
-	let strategy = if resume_from_build {
+	let strategy = if resume {
+		// RunStrategy::ResumeFrom(Stage::Plan)
 		RunStrategy::ResumeFrom(Stage::Build)
 	} else {
 		RunStrategy::Full
@@ -68,14 +64,12 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let session_started_at = chrono::Local::now().format("%H:%M:%S").to_string();
 	let session_started = Instant::now();
 
-	// Plain mode, or TUI requested without an interactive terminal.
+	// 4. Plain mode: run and exit.
 	if !use_tui || !std::io::stdout().is_terminal() {
 		let mut stdout = std::io::stdout();
 		let input = String::new();
-
 		render_plain_guard(&input, &mut stdout, &session_started_at, session_started)?;
-
-		let result = run_with_strategy(&mut runtime, &mut input_rx, strategy)
+		let result = run_with_strategy(&mut runtime, &mut pipeline, &mut input_rx, strategy)
 			.await
 			.context("run_with_strategy");
 
@@ -85,23 +79,26 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 		return Ok(());
 	}
 
-	// The TUI owns rendering and keyboard input, while the same strategy
-	// abstraction selects how the pipeline runs.
+	// 5. TUI mode: create the runner once.
+	let mut runner = _Runner {
+		runtime: &mut runtime,
+		pipeline: &mut pipeline,
+	};
+
 	let run = async {
 		if is_real_run {
-			run_with_strategy(&mut runtime, &mut input_rx, strategy)
+			run_with_strategy(runner.runtime, runner.pipeline, &mut input_rx, strategy)
 				.await
 				.map(|_| ())
 				.context("run_with_strategy")
 		} else {
-			runtime
+			runner
 				.run_simulated(&mut input_rx)
 				.await
 				.map(|_| ())
-				.context("runtime.run_simulated")
+				.context("runner.run_simulated")
 		}
 	};
-
 	tokio::pin!(run);
 
 	let mut terminal =
@@ -172,7 +169,6 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 							{
 								break Ok(());
 							}
-
 							if view.is_input_active() {
 								view.handle_input_key(key, &input_tx)?;
 							} else {
@@ -180,26 +176,21 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 									KeyCode::Char('p') => {
 										view.toggle_pause();
 									}
-
 									KeyCode::Char('l') => {
 										view.toggle_logs();
 									}
-
 									KeyCode::Char('r') => {
 										input_tx.send(SdlcInput::Retry)?;
 									}
-
 									KeyCode::Char('v') => {
 										input_tx.send(SdlcInput::Reviewed)?;
 									}
-
 									_ => {}
 								}
 							}
 						}
 					}
 				}
-
 				terminal.draw(|frame| {
 					AiView::render(frame, &view);
 				})?;
@@ -220,103 +211,41 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	Ok(())
 }
 
-struct Guard;
-impl Drop for Guard {
-	fn drop(&mut self) {
-		let _ = crossterm::terminal::disable_raw_mode();
-		let mut stdout = std::io::stdout();
-
-		let _ = crossterm::execute!(
-			stdout,
-			crossterm::cursor::Show,
-			crossterm::terminal::LeaveAlternateScreen
-		);
-	}
-}
-fn render_plain_guard(
-	input: &str,
-	stdout: &mut std::io::Stdout,
-	session_started_at: &str,
-	session_started: Instant,
-) -> std::io::Result<()> {
-	use crossterm::{
-		QueueableCommand, cursor,
-		style::{Color, Print, ResetColor, SetForegroundColor},
-		terminal::{self, ClearType},
-	};
-
-	let (width, height) = terminal::size()?;
-	let row = height.saturating_sub(1);
-
-	let elapsed = session_started.elapsed().as_secs();
-	let elapsed_time = format!(
-		"{:02}:{:02}:{:02}",
-		elapsed / 3600,
-		(elapsed % 3600) / 60,
-		elapsed % 60,
-	);
-
-	let ticker = format!("{session_started_at}  {elapsed_time}");
-	let ticker_width = ticker.len();
-
-	stdout.queue(cursor::MoveTo(0, row))?;
-	stdout.queue(terminal::Clear(ClearType::CurrentLine))?;
-
-	stdout.queue(SetForegroundColor(Color::Green))?;
-	stdout.queue(Print("> "))?;
-	stdout.queue(ResetColor)?;
-
-	let input_width = (width as usize).saturating_sub(ticker_width + 3);
-
-	let visible_input: String = input.chars().take(input_width).collect();
-	stdout.queue(Print(visible_input))?;
-
-	if width as usize > ticker_width + 2 {
-		stdout.queue(cursor::MoveTo(
-			width.saturating_sub(ticker_width as u16),
-			row,
-		))?;
-		stdout.queue(SetForegroundColor(Color::Cyan))?;
-		stdout.queue(Print(ticker))?;
-		stdout.queue(ResetColor)?;
-	}
-
-	stdout.queue(cursor::Show)?;
-	stdout.flush()
-}
-
-pub async fn run_with_strategy(
-	runtime: &mut PipelineRuntime<impl Ctx>,
+pub async fn run_with_strategy<C: Ctx>(
+	runtime: &mut _Runtime<C>,
+	pipeline: &mut Pipeline,
 	input_rx: &mut UnboundedReceiver<SdlcInput>,
 	strategy: RunStrategy,
 ) -> Result<RunResults> {
+	let mut runner = _Runner { runtime, pipeline };
+
 	match strategy {
 		RunStrategy::Full => {
-			let outcome = runtime.run(input_rx).await.context("runtime.run")?;
+			let outcome = runner.run(input_rx).await.context("_Runner::run")?;
+
 			Ok(RunResults::Pipeline(outcome))
 		}
-
 		RunStrategy::ResumeFrom(stage) => {
-			let outcome = runtime
+			let outcome = runner
 				.resume_from(stage, input_rx)
 				.await
-				.with_context(|| format!("runtime.resume_from({stage:?})"))?;
+				.with_context(|| format!("_Runner::resume_from({stage:?})"))?;
 
 			Ok(RunResults::Pipeline(outcome))
 		}
 		RunStrategy::Stage(stage) => {
-			let outcome = runtime
+			let outcome = runner
 				.run_stage(stage)
 				.await
-				.with_context(|| format!("runtime.run_stage({stage:?})"))?;
+				.with_context(|| format!("_Runner::run_stage({stage:?})"))?;
+
 			Ok(RunResults::Stage(outcome))
 		}
-
 		RunStrategy::SingleAttempt(stage) => {
-			let outcome = runtime
+			let outcome = runner
 				.execute_attempt(stage)
 				.await
-				.with_context(|| format!("runtime.execute_attempt({stage:?})"))?;
+				.with_context(|| format!("_Runner::execute_attempt({stage:?})"))?;
 
 			Ok(RunResults::Attempt(outcome))
 		}

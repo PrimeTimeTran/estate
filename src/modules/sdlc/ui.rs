@@ -1,3 +1,6 @@
+use anyhow::Context as CtxAnyhow;
+use chrono::Local;
+use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::{
 	Frame,
 	layout::{Constraint, Direction, Layout as RatatuiLayout, Position, Rect},
@@ -6,13 +9,10 @@ use ratatui::{
 	widgets::{Block, BorderType, Borders, Clear, List, ListItem, Paragraph, Wrap},
 };
 use std::{
-	io::{self, Write},
+	io::{self, IsTerminal, Write},
 	sync::Arc,
-	time::Duration,
+	time::{Duration, Instant},
 };
-use anyhow::{Context as CtxAnyhow};
-use chrono::Local;
-use std::io::IsTerminal;
 use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
 
@@ -22,7 +22,9 @@ use crate::{
 		agent::{Agent, AgentCtx},
 		resolver::*,
 		task::TaskResult,
-	}, prelude::{structs as ext_structs, *}, sdlc::{format_elapsed, pipeline::PipelineRuntime, r#struct::AiView},
+	},
+	prelude::{structs as ext_structs, *},
+	sdlc::{format_elapsed, pipeline::_Runtime, r#struct::AiView},
 };
 
 pub fn body(chunk: Rect) -> Vec<Rect> {
@@ -386,6 +388,17 @@ pub fn footer(frame: &mut Frame<'_>, view: &AiView, area: Rect) {
 }
 pub fn event_line(event: &SdlcEvent) -> Line<'static> {
 	match event {
+		SdlcEvent::RunAttempt { stage, phase } => Line::from(vec![
+			Span::styled("↳ ", Style::default().fg(Color::Magenta)),
+			Span::styled(
+				format!("{stage:?} human input"),
+				Style::default()
+					.fg(Color::Magenta)
+					.add_modifier(Modifier::BOLD),
+			),
+			Span::raw(": "),
+			// Span::styled(stage, Style::default().fg(Color::Gray)),
+		]),
 		SdlcEvent::HumanInput { stage, input } => Line::from(vec![
 			Span::styled("↳ ", Style::default().fg(Color::Magenta)),
 			Span::styled(
@@ -431,7 +444,7 @@ pub fn event_line(event: &SdlcEvent) -> Line<'static> {
 			),
 			Span::raw(format!(" → {action}")),
 		]),
-		SdlcEvent::RunStarted => Line::from(Span::styled(
+		SdlcEvent::RunBegin => Line::from(Span::styled(
 			"SDLC started",
 			Style::default().fg(Color::Gray),
 		)),
@@ -519,7 +532,7 @@ pub fn event_line(event: &SdlcEvent) -> Line<'static> {
 			),
 		]),
 
-		SdlcEvent::StageRetrying { stage, number } => Line::from(vec![
+		SdlcEvent::StageRunRetry { stage, number } => Line::from(vec![
 			Span::styled("↻ ", Style::default().fg(Color::Yellow)),
 			Span::styled(
 				format!("{stage:?} · retry #{number}"),
@@ -548,7 +561,7 @@ pub fn event_line(event: &SdlcEvent) -> Line<'static> {
 				.add_modifier(Modifier::BOLD),
 		)),
 
-		SdlcEvent::Exited { reason } => Line::from(vec![
+		SdlcEvent::RunExited { reason } => Line::from(vec![
 			Span::styled("→ exited ", Style::default().fg(Color::DarkGray)),
 			Span::styled(reason.clone(), Style::default().fg(Color::Gray)),
 		]),
@@ -572,6 +585,9 @@ pub fn event_line(event: &SdlcEvent) -> Line<'static> {
 			format!("↳ {message}"),
 			Style::default().fg(Color::Gray),
 		)),
+		_ => {
+			todo!();
+		}
 	}
 }
 pub fn stage_style(stage: Stage, current: Stage) -> Style {
@@ -632,7 +648,7 @@ use crossterm::{
 impl AiView {
 	pub fn apply(&mut self, event: sdlc_enum::SdlcEvent) {
 		match event {
-			SdlcEvent::RunStarted => {
+			SdlcEvent::RunBegin => {
 				self.runtime.phase = Phase::Starting;
 				self.runtime.time_started = Instant::now();
 				self.runtime.stage_time_started = Instant::now();
@@ -761,14 +777,14 @@ impl AiView {
 	pub fn is_input_active(&self) -> bool {
 		self.input_active
 	}
-	pub fn new(runtime: &PipelineRuntime<sdlc::Context>) -> Self {
+	pub fn new(runtime: &_Runtime<sdlc::Context>, pipeline: &Pipeline) -> Self {
 		Self {
 			input_active: false,
 			input: String::new(),
 			paused: false,
 			show_logs: false,
 			events: vec![],
-			runtime: runtime.view(),
+			runtime: runtime.view(pipeline),
 		}
 	}
 	pub fn render(frame: &mut Frame<'_>, view: &AiView) {
@@ -881,4 +897,69 @@ pub struct StatusBar {
 
 pub struct TerminalUi {
 	status: StatusBar,
+}
+
+pub struct Guard;
+impl Drop for Guard {
+	fn drop(&mut self) {
+		let _ = crossterm::terminal::disable_raw_mode();
+		let mut stdout = std::io::stdout();
+
+		let _ = crossterm::execute!(
+			stdout,
+			crossterm::cursor::Show,
+			crossterm::terminal::LeaveAlternateScreen
+		);
+	}
+}
+pub fn render_plain_guard(
+	input: &str,
+	stdout: &mut std::io::Stdout,
+	session_started_at: &str,
+	session_started: Instant,
+) -> std::io::Result<()> {
+	use crossterm::{
+		QueueableCommand, cursor,
+		style::{Color, Print, ResetColor, SetForegroundColor},
+		terminal::{self, ClearType},
+	};
+
+	let (width, height) = terminal::size()?;
+	let row = height.saturating_sub(1);
+
+	let elapsed = session_started.elapsed().as_secs();
+	let elapsed_time = format!(
+		"{:02}:{:02}:{:02}",
+		elapsed / 3600,
+		(elapsed % 3600) / 60,
+		elapsed % 60,
+	);
+
+	let ticker = format!("{session_started_at}  {elapsed_time}");
+	let ticker_width = ticker.len();
+
+	stdout.queue(cursor::MoveTo(0, row))?;
+	stdout.queue(terminal::Clear(ClearType::CurrentLine))?;
+
+	stdout.queue(SetForegroundColor(Color::Green))?;
+	stdout.queue(Print("> "))?;
+	stdout.queue(ResetColor)?;
+
+	let input_width = (width as usize).saturating_sub(ticker_width + 3);
+
+	let visible_input: String = input.chars().take(input_width).collect();
+	stdout.queue(Print(visible_input))?;
+
+	if width as usize > ticker_width + 2 {
+		stdout.queue(cursor::MoveTo(
+			width.saturating_sub(ticker_width as u16),
+			row,
+		))?;
+		stdout.queue(SetForegroundColor(Color::Cyan))?;
+		stdout.queue(Print(ticker))?;
+		stdout.queue(ResetColor)?;
+	}
+
+	stdout.queue(cursor::Show)?;
+	stdout.flush()
 }

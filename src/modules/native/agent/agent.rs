@@ -10,24 +10,18 @@ impl Agent {
 			tokens_seen: 0,
 		}
 	}
-
 	fn emit_thinking(&self, task: &AgentTask, event_tx: &UnboundedSender<RuntimeEvent>) {
-		let mut log_task = task.clone();
-		log_task.prompt = crate::agent::log::truncate(&task.prompt, 50);
-
-		let log_event = RuntimeEvent::Agent(AgentEvent::Thinking { task: log_task });
-
-		if let Err(error) = crate::agent::log::append_event(&log_event) {
+		let mut t = task.clone();
+		t.prompt = crate::agent::log::truncate(&task.prompt, 50);
+		let log_event = RuntimeEvent::Agent(AgentEvent::Thinking { task: t });
+		if let Err(error) = log::event(&log_event) {
 			eprintln!("Failed to write agent event log: {error:#}");
 		}
-
 		let event = RuntimeEvent::Agent(AgentEvent::Thinking { task: task.clone() });
-
 		if let Err(error) = event_tx.send(event) {
 			eprintln!("Failed to emit thinking event: {error}");
 		}
 	}
-
 	fn guard_action(
 		&self,
 		action: &AgentAction,
@@ -161,7 +155,7 @@ impl Agent {
 			message: message.clone(),
 		});
 
-		if let Err(error) = crate::agent::log::append_event(&event) {
+		if let Err(error) = log::event(&event) {
 			eprintln!("Failed to write agent event log: {error:#}");
 		}
 
@@ -195,7 +189,7 @@ impl Agent {
 			message: msg.clone(),
 		});
 
-		if let Err(error) = crate::agent::log::append_event(&event) {
+		if let Err(error) = log::event(&event) {
 			eprintln!("Failed to write agent event log: {error:#}");
 		}
 
@@ -271,7 +265,7 @@ impl Agent {
 	fn emit_finished(&self, event_tx: &UnboundedSender<RuntimeEvent>, result: TaskResult) {
 		let event = RuntimeEvent::Agent(AgentEvent::Finished { result });
 
-		if let Err(error) = crate::agent::log::append_event(&event) {
+		if let Err(error) = log::event(&event) {
 			eprintln!("Failed to write agent event log: {error:#}");
 		}
 
@@ -359,7 +353,6 @@ impl Agent {
 	}
 	async fn select_action(&self, run: &mut AgentRun, step: usize) -> Result<Option<AgentAction>> {
 		const MAX_SELECTION_ERRORS: usize = 3;
-
 		match self.pick_action(&run).await {
 			Ok(action) => {
 				// A valid response breaks the consecutive failure streak.

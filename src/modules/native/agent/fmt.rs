@@ -18,6 +18,65 @@ pub fn fmt_kv(k: &str, v: &str) -> String {
 	format!("{} {}", colorize(BOLD, k), colorize(DIM, v),)
 }
 
+pub fn fmt_manifest(manifest: &BuildManifest) -> String {
+	let mut output = fmt_section("EXPECTED FILE OPERATIONS");
+
+	let mut create = 0;
+	let mut update = 0;
+	let mut delete = 0;
+
+	let path_width = manifest
+		.files
+		.iter()
+		.map(|file| file.path.display().to_string().chars().count())
+		.max()
+		.unwrap_or(4)
+		.max(4);
+
+	for file in &manifest.files {
+		let operation = match file.operation {
+			BuildOperation::Create => {
+				create += 1;
+				"CREATE"
+			}
+			BuildOperation::Update => {
+				update += 1;
+				"UPDATE"
+			}
+			BuildOperation::Delete => {
+				delete += 1;
+				"DELETE"
+			}
+		};
+
+		let path = file.path.display().to_string();
+		let path_padding = path_width.saturating_sub(path.chars().count());
+
+		output.push_str(&format!(
+			"{}  {}{}  {}\n",
+			colorize(BOLD, operation),
+			path,
+			" ".repeat(path_padding),
+			colorize(DIM, &file.reason),
+		));
+	}
+
+	output.push('\n');
+	output.push_str(&fmt_kv(
+		"files",
+		&format!(
+			"{} total | {} create | {} update | {} delete",
+			manifest.files.len(),
+			create,
+			update,
+			delete,
+		),
+	));
+	output.push('\n');
+
+	output
+}
+
 pub fn fmt_output(label: &str, content: &str, max_chars: usize, max_lines: usize) -> String {
 	let total_chars = content.chars().count();
 	let total_lines = content.lines().count();

@@ -1,5 +1,4 @@
 use super::*;
-use std::path::PathBuf;
 
 pub const TODO: &'static str = r#"
 	- Question prompt
@@ -35,6 +34,3 @@ pub static DEFAULT_LOOP_TRIES: u32 = 3;
 pub static DEFAULT_NAUL_BAR: f64 = 0.40;
 pub static DEFAULT_MODEL: &str = "qwen3:8b";
 
-pub fn sdlc_log_file(name: &str) -> PathBuf {
-	PathBuf::from(SDLC_LOG_DIR).join(name)
-}

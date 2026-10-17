@@ -1,5 +1,14 @@
 use super::*;
 
+pub enum ArtifactPolicy {
+	/// Require valid upstream artifacts before executing.
+	RequireValid,
+	/// Explicitly allow existing artifacts, even if QA previously rejected them.
+	AcceptExisting,
+	/// Regenerate missing or invalid upstream artifacts as needed.
+	Regenerate,
+}
+
 #[derive(Debug)]
 pub enum Decision {
 	Continue,
@@ -53,14 +62,32 @@ pub type PipelineId = uuid::Uuid;
 
 #[derive(Debug)]
 pub enum RunControl {
-    Continue,
-    RetryStage,
-    Exit(PipelineStatus),
+	Continue,
+	RetryStage,
+	Exit(PipelineStatus),
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub enum SdlcEvent {
-	RunStarted,
+	ModelPrepare,
+	ModelAssess,
+	ModelExecute,
+	ModelVerify,
+
+	BuildBegin,
+	BuildPrepare,
+	BuildAssess,
+	BuildExecute,
+	BuildVerify,
+
+	RunBegin,
+	RunExited {
+		reason: String,
+	},
+	RunAttempt {
+		stage: Stage,
+		phase: Phase,
+	},
 	Activity {
 		stage: Stage,
 		attempt: Attempt,
@@ -70,6 +97,10 @@ pub enum SdlcEvent {
 	Failed {
 		stage: Option<Stage>,
 		error: String,
+	},
+	HumanInput {
+		stage: Stage,
+		input: String,
 	},
 	InterventionRequired {
 		stage: Stage,
@@ -101,14 +132,19 @@ pub enum SdlcEvent {
 		attempt: Attempt,
 		error: String,
 	},
-	Exited {
-		reason: String,
-	},
 	PhaseChanged {
 		stage: Stage,
 		phase: Phase,
 	},
-	StageRetrying {
+	// PhaseAttempt {
+	// 	stage: Stage,
+	// 	phase: Phase,
+	// },
+	// StageRetrying {
+	// 	stage: Stage,
+	// 	number: u32,
+	// },
+	StageRunRetry {
 		stage: Stage,
 		number: u32,
 	},
@@ -119,10 +155,6 @@ pub enum SdlcEvent {
 	StageTransitioned {
 		from: Stage,
 		to: Stage,
-	},
-	HumanInput {
-		stage: Stage,
-		input: String,
 	},
 }
 #[derive(Debug)]

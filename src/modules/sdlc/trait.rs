@@ -8,10 +8,11 @@ impl Clone for Box<dyn GeneratorTrait> {
 
 #[async_trait::async_trait]
 pub trait GeneratorTrait: Send + Sync + Debug {
+	fn clone_box(&self) -> Box<dyn GeneratorTrait>;
+
 	async fn generate(&self, prompt: &str) -> Result<String>;
 	async fn run_agent(&self, prompt: &str) -> Result<String>;
 	async fn with_session(&mut self, session: &AiSession, prompt: String) -> Result<TaskResult>;
-	fn clone_box(&self) -> Box<dyn GeneratorTrait>;
 }
 
 // Steps to complete the pipeline
@@ -19,7 +20,6 @@ pub trait PipelineTrait {
 	type Stage: StageTrait;
 
 	fn id(&self) -> &PipelineId;
-	fn state(&self) -> &PipelineState<Self::Stage>;
 	fn name(&self) -> &'static str;
 	fn description(&self) -> &'static str {
 		""

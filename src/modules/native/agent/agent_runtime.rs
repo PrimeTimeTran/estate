@@ -1,7 +1,7 @@
 use anyhow::bail;
 
 use super::*;
-use crate::modules::sdlc::sdlc_log_file;
+use crate::prelude::{SdlcEvent as E, *};
 
 impl AgentRuntime {
 	pub fn workspace(&self) -> &CtxWorkspace {
@@ -30,7 +30,7 @@ impl AgentRuntime {
 		if prompt.trim().is_empty() {
 			return Err(anyhow!("AgentRuntime generate prompt is empty"));
 		}
-		const AGENT_GEN_URL: &str = "http://127.0.0.1:11434/api/generate";
+		// const AGENT_GEN_URL: &str = "http://127.0.0.1:11434/api/generate";
 		let request = serde_json::json!({
 			"model": DEFAULT_MODEL,
 			"prompt": prompt,
@@ -141,45 +141,47 @@ impl AgentRuntime {
 }
 
 impl AgentRuntime {
-	pub async fn orient(&self, intent: &str, spec: &str, plan: &str) -> Result<BuildManifest> {
+	pub async fn assess(&self, plan: &str) -> Result<BuildManifest> {
+		log::event(E::ModelAssess);
+
 		let prompt = format!(
 			"{PROMPT_BUILD_ORIENT}\n\n\
-		 ## Intent\n\n{intent}\n\n\
-		 ## Specification\n\n{spec}\n\n\
-		 ## Plan\n\n{plan}\n\n\
-		 Return only a JSON object in this format:\n\
-		 {{\"version\":1,\"files\":[{{\"path\":\"src/example.rs\",\
-		 \"operation\":\"create\",\"reason\":\"Why this file changes\"}}]}}\n\n\
-		 Allowed operations: create, update, delete.\n\
-		 Paths must be relative to the workspace root.\n\
-		 Include only files needed by the approved plan.\n\
-		 Do not modify files or execute commands. Do not include \
-		 Markdown fences or commentary."
+			## Implementation Plan\n\n\
+			{plan}\n\n\
+			Convert this plan into a file-operation manifest.\n\n\
+			Return only valid JSON matching this structure:\n\
+			{{\"version\":1,\"files\":[{{\"path\":\"src/example.rs\",\
+			\"operation\":\"create\",\"reason\":\"Why this change is required\"}}]}}\n\n\
+			Each file must have a workspace-relative path, one operation \
+			(create, update, or delete), and a concise reason grounded in \
+			the plan.\n\
+			Include all files required by the plan and no unrelated files.\n\
+			Do not implement changes or execute commands.\n\
+			Do not return Markdown fences or commentary."
 		);
 
 		let response = self.generate_text(prompt).await?;
 
-		let manifest: BuildManifest =
-			serde_json::from_str(response.trim()).context("parsing Orient response as BuildManifest")?;
+		let manifest: BuildManifest = serde_json::from_str(response.trim())
+			.context("parsing Plan-derived response as BuildManifest")?;
 
 		Self::validate_build_manifest(&manifest, &self.workspace.cwd)?;
 
 		Ok(manifest)
 	}
 
-	pub async fn generate_new(
+	pub async fn execute(
 		&self,
 		manifest: &BuildManifest,
 		intent: &str,
 		spec: &str,
 		plan: &str,
 	) -> Result<BuildExecutionReport> {
+		log::event(E::ModelExecute);
 		Self::validate_build_manifest(manifest, &self.workspace.cwd)?;
-
 		let mut report = BuildExecutionReport {
 			files: Vec::with_capacity(manifest.files.len()),
 		};
-
 		for file in &manifest.files {
 			let path = Self::resolve_build_path(&self.workspace.cwd, &file.path)?;
 
@@ -308,6 +310,7 @@ impl AgentRuntime {
 		spec: &str,
 		plan: &str,
 	) -> Result<BuildVerification> {
+		log::event(E::ModelVerify);
 		Self::validate_build_manifest(manifest, &self.workspace.cwd)?;
 
 		let mut findings = Vec::new();
