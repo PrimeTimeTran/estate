@@ -60,7 +60,7 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 	let is_real_run = std::env::var_os("DRY_RUN").is_none();
 
 	let strategy = if resume_from_build {
-		RunStrategy::ResumeFrom(Stage::Plan)
+		RunStrategy::ResumeFrom(Stage::Build)
 	} else {
 		RunStrategy::Full
 	};

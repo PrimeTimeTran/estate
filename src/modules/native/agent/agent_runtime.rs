@@ -1,3 +1,5 @@
+use anyhow::bail;
+
 use super::*;
 use crate::modules::sdlc::sdlc_log_file;
 
@@ -56,7 +58,7 @@ impl AgentRuntime {
 			.context("sending one-shot Ollama generation request")?;
 
 		tracing::info!(
-		  elapsed_ms = started.elapsed().as_millis(),
+			elapsed_ms = started.elapsed().as_millis(),
 			status = %response.status(),
 			"Ollama: response headers received"
 		);
@@ -137,6 +139,367 @@ impl AgentRuntime {
 		}
 	}
 }
+
+impl AgentRuntime {
+	pub async fn orient(&self, intent: &str, spec: &str, plan: &str) -> Result<BuildManifest> {
+		let prompt = format!(
+			"{PROMPT_BUILD_ORIENT}\n\n\
+		 ## Intent\n\n{intent}\n\n\
+		 ## Specification\n\n{spec}\n\n\
+		 ## Plan\n\n{plan}\n\n\
+		 Return only a JSON object in this format:\n\
+		 {{\"version\":1,\"files\":[{{\"path\":\"src/example.rs\",\
+		 \"operation\":\"create\",\"reason\":\"Why this file changes\"}}]}}\n\n\
+		 Allowed operations: create, update, delete.\n\
+		 Paths must be relative to the workspace root.\n\
+		 Include only files needed by the approved plan.\n\
+		 Do not modify files or execute commands. Do not include \
+		 Markdown fences or commentary."
+		);
+
+		let response = self.generate_text(prompt).await?;
+
+		let manifest: BuildManifest =
+			serde_json::from_str(response.trim()).context("parsing Orient response as BuildManifest")?;
+
+		Self::validate_build_manifest(&manifest, &self.workspace.cwd)?;
+
+		Ok(manifest)
+	}
+
+	pub async fn generate_new(
+		&self,
+		manifest: &BuildManifest,
+		intent: &str,
+		spec: &str,
+		plan: &str,
+	) -> Result<BuildExecutionReport> {
+		Self::validate_build_manifest(manifest, &self.workspace.cwd)?;
+
+		let mut report = BuildExecutionReport {
+			files: Vec::with_capacity(manifest.files.len()),
+		};
+
+		for file in &manifest.files {
+			let path = Self::resolve_build_path(&self.workspace.cwd, &file.path)?;
+
+			let result: Result<String> = async {
+				match file.operation {
+					BuildOperation::Create => {
+						// Recheck immediately before creating.
+						if tokio::fs::symlink_metadata(&path).await.is_ok() {
+							bail!("Create target already exists: {}", file.path.display());
+						}
+
+						let prompt = format!(
+							"Generate the complete contents of one new file for \
+						 the approved implementation.\n\n\
+						 ## Intent\n\n{intent}\n\n\
+						 ## Specification\n\n{spec}\n\n\
+						 ## Plan\n\n{plan}\n\n\
+						 ## Target\n\n{}\n\n\
+						 ## Reason\n\n{}\n\n\
+						 Return only the file contents. No Markdown fences, \
+						 shell commands, or explanatory text.",
+							file.path.display(),
+							file.reason,
+						);
+
+						let content = self.generate_text(prompt).await?;
+
+						if let Some(parent) = path.parent() {
+							tokio::fs::create_dir_all(parent)
+								.await
+								.context("creating parent directories")?;
+						}
+
+						let mut output = tokio::fs::OpenOptions::new()
+							.write(true)
+							.create_new(true)
+							.open(&path)
+							.await
+							.with_context(|| format!("creating {}", file.path.display()))?;
+
+						tokio::io::AsyncWriteExt::write_all(&mut output, content.as_bytes())
+							.await
+							.context("writing generated content")?;
+
+						Ok("Created file".to_string())
+					}
+					BuildOperation::Update => {
+						let existing = tokio::fs::read_to_string(&path)
+							.await
+							.with_context(|| format!("reading {}", file.path.display()))?;
+
+						let prompt = format!(
+							"Update one existing file to implement the approved plan.\n\n\
+						 ## Intent\n\n{intent}\n\n\
+						 ## Specification\n\n{spec}\n\n\
+						 ## Plan\n\n{plan}\n\n\
+						 ## Target\n\n{}\n\n\
+						 ## Reason\n\n{}\n\n\
+						 ## Existing file contents\n\n\
+						 <existing_file>\n{existing}\n</existing_file>\n\n\
+						 Return the complete updated file contents. Preserve \
+						 unrelated behavior. Do not use Markdown fences, \
+						 shell commands, or explanatory text.",
+							file.path.display(),
+							file.reason,
+						);
+
+						let content = self.generate_text(prompt).await?;
+
+						tokio::fs::write(&path, content.as_bytes())
+							.await
+							.with_context(|| format!("updating {}", file.path.display()))?;
+
+						Ok("Updated file".to_string())
+					}
+					BuildOperation::Delete => {
+						let metadata = tokio::fs::symlink_metadata(&path)
+							.await
+							.with_context(|| format!("checking {}", file.path.display()))?;
+
+						if !metadata.is_file() {
+							bail!(
+								"Delete target is not a regular file: {}",
+								file.path.display()
+							);
+						}
+
+						tokio::fs::remove_file(&path)
+							.await
+							.with_context(|| format!("deleting {}", file.path.display()))?;
+
+						Ok("Deleted file".to_string())
+					}
+				}
+			}
+			.await;
+
+			match result {
+				Ok(message) => report.files.push(BuildFileResult {
+					path: file.path.clone(),
+					operation: file.operation.clone(),
+					success: true,
+					message,
+				}),
+				Err(error) => {
+					report.files.push(BuildFileResult {
+						path: file.path.clone(),
+						operation: file.operation.clone(),
+						success: false,
+						message: format!("{error:#}"),
+					});
+
+					return Err(error).with_context(|| format!("Generate failed at {}", file.path.display()));
+				}
+			}
+		}
+
+		Ok(report)
+	}
+
+	pub async fn verify(
+		&self,
+		manifest: &BuildManifest,
+		execution: &BuildExecutionReport,
+		intent: &str,
+		spec: &str,
+		plan: &str,
+	) -> Result<BuildVerification> {
+		Self::validate_build_manifest(manifest, &self.workspace.cwd)?;
+
+		let mut findings = Vec::new();
+
+		for file in &manifest.files {
+			let path = Self::resolve_build_path(&self.workspace.cwd, &file.path)?;
+
+			let result = execution
+				.files
+				.iter()
+				.find(|result| result.path == file.path && result.operation == file.operation);
+
+			match result {
+				Some(result) if result.success => {}
+				Some(result) => {
+					findings.push(format!(
+						"{}: operation failed: {}",
+						file.path.display(),
+						result.message,
+					));
+					continue;
+				}
+				None => {
+					findings.push(format!("{}: missing execution record", file.path.display(),));
+					continue;
+				}
+			}
+
+			match file.operation {
+				BuildOperation::Create | BuildOperation::Update => match tokio::fs::metadata(&path).await {
+					Ok(metadata) if metadata.is_file() => {}
+					_ => findings.push(format!(
+						"{}: expected file is missing or is not a regular file",
+						file.path.display(),
+					)),
+				},
+				BuildOperation::Delete => {
+					if tokio::fs::symlink_metadata(&path).await.is_ok() {
+						findings.push(format!(
+							"{}: still exists after deletion",
+							file.path.display(),
+						));
+					}
+				}
+			}
+		}
+
+		if !findings.is_empty() {
+			return Ok(BuildVerification {
+				passed: false,
+				summary: "Build file-operation checks failed".into(),
+				findings,
+			});
+		}
+
+		let mut contents = String::new();
+
+		for file in &manifest.files {
+			if matches!(file.operation, BuildOperation::Delete) {
+				continue;
+			}
+
+			let path = Self::resolve_build_path(&self.workspace.cwd, &file.path)?;
+			let content = tokio::fs::read_to_string(&path)
+				.await
+				.with_context(|| format!("reading {}", file.path.display()))?;
+
+			contents.push_str(&format!(
+				"\n\n## {}\n\n<file_contents>\n{}\n</file_contents>",
+				file.path.display(),
+				content,
+			));
+		}
+
+		let prompt = format!(
+			"{PROMPT_BUILD_VERIFY}\n\n\
+		 ## Intent\n\n{intent}\n\n\
+		 ## Specification\n\n{spec}\n\n\
+		 ## Plan\n\n{plan}\n\n\
+		 ## Manifest\n\n{}\n\n\
+		 ## Execution report\n\n{}\n\n\
+		 ## Actual resulting file contents\n\n{contents}\n\n\
+		 Return only JSON in this format:\n\
+		 {{\"passed\":true,\"summary\":\"...\",\"findings\":[]}}\n\
+		 Set passed=false for unmet requirements or implementation defects. \
+		 Do not claim tests were run unless actual test results were supplied. \
+		 No Markdown fences.",
+			serde_json::to_string_pretty(manifest)?,
+			serde_json::to_string_pretty(execution)?,
+		);
+
+		let response = self.generate_text(prompt).await?;
+
+		let verification: BuildVerification = serde_json::from_str(response.trim())
+			.context("parsing Verify response as BuildVerification")?;
+
+		Ok(verification)
+	}
+
+	async fn generate_text(&self, prompt: String) -> Result<String> {
+		let ctx = AgentCtx::with_workspace(prompt, self.workspace.clone());
+		let response = prompt_chat(&ctx)
+			.await
+			.context("generating model response")?;
+		Ok(response)
+	}
+
+	fn validate_build_manifest(manifest: &BuildManifest, workspace: &Path) -> Result<()> {
+		if manifest.version != 1 {
+			bail!("Unsupported Build manifest version: {}", manifest.version);
+		}
+
+		if manifest.files.len() > 500 {
+			bail!("Build manifest exceeds the 500-file limit");
+		}
+
+		let mut seen = std::collections::HashSet::new();
+
+		for file in &manifest.files {
+			if file.reason.trim().is_empty() {
+				bail!("Missing reason for {}", file.path.display());
+			}
+
+			if !seen.insert(file.path.clone()) {
+				bail!("Duplicate manifest path: {}", file.path.display());
+			}
+
+			let path = Self::resolve_build_path(workspace, &file.path)?;
+
+			match file.operation {
+				BuildOperation::Create => {
+					if path.exists() {
+						bail!("Create target already exists: {}", file.path.display());
+					}
+				}
+				BuildOperation::Update | BuildOperation::Delete => {
+					let metadata = std::fs::symlink_metadata(&path)
+						.with_context(|| format!("Target does not exist: {}", file.path.display()))?;
+
+					if !metadata.is_file() {
+						bail!("Target is not a regular file: {}", file.path.display());
+					}
+				}
+			}
+		}
+
+		Ok(())
+	}
+
+	fn resolve_build_path(workspace: &Path, relative: &Path) -> Result<PathBuf> {
+		if relative.as_os_str().is_empty() || relative.is_absolute() {
+			bail!(
+				"Build paths must be non-empty relative paths: {}",
+				relative.display()
+			);
+		}
+
+		for component in relative.components() {
+			match component {
+				Component::Normal(_) => {}
+				_ => bail!("Invalid Build path: {}", relative.display()),
+			}
+		}
+
+		let root = workspace
+			.canonicalize()
+			.with_context(|| format!("resolving workspace {}", workspace.display()))?;
+
+		let target = root.join(relative);
+
+		// Resolve the target if it exists. Otherwise resolve its nearest
+		// existing ancestor, which also catches symlinks escaping the workspace.
+		let mut ancestor = target.as_path();
+
+		while !ancestor.exists() {
+			ancestor = ancestor
+				.parent()
+				.ok_or_else(|| anyhow!("Cannot resolve {}", relative.display()))?;
+		}
+
+		let resolved_ancestor = ancestor
+			.canonicalize()
+			.with_context(|| format!("resolving path ancestor {}", ancestor.display()))?;
+
+		if !resolved_ancestor.starts_with(&root) {
+			bail!("Build path escapes workspace: {}", relative.display());
+		}
+
+		Ok(target)
+	}
+}
+
 impl RuntimeMetrics {
 	pub fn new() -> Self {
 		Self::default()
@@ -327,4 +690,45 @@ pub struct RuntimeMetrics {
 	pub command_durations_ms: Vec<u64>,
 	pub tool_durations_ms: Vec<u64>,
 	pub stage_durations_ms: Vec<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BuildManifest {
+	pub version: u32,
+	pub files: Vec<BuildFile>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BuildFile {
+	pub path: PathBuf,
+	pub operation: BuildOperation,
+	pub reason: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum BuildOperation {
+	Create,
+	Update,
+	Delete,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BuildVerification {
+	pub passed: bool,
+	pub summary: String,
+	pub findings: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BuildExecutionReport {
+	pub files: Vec<BuildFileResult>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BuildFileResult {
+	pub path: PathBuf,
+	pub operation: BuildOperation,
+	pub success: bool,
+	pub message: String,
 }

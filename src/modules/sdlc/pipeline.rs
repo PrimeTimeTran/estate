@@ -1,21 +1,6 @@
 use super::*;
 
 impl Pipeline {
-	fn ensure_agent_completed(result: TaskResult, phase: &str) -> Result<TaskResult> {
-		if matches!(&result.status, crate::TaskStatus::Completed) {
-			return Ok(result);
-		}
-		let errors = result
-			.errors
-			.iter()
-			.map(|error| format!("{}: {}", error.kind, error.message))
-			.collect::<Vec<_>>()
-			.join("\n");
-		Err(anyhow!(
-			"Build {phase} agent did not complete ({:?})\n{errors}",
-			result.status
-		))
-	}
 	fn from_session(kontex: Kontex, session: AiSession) -> anyhow::Result<Self> {
 		let qa = Evaluator {
 			session: session.clone(),
@@ -26,6 +11,7 @@ impl Pipeline {
 		let generator = Box::new(LocalGenerator::new(system.runtime.clone(), DEFAULT_MODEL));
 		Ok(Self {
 			qa,
+
 			system,
 			kontex,
 			generator,
@@ -262,16 +248,17 @@ impl Pipeline {
 	pub fn stage(&self) -> Stage {
 		self.session.stage
 	}
+	pub fn stage_set(&mut self, stage: Stage) -> Result<()> {
+		self.session()?.stage = stage;
+		Ok(())
+	}
+
 	pub fn stage_attempt_increment(&mut self) -> u32 {
 		self.stage_attempt += 1;
 		self.stage_attempt
 	}
 	pub fn stage_attempt_reset(&mut self) {
 		self.stage_attempt = 1;
-	}
-	pub fn set_stage(&mut self, stage: Stage) -> Result<()> {
-		self.session()?.stage = stage;
-		Ok(())
 	}
 
 	pub async fn evaluate(&self, execution: &Execution) -> Result<QACheck> {
@@ -284,7 +271,7 @@ impl Pipeline {
 	}
 	pub async fn resume_from(&mut self, stage: Stage) -> Result<()> {
 		tracing::info!("resume_from sprintpi pipeline");
-		self.set_stage(stage)?;
+		self.stage_set(stage)?;
 		self.persist_progress(&format!("SDLC session resumed from {stage}"))?;
 		self.persist()?;
 		Ok(())
@@ -670,6 +657,21 @@ impl<'a, Context: Ctx> PipelineRunner<'a, Context> {
 	}
 }
 impl<'a, Context: Ctx> PipelineRunner<'a, Context> {
+	fn ensure_agent_completed(result: TaskResult, phase: &str) -> Result<TaskResult> {
+		if matches!(&result.status, crate::TaskStatus::Completed) {
+			return Ok(result);
+		}
+		let errors = result
+			.errors
+			.iter()
+			.map(|error| format!("{}: {}", error.kind, error.message))
+			.collect::<Vec<_>>()
+			.join("\n");
+		Err(anyhow!(
+			"Build {phase} agent did not complete ({:?})\n{errors}",
+			result.status
+		))
+	}
 	fn next_attempt(&mut self, stage: Stage) -> Result<Attempt> {
 		self.runtime.next_attempt(stage)
 	}
@@ -1695,7 +1697,7 @@ impl<'a, Context: Ctx> PipelineRunner<'a, Context> {
 	}
 	// SDLC_FORCE_CONTINUE=1 SDLC_PLAIN=1 cargo run --bin sdlc --features sdlc
 	// SDLC_RESUME_BUILD=1 SDLC_PLAIN=1 cargo run --bin sdlc --features sdlc
-	async fn on_build(&mut self, input: StageInput) -> Result<RunResult> {
+	async fn on_build(&mut self, _input: StageInput) -> Result<RunResult> {
 		let (stage, session_dir) = self.stage_dir();
 		if stage != Stage::Build {
 			return Err(anyhow::anyhow!(
@@ -1708,7 +1710,7 @@ impl<'a, Context: Ctx> PipelineRunner<'a, Context> {
 
 		let workspace = self.runtime.pipeline.session.workspace_owned();
 
-		// Load the SDLC artifacts.
+		// Load and validate the approved SDLC artifacts once.
 		let intent_path = session_dir.join("intent.md");
 		let spec_path = session_dir.join("spec.md");
 		let plan_path = session_dir.join("plan.md");
@@ -1732,17 +1734,16 @@ impl<'a, Context: Ctx> PipelineRunner<'a, Context> {
 		if plan.trim().is_empty() {
 			return Err(anyhow::anyhow!("Plan artifact is empty"));
 		}
-		let expected_outputs = p::expected_outputs_from_plan(&plan)?;
 
 		self.runtime.pipeline.system.add_file(intent_path);
 		self.runtime.pipeline.system.add_file(spec_path);
 		self.runtime.pipeline.system.add_file(plan_path);
 
+		// Capture the baseline before any Build phase modifies the workspace.
 		let workspace_before = WSSnapshot::capture(&workspace)?;
 		let git_status = workspace_before.git_status.trim();
 
 		let mut values = Vec::new();
-
 		if !git_status.is_empty() {
 			for line in git_status.lines() {
 				values.push(("changed", line.to_string()));
@@ -1762,24 +1763,83 @@ impl<'a, Context: Ctx> PipelineRunner<'a, Context> {
 		);
 
 		// Phase 1: Orient.
-		let orient_task = AgentTask::new(format!(
-			"{PROMPT_BUILD_ORIENT}\n\n\
-			 # Supplied SDLC Artifacts\n\n\
-			 The following sections contain the artifact contents already loaded \
-			 by the orchestrator. Analyze these contents directly; do not reread \
-			 the corresponding files from disk.\n\n\
-			 ## Intent (intent.md)\n\n{intent}\n\n\
-			 ## Specification (spec.md)\n\n{spec}\n\n\
-			 ## Plan (plan.md)\n\n{plan}"
+		let orient_report = self
+			.on_build_orient(&session_dir, &intent, &spec, &plan)
+			.await?;
+
+		// Phase 2: Generate.
+		let execute_report = self
+			.on_build_generate(
+				&session_dir,
+				&workspace,
+				&workspace_before,
+				&intent,
+				&spec,
+				&plan,
+				&orient_report,
+			)
+			.await?;
+
+		// Phase 3: Verify.
+		let _verify_report = self
+			.on_build_verify(
+				&session_dir,
+				&workspace,
+				&workspace_before,
+				&intent,
+				&spec,
+				&plan,
+				&orient_report,
+				&execute_report,
+			)
+			.await?;
+
+		// Capture final workspace state after all three phases.
+		section!("BUILD SNAPSHOT START");
+
+		let workspace_after =
+			WSSnapshot::capture(&workspace).context("capturing workspace after Build")?;
+		let changes = workspace_before.diff(&workspace_after);
+
+		section!(&format!(
+			"BUILD SNAPSHOT COMPLETE: files_changed={}",
+			changes.file_count()
 		));
 
-		use std::time::Instant;
+		self.write(&changes.to_markdown("Build completed"))?;
 
-		// Phase 1: Orient.
-		let phase_started = Instant::now();
+		self.runtime.pipeline.persist_progress(&format!(
+			"Build phases completed; {} file(s) changed",
+			changes.file_count()
+		))?;
+
+		section!("BUILD STAGE COMPLETE");
+
+		Ok(RunResult::Build)
+	}
+
+	async fn on_build_orient(
+		&mut self,
+		session_dir: &std::path::Path,
+		intent: &str,
+		spec: &str,
+		plan: &str,
+	) -> Result<String> {
+		let orient_task = AgentTask::new(format!(
+			"{PROMPT_BUILD_ORIENT}\n\n\
+		 # Supplied SDLC Artifacts\n\n\
+		 The following sections contain the artifact contents already loaded \
+		 by the orchestrator. Analyze these contents directly; do not reread \
+		 the corresponding files from disk.\n\n\
+		 ## Intent (intent.md)\n\n{intent}\n\n\
+		 ## Specification (spec.md)\n\n{spec}\n\n\
+		 ## Plan (plan.md)\n\n{plan}"
+		));
+
+		let phase_started = std::time::Instant::now();
 		section!("BUILD PHASE START: Orient");
 
-		let orient_result = match self
+		let result = match self
 			.runtime
 			.pipeline
 			.system
@@ -1787,14 +1847,7 @@ impl<'a, Context: Ctx> PipelineRunner<'a, Context> {
 			.run_agent(orient_task)
 			.await
 		{
-			Ok(result) => {
-				let result = Pipeline::ensure_agent_completed(result, "Orient")?;
-				section!(&format!(
-					"BUILD PHASE COMPLETE: Orient elapsed={:?}",
-					phase_started.elapsed()
-				));
-				result
-			}
+			Ok(result) => Self::ensure_agent_completed(result, "Orient")?,
 			Err(error) => {
 				section_info!(
 					"BUILD PHASE FAILED",
@@ -1809,25 +1862,46 @@ impl<'a, Context: Ctx> PipelineRunner<'a, Context> {
 			}
 		};
 
-		let orient_report = format!("{orient_result:#?}");
-		tokio::fs::write(session_dir.join("build-orient.md"), &orient_report)
+		section!(&format!(
+			"BUILD PHASE COMPLETE: Orient elapsed={:?}",
+			phase_started.elapsed()
+		));
+
+		let report = format!("{result:#?}");
+
+		tokio::fs::write(session_dir.join("build-orient.md"), &report)
 			.await
 			.context("writing Build Orient report")?;
-		// Phase 2: Execute.
+
+		Ok(report)
+	}
+
+	async fn on_build_generate(
+		&mut self,
+		session_dir: &std::path::Path,
+		workspace: &std::path::Path,
+		workspace_before: &WSSnapshot,
+		intent: &str,
+		spec: &str,
+		plan: &str,
+		orient_report: &str,
+	) -> Result<String> {
+		let expected_outputs = p::expected_outputs_from_plan(plan)?;
+
 		let execute_task = AgentTask::new(format!(
 			"{PROMPT_BUILD_EXECUTE}\n\n\
-			 ## Intent\n\n{intent}\n\n\
-			 ## Specification\n\n{spec}\n\n\
-			 ## Plan\n\n{plan}\n\n\
-			 ## Orientation Report\n\n{orient_report}"
+		 ## Intent\n\n{intent}\n\n\
+		 ## Specification\n\n{spec}\n\n\
+		 ## Plan\n\n{plan}\n\n\
+		 ## Orientation Report\n\n{orient_report}"
 		))
 		.with_expected_outputs(expected_outputs)
 		.with_recovery_prompt(PROMPT_PHASE_RECOVER);
 
 		let phase_started = std::time::Instant::now();
-		section!("BUILD PHASE START: Execute");
+		section!("BUILD PHASE START: Generate");
 
-		let execute_result = match self
+		let result = match self
 			.runtime
 			.pipeline
 			.system
@@ -1835,73 +1909,84 @@ impl<'a, Context: Ctx> PipelineRunner<'a, Context> {
 			.run_agent(execute_task)
 			.await
 		{
-			Ok(result) => {
-				let result = Pipeline::ensure_agent_completed(result, "Execute")?;
-				section!(&format!(
-					"BUILD PHASE COMPLETE: Execute elapsed={:?}",
-					phase_started.elapsed()
-				));
-				result
-			}
+			Ok(result) => Self::ensure_agent_completed(result, "Generate")?,
 			Err(error) => {
 				section_info!(
 					"BUILD PHASE FAILED",
 					metrics: [
-						"phase" => "Execute",
+						"phase" => "Generate",
 						"elapsed" => format!("{:?}", phase_started.elapsed()),
 					],
 					"error" => format!("{error:#}"),
 				);
 
-				// Capture partial work before returning the error.
-				match WSSnapshot::capture(&workspace) {
+				// Preserve partial work even when generation fails.
+				match WSSnapshot::capture(workspace) {
 					Ok(snapshot) => {
 						let changes = workspace_before.diff(&snapshot);
-
 						section_info!(
 							"BUILD PARTIAL WORK",
 							metrics: [
-								"phase" => "Execute",
+								"phase" => "Generate",
 								"files changed" => changes.file_count(),
 							],
 						);
 
-						let _ = self.write(&changes.to_markdown("Build failed during Execute"));
+						let _ = self.write(&changes.to_markdown("Build failed during Generate"));
 					}
 					Err(snapshot_error) => {
 						section_info!(
 							"BUILD SNAPSHOT FAILED",
 							metrics: [
-								"phase" => "Execute",
+								"phase" => "Generate",
 							],
 							"error" => format!("{snapshot_error:#}"),
 						);
 					}
 				}
 
-				return Err(error).context("Build Execute phase failed");
+				return Err(error).context("Build Generate phase failed");
 			}
 		};
 
-		let execute_report = format!("{execute_result:#?}");
-		tokio::fs::write(session_dir.join("build-execute.md"), &execute_report)
-			.await
-			.context("writing Build Execute report")?;
+		section!(&format!(
+			"BUILD PHASE COMPLETE: Generate elapsed={:?}",
+			phase_started.elapsed()
+		));
 
-		// Phase 3: Verify.
+		let report = format!("{result:#?}");
+
+		tokio::fs::write(session_dir.join("build-execute.md"), &report)
+			.await
+			.context("writing Build Generate report")?;
+
+		Ok(report)
+	}
+
+	async fn on_build_verify(
+		&mut self,
+		session_dir: &std::path::Path,
+		workspace: &std::path::Path,
+		workspace_before: &WSSnapshot,
+		intent: &str,
+		spec: &str,
+		plan: &str,
+		orient_report: &str,
+		execute_report: &str,
+	) -> Result<String> {
 		let verify_task = AgentTask::new(format!(
 			"{PROMPT_BUILD_VERIFY}\n\n\
-			 ## Intent\n\n{intent}\n\n\
-			 ## Specification\n\n{spec}\n\n\
-			 ## Plan\n\n{plan}\n\n\
-			 ## Orientation Report\n\n{orient_report}\n\n\
-			 ## Implementation Report\n\n{execute_report}"
+		 ## Intent\n\n{intent}\n\n\
+		 ## Specification\n\n{spec}\n\n\
+		 ## Plan\n\n{plan}\n\n\
+		 ## Orientation Report\n\n{orient_report}\n\n\
+		 ## Implementation Report\n\n{execute_report}"
 		));
 
 		let phase_started = std::time::Instant::now();
 		section!("BUILD PHASE START: Verify");
 
-		let verify_result = match self
+		let result = match self
 			.runtime
 			.pipeline
 			.system
@@ -1909,14 +1994,7 @@ impl<'a, Context: Ctx> PipelineRunner<'a, Context> {
 			.run_agent(verify_task)
 			.await
 		{
-			Ok(result) => {
-				let result = Pipeline::ensure_agent_completed(result, "Verify")?;
-				section!(&format!(
-					"BUILD PHASE COMPLETE: Verify elapsed={:?}",
-					phase_started.elapsed()
-				));
-				result
-			}
+			Ok(result) => Self::ensure_agent_completed(result, "Verify")?,
 			Err(error) => {
 				section_info!(
 					"BUILD PHASE FAILED",
@@ -1927,8 +2005,8 @@ impl<'a, Context: Ctx> PipelineRunner<'a, Context> {
 					"error" => format!("{error:#}"),
 				);
 
-				// Execute may have created files even though Verify failed.
-				match WSSnapshot::capture(&workspace) {
+				// Generation may have modified files before verification failed.
+				match WSSnapshot::capture(workspace) {
 					Ok(snapshot) => {
 						let changes = workspace_before.diff(&snapshot);
 
@@ -1957,34 +2035,20 @@ impl<'a, Context: Ctx> PipelineRunner<'a, Context> {
 			}
 		};
 
-		let verify_report = format!("{verify_result:#?}");
-		tokio::fs::write(session_dir.join("build-verify.md"), &verify_report)
+		section!(&format!(
+			"BUILD PHASE COMPLETE: Verify elapsed={:?}",
+			phase_started.elapsed()
+		));
+
+		let report = format!("{result:#?}");
+
+		tokio::fs::write(session_dir.join("build-verify.md"), &report)
 			.await
 			.context("writing Build Verify report")?;
 
-		// Capture final workspace state.
-		section!("BUILD SNAPSHOT START");
-
-		let workspace_after =
-			WSSnapshot::capture(&workspace).context("capturing workspace after Build")?;
-		let changes = workspace_before.diff(&workspace_after);
-
-		section!(&format!(
-			"BUILD SNAPSHOT COMPLETE: files_changed={}",
-			changes.file_count()
-		));
-
-		self.write(&changes.to_markdown("Build completed"))?;
-
-		self.runtime.pipeline.persist_progress(&format!(
-			"Build phases completed; {} file(s) changed",
-			changes.file_count()
-		))?;
-
-		section!("BUILD STAGE COMPLETE");
-
-		Ok(RunResult::Build)
+		Ok(report)
 	}
+
 	async fn on_qa(&mut self, input: StageInput) -> Result<RunResult> {
 		let verification = self.run_qa_checks(self.runtime.pipeline.stage()).await?;
 		self.runtime.pipeline.persist_progress(&format!(
@@ -2089,6 +2153,15 @@ impl<'a, Context: Ctx> PipelineRunner<'a, Context> {
 }
 
 impl<C: Ctx> PipelineRuntime<C> {
+	fn retry(&mut self, _stage: Stage) -> Result<()> {
+		Ok(())
+	}
+	fn next_attempt(&mut self, stage: Stage) -> Result<Attempt> {
+		self.pipeline.next_attempt(stage)
+	}
+	fn emit(&self, event: SdlcEvent) {
+		self.pipeline.emit(event)
+	}
 	pub fn new(pipeline: Pipeline, runtime: Arc<NativeRuntime<C>>) -> Self {
 		let event_bus = EventBus::new();
 		let stage = pipeline.stage().clone();
@@ -2112,9 +2185,6 @@ impl<C: Ctx> PipelineRuntime<C> {
 			error: None,
 			event_history: vec![],
 		}
-	}
-	fn retry(&mut self, _stage: Stage) -> Result<()> {
-		Ok(())
 	}
 	pub fn view(&self) -> SSPipelineRuntime {
 		SSPipelineRuntime {
@@ -2206,8 +2276,6 @@ impl<C: Ctx> PipelineRuntime<C> {
 		let mut runner = PipelineRunner { runtime: self };
 		runner.run(input_rx).await.context("PipelineRunner::run")
 	}
-}
-impl<C: Ctx> PipelineRuntime<C> {
 	pub async fn run_stage(&mut self, stage: Stage) -> Result<StageOutcome> {
 		let mut runner = PipelineRunner { runtime: self };
 		runner
@@ -2221,12 +2289,6 @@ impl<C: Ctx> PipelineRuntime<C> {
 			.execute_attempt(stage)
 			.await
 			.context("PipelineRuntime::execute_attempt")
-	}
-	fn next_attempt(&mut self, stage: Stage) -> Result<Attempt> {
-		self.pipeline.next_attempt(stage)
-	}
-	fn emit(&self, event: SdlcEvent) {
-		self.pipeline.emit(event)
 	}
 }
 

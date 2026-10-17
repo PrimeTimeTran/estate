@@ -9,19 +9,19 @@ The tool is executed/called with a single CLI argument and writes that value to 
 The CLI entrypoint must be:
 
 ```sh
-hello-world.cjs
+hello-globe.cjs
 ```
 
 If the tool is called with
 
 ```sh
-node hello-world.cjs 'hey there'
+node hello-globe.cjs 'hey there'
 ```
 
 Then a file is generated named
 
 ```sh
-hello-world.md
+hello-globe.md
 ```
 
 With this content
@@ -35,21 +35,21 @@ hey there
 From the repository root, the user must be able to run:
 
 ```sh
-node hello-world.cjs "hi"
+node hello-globe.cjs "hi"
 ```
 
-and the command must create or overwrite `hello-world.md` so that the file contains the supplied value.
+and the command must create or overwrite `hello-globe.md` so that the file contains the supplied value.
 
 For example:
 
 ```sh
-node hello-world.cjs "hi"
+node hello-globe.cjs "hi"
 ```
 
 must result in:
 
 ```sh
-hello-world.md
+hello-globe.md
 ```
 
 containing:
@@ -73,10 +73,10 @@ Add automated tests covering both:
    - The test should invoke the equivalent of:
 
      ```sh
-     node hello-world.cjs "hi"
+     node hello-globe.cjs "hi"
      ```
 
-   - Verify that the expected `hello-world.md` file is created and contains the expected value.
+   - Verify that the expected `hello-globe.md` file is created and contains the expected value.
 
 Tests should avoid modifying unrelated repository files and should clean up any temporary files they create.
 
@@ -84,11 +84,11 @@ Tests should avoid modifying unrelated repository files and should clean up any 
 
 The implementation is complete when all of the following are true:
 
-- `hello-world.cjs` exists at the repository root.
-- `hello-world.cjs` is executable through Node.js with no additional runtime setup.
-- Running `node hello-world.cjs "hi"` succeeds.
-- Running the command creates or overwrites `hello-world.md` at the repository root.
-- `hello-world.md` contains the supplied argument.
+- `hello-globe.cjs` exists at the repository root.
+- `hello-globe.cjs` is executable through Node.js with no additional runtime setup.
+- Running `node hello-globe.cjs "hi"` succeeds.
+- Running the command creates or overwrites `hello-globe.md` at the repository root.
+- `hello-globe.md` contains the supplied argument.
 - The JavaScript logic has automated test coverage.
 - The CLI behavior has automated test coverage.
 - All automated tests pass.
