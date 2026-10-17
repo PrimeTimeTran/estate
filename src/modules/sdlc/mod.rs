@@ -1,4 +1,4 @@
-use anyhow::{Context, anyhow};
+use anyhow::{Context as CtxAnyhow, anyhow};
 use crossterm::{
 	cursor,
 	event::{self, Event as CrosstermEvent, KeyCode, KeyEvent, KeyEventKind},
@@ -11,6 +11,7 @@ pub use ratatui::{
 	layout::{Constraint, Direction, Layout as RatatuiLayout, Position, Rect},
 	widgets::Clear,
 };
+
 use std::{
 	io::Stdout,
 	path::{Path, PathBuf},
@@ -25,17 +26,19 @@ use r#const as c;
 pub use r#const::*;
 
 #[path = "./enum.rs"]
-mod sdlc_enum;
-use sdlc_enum as e;
+pub mod sdlc_enum;
+pub use sdlc_enum as e;
 pub use sdlc_enum::{Status, *};
 
 mod r#fn;
 use r#fn as f;
 use r#fn::*;
 
+mod generator;
+use generator::*;
+
 mod r#impl;
 use r#impl as i;
-pub use r#impl::{Context as CtxSdlc, *};
 
 mod prompt;
 use prompt as p;
@@ -53,6 +56,43 @@ use sdlc_trait::*;
 mod ui;
 use ui as u;
 pub use ui::*;
+
+impl Context {
+	fn new(state: NativeState, api: ApiService) -> Self {
+		Self { state, api }
+	}
+}
+impl Ctx for Context {
+	fn api(&self) -> &Self::Api {
+		&self.api
+	}
+	fn api_mut(&mut self) -> &mut Self::Api {
+		&mut self.api
+	}
+	fn initial_state() -> Self::AppState {
+		structs::S {
+			context: PhantomData,
+			state: PhantomData,
+			view: ViewType::MarkdownScreen,
+		}
+	}
+	type Api = ApiService;
+	type AppState = structs::S<Context>;
+	type EventReceiver = BroadcastReceiver<crate::e::Event>;
+	type EventSender = BroadcastSender<crate::e::Event>;
+	type GuiState = NativeGuiState;
+}
+impl Default for Context {
+	fn default() -> Self {
+		Self::new(NativeState::default(), ApiService::default())
+	}
+}
+
+#[derive(Clone)]
+pub struct Context {
+	pub state: NativeState,
+	pub api: ApiService,
+}
 
 // cmd+alt+f
 // - Search in all files overlay

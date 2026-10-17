@@ -5,6 +5,16 @@ use ratatui::{
 	text::{Line, Span},
 	widgets::{Block, BorderType, Borders, Clear, List, ListItem, Paragraph, Wrap},
 };
+use std::{
+	io::{self, Write},
+	sync::Arc,
+	time::Duration,
+};
+use anyhow::{Context as CtxAnyhow};
+use chrono::Local;
+use std::io::IsTerminal;
+use tokio::sync::Mutex;
+use tokio_util::sync::CancellationToken;
 
 use crate::{
 	model::{
@@ -616,24 +626,177 @@ pub fn spinner(elapsed: std::time::Duration) -> &'static str {
 	FRAMES[index]
 }
 
-use std::{
-	io::{self, Write},
-	sync::Arc,
-	time::Duration,
-};
-
-use chrono::Local;
-use std::io::IsTerminal;
-use tokio::sync::Mutex;
-use tokio_util::sync::CancellationToken;
-
 use crossterm::{
 	cursor, execute,
 	terminal::{self, ClearType},
 };
 
-pub struct StatusBar {
-	running: bool,
+impl AiView {
+	pub fn apply(&mut self, event: sdlc_enum::SdlcEvent) {
+		match event {
+			SdlcEvent::RunStarted => {
+				self.runtime.phase = Phase::Starting;
+				self.runtime.time_started = Instant::now();
+				self.runtime.stage_time_started = Instant::now();
+				self.runtime.message = Some(String::from("Run started"));
+			}
+			SdlcEvent::StageStarted { stage, attempt } => {
+				self.runtime.stage = stage;
+				self.runtime.attempt = attempt.number;
+				self.runtime.phase = Phase::Starting;
+				self.runtime.stage_time_started = Instant::now();
+				self.runtime.score = None;
+				self.runtime.confidence = None;
+				self.runtime.error = None;
+				self.runtime.message = Some(format!("{stage:?}"));
+			}
+			SdlcEvent::Activity {
+				stage,
+				attempt,
+				message,
+			} => {
+				self.runtime.stage = stage;
+				self.runtime.attempt = attempt.number;
+				self.runtime.message = Some(message);
+			}
+			SdlcEvent::PhaseChanged { stage, phase } => {
+				self.runtime.phase = match phase {
+					Phase::Executing => Phase::Executing,
+					Phase::Evaluating => Phase::Evaluating,
+					Phase::Completed => Phase::Completed,
+					// Add the remaining mappings for your actual
+					// Phase variants.
+					_ => self.runtime.phase,
+				};
+				self.runtime.message = Some(format!("{phase:?}"));
+			}
+			SdlcEvent::ExecutionComplete { stage } => {
+				self.runtime.stage = stage;
+				self.runtime.phase = Phase::Evaluating;
+				self.runtime.message = Some(String::from("Execution complete"));
+			}
+			SdlcEvent::EvaluationStarted { stage } => {
+				self.runtime.stage = stage;
+				self.runtime.phase = Phase::Evaluating;
+				self.runtime.message = Some(String::from("Evaluating"));
+			}
+			SdlcEvent::Evaluated {
+				stage,
+				score,
+				confidence,
+				passed,
+			} => {
+				self.runtime.stage = stage;
+				self.runtime.score = Some(score);
+				self.runtime.confidence = Some(confidence);
+				self.runtime.message = Some(format!(
+					"Evaluation: {:.2} (confidence {:.2})",
+					score, confidence
+				));
+				if !passed {
+					self.runtime.phase = Phase::Failed;
+				}
+			}
+			SdlcEvent::StageTransitioned { from: _, to } => {
+				self.runtime.stage = to;
+				self.runtime.stage_time_started = Instant::now();
+				self.runtime.score = None;
+				self.runtime.confidence = None;
+				self.runtime.message = Some(format!("Starting {to:?}"));
+			}
+			SdlcEvent::Completed => {
+				self.runtime.phase = Phase::Completed;
+				self.runtime.message = Some(String::from("SDLC complete"));
+			}
+			SdlcEvent::Failed { stage, error } => {
+				if let Some(stage) = stage {
+					self.runtime.stage = stage;
+				}
+
+				self.runtime.phase = Phase::Failed;
+				self.runtime.message = Some(error.clone());
+				self.runtime.error = Some(error);
+			}
+
+			event => {
+				self.runtime.events.push(event);
+			}
+		}
+	}
+	pub fn handle_input_key(
+		&mut self,
+		key: crossterm::event::KeyEvent,
+		input_tx: &UnboundedSender<SdlcInput>,
+	) -> anyhow::Result<()> {
+		use crossterm::event::KeyCode;
+		match key.code {
+			KeyCode::Char(c) => {
+				self.input.push(c);
+			}
+
+			KeyCode::Backspace => {
+				self.input.pop();
+			}
+			KeyCode::Enter => {
+				let input = std::mem::take(&mut self.input);
+				input_tx.send(SdlcInput::Human(input))?;
+				self.input_active = false;
+			}
+
+			KeyCode::Esc => {
+				self.input_active = false;
+				self.input.clear();
+			}
+
+			_ => {}
+		}
+		Ok(())
+	}
+	pub fn begin_input(&mut self) {
+		self.input_active = true;
+		self.input.clear();
+	}
+	pub fn end_input(&mut self) {
+		self.input_active = false;
+		self.input.clear();
+	}
+	pub fn is_input_active(&self) -> bool {
+		self.input_active
+	}
+	pub fn new(runtime: &PipelineRuntime<sdlc::Context>) -> Self {
+		Self {
+			input_active: false,
+			input: String::new(),
+			paused: false,
+			show_logs: false,
+			events: vec![],
+			runtime: runtime.view(),
+		}
+	}
+	pub fn render(frame: &mut Frame<'_>, view: &AiView) {
+		let area = frame.area();
+		frame.render_widget(Clear, area);
+		let chunks = RatatuiLayout::default()
+			.direction(Direction::Vertical)
+			.constraints([
+				Constraint::Length(2),
+				Constraint::Length(3),
+				Constraint::Min(8),
+				Constraint::Length(3),
+			])
+			.split(area);
+		stepper(frame, view, chunks[1]);
+		let body = body(chunks[2]);
+		left_stage_panel(frame, view, body[0]);
+		right_activity_panel(frame, view, body[2]);
+		footer(frame, view, chunks[3]);
+	}
+	pub fn toggle_pause(&mut self) {
+		self.paused = !self.paused;
+	}
+	pub fn toggle_logs(&mut self) {
+		self.show_logs = !self.show_logs;
+	}
 }
 
 impl StatusBar {
@@ -697,10 +860,6 @@ impl StatusBar {
 	}
 }
 
-pub struct TerminalUi {
-	status: StatusBar,
-}
-
 impl TerminalUi {
 	pub fn new() -> Self {
 		Self {
@@ -717,22 +876,11 @@ impl TerminalUi {
 		Ok(())
 	}
 }
-// let ui = TerminalUi::new();
-//
-// ui.println(">>> starting runtime")?;
-//
-// if resume_from_build {
-//     ui.println(">>> resuming from Build")?;
-//
-//     runtime
-//         .resume_from(Stage::Build, &mut input_rx)
-//         .await
-//         .context("runtime.resume_from(Build)")?;
-// } else {
-//     runtime
-//         .run(&mut input_rx)
-//         .await
-//         .context("runtime.run")?;
-// }
-//
-// ui.println(">>> runtime finished")?;
+
+pub struct StatusBar {
+	running: bool,
+}
+
+pub struct TerminalUi {
+	status: StatusBar,
+}

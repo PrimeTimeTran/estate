@@ -43,173 +43,7 @@ impl crate::traits::DateableSession for AiSession {
 		Some(self.time_updated)
 	}
 }
-impl AiView {
-	pub fn apply(&mut self, event: e::SdlcEvent) {
-		match event {
-			SdlcEvent::RunStarted => {
-				self.runtime.phase = Phase::Starting;
-				self.runtime.time_started = Instant::now();
-				self.runtime.stage_time_started = Instant::now();
-				self.runtime.message = Some(String::from("Run started"));
-			}
-			SdlcEvent::StageStarted { stage, attempt } => {
-				self.runtime.stage = stage;
-				self.runtime.attempt = attempt.number;
-				self.runtime.phase = Phase::Starting;
-				self.runtime.stage_time_started = Instant::now();
-				self.runtime.score = None;
-				self.runtime.confidence = None;
-				self.runtime.error = None;
-				self.runtime.message = Some(format!("{stage:?}"));
-			}
-			SdlcEvent::Activity {
-				stage,
-				attempt,
-				message,
-			} => {
-				self.runtime.stage = stage;
-				self.runtime.attempt = attempt.number;
-				self.runtime.message = Some(message);
-			}
-			SdlcEvent::PhaseChanged { stage, phase } => {
-				self.runtime.phase = match phase {
-					Phase::Executing => Phase::Executing,
-					Phase::Evaluating => Phase::Evaluating,
-					Phase::Completed => Phase::Completed,
-					// Add the remaining mappings for your actual
-					// Phase variants.
-					_ => self.runtime.phase,
-				};
-				self.runtime.message = Some(format!("{phase:?}"));
-			}
-			SdlcEvent::ExecutionComplete { stage } => {
-				self.runtime.stage = stage;
-				self.runtime.phase = Phase::Evaluating;
-				self.runtime.message = Some(String::from("Execution complete"));
-			}
-			SdlcEvent::EvaluationStarted { stage } => {
-				self.runtime.stage = stage;
-				self.runtime.phase = Phase::Evaluating;
-				self.runtime.message = Some(String::from("Evaluating"));
-			}
-			SdlcEvent::Evaluated {
-				stage,
-				score,
-				confidence,
-				passed,
-			} => {
-				self.runtime.stage = stage;
-				self.runtime.score = Some(score);
-				self.runtime.confidence = Some(confidence);
-				self.runtime.message = Some(format!(
-					"Evaluation: {:.2} (confidence {:.2})",
-					score, confidence
-				));
-				if !passed {
-					self.runtime.phase = Phase::Failed;
-				}
-			}
-			SdlcEvent::StageTransitioned { from: _, to } => {
-				self.runtime.stage = to;
-				self.runtime.stage_time_started = Instant::now();
-				self.runtime.score = None;
-				self.runtime.confidence = None;
-				self.runtime.message = Some(format!("Starting {to:?}"));
-			}
-			SdlcEvent::Completed => {
-				self.runtime.phase = Phase::Completed;
-				self.runtime.message = Some(String::from("SDLC complete"));
-			}
-			SdlcEvent::Failed { stage, error } => {
-				if let Some(stage) = stage {
-					self.runtime.stage = stage;
-				}
 
-				self.runtime.phase = Phase::Failed;
-				self.runtime.message = Some(error.clone());
-				self.runtime.error = Some(error);
-			}
-
-			event => {
-				self.runtime.events.push(event);
-			}
-		}
-	}
-	pub fn handle_input_key(
-		&mut self,
-		key: crossterm::event::KeyEvent,
-		input_tx: &UnboundedSender<SdlcInput>,
-	) -> anyhow::Result<()> {
-		use crossterm::event::KeyCode;
-		match key.code {
-			KeyCode::Char(c) => {
-				self.input.push(c);
-			}
-
-			KeyCode::Backspace => {
-				self.input.pop();
-			}
-			KeyCode::Enter => {
-				let input = std::mem::take(&mut self.input);
-				input_tx.send(SdlcInput::Human(input))?;
-				self.input_active = false;
-			}
-
-			KeyCode::Esc => {
-				self.input_active = false;
-				self.input.clear();
-			}
-
-			_ => {}
-		}
-		Ok(())
-	}
-	pub fn begin_input(&mut self) {
-		self.input_active = true;
-		self.input.clear();
-	}
-	pub fn end_input(&mut self) {
-		self.input_active = false;
-		self.input.clear();
-	}
-	pub fn is_input_active(&self) -> bool {
-		self.input_active
-	}
-	pub fn new(runtime: &PipelineRuntime<Context>) -> Self {
-		Self {
-			input_active: false,
-			input: String::new(),
-			paused: false,
-			show_logs: false,
-			events: vec![],
-			runtime: runtime.view(),
-		}
-	}
-	pub fn render(frame: &mut Frame<'_>, view: &AiView) {
-		let area = frame.area();
-		frame.render_widget(Clear, area);
-		let chunks = RatatuiLayout::default()
-			.direction(Direction::Vertical)
-			.constraints([
-				Constraint::Length(2),
-				Constraint::Length(3),
-				Constraint::Min(8),
-				Constraint::Length(3),
-			])
-			.split(area);
-		stepper(frame, view, chunks[1]);
-		let body = body(chunks[2]);
-		left_stage_panel(frame, view, body[0]);
-		right_activity_panel(frame, view, body[2]);
-		footer(frame, view, chunks[3]);
-	}
-	pub fn toggle_pause(&mut self) {
-		self.paused = !self.paused;
-	}
-	pub fn toggle_logs(&mut self) {
-		self.show_logs = !self.show_logs;
-	}
-}
 impl Attempt {
 	pub fn new() -> Self {
 		Self {
@@ -746,90 +580,6 @@ impl Evaluator {
 	}
 }
 
-#[async_trait]
-impl t::Generator for ApiGenerator {
-	async fn generate(&self, prompt: &str) -> Result<String> {
-		todo!("API generate")
-	}
-	async fn run_agent(&self, prompt: &str) -> Result<String> {
-		todo!("API generate")
-	}
-	async fn with_session(&mut self, session: &AiSession, prompt: String) -> Result<TaskResult> {
-		todo!("with_session")
-	}
-	fn clone_box(&self) -> Box<dyn Generator> {
-		Box::new(self.clone())
-	}
-}
-#[async_trait]
-impl t::Generator for LocalGenerator {
-	async fn generate(&self, prompt: &str) -> Result<String> {
-		let request = serde_json::json!({
-			"model": self.model,
-			"prompt": prompt,
-			"stream": false,
-			"options": {
-				"num_ctx": ctx_window_size(),
-			},
-		});
-		std::fs::write(
-			sdlc_log_file("ollama-request.json"),
-			serde_json::to_string_pretty(&request)?,
-		)?;
-		let response = reqwest::Client::new()
-			.post(AGENT_GEN_URL)
-			.json(&request)
-			.send()
-			.await?
-			.error_for_status()?;
-		let body = response.text().await?;
-		std::fs::write(sdlc_log_file("ollama-response.json"), &body)?;
-		let response: OllamaResponse =
-			serde_json::from_str(&body).context("invalid Ollama response")?;
-		let artifact = response.response.trim();
-		if artifact.is_empty() {
-			return Err(anyhow!(
-				"Ollama returned an empty artifact \
-				 (model={}, done_reason={:?})",
-				self.model,
-				response.done_reason,
-			));
-		}
-		Ok(artifact.to_string())
-	}
-	// cargo run --bin sanity-tests -- --native src/bin/sanity-tests/tools-intern
-	// cargo run --bin sanity-tests -- --native src/bin/sanity-tests/tools-host-env
-	async fn run_agent(&self, prompt: &str) -> Result<String> {
-		let task = AgentTask::new(prompt.to_string());
-		let result = self
-			.runtime
-			.run_agent(task)
-			// .run_agent_with_sdlc(task, Path::new("/Users/future/kb/project/crates/estate/log/"))
-			.await?;
-		Ok(
-			result
-				.chat
-				.or(result.summary)
-				.unwrap_or_else(|| "Agent completed".to_string()),
-		)
-	}
-	async fn with_session(&mut self, session: &AiSession, prompt: String) -> Result<TaskResult> {
-		let task = AgentTask::new(prompt.to_string());
-		let result = self.runtime.from_session(task, session).await?;
-		Ok(result)
-	}
-	fn clone_box(&self) -> Box<dyn Generator> {
-		Box::new(self.clone())
-	}
-}
-impl LocalGenerator {
-	pub fn new(runtime: AgentRuntime, model: impl Into<String>) -> Self {
-		Self {
-			runtime,
-			model: model.into(),
-		}
-	}
-}
 impl Metric {
 	fn threshold(name: impl Into<String>, score: f64, confidence: f64, bar: f64) -> Self {
 		Self {
@@ -871,6 +621,7 @@ impl Outcome {
 		}
 	}
 }
+
 impl Pipeline {
 	fn ensure_agent_completed(result: TaskResult, phase: &str) -> Result<TaskResult> {
 		if matches!(&result.status, crate::TaskStatus::Completed) {
@@ -1460,98 +1211,6 @@ impl<C: Ctx> PipelineRuntime<C> {
 		runner.run(input_rx).await.context("PipeRunner::run")
 	}
 }
-impl QACheck {
-	fn new(
-		stage: Stage,
-		time_started: DateTime<Utc>,
-		score: f64,
-		confidence: f64,
-		meets_bar: f64,
-		evaluations: Vec<Metric>,
-	) -> Self {
-		let time_completed = Utc::now();
-		let time_total = time_completed - time_started;
-		Self {
-			stage,
-			time_started,
-			time_completed,
-			time_total,
-			score,
-			confidence,
-			passed: meets_bar >= DEFAULT_NAUL_BAR && confidence >= DEFAULT_NAUL_BAR,
-			evaluations,
-		}
-	}
-	pub fn time_total_readable(&self) -> String {
-		duration_readable(self.time_total)
-	}
-	pub fn start_readable(&self) -> String {
-		time_readable(self.time_started)
-	}
-	pub fn end_readable(&self) -> String {
-		time_readable(self.time_completed)
-	}
-	pub fn with_evaluations(&self, checks: Vec<CheckResult>) -> Self {
-		let mut evaluation = self.clone();
-		for check in checks {
-			evaluation.passed &= check.passed;
-			evaluation.evaluations.push(Metric {
-				name: check.name,
-				passed: check.passed,
-				score: if check.passed { 1.0 } else { 0.0 },
-				confidence: 1.0,
-				explanation: check.output.unwrap_or_else(|| {
-					if check.passed {
-						"Verification command passed.".into()
-					} else {
-						"Verification command failed.".into()
-					}
-				}),
-			});
-		}
-		evaluation
-	}
-}
-
-#[cfg(test)]
-mod qa_check_tests {
-	use super::*;
-
-	#[test]
-	fn failed_deterministic_check_fails_semantic_qa() {
-		let now = Utc::now();
-		let semantic = QACheck {
-			confidence: 1.0,
-			passed: true,
-			score: 1.0,
-			stage: Stage::QA,
-			time_completed: now,
-			time_started: now,
-			time_total: chrono::Duration::zero(),
-			evaluations: Vec::new(),
-		};
-		let combined = semantic.with_evaluations(vec![CheckResult {
-			name: "node --test tests/hello-world.test.js".into(),
-			passed: false,
-			output: Some("1 test failed".into()),
-		}]);
-
-		assert!(!combined.passed);
-		assert_eq!(combined.evaluations.len(), 1);
-		assert!(!combined.evaluations[0].passed);
-		assert_eq!(combined.evaluations[0].explanation, "1 test failed");
-	}
-}
-
-impl SdlcInput {
-	pub fn text(&self) -> Option<&str> {
-		match self {
-			Self::Human(value) | Self::ProvideContext(value) => Some(value),
-			Self::Abort | Self::Retry | Self::Reviewed | Self::Revision { .. } => None,
-		}
-	}
-}
-
 #[async_trait::async_trait]
 impl sdlc_trait::Runner for PipeRunner<'_> {
 	type Context = UnboundedReceiver<SdlcInput>;
@@ -2856,6 +2515,7 @@ impl PipeRunner<'_> {
 		})
 	}
 	async fn run_qa_checks(&mut self, stage: Stage) -> Result<Verification> {
+	  tracing::info!("run_qa_checks");
 		let checks = self.pipeline.run_checks(stage).await?;
 		let evaluations = self.pipeline.evaluate_checks(&checks);
 		let passed = self.pipeline.is_passing(&checks, &evaluations);
@@ -2905,6 +2565,68 @@ impl PipeRunner<'_> {
 		Pipeline::write(output_path, content).context("writing generated SDLC artifact")?;
 
 		Ok(())
+	}
+}
+
+impl QACheck {
+	fn new(
+		stage: Stage,
+		time_started: DateTime<Utc>,
+		score: f64,
+		confidence: f64,
+		meets_bar: f64,
+		evaluations: Vec<Metric>,
+	) -> Self {
+		let time_completed = Utc::now();
+		let time_total = time_completed - time_started;
+		Self {
+			stage,
+			time_started,
+			time_completed,
+			time_total,
+			score,
+			confidence,
+			passed: meets_bar >= DEFAULT_NAUL_BAR && confidence >= DEFAULT_NAUL_BAR,
+			evaluations,
+		}
+	}
+	pub fn time_total_readable(&self) -> String {
+		duration_readable(self.time_total)
+	}
+	pub fn start_readable(&self) -> String {
+		time_readable(self.time_started)
+	}
+	pub fn end_readable(&self) -> String {
+		time_readable(self.time_completed)
+	}
+	pub fn with_evaluations(&self, checks: Vec<CheckResult>) -> Self {
+		let mut evaluation = self.clone();
+		for check in checks {
+			evaluation.passed &= check.passed;
+			evaluation.evaluations.push(Metric {
+				name: check.name,
+				passed: check.passed,
+				score: if check.passed { 1.0 } else { 0.0 },
+				confidence: 1.0,
+				explanation: check.output.unwrap_or_else(|| {
+					if check.passed {
+						"Verification command passed.".into()
+					} else {
+						"Verification command failed.".into()
+					}
+				}),
+			});
+		}
+		evaluation
+	}
+}
+
+impl SdlcInput {
+	pub fn text(&self) -> Option<&str> {
+		match self {
+			Self::Human(value) | Self::ProvideContext(value) => Some(value),
+			Self::Abort | Self::Retry | Self::Reviewed | Self::Revision { .. } => None,
+		}
 	}
 }
 
@@ -3044,6 +2766,15 @@ impl WSSnapshot {
 	}
 }
 
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct BuildPhaseEvent {
+	pub phase: String,
+	pub status: String, // "started", "completed", "failed"
+	pub elapsed_ms: Option<u128>,
+	pub error: Option<String>,
+}
+
+
 fn fnnn() {
 	let anti_stuck_rules = vec![
 		"Always make forward progress. If the current approach is blocked, change approach.",
@@ -3102,58 +2833,32 @@ fn hithere() {
 	];
 }
 
-impl Context {
-	fn new(state: NativeState, api: ApiService) -> Self {
-		Self { state, api }
-	}
-}
-impl Ctx for Context {
-	fn api(&self) -> &Self::Api {
-		&self.api
-	}
-	fn api_mut(&mut self) -> &mut Self::Api {
-		&mut self.api
-	}
-	fn initial_state() -> Self::AppState {
-		structs::S {
-			context: PhantomData,
-			state: PhantomData,
-			view: ViewType::MarkdownScreen,
-		}
-	}
-	type Api = ApiService;
-	type AppState = structs::S<Context>;
-	type EventReceiver = BroadcastReceiver<crate::e::Event>;
-	type EventSender = BroadcastSender<crate::e::Event>;
-	type GuiState = NativeGuiState;
-}
+#[cfg(test)]
+mod qa_check_tests {
+	use super::*;
 
-impl Default for Context {
-	fn default() -> Self {
-		Self::new(NativeState::default(), ApiService::default())
+	#[test]
+	fn failed_deterministic_check_fails_semantic_qa() {
+		let now = Utc::now();
+		let semantic = QACheck {
+			confidence: 1.0,
+			passed: true,
+			score: 1.0,
+			stage: Stage::QA,
+			time_completed: now,
+			time_started: now,
+			time_total: chrono::Duration::zero(),
+			evaluations: Vec::new(),
+		};
+		let combined = semantic.with_evaluations(vec![CheckResult {
+			name: "node --test tests/hello-world.test.js".into(),
+			passed: false,
+			output: Some("1 test failed".into()),
+		}]);
+
+		assert!(!combined.passed);
+		assert_eq!(combined.evaluations.len(), 1);
+		assert!(!combined.evaluations[0].passed);
+		assert_eq!(combined.evaluations[0].explanation, "1 test failed");
 	}
-}
-
-#[derive(Clone)]
-pub struct Context {
-	pub state: NativeState,
-	pub api: ApiService,
-}
-
-//
-// impl CtxSdlc {
-//   pub fn new() -> Self {
-//     Self {
-//       state: NativeState::default(),
-//       api: ApiService::new(client)
-//     }
-//   }
-// }
-
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct BuildPhaseEvent {
-	pub phase: String,
-	pub status: String, // "started", "completed", "failed"
-	pub elapsed_ms: Option<u128>,
-	pub error: Option<String>,
 }

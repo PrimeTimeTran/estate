@@ -205,7 +205,6 @@ impl Agent {
 		message: String,
 	) -> Result<Option<TaskResult>> {
 		let workspace_final = WSSnapshot::capture(&self.workspace.cwd)?;
-
 		let final_changed_paths = reconcile_agent_artifacts(&mut run.ctx, baseline, &workspace_final)?;
 
 		let expected_outputs = run
@@ -412,7 +411,6 @@ impl Agent {
 		println!("COMMAND: {command}");
 
 		let workspace_before = WSSnapshot::capture(&self.workspace.cwd)?;
-
 		let mut shell_command = ShellCommand::shell(command.clone());
 		shell_command.cwd = Some(self.workspace.cwd.clone());
 
@@ -420,7 +418,6 @@ impl Agent {
 			Ok(result) => result,
 			Err(error) => {
 				let workspace_after = WSSnapshot::capture(&self.workspace.cwd)?;
-
 				let changed_paths =
 					reconcile_agent_artifacts(&mut run.ctx, &workspace_before, &workspace_after)?;
 
@@ -473,7 +470,6 @@ impl Agent {
 		);
 
 		let workspace_after = WSSnapshot::capture(&self.workspace.cwd)?;
-
 		let changed_paths =
 			reconcile_agent_artifacts(&mut run.ctx, &workspace_before, &workspace_after)?;
 
@@ -558,7 +554,6 @@ impl Agent {
 			Ok(result) => result,
 			Err(error) => {
 				let workspace_after = WSSnapshot::capture(&self.workspace.cwd)?;
-
 				let changed_paths =
 					reconcile_agent_artifacts(&mut run.ctx, &workspace_before, &workspace_after)?;
 
@@ -612,7 +607,6 @@ impl Agent {
 		);
 
 		let workspace_after = WSSnapshot::capture(&self.workspace.cwd)?;
-
 		let changed_paths =
 			reconcile_agent_artifacts(&mut run.ctx, &workspace_before, &workspace_after)?;
 
