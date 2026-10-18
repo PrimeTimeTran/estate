@@ -159,14 +159,10 @@ impl AgentRuntime {
 			Do not implement changes or execute commands.\n\
 			Do not return Markdown fences or commentary."
 		);
-
 		let response = self.generate_text(prompt).await?;
-
 		let manifest: BuildManifest = serde_json::from_str(response.trim())
 			.context("parsing Plan-derived response as BuildManifest")?;
-
 		Self::validate_build_manifest(&manifest, &self.workspace.cwd)?;
-
 		Ok(manifest)
 	}
 

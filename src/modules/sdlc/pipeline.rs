@@ -1309,15 +1309,31 @@ impl<'a, C: Ctx> _Runner<'a, C> {
 		plan: &str,
 	) -> Result<String> {
 		log::event(E::BuildAssess);
+
 		let orient_task = AgentTask::new(format!(
 			"{PROMPT_BUILD_ORIENT}\n\n\
-		 # Supplied SDLC Artifacts\n\n\
-		 The following sections contain the artifact contents already loaded \
-		 by the orchestrator. Analyze these contents directly; do not reread \
-		 the corresponding files from disk.\n\n\
-		 ## Intent (intent.md)\n\n{intent}\n\n\
-		 ## Specification (spec.md)\n\n{spec}\n\n\
-		 ## Plan (plan.md)\n\n{plan}"
+		# Supplied SDLC Artifacts\n\n\
+		The following sections contain artifact contents already loaded \
+		by the orchestrator. Analyze these contents directly; do not reread \
+		the corresponding files from disk.\n\n\
+		## Plan (plan.md)\n\n{plan}\n\n\
+		# Required Path Preservation\n\n\
+		The user's explicit requirements in the supplied artifacts are \
+		authoritative for filenames, paths, and file extensions.\n\n\
+		- Preserve every explicitly required implementation filename \
+		and path exactly as specified.\n\
+		- Never replace an explicitly named entrypoint with a conventional \
+		name such as index.js or main.js.\n\
+		- Never change an explicitly required file extension.\n\
+		- Distinguish files that must be created or modified during \
+		implementation from files generated only when the program runs.\n\
+		- Include required test files when the plan calls for them, and \
+		ensure tests target the exact required entrypoint.\n\
+		- Do not invent additional implementation files when the required \
+		files can satisfy the plan.\n\
+		- Before returning the manifest, cross-check every path against \
+		the user's requirements and the supplied artifacts.\n\n\
+		Return only the manifest JSON required by the assessor instructions."
 		));
 
 		let phase_started = std::time::Instant::now();
